@@ -8,8 +8,12 @@ export type DataFormat = "currency" | "datetime" | "date" | "number" | "text" | 
  */
 export interface LayoutDefinition {
   type: "grid";
-  columns: number; // Geralmente 12
-  gap?: number;    // Espaçamento em pixels (ex: 16)
+  /** Número de colunas da grade (geralmente 12). */
+  columns: number;
+  /** Espaçamento entre células em pixels (ex: 16 → gap-4). */
+  gap?: number;
+  /** Altura mínima de cada linha em pixels (default: 140). */
+  rowHeight?: number;
 }
 
 /**
@@ -82,24 +86,34 @@ export interface ChartProps {
 }
 
 /**
+ * Props de layout de um componente na grade SDUI.
+ */
+interface LayoutProps {
+  /** Número de colunas que o componente ocupa (1-12). Mobile: sempre col-span-12. */
+  colSpan?: number;
+  /** Número de linhas que o componente ocupa (1-12). Mobile: sempre row-span-1. */
+  rowSpan?: number;
+}
+
+/**
  * Componentes visuais do layout SDUI suportados na árvore declarativa.
  */
 export type UIComponentDef<TRow = Record<string, unknown>> =
   | {
       id: string;
       component: "stat_card";
-      layoutProps?: { colSpan?: number; rowSpan?: number };
+      layoutProps?: LayoutProps;
       props: StatCardProps<TRow>;
     }
   | {
       id: string;
       component: "data_table";
-      layoutProps?: { colSpan?: number; rowSpan?: number };
+      layoutProps?: LayoutProps;
       props: DataTableProps<TRow>;
     }
   | {
       id: string;
       component: "bar_chart" | "line_chart" | "pie_chart";
-      layoutProps?: { colSpan?: number; rowSpan?: number };
+      layoutProps?: LayoutProps;
       props: ChartProps;
     };
