@@ -280,7 +280,7 @@ export const AppLayout: React.FC = () => {
       </Sidebar>
 
       <SidebarInset>
-        <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 md:px-6 transition-[width,height] ease-linear">
+        <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center border-b border-border/50 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 px-3 md:px-6 transition-[width,height] ease-linear">
           <div className="flex items-center gap-2 min-w-0 shrink-0">
             <SidebarTrigger className="-ml-1 size-8 shrink-0" />
             <Separator orientation="vertical" className="h-4 hidden sm:block my-auto" />
