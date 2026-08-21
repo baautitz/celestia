@@ -183,9 +183,12 @@ export const RecipeDashboardPage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-72" />
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-8 shrink-0" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-96" />
+          </div>
         </div>
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-12 md:col-span-6">
@@ -223,23 +226,24 @@ export const RecipeDashboardPage: React.FC = () => {
 
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           size="icon"
           onClick={fetchData}
           title="Atualizar dados"
+          className="size-8"
         >
           <RefreshCw className="size-4" />
         </Button>
 
         {hasPermission("system:workspaces:create") && (
-          <Button type="button" onClick={handleOpenInit}>
+          <Button type="button" size="default" onClick={handleOpenInit}>
             <Play className="size-4 mr-2" />
             Inicializar Área de Trabalho
           </Button>
         )}
 
         {hasPermission("system:roles:update") && (
-          <Button type="button" variant="outline" onClick={() => setPermSheetOpen(true)}>
+          <Button type="button" variant="outline" size="default" onClick={() => setPermSheetOpen(true)}>
             <Shield className="size-4 mr-2" />
             Permissões
           </Button>
@@ -247,23 +251,24 @@ export const RecipeDashboardPage: React.FC = () => {
       </HeaderActions>
 
       {/* Título da Página */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => navigate("/workspaces")}
           title="Voltar para a lista"
+          className="mt-1 shrink-0"
         >
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="size-5" />
         </Button>
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight">{schema.name}</h1>
-            <Badge variant="outline" className="font-mono text-xs">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight">{schema.name}</h1>
+            <Badge variant="secondary" className="font-mono text-xs px-2 py-0.5">
               {recipeId}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{schema.description}</p>
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{schema.description}</p>
         </div>
       </div>
 
