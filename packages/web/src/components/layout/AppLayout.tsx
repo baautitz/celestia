@@ -267,20 +267,20 @@ export const AppLayout: React.FC = () => {
       </Sidebar>
 
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border px-6 transition-[width,height] ease-linear">
-          <div className="flex items-center gap-2">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
+        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6 transition-[width,height] ease-linear">
+          <div className="flex items-center gap-2.5">
+            <SidebarTrigger className="-ml-1 size-8" />
+            <Separator orientation="vertical" className="h-4" />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink onClick={() => navigate("/workspaces")} className="cursor-pointer">
+                  <BreadcrumbLink onClick={() => navigate("/workspaces")} className="cursor-pointer text-sm">
                     Início
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>{getPageTitle()}</BreadcrumbPage>
+                  <BreadcrumbPage className="text-sm font-medium">{getPageTitle()}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -289,7 +289,7 @@ export const AppLayout: React.FC = () => {
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
 
-        <main className="flex flex-1 flex-col gap-6 p-6">
+        <main className="flex flex-1 flex-col gap-4 md:gap-6 p-4 md:p-6">
           <Outlet />
         </main>
       </SidebarInset>
