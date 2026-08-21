@@ -267,11 +267,11 @@ export const AppLayout: React.FC = () => {
       </Sidebar>
 
       <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6 transition-[width,height] ease-linear">
-          <div className="flex items-center gap-2.5">
-            <SidebarTrigger className="-ml-1 size-8" />
-            <Separator orientation="vertical" className="h-4" />
-            <Breadcrumb>
+        <header className="flex h-14 shrink-0 items-center border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 md:px-6 transition-[width,height] ease-linear">
+          <div className="flex items-center gap-2 min-w-0 shrink-0">
+            <SidebarTrigger className="-ml-1 size-8 shrink-0" />
+            <Separator orientation="vertical" className="h-4 hidden sm:block" />
+            <Breadcrumb className="min-w-0">
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <BreadcrumbLink onClick={() => navigate("/workspaces")} className="cursor-pointer text-sm">
@@ -280,13 +280,17 @@ export const AppLayout: React.FC = () => {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="text-sm font-medium">{getPageTitle()}</BreadcrumbPage>
+                  <BreadcrumbPage className="text-sm font-medium truncate">{getPageTitle()}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
 
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+          {actions && (
+            <div className="flex items-center gap-1.5 md:gap-2 ml-2 shrink-0 overflow-x-auto">
+              {actions}
+            </div>
+          )}
         </header>
 
         <main className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
