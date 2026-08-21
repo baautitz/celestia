@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { FormFieldDef, OpenDialogOptions, ShowTableOptions } from "@platform/shared";
 import {
   Dialog,
@@ -102,11 +102,11 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
     resolve: null,
   });
 
-  const triggerRefresh = () => {
+  const triggerRefresh = useCallback(() => {
     setRefreshSignal((prev) => prev + 1);
-  };
+  }, []);
 
-  const openDialog = (options: OpenDialogOptions): Promise<Record<string, unknown> | null> => {
+  const openDialog = useCallback((options: OpenDialogOptions): Promise<Record<string, unknown> | null> => {
     return new Promise((resolve) => {
       const initialValues: Record<string, unknown> = {};
       options.fields.forEach((field) => {
@@ -120,15 +120,17 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
         resolve,
       });
     });
-  };
+  }, []);
 
-  const handleDialogSubmit = (e: React.FormEvent) => {
+  const handleDialogSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (dialogState.resolve) {
-      dialogState.resolve(dialogState.values);
-    }
-    setDialogState({ isOpen: false, options: null, values: {}, resolve: null });
-  };
+    setDialogState((prev) => {
+      if (prev.resolve) {
+        prev.resolve(prev.values);
+      }
+      return { isOpen: false, options: null, values: {}, resolve: null };
+    });
+  }, []);
 
   const handleDialogCancel = () => {
     if (dialogState.resolve) {
@@ -137,7 +139,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setDialogState({ isOpen: false, options: null, values: {}, resolve: null });
   };
 
-  const showTableModal = (
+  const showTableModal = useCallback((
     options: ShowTableOptions,
     data: Record<string, unknown>[],
     onAction?: (actionId: string, row: Record<string, unknown>) => Promise<void>
@@ -151,21 +153,21 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
         resolve,
       });
     });
-  };
+  }, []);
 
-  const handleTableClose = () => {
+  const handleTableClose = useCallback(() => {
     if (tableState.resolve) {
       tableState.resolve();
     }
     setTableState({ isOpen: false, options: null, data: [], resolve: null });
-  };
+  }, []);
 
-  const updateTableData = (data: Record<string, unknown>[]) => {
+  const updateTableData = useCallback((data: Record<string, unknown>[]) => {
     setTableState((prev) => ({
       ...prev,
       data,
     }));
-  };
+  }, []);
 
   const handleRowAction = async (actionId: string, row: Record<string, unknown>) => {
     if (tableState.onAction) {
@@ -173,7 +175,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const confirm = (options: ConfirmOptions): Promise<boolean> => {
+  const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
       setConfirmState({
         isOpen: true,
@@ -181,7 +183,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
         resolve,
       });
     });
-  };
+  }, []);
 
   const handleConfirmResult = (result: boolean) => {
     if (confirmState.resolve) {
@@ -320,17 +322,17 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return String(val);
   };
 
+  const contextValue = useMemo(() => ({
+    openDialog,
+    showTableModal,
+    updateTableData,
+    confirm,
+    triggerRefresh,
+    refreshSignal,
+  }), [openDialog, showTableModal, confirm, triggerRefresh, refreshSignal]);
+
   return (
-    <ImperativeUIContext.Provider
-      value={{
-        openDialog,
-        showTableModal,
-        updateTableData,
-        confirm,
-        triggerRefresh,
-        refreshSignal,
-      }}
-    >
+    <ImperativeUIContext.Provider value={contextValue}>
       {children}
 
       {/* Modal Dinâmico de Diálogo (ui.dialog.open) */}
