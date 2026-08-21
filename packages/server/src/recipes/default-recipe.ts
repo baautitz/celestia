@@ -281,19 +281,19 @@ export const defaultFechamentoRecipe = defineRecipe<FechamentoVendedorRow>({
       {
         id: "grafico_ranking_vendas",
         component: "bar_chart",
-        layoutProps: { colSpan: 6 },
+        layoutProps: { colSpan: 6, rowSpan: 2 },
         props: {
           title: "Ranking de Vendas por Vendedor",
           source: "inovafarma",
           nameKey: "vendedor",
           valueKey: "venda_geral",
-          limit: 10,
+          limit: 5,
         },
       },
       {
         id: "grafico_pizza_vendas",
         component: "pie_chart",
-        layoutProps: { colSpan: 6 },
+        layoutProps: { colSpan: 6, rowSpan: 2 },
         props: {
           title: "Distribuição das Vendas na Equipe",
           source: "inovafarma",
