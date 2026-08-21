@@ -12,6 +12,11 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
@@ -276,16 +281,17 @@ export const IAMUsersPage: React.FC = () => {
           <CardTitle className="text-base font-semibold">
             Usuários Cadastrados ({filteredUsers.length})
           </CardTitle>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-            <Input
+          <InputGroup className="w-72">
+            <InputGroupInput
               type="search"
               placeholder="Buscar por nome, usuário ou e-mail..."
-              className="pl-8 w-72"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-          </div>
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+          </InputGroup>
         </CardHeader>
         <CardContent>
           {isMobile ? (
