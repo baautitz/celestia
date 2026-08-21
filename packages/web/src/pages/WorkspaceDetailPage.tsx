@@ -31,6 +31,7 @@ import { toast } from "@/components/ui/toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { HeaderActions } from "@/context/HeaderActionsContext";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import type { DateRange } from "react-day-picker";
 import {
   RefreshCw,
@@ -263,21 +264,6 @@ export const WorkspaceDetailPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Banner de Aviso quando Concluído */}
-      {isClosed && (
-        <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50/50 px-4 py-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-            <Lock className="size-4 text-emerald-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-emerald-800">Área de Trabalho Concluída</p>
-            <p className="text-xs text-emerald-600">
-              Esta sessão de apuração foi finalizada. Os dados estão preservados em modo leitura e bloqueados para novas ações operacionais.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Ações do Header Global */}
       <HeaderActions>
         <Button
@@ -290,6 +276,15 @@ export const WorkspaceDetailPage: React.FC = () => {
         >
           <RefreshCw className="size-4" />
         </Button>
+
+        {isClosed && (
+          <Tooltip>
+            <TooltipTrigger render={<span className="flex size-8 items-center justify-center rounded-md text-muted-foreground" />}>
+              <Lock className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent>Área de Trabalho Concluída — modo somente leitura</TooltipContent>
+          </Tooltip>
+        )}
 
         {!isClosed && hasPermission("system:workspaces:update") && (
           <Button
@@ -351,7 +346,7 @@ export const WorkspaceDetailPage: React.FC = () => {
               {startDate} — {endDate}
             </Badge>
             {isClosed ? (
-              <Badge variant="secondary" className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border-emerald-200 px-2 py-0.5">
+              <Badge variant="secondary" className="flex items-center gap-1 px-2 py-0.5">
                 <CheckCircle2 className="size-3" /> Concluído
               </Badge>
             ) : (
