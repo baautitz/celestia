@@ -180,6 +180,14 @@ When generating or modifying code in this repository, agents MUST adhere to thes
   - **Desktop**: Full `<Table>` with `<TableHeader>`, `<TableBody>`, `<TableCell>` and sorting/pagination controls.
   - **Mobile**: Grid of `<MobileCard>` elements with primary title, secondary subtitle, structured fields list, and action buttons.
 
+### 21. Granular One-Line Conventional Commits & Mandatory Approval
+- All commits in this repository MUST strictly follow the **One-Line Conventional Commits** format: `<type>(<scope>): <short description in english>` (e.g. `fix(web): filter showTable rowActions by user permissions`).
+- Granularity: Commits must be separated logically by responsibility/component.
+- **NEVER** execute commits unilaterally. The agent MUST ALWAYS:
+  1. Present the detailed commit plan (messages and corresponding files) to the user.
+  2. Request explicit user confirmation.
+  3. Execute `git commit` ONLY after user approval.
+
 ---
 
 ## 4. Code Generation Recipes & Templates

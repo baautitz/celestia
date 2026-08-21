@@ -27,3 +27,12 @@
 - **ALWAYS** check official documentation and primary sources before planning, diagnosing, or modifying code.
 - **PROHIBITION OF HACKS**: NEVER invent workarounds, guess APIs, use inline styles, or create custom hacks when canonical patterns exist in the official documentation.
 - Stop taking unilateral decisions: adhere strictly to the user's directions and confirm each step.
+
+---
+
+## 4. Granular One-Line Conventional Commits & Mandatory Approval Plan
+- All git commits in this repository MUST strictly use the **One-Line Conventional Commits** format (`<type>(<scope>): <short description in english>`).
+- Commits must be granular, logical, and separated by concern.
+- **MANDATORY COMMIT PLANNING**:
+  - The agent must **NEVER** run `git commit` without presenting the planned list of commits first.
+  - The agent MUST ALWAYS display the commit messages and files to be committed, ask for user approval, and proceed ONLY upon explicit confirmation.
