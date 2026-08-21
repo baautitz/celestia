@@ -2,6 +2,7 @@ import React from "react";
 import type { DashboardSchemaResponse, UIComponentDef, ActionDef } from "@platform/shared";
 import { SDUICard } from "./SDUICard";
 import { SDUITable } from "./SDUITable";
+import { SDUIChart } from "./SDUIChart";
 
 interface SDUIRendererProps {
   schema: DashboardSchemaResponse;
@@ -89,12 +90,30 @@ export const SDUIRenderer: React.FC<SDUIRendererProps> = ({
           />
         );
 
-      default:
+      case "bar_chart":
+      case "line_chart":
+      case "pie_chart":
         return (
-          <div key={comp.id} className="p-4 border border-dashed border-border text-xs text-muted-foreground">
-            Componente não suportado: {comp.component}
+          <SDUIChart
+            key={comp.id}
+            id={comp.id}
+            component={comp.component}
+            props={comp.props}
+            workspaceId={workspaceId}
+            recipeId={schema.id}
+            startDate={startDate}
+            endDate={endDate}
+          />
+        );
+
+      default: {
+        const unknown = comp as unknown as { id: string; component: string };
+        return (
+          <div key={unknown.id} className="p-4 border border-dashed border-border text-xs text-muted-foreground">
+            Componente não suportado: {unknown.component}
           </div>
         );
+      }
     }
   };
 
