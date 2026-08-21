@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import { MobileCard } from "@/components/ui/mobile-card";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Select,
   SelectContent,
@@ -47,7 +49,7 @@ import {
   Edit2,
   Power,
   CheckCircle2,
-  XCircle,
+  Clock,
   Database,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
@@ -80,6 +82,7 @@ export const IAMUsersPage: React.FC = () => {
   // Form State Reset Senha
   const [newPassword, setNewPassword] = useState("");
   const [resetting, setResetting] = useState(false);
+  const isMobile = useIsMobile();
 
   const fetchData = async () => {
     try {
@@ -285,58 +288,50 @@ export const IAMUsersPage: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40">
-                <TableHead>Nome Completo</TableHead>
-                <TableHead>Usuário</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Perfil</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right w-20">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          {isMobile ? (
+            <div className="flex flex-col gap-3">
               {loading ? (
                 Array.from({ length: 4 }).map((_, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-36" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                  </TableRow>
+                  <MobileCard
+                    key={idx}
+                    primary=""
+                    secondary=""
+                    fields={[
+                      { label: "E-mail", value: <Skeleton className="h-4 w-32" /> },
+                      { label: "Perfil", value: <Skeleton className="h-5 w-24" /> },
+                      { label: "Status", value: <Skeleton className="h-5 w-16" /> },
+                    ]}
+                  />
                 ))
               ) : filteredUsers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                    Nenhum usuário encontrado.
-                  </TableCell>
-                </TableRow>
+                <p className="text-center py-8 text-muted-foreground text-sm">
+                  Nenhum usuário encontrado.
+                </p>
               ) : (
                 filteredUsers.map((u) => (
-                  <TableRow key={u.id} className="hover:bg-muted/30">
-                    <TableCell className="font-medium">{u.fullname}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{u.username}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{u.email || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{getRoleName(u.roleId)}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {u.status === "active" ? (
-                        <Badge variant="outline" className="text-emerald-600 border-emerald-300 flex items-center gap-1 w-fit">
-                          <CheckCircle2 className="size-3" />
-                          Ativo
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground flex items-center gap-1 w-fit">
-                          <XCircle className="size-3" />
-                          Inativo
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
+                  <MobileCard
+                    key={u.id}
+                    primary={u.fullname}
+                    secondary={u.username}
+                    fields={[
+                      { label: "E-mail", value: u.email || "-" },
+                      { label: "Perfil", value: <Badge variant="secondary">{getRoleName(u.roleId)}</Badge> },
+                      {
+                        label: "Status",
+                        value: u.status === "active" ? (
+                          <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                            <CheckCircle2 className="size-3 text-emerald-500" />
+                            Ativo
+                          </Badge>
+                        ) : (
+                          <Badge variant="default" className="flex items-center gap-1 w-fit">
+                            <Clock className="size-3" />
+                            Inativo
+                          </Badge>
+                        ),
+                      },
+                    ]}
+                    actions={
                       <DropdownMenu>
                         <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
                           <MoreHorizontal className="size-4" />
@@ -374,12 +369,108 @@ export const IAMUsersPage: React.FC = () => {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                    }
+                  />
                 ))
               )}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead>Nome Completo</TableHead>
+                  <TableHead>Usuário</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Perfil</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right w-20">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                      Nenhum usuário encontrado.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredUsers.map((u) => (
+                    <TableRow key={u.id} className="hover:bg-muted/30">
+                      <TableCell className="font-medium">{u.fullname}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{u.username}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{u.email || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{getRoleName(u.roleId)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {u.status === "active" ? (
+                          <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                            <CheckCircle2 className="size-3 text-emerald-500" />
+                            Ativo
+                          </Badge>
+                        ) : (
+                          <Badge variant="default" className="flex items-center gap-1 w-fit">
+                            <Clock className="size-3" />
+                            Inativo
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
+                            <MoreHorizontal className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {hasPermission("system:users:update") && (
+                              <DropdownMenuItem onClick={() => openEditModal(u)} className="cursor-pointer">
+                                <Edit2 className="size-4 mr-2" />
+                                Editar Usuário
+                              </DropdownMenuItem>
+                            )}
+                            {hasPermission("system:users:reset_password") && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedUser(u);
+                                  setIsResetOpen(true);
+                                }}
+                                className="cursor-pointer"
+                              >
+                                <KeyRound className="size-4 mr-2" />
+                                Redefinir Senha
+                              </DropdownMenuItem>
+                            )}
+                            {hasPermission("system:users:update") && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleToggleStatus(u)}
+                                  className={`cursor-pointer ${u.status === "active" ? "text-destructive" : "text-emerald-600"}`}
+                                >
+                                  <Power className="size-4 mr-2" />
+                                  {u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 

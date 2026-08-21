@@ -24,8 +24,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { MobileCard } from "@/components/ui/mobile-card";
 import { api } from "@/lib/api-client";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 import {
@@ -69,6 +71,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState<number>(1);
   const pageSize = props.pagination?.pageSize || 10;
+  const isMobile = useIsMobile();
 
   const { openDialog, showTableModal, updateTableData, confirm, triggerRefresh, refreshSignal } = useImperativeUI();
 
@@ -278,122 +281,213 @@ export const SDUITable: React.FC<SDUITableProps> = ({
       </CardHeader>
 
       <CardContent>
-        <div className="overflow-x-auto border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40">
-                {props.columns.map((col) => (
-                  <TableHead
-                    key={col.key}
-                    className={col.sortable ? "cursor-pointer select-none" : ""}
-                    onClick={() => col.sortable && handleSort(col.key)}
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>{col.label}</span>
-                      {col.sortable && <ArrowUpDown className="size-3 text-muted-foreground" />}
-                    </div>
-                  </TableHead>
-                ))}
-                {hasAuthorizedActions && (
-                  <TableHead className="text-right w-24">Ações</TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, idx) => (
-                  <TableRow key={idx}>
-                    {props.columns.map((c) => (
-                      <TableCell key={c.key}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                    {hasAuthorizedActions && (
-                      <TableCell>
-                        <Skeleton className="h-8 w-8 ml-auto" />
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))
-              ) : rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={props.columns.length + (hasAuthorizedActions ? 1 : 0)}
-                    className="text-center py-8 text-muted-foreground"
-                  >
-                    Nenhum registro encontrado para o período selecionado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row, rowIdx) => (
-                  <TableRow key={rowIdx} className="hover:bg-muted/30">
-                    {props.columns.map((col) => (
-                      <TableCell key={col.key} className="font-mono text-xs">
-                        {formatCellValue(col, row)}
-                      </TableCell>
-                    ))}
+        {isMobile ? (
+          <div className="flex flex-col gap-3">
+            {loading ? (
+              Array.from({ length: 3 }).map((_, idx) => (
+                <MobileCard
+                  key={idx}
+                  primary=""
+                  secondary=""
+                  fields={props.columns.map((c) => ({
+                    label: c.label,
+                    value: <Skeleton className="h-4 w-20" />,
+                  }))}
+                />
+              ))
+            ) : rows.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">
+                Nenhum registro encontrado para o período selecionado.
+              </p>
+            ) : (
+              rows.map((row, rowIdx) => (
+                <MobileCard
+                  key={rowIdx}
+                  primary={formatCellValue(props.columns[0], row)}
+                  secondary={props.columns.length > 1 ? String(row[props.columns[1].key] ?? "") : undefined}
+                  fields={props.columns.slice(2).map((col) => ({
+                    label: col.label,
+                    value: formatCellValue(col, row),
+                  }))}
+                  actions={
+                    hasAuthorizedActions ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenuContent align="end">
+                          {effectiveRowActions.map((actionId) => {
+                            const actionDef = availableActions[actionId];
+                            return (
+                              <DropdownMenuItem
+                                key={actionId}
+                                onClick={() => executeActionEffect(actionId, row)}
+                                className="cursor-pointer"
+                              >
+                                {getActionIcon(actionDef?.icon)}
+                                {actionDef?.label || actionId}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : undefined
+                  }
+                />
+              ))
+            )}
 
-                    {hasAuthorizedActions && (
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="size-4" />
-                              </Button>
-                            }
-                          />
-                          <DropdownMenuContent align="end">
-                            {effectiveRowActions.map((actionId) => {
-                                const actionDef = availableActions[actionId];
-                                return (
-                                  <DropdownMenuItem
-                                    key={actionId}
-                                    onClick={() => executeActionEffect(actionId, row)}
-                                    className="cursor-pointer"
-                                  >
-                                    {getActionIcon(actionDef?.icon)}
-                                    {actionDef?.label || actionId}
-                                  </DropdownMenuItem>
-                                );
-                              })}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* Rodapé de Paginação */}
-        <div className="flex items-center justify-between py-4 border-t border-border">
-          <span className="text-xs text-muted-foreground">
-            Página {page} de {totalPages}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="default"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="size-4 mr-1" />
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="default"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Próxima
-              <ChevronRight className="size-4 ml-1" />
-            </Button>
+            {/* Rodapé de Paginação Mobile */}
+            <div className="flex items-center justify-between pt-3 border-t border-border">
+              <span className="text-xs text-muted-foreground">
+                Página {page} de {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="default"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="size-4 mr-1" />
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="default"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Próxima
+                  <ChevronRight className="size-4 ml-1" />
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    {props.columns.map((col) => (
+                      <TableHead
+                        key={col.key}
+                        className={col.sortable ? "cursor-pointer select-none" : ""}
+                        onClick={() => col.sortable && handleSort(col.key)}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>{col.label}</span>
+                          {col.sortable && <ArrowUpDown className="size-3 text-muted-foreground" />}
+                        </div>
+                      </TableHead>
+                    ))}
+                    {hasAuthorizedActions && (
+                      <TableHead className="text-right w-24">Ações</TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, idx) => (
+                      <TableRow key={idx}>
+                        {props.columns.map((c) => (
+                          <TableCell key={c.key}>
+                            <Skeleton className="h-4 w-full" />
+                          </TableCell>
+                        ))}
+                        {hasAuthorizedActions && (
+                          <TableCell>
+                            <Skeleton className="h-8 w-8 ml-auto" />
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  ) : rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={props.columns.length + (hasAuthorizedActions ? 1 : 0)}
+                        className="text-center py-8 text-muted-foreground"
+                      >
+                        Nenhum registro encontrado para o período selecionado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rows.map((row, rowIdx) => (
+                      <TableRow key={rowIdx} className="hover:bg-muted/30">
+                        {props.columns.map((col) => (
+                          <TableCell key={col.key} className="font-mono text-xs">
+                            {formatCellValue(col, row)}
+                          </TableCell>
+                        ))}
+
+                        {hasAuthorizedActions && (
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                render={
+                                  <Button variant="ghost" size="icon">
+                                    <MoreHorizontal className="size-4" />
+                                  </Button>
+                                }
+                              />
+                              <DropdownMenuContent align="end">
+                                {effectiveRowActions.map((actionId) => {
+                                    const actionDef = availableActions[actionId];
+                                    return (
+                                      <DropdownMenuItem
+                                        key={actionId}
+                                        onClick={() => executeActionEffect(actionId, row)}
+                                        className="cursor-pointer"
+                                      >
+                                        {getActionIcon(actionDef?.icon)}
+                                        {actionDef?.label || actionId}
+                                      </DropdownMenuItem>
+                                    );
+                                  })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Rodapé de Paginação */}
+            <div className="flex items-center justify-between py-4 border-t border-border">
+              <span className="text-xs text-muted-foreground">
+                Página {page} de {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="default"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="size-4 mr-1" />
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="default"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Próxima
+                  <ChevronRight className="size-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

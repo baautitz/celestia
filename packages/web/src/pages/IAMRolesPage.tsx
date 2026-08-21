@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import { MobileCard } from "@/components/ui/mobile-card";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sheet,
   SheetContent,
@@ -60,6 +62,7 @@ export const IAMRolesPage: React.FC = () => {
   const [roleDescription, setRoleDescription] = useState("");
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const isMobile = useIsMobile();
 
   const fetchData = async () => {
     try {
@@ -194,45 +197,42 @@ export const IAMRolesPage: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40">
-                <TableHead>Identificador (Slug)</TableHead>
-                <TableHead>Nome do Grupo</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Permissões Ativas</TableHead>
-                <TableHead className="text-right w-20">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          {isMobile ? (
+            <div className="flex flex-col gap-3">
               {loading ? (
                 Array.from({ length: 3 }).map((_, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-56" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                  </TableRow>
+                  <MobileCard
+                    key={idx}
+                    primary=""
+                    secondary=""
+                    fields={[
+                      { label: "Descrição", value: <Skeleton className="h-4 w-40" /> },
+                      { label: "Permissões", value: <Skeleton className="h-5 w-20" /> },
+                    ]}
+                  />
                 ))
               ) : roles.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                    Nenhum grupo de acesso cadastrado.
-                  </TableCell>
-                </TableRow>
+                <p className="text-center py-8 text-muted-foreground text-sm">
+                  Nenhum grupo de acesso cadastrado.
+                </p>
               ) : (
                 roles.map((r) => (
-                  <TableRow key={r.id} className="hover:bg-muted/30">
-                    <TableCell className="font-mono text-xs font-semibold">{r.id}</TableCell>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{r.description || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
+                  <MobileCard
+                    key={r.id}
+                    primary={r.name}
+                    secondary={r.id}
+                    fields={[
+                      { label: "Descrição", value: r.description || "-" },
+                      {
+                        label: "Permissões",
+                        value: (
+                          <Badge variant="secondary">
+                            {r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`}
+                          </Badge>
+                        ),
+                      },
+                    ]}
+                    actions={
                       <DropdownMenu>
                         <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
                           <MoreHorizontal className="size-4" />
@@ -246,12 +246,71 @@ export const IAMRolesPage: React.FC = () => {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                    }
+                  />
                 ))
               )}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead>Identificador (Slug)</TableHead>
+                  <TableHead>Nome do Grupo</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Permissões Ativas</TableHead>
+                  <TableHead className="text-right w-20">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-56" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : roles.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                      Nenhum grupo de acesso cadastrado.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  roles.map((r) => (
+                    <TableRow key={r.id} className="hover:bg-muted/30">
+                      <TableCell className="font-mono text-xs font-semibold">{r.id}</TableCell>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{r.description || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
+                            <MoreHorizontal className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {hasPermission("system:roles:update") && (
+                              <DropdownMenuItem onClick={() => openEditSheet(r)} className="cursor-pointer">
+                                <Edit2 className="size-4 mr-2" />
+                                Editar Grupo & Permissões
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -311,19 +370,19 @@ export const IAMRolesPage: React.FC = () => {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <Shield className="size-3.5 text-primary" />
-                    Módulos de Sistema (system:*)
+                    Módulos de Sistema
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-4">
+                <CardContent className="flex flex-col gap-3">
                   {catalog &&
                     Object.entries(catalog.system).map(([moduleName, perms]) => (
                       <div key={moduleName} className="flex flex-col gap-2">
-                        <div className="bg-muted/60 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-foreground">
+                        <div className="bg-muted/60 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground">
                           Módulo: {moduleName}
                         </div>
                         <div className="flex flex-col divide-y divide-border/40">
                           {perms.map((p: PermissionItem) => (
-                            <div key={p.key} className="flex items-center justify-between gap-4 py-2.5">
+                            <div key={p.key} className="flex items-center justify-between gap-4 py-2">
                               <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                                 <span className="font-mono text-xs font-medium text-foreground break-all">{p.key}</span>
                                 {p.description && (

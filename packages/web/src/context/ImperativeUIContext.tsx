@@ -31,6 +31,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
+import { MobileCard } from "@/components/ui/mobile-card";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Select,
   SelectContent,
@@ -63,6 +65,7 @@ const ImperativeUIContext = createContext<ImperativeUIContextType | undefined>(u
 
 export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [refreshSignal, setRefreshSignal] = useState(0);
+  const isMobile = useIsMobile();
 
   // Estado do Diálogo Imperativo (ui.dialog.open)
   const [dialogState, setDialogState] = useState<{
@@ -373,57 +376,98 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
           </DialogHeader>
 
           <div className="flex-1 overflow-auto border border-border mt-2">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  {tableState.options?.columns.map((col) => (
-                    <TableHead key={col.key}>{col.label}</TableHead>
-                  ))}
-                  {tableState.options?.rowActions && tableState.options.rowActions.length > 0 && !tableState.options.isWorkspaceClosed && (
-                    <TableHead className="text-right w-16">Ação</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            {isMobile ? (
+              <div className="flex flex-col gap-3 p-2">
                 {tableState.data.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={(tableState.options?.columns.length || 1) + (tableState.options?.rowActions && !tableState.options.isWorkspaceClosed ? 1 : 0)}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      Nenhum registro encontrado.
-                    </TableCell>
-                  </TableRow>
+                  <p className="text-center py-8 text-muted-foreground text-sm">
+                    Nenhum registro encontrado.
+                  </p>
                 ) : (
                   tableState.data.map((row, idx) => (
-                    <TableRow key={idx}>
-                      {tableState.options?.columns.map((col) => (
-                        <TableCell key={col.key} className="font-mono text-xs">
-                          {formatTableCell(col.format, row[col.key])}
-                        </TableCell>
-                      ))}
-                      {tableState.options?.rowActions && !tableState.options.isWorkspaceClosed && (
-                        <TableCell className="text-right">
-                          {tableState.options.rowActions.map((actionId) => (
-                            <Button
-                              key={actionId}
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive/80"
-                              onClick={() => handleRowAction(actionId, row)}
-                              title="Remover Registro"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          ))}
-                        </TableCell>
-                      )}
-                    </TableRow>
+                    <MobileCard
+                      key={idx}
+                      primary={tableState.options?.columns[0] ? formatTableCell(tableState.options.columns[0].format, row[tableState.options.columns[0].key]) : ""}
+                      secondary={tableState.options?.columns[1] ? formatTableCell(tableState.options.columns[1].format, row[tableState.options.columns[1].key]) : undefined}
+                      fields={(tableState.options?.columns || []).slice(2).map((col) => ({
+                        label: col.label,
+                        value: formatTableCell(col.format, row[col.key]),
+                      }))}
+                      actions={
+                        tableState.options?.rowActions && !tableState.options.isWorkspaceClosed ? (
+                          <div className="flex items-center gap-1">
+                            {tableState.options.rowActions.map((actionId) => (
+                              <Button
+                                key={actionId}
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive/80"
+                                onClick={() => handleRowAction(actionId, row)}
+                                title="Remover Registro"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            ))}
+                          </div>
+                        ) : undefined
+                      }
+                    />
                   ))
                 )}
-              </TableBody>
-            </Table>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    {tableState.options?.columns.map((col) => (
+                      <TableHead key={col.key}>{col.label}</TableHead>
+                    ))}
+                    {tableState.options?.rowActions && tableState.options.rowActions.length > 0 && !tableState.options.isWorkspaceClosed && (
+                      <TableHead className="text-right w-16">Ação</TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tableState.data.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={(tableState.options?.columns.length || 1) + (tableState.options?.rowActions && !tableState.options.isWorkspaceClosed ? 1 : 0)}
+                        className="text-center py-8 text-muted-foreground"
+                      >
+                        Nenhum registro encontrado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    tableState.data.map((row, idx) => (
+                      <TableRow key={idx}>
+                        {tableState.options?.columns.map((col) => (
+                          <TableCell key={col.key} className="font-mono text-xs">
+                            {formatTableCell(col.format, row[col.key])}
+                          </TableCell>
+                        ))}
+                        {tableState.options?.rowActions && !tableState.options.isWorkspaceClosed && (
+                          <TableCell className="text-right">
+                            {tableState.options.rowActions.map((actionId) => (
+                              <Button
+                                key={actionId}
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive/80"
+                                onClick={() => handleRowAction(actionId, row)}
+                                title="Remover Registro"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            ))}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
 
           <DialogFooter className="mt-4">
