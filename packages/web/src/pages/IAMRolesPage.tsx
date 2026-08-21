@@ -150,16 +150,31 @@ export const IAMRolesPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6">
       <HeaderActions>
-        <Button variant="outline" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`size-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          Atualizar
+        <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={fetchData} disabled={loading}>
+          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
         </Button>
 
         {hasPermission("system:roles:create") && (
-          <Button onClick={openCreateSheet}>
+          <Button onClick={openCreateSheet} className="hidden lg:inline-flex shrink-0">
             <PlusCircle className="size-3.5 mr-1.5" />
             Novo Grupo
           </Button>
+        )}
+
+        {hasPermission("system:roles:create") && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button variant="outline" size="icon" className="size-8 shrink-0 lg:hidden" />}
+            >
+              <MoreHorizontal className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={openCreateSheet} className="cursor-pointer">
+                <PlusCircle className="size-4 mr-2" />
+                Novo Grupo
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </HeaderActions>
 

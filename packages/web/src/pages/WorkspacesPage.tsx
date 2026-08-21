@@ -88,9 +88,8 @@ export const WorkspacesPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6">
       <HeaderActions>
-        <Button variant="outline" size="default" onClick={fetchWorkspaces} disabled={loading}>
-          <RefreshCw className={`size-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          Atualizar
+        <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={fetchWorkspaces} disabled={loading}>
+          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
         </Button>
       </HeaderActions>
 

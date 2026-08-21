@@ -231,16 +231,31 @@ export const IAMUsersPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6">
       <HeaderActions>
-        <Button variant="outline" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`size-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          Atualizar
+        <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={fetchData} disabled={loading}>
+          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
         </Button>
 
         {hasPermission("system:users:create") && (
-          <Button onClick={openCreateModal}>
+          <Button onClick={openCreateModal} className="hidden lg:inline-flex shrink-0">
             <UserPlus className="size-3.5 mr-1.5" />
             Novo Usuário
           </Button>
+        )}
+
+        {hasPermission("system:users:create") && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button variant="outline" size="icon" className="size-8 shrink-0 lg:hidden" />}
+            >
+              <MoreHorizontal className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={openCreateModal} className="cursor-pointer">
+                <UserPlus className="size-4 mr-2" />
+                Novo Usuário
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </HeaderActions>
 
