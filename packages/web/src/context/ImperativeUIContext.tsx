@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
@@ -272,6 +273,30 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
 
       case "money":
+        return (
+          <Field key={field.name}>
+            <FieldLabel htmlFor={field.name}>{field.label}</FieldLabel>
+            <MoneyInput
+              id={field.name}
+              value={value as number | string}
+              disabled={field.readOnly}
+              required={field.required}
+              prefix={field.prefix || "R$ "}
+              precision={field.precision ?? 2}
+              allowNegative={field.allowNegative ?? false}
+              onValueChange={(numVal) =>
+                setDialogState((prev) => ({
+                  ...prev,
+                  values: {
+                    ...prev.values,
+                    [field.name]: numVal,
+                  },
+                }))
+              }
+            />
+          </Field>
+        );
+
       case "number":
         return (
           <Field key={field.name}>
@@ -279,7 +304,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
             <Input
               id={field.name}
               type="number"
-              step={field.type === "money" ? "0.01" : "1"}
+              step={field.step ?? 1}
               value={value !== undefined ? String(value) : ""}
               disabled={field.readOnly}
               required={field.required}

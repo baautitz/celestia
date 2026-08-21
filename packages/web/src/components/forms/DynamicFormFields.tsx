@@ -9,6 +9,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -146,8 +147,36 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
               />
             );
 
-          case "number":
           case "money":
+            return (
+              <FormFieldControl
+                key={field.name}
+                control={form.control}
+                name={field.name}
+                render={({ field: rhf }) => (
+                  <FormItem>
+                    <FormLabel>{field.label}</FormLabel>
+                    <FormControl>
+                      <MoneyInput
+                        value={rhf.value as number | string | undefined}
+                        disabled={field.readOnly}
+                        required={field.required}
+                        prefix={field.prefix || "R$ "}
+                        precision={field.precision ?? 2}
+                        allowNegative={field.allowNegative ?? false}
+                        onValueChange={(val) => rhf.onChange(val)}
+                        onBlur={rhf.onBlur}
+                        name={rhf.name}
+                        ref={rhf.ref}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            );
+
+          case "number":
             return (
               <FormFieldControl
                 key={field.name}
@@ -159,7 +188,7 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                     <FormControl>
                       <Input
                         type="number"
-                        step={field.type === "money" ? "0.01" : "1"}
+                        step={field.step ?? 1}
                         value={rhf.value !== undefined && rhf.value !== "" ? String(rhf.value) : ""}
                         disabled={field.readOnly}
                         required={field.required}
