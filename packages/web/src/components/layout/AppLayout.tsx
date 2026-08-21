@@ -287,7 +287,7 @@ export const AppLayout: React.FC = () => {
           </div>
 
           {actions && (
-            <div className="flex items-center gap-1.5 md:gap-2 ml-2 shrink-0 overflow-x-auto">
+            <div className="flex items-center gap-1.5 md:gap-2 ml-auto shrink-0">
               {actions}
             </div>
           )}
