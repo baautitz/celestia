@@ -74,6 +74,7 @@ class ApiClient {
         const res = await fetch("/api/auth/refresh", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
           credentials: "include",
         });
 
