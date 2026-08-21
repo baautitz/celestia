@@ -40,6 +40,12 @@ import { toast } from "@/components/ui/toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { HeaderActions } from "@/context/HeaderActionsContext";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import type { DateRange } from "react-day-picker";
 import {
   ArrowLeft,
@@ -47,6 +53,7 @@ import {
   RefreshCw,
   Play,
   Shield,
+  MoreHorizontal,
 } from "lucide-react";
 import { RecipePermissionsSheet } from "@/components/recipes/RecipePermissionsSheet";
 
@@ -222,6 +229,7 @@ export const RecipeDashboardPage: React.FC = () => {
         <DateRangePicker
           value={dateRange}
           onChange={setDateRange}
+          className="hidden sm:inline-flex"
         />
 
         <Button
@@ -230,41 +238,66 @@ export const RecipeDashboardPage: React.FC = () => {
           size="icon"
           onClick={fetchData}
           title="Atualizar dados"
-          className="size-8"
+          className="size-8 shrink-0"
         >
           <RefreshCw className="size-4" />
         </Button>
 
         {hasPermission("system:workspaces:create") && (
-          <Button type="button" size="default" onClick={handleOpenInit}>
+          <Button type="button" size="default" onClick={handleOpenInit} className="hidden md:inline-flex shrink-0">
             <Play className="size-4 mr-2" />
             Inicializar Área de Trabalho
           </Button>
         )}
 
         {hasPermission("system:roles:update") && (
-          <Button type="button" variant="outline" size="default" onClick={() => setPermSheetOpen(true)}>
+          <Button type="button" variant="outline" size="default" onClick={() => setPermSheetOpen(true)} className="hidden md:inline-flex shrink-0">
             <Shield className="size-4 mr-2" />
             Permissões
           </Button>
         )}
+
+        {/* Dropdown mobile */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button type="button" variant="outline" size="icon" className="size-8 shrink-0 md:hidden" />
+            }
+          >
+            <MoreHorizontal className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {hasPermission("system:workspaces:create") && (
+              <DropdownMenuItem onClick={handleOpenInit}>
+                <Play className="size-4" />
+                Inicializar Área de Trabalho
+              </DropdownMenuItem>
+            )}
+            {hasPermission("system:roles:update") && (
+              <DropdownMenuItem onClick={() => setPermSheetOpen(true)}>
+                <Shield className="size-4" />
+                Permissões
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </HeaderActions>
 
       {/* Título da Página */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2 md:gap-3">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => navigate("/workspaces")}
           title="Voltar para a lista"
-          className="mt-1 shrink-0"
+          className="mt-1 shrink-0 size-8 md:size-10"
         >
-          <ArrowLeft className="size-5" />
+          <ArrowLeft className="size-4 md:size-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight">{schema.name}</h1>
-            <Badge variant="secondary" className="font-mono text-xs px-2 py-0.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight">{schema.name}</h1>
+            <Badge variant="secondary" className="font-mono text-xs px-2 py-0.5 hidden sm:inline-flex">
               {recipeId}
             </Badge>
           </div>

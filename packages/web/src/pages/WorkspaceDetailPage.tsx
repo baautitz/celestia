@@ -32,6 +32,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import type { DateRange } from "react-day-picker";
 import {
   RefreshCw,
@@ -42,6 +48,7 @@ import {
   Lock,
   RotateCcw,
   Settings,
+  MoreHorizontal,
 } from "lucide-react";
 
 export const WorkspaceDetailPage: React.FC = () => {
@@ -272,14 +279,14 @@ export const WorkspaceDetailPage: React.FC = () => {
           size="icon"
           onClick={() => triggerRefresh()}
           title="Atualizar dados"
-          className="size-8"
+          className="size-8 shrink-0"
         >
           <RefreshCw className="size-4" />
         </Button>
 
         {isClosed && (
           <Tooltip>
-            <TooltipTrigger render={<span className="flex size-8 items-center justify-center rounded-md text-muted-foreground" />}>
+            <TooltipTrigger render={<span className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground" />}>
               <Lock className="size-4" />
             </TooltipTrigger>
             <TooltipContent>Área de Trabalho Concluída — modo somente leitura</TooltipContent>
@@ -292,6 +299,7 @@ export const WorkspaceDetailPage: React.FC = () => {
             variant="outline"
             size="default"
             onClick={handleOpenEdit}
+            className="hidden md:inline-flex shrink-0"
           >
             <Settings className="size-4 mr-2" />
             Editar Parâmetros
@@ -306,6 +314,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                 size="default"
                 onClick={handleReopenWorkspace}
                 disabled={concluding}
+                className="hidden md:inline-flex shrink-0"
               >
                 <RotateCcw className="size-4 mr-2" />
                 Reabrir Área
@@ -318,32 +327,65 @@ export const WorkspaceDetailPage: React.FC = () => {
                 size="default"
                 onClick={handleConcludeWorkspace}
                 disabled={concluding}
+                className="hidden md:inline-flex shrink-0"
               >
                 <CheckCircle2 className="size-4 mr-2" />
                 Concluir Fechamento
               </Button>
             )}
+
+        {/* Dropdown mobile */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button type="button" variant="outline" size="icon" className="size-8 shrink-0 md:hidden" />
+            }
+          >
+            <MoreHorizontal className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {!isClosed && hasPermission("system:workspaces:update") && (
+              <DropdownMenuItem onClick={handleOpenEdit}>
+                <Settings className="size-4" />
+                Editar Parâmetros
+              </DropdownMenuItem>
+            )}
+            {isClosed
+              ? hasPermission("system:workspaces:reopen") && (
+                  <DropdownMenuItem onClick={handleReopenWorkspace} disabled={concluding}>
+                    <RotateCcw className="size-4" />
+                    Reabrir Área
+                  </DropdownMenuItem>
+                )
+              : hasPermission("system:workspaces:close") && (
+                  <DropdownMenuItem onClick={handleConcludeWorkspace} disabled={concluding}>
+                    <CheckCircle2 className="size-4" />
+                    Concluir Fechamento
+                  </DropdownMenuItem>
+                )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </HeaderActions>
 
       {/* Título da Página */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2 md:gap-3">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => navigate("/workspaces")}
           title="Voltar para a lista"
-          className="mt-1 shrink-0"
+          className="mt-1 shrink-0 size-8 md:size-10"
         >
-          <ArrowLeft className="size-5" />
+          <ArrowLeft className="size-4 md:size-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight">{workspaceInfo?.name || schema.name}</h1>
-            <Badge variant="secondary" className="font-mono text-xs px-2 py-0.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight">{workspaceInfo?.name || schema.name}</h1>
+            <Badge variant="secondary" className="font-mono text-xs px-2 py-0.5 hidden sm:inline-flex">
               {workspaceId}
             </Badge>
             <Badge variant="outline" className="text-xs px-2 py-0.5">
-              {startDate} — {endDate}
+              {new Date(startDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })} — {new Date(endDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}
             </Badge>
             {isClosed ? (
               <Badge variant="secondary" className="flex items-center gap-1 px-2 py-0.5">
