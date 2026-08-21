@@ -21,6 +21,7 @@ import {
   SidebarFooter,
   SidebarInset,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -53,6 +54,17 @@ import {
   Building2,
   Layers,
 } from "lucide-react";
+
+const SidebarAutoClose: React.FC = () => {
+  const { setOpenMobile } = useSidebar();
+  const location = useLocation();
+
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [location.pathname, setOpenMobile]);
+
+  return null;
+};
 
 export const AppLayout: React.FC = () => {
   const { user, logout, hasAnyPermission } = useAuth();
@@ -101,6 +113,7 @@ export const AppLayout: React.FC = () => {
 
   return (
     <SidebarProvider>
+      <SidebarAutoClose />
       <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
           <SidebarMenu>
