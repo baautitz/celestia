@@ -148,7 +148,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = ({
               accessibilityLayer
               data={chartData}
               layout="vertical"
-              margin={{ left: 10, right: 20, top: 4, bottom: 4 }}
+              margin={{ left: 0, right: 30, top: 4, bottom: 4 }}
             >
               <CartesianGrid horizontal={false} />
               <YAxis
@@ -157,8 +157,12 @@ export const SDUIChart: React.FC<SDUIChartProps> = ({
                 tickLine={false}
                 tickMargin={8}
                 axisLine={false}
-                width={130}
+                width={140}
                 tick={{ fontSize: 12 }}
+                tickFormatter={(v: string) => {
+                  const s = String(v);
+                  return s.length > 16 ? `${s.slice(0, 15)}…` : s;
+                }}
               />
               <XAxis
                 type="number"
