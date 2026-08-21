@@ -36,7 +36,7 @@ interface SDUIChartProps {
   endDate: string;
 }
 
-export const SDUIChart: React.FC<SDUIChartProps> = ({
+export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
   id,
   component,
   props,
@@ -121,11 +121,11 @@ export const SDUIChart: React.FC<SDUIChartProps> = ({
   );
 
   const renderContent = () => {
-    if (loading) return <Skeleton className="h-[280px] w-full" />;
+    if (loading) return <Skeleton className="h-full min-h-[180px] md:min-h-[220px] w-full" />;
 
     if (error) {
       return (
-        <div className="flex h-[280px] w-full items-center justify-center text-sm text-destructive">
+        <div className="flex h-full min-h-[180px] md:min-h-[220px] w-full items-center justify-center text-sm text-destructive">
           {error}
         </div>
       );
@@ -133,70 +133,68 @@ export const SDUIChart: React.FC<SDUIChartProps> = ({
 
     if (chartData.length === 0) {
       return (
-        <div className="flex h-[280px] w-full items-center justify-center text-sm text-muted-foreground">
+        <div className="flex h-full min-h-[180px] md:min-h-[220px] w-full items-center justify-center text-sm text-muted-foreground">
           Nenhum dado para exibir.
         </div>
       );
     }
 
     if (component === "bar_chart") {
-      const barHeight = Math.max(200, chartData.length * 40 + 40);
       return (
-        <div className="w-full" style={{ height: barHeight }}>
-          <ChartContainer config={barConfig} className="h-full w-full">
-            <BarChart
-              accessibilityLayer
-              data={chartData}
-              layout="vertical"
-              margin={{ left: 0, right: 30, top: 4, bottom: 4 }}
-            >
-              <CartesianGrid horizontal={false} />
-              <YAxis
-                dataKey="name"
-                type="category"
-                tickLine={false}
-                tickMargin={8}
-                axisLine={false}
-                width={140}
-                tick={{ fontSize: 12 }}
-                tickFormatter={(v: string) => {
-                  const s = String(v);
-                  return s.length > 16 ? `${s.slice(0, 15)}…` : s;
-                }}
-              />
-              <XAxis
-                type="number"
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v: number) => formatCurrency(v)}
-                tick={{ fontSize: 11 }}
-              />
-              <ChartTooltip
-                cursor={false}
-                content={
-                  <ChartTooltipContent
-                    hideLabel
-                    formatter={(value) => formatCurrency(value as number)}
-                  />
-                }
-              />
-              <Bar dataKey="value" fill="var(--color-value)" radius={4}>
-                <LabelList
-                  position="right"
-                  offset={8}
-                  className="fill-foreground"
-                  fontSize={11}
+        <ChartContainer config={barConfig} className="h-full w-full min-h-[180px] md:min-h-[220px]">
+          <BarChart
+            accessibilityLayer
+            data={chartData}
+            layout="vertical"
+            margin={{ left: 0, right: 16, top: 4, bottom: 4 }}
+          >
+            <CartesianGrid horizontal={false} />
+            <YAxis
+              dataKey="name"
+              type="category"
+              tickLine={false}
+              tickMargin={8}
+              axisLine={false}
+              width={120}
+              tick={{ fontSize: 12 }}
+              tickFormatter={(v: string) => {
+                const s = String(v);
+                return s.length > 14 ? `${s.slice(0, 13)}…` : s;
+              }}
+            />
+            <XAxis
+              type="number"
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v: number) => formatCurrency(v)}
+              tick={{ fontSize: 11 }}
+            />
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  labelKey="name"
+                  indicator="dot"
+                  formatter={(value) => formatCurrency(value as number)}
                 />
-              </Bar>
-            </BarChart>
-          </ChartContainer>
-        </div>
+              }
+            />
+            <Bar dataKey="value" fill="var(--color-value)" radius={4}>
+              <LabelList
+                position="right"
+                offset={8}
+                className="fill-foreground"
+                fontSize={11}
+              />
+            </Bar>
+          </BarChart>
+        </ChartContainer>
       );
     }
 
     if (component === "line_chart") {
       return (
-        <ChartContainer config={lineConfig} className="min-h-[250px] w-full">
+        <ChartContainer config={lineConfig} className="h-full w-full min-h-[180px] md:min-h-[220px]">
           <LineChart
             accessibilityLayer
             data={chartData}
@@ -215,7 +213,8 @@ export const SDUIChart: React.FC<SDUIChartProps> = ({
               cursor={false}
               content={
                 <ChartTooltipContent
-                  hideLabel
+                  labelKey="name"
+                  indicator="line"
                   formatter={(value) => formatCurrency(value as number)}
                 />
               }
@@ -234,41 +233,41 @@ export const SDUIChart: React.FC<SDUIChartProps> = ({
 
     // pie_chart
     return (
-      <div className="flex flex-col items-center gap-2">
-        <ChartContainer
-          config={pieConfig}
-          className="mx-auto aspect-square max-h-[220px] w-full"
-        >
-          <PieChart>
-            <ChartTooltip
-              cursor={false}
-              content={
-                <ChartTooltipContent
-                  hideLabel
-                  formatter={(value) => formatCurrency(value as number)}
-                />
-              }
-            />
-            <Pie
-              data={pieData}
-              dataKey="value"
-              nameKey="name"
-              strokeWidth={2}
-              stroke="hsl(var(--background))"
-            />
-            <ChartLegend
-              content={<ChartLegendContent nameKey="name" />}
-              verticalAlign="bottom"
-            />
-          </PieChart>
-        </ChartContainer>
-      </div>
+      <ChartContainer
+        config={pieConfig}
+        className="h-full w-full min-h-[180px] md:min-h-[220px] flex items-center justify-center"
+      >
+        <PieChart>
+          <ChartTooltip
+            cursor={false}
+            content={
+              <ChartTooltipContent
+                labelKey="name"
+                indicator="dot"
+                nameKey="name"
+                formatter={(value) => formatCurrency(value as number)}
+              />
+            }
+          />
+          <Pie
+            data={pieData}
+            dataKey="value"
+            nameKey="name"
+            strokeWidth={2}
+            stroke="hsl(var(--background))"
+          />
+          <ChartLegend
+            content={<ChartLegendContent nameKey="name" />}
+            verticalAlign="bottom"
+          />
+        </PieChart>
+      </ChartContainer>
     );
   };
 
   return (
-    <Card className="flex flex-col">
-      <CardHeader className="pb-2">
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-2 shrink-0">
         <CardTitle className="text-sm font-medium">
           {props.title ?? "Gráfico"}
         </CardTitle>
@@ -282,7 +281,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = ({
           </CardDescription>
         )}
       </CardHeader>
-      <CardContent className="flex-1 pb-3">{renderContent()}</CardContent>
+      <CardContent className="flex-1 min-h-0 pb-3">{renderContent()}</CardContent>
     </Card>
   );
-};
+});
