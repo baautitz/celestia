@@ -299,7 +299,7 @@ export const WorkspaceDetailPage: React.FC = () => {
             variant="outline"
             size="default"
             onClick={handleOpenEdit}
-            className="hidden md:inline-flex shrink-0"
+            className="hidden lg:inline-flex shrink-0"
           >
             <Settings className="size-4 mr-2" />
             Editar Parâmetros
@@ -314,7 +314,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                 size="default"
                 onClick={handleReopenWorkspace}
                 disabled={concluding}
-                className="hidden md:inline-flex shrink-0"
+                className="hidden lg:inline-flex shrink-0"
               >
                 <RotateCcw className="size-4 mr-2" />
                 Reabrir Área
@@ -327,7 +327,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                 size="default"
                 onClick={handleConcludeWorkspace}
                 disabled={concluding}
-                className="hidden md:inline-flex shrink-0"
+                className="hidden lg:inline-flex shrink-0"
               >
                 <CheckCircle2 className="size-4 mr-2" />
                 Concluir Fechamento
@@ -338,7 +338,7 @@ export const WorkspaceDetailPage: React.FC = () => {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button type="button" variant="outline" size="icon" className="size-8 shrink-0 md:hidden" />
+              <Button type="button" variant="outline" size="icon" className="size-8 shrink-0 lg:hidden" />
             }
           >
             <MoreHorizontal className="size-4" />

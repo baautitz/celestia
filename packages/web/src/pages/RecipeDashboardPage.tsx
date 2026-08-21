@@ -244,14 +244,14 @@ export const RecipeDashboardPage: React.FC = () => {
         </Button>
 
         {hasPermission("system:workspaces:create") && (
-          <Button type="button" size="default" onClick={handleOpenInit} className="hidden md:inline-flex shrink-0">
+          <Button type="button" size="default" onClick={handleOpenInit} className="hidden lg:inline-flex shrink-0">
             <Play className="size-4 mr-2" />
             Inicializar Área de Trabalho
           </Button>
         )}
 
         {hasPermission("system:roles:update") && (
-          <Button type="button" variant="outline" size="default" onClick={() => setPermSheetOpen(true)} className="hidden md:inline-flex shrink-0">
+          <Button type="button" variant="outline" size="default" onClick={() => setPermSheetOpen(true)} className="hidden lg:inline-flex shrink-0">
             <Shield className="size-4 mr-2" />
             Permissões
           </Button>
@@ -261,7 +261,7 @@ export const RecipeDashboardPage: React.FC = () => {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button type="button" variant="outline" size="icon" className="size-8 shrink-0 md:hidden" />
+              <Button type="button" variant="outline" size="icon" className="size-8 shrink-0 lg:hidden" />
             }
           >
             <MoreHorizontal className="size-4" />
