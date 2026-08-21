@@ -167,11 +167,24 @@ export const SDUITable: React.FC<SDUITableProps> = ({
           );
         };
         const collectionData = await fetchCollection();
-        await showTableModal({ ...eff.options, isWorkspaceClosed }, collectionData, async (subActionId, subItemRow) => {
-          await executeActionEffect(subActionId, subItemRow);
-          const updatedCollection = await fetchCollection();
-          updateTableData(updatedCollection);
+        const filteredRowActions = (eff.options.rowActions || []).filter((actId) => {
+          const def = availableActions[actId];
+          if (!def) return false;
+          if (isWorkspaceClosed && (def as ActionDef & { nature?: string }).nature !== "read") {
+            return false;
+          }
+          return true;
         });
+
+        await showTableModal(
+          { ...eff.options, rowActions: filteredRowActions, isWorkspaceClosed },
+          collectionData,
+          async (subActionId, subItemRow) => {
+            await executeActionEffect(subActionId, subItemRow);
+            const updatedCollection = await fetchCollection();
+            updateTableData(updatedCollection);
+          }
+        );
       } else if (eff.type === "confirm") {
         const confirmed = await confirm({
           title: eff.title,

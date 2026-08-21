@@ -418,7 +418,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         value: formatTableCell(col.format, row[col.key]),
                       }))}
                       actions={
-                        tableState.options?.rowActions && !tableState.options.isWorkspaceClosed ? (
+                        tableState.options?.rowActions && tableState.options.rowActions.length > 0 && !tableState.options.isWorkspaceClosed ? (
                           <div className="flex items-center gap-1">
                             {tableState.options.rowActions.map((actionId) => (
                               <Button
@@ -456,7 +456,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   {tableState.data.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={(tableState.options?.columns.length || 1) + (tableState.options?.rowActions && !tableState.options.isWorkspaceClosed ? 1 : 0)}
+                        colSpan={(tableState.options?.columns.length || 1) + (tableState.options?.rowActions && tableState.options.rowActions.length > 0 && !tableState.options.isWorkspaceClosed ? 1 : 0)}
                         className="text-center py-8 text-muted-foreground"
                       >
                         Nenhum registro encontrado.
@@ -470,7 +470,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
                             {formatTableCell(col.format, row[col.key])}
                           </TableCell>
                         ))}
-                        {tableState.options?.rowActions && !tableState.options.isWorkspaceClosed && (
+                        {tableState.options?.rowActions && tableState.options.rowActions.length > 0 && !tableState.options.isWorkspaceClosed && (
                           <TableCell className="text-right">
                             {tableState.options.rowActions.map((actionId) => (
                               <Button
