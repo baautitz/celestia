@@ -289,7 +289,7 @@ export const AppLayout: React.FC = () => {
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
 
-        <main className="flex flex-1 flex-col gap-4 md:gap-6 p-4 md:p-6">
+        <main className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
           <Outlet />
         </main>
       </SidebarInset>
