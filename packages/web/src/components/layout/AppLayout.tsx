@@ -123,7 +123,7 @@ export const AppLayout: React.FC = () => {
                   <Building2 className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">SDUI Enterprise</span>
+                  <span className="truncate font-semibold">Celestia</span>
                   <span className="truncate text-xs text-muted-foreground">Plataforma de Gestão</span>
                 </div>
               </SidebarMenuButton>
@@ -133,7 +133,7 @@ export const AppLayout: React.FC = () => {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
+            <SidebarGroupLabel>Celestia</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton

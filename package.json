@@ -1,5 +1,5 @@
 {
-  "name": "sdui-platform-root",
+  "name": "celestia-root",
   "private": true,
   "packageManager": "pnpm@10.18.2",
   "workspaces": [

@@ -1004,6 +1004,6 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     },
   });
   const port = Number(process.env.PORT) || 3000;
-  console.log(`🚀 Plataforma SDUI Backend rodando em http://localhost:${port}`);
+  console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
   serve({ fetch: app.fetch, port });
 }

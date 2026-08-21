@@ -8,7 +8,6 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
@@ -16,7 +15,6 @@ import { FieldGroup, Field, FieldLabel, FieldError } from "@/components/ui/field
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "@/components/ui/toast";
 import { ShieldCheck, Crown, Wrench, UserCheck } from "lucide-react";
 
@@ -80,15 +78,7 @@ export const LoginPage: React.FC = () => {
     <main className="flex min-h-screen items-center justify-center p-4 bg-muted/20">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center items-center justify-center pb-4 flex flex-col">
-          <Avatar className="size-12 mb-2">
-            <AvatarFallback className="bg-primary text-primary-foreground font-bold">
-              S
-            </AvatarFallback>
-          </Avatar>
-          <CardTitle className="text-xl font-bold">SDUI Enterprise</CardTitle>
-          <CardDescription>
-            Plataforma de Fechamentos & Auditoria Operacional
-          </CardDescription>
+          <CardTitle className="text-xl font-bold">Celestia</CardTitle>
         </CardHeader>
 
         <CardContent>
@@ -128,7 +118,7 @@ export const LoginPage: React.FC = () => {
                 className="w-full mt-2"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Autenticando..." : "Entrar na Plataforma"}
+                {isSubmitting ? "Autenticando..." : "Entrar no Celestia"}
               </Button>
             </FieldGroup>
           </form>
