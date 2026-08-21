@@ -1,0 +1,20 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  width: 100%;
+  align-items: stretch;
+  grid-auto-rows: minmax(100px, auto);
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-auto-rows: minmax(var(--sdui-row-h, 140px), auto);
+  }
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
