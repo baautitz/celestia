@@ -1,6 +1,6 @@
 # SDUI & IAM Coding Standards & Architectural Invariants
 
-Regras e restrições obrigatórias para IAs e desenvolvedores na plataforma SDUI:
+Regras e restrições obrigatórias para IAs e desenvolvedores na plataforma Celestia (SDUI & IAM):
 
 ---
 

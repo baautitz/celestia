@@ -1,19 +1,19 @@
 # AGENTS.md — Technical Architecture & Operational Directives for AI Agents
 
 > **Audience**: Autonomous Coding Agents, Antigravity, Claude Code, Cursor, Copilot, Cline, Windsurf.  
-> **Platform**: Server-Driven UI (SDUI) & Permission-First IAM Enterprise Platform.  
+> **Platform**: Celestia — Server-Driven UI (SDUI) & Permission-First IAM Enterprise Platform.  
 > **Runtime**: Node.js >= 20.x, TypeScript >= 5.6 (strict mode), pnpm workspaces.
 
 ---
 
 ## 1. System Identity & Mission
 
-This platform is a **Server-Driven UI (SDUI)** engine with an embedded **Permission-First IAM** system designed for enterprise operations (monthly closings, retail auditing, sales commissions, pharmacy/ERP reconciliations).
+**Celestia** is an enterprise **Server-Driven UI (SDUI)** engine with an embedded **Permission-First IAM** system designed for high-stakes enterprise operations (monthly closings, retail auditing, sales commissions, pharmacy/ERP reconciliations).
 
 - **Backend**: [Hono](https://hono.dev/) on Node.js (ultra-fast, typed RPC, minimal overhead).
 - **Security & Caching**: **Argon2id** (`@node-rs/argon2`), stateless JWT (5 min) + Refresh Token (7 days).
 - **SDUI Engine**: TypeScript-defined Recipes compiled in-memory via `esbuild` and executed inside isolated `node:vm` sandboxes.
-- **Frontend**: Vite + React + shadcn/ui.
+- **Frontend**: Vite + React 19 + shadcn/ui + Tailwind CSS v4.
 - **PT-BR UI Terminology**:
   - `Recipe` ➔ **Modelo** (the reusable blueprint/dashboard definition).
   - `Workspace` ➔ **Área de Trabalho** (the active session/closing period).
@@ -23,7 +23,7 @@ This platform is a **Server-Driven UI (SDUI)** engine with an embedded **Permiss
 ## 2. Monorepo Map
 
 ```text
-projects/
+celestia/
 ├── packages/
 │   ├── shared/                   (@platform/shared) -> Source of truth for contracts & types
 │   │   └── src/
@@ -38,26 +38,39 @@ projects/
 │   │       │   └── index.ts      -> Central barrel export
 │   │       └── index.ts
 │   │
-│   └── server/                   (@platform/server) -> Backend API, Compiler, IAM & Data Resolver
+│   ├── server/                   (@platform/server) -> Backend API, Compiler, IAM & Data Resolver
+│   │   └── src/
+│   │       ├── index.ts          -> Hono app entrypoint, public & protected routes
+│   │       ├── iam/
+│   │       │   ├── password-service.ts    -> Argon2id OWASP hashing & Zod password complexity validator
+│   │       │   ├── token-service.ts       -> JWT Access (5 min) & Refresh (7 days) HS256 tokens
+│   │       │   ├── system-permissions.ts  -> Static system:* permissions catalog
+│   │       │   ├── permission-catalog.ts  -> Recipe scanner & automatic orphan permission pruner
+│   │       │   ├── permission-resolver.ts -> Permission-first query & action resolver (declaration order)
+│   │       │   ├── user-store.ts          -> MemoryUserStore with sanitization & initial seeds
+│   │       │   └── middleware.ts          -> createAuthMiddleware & requirePermission guards
+│   │       ├── engine/
+│   │       │   ├── compiler.ts            -> esbuild in-memory transpiler + node:vm isolated sandbox
+│   │       │   ├── action-executor.ts     -> Action executor with 5s timeout & imperative UI context
+│   │       │   ├── template-engine.ts     -> Safe query parameterizer (converts {{...}} into @p1, @p2)
+│   │       │   └── workspace-validator.ts -> Mandatory workspace dates validator (end_date >= start_date)
+│   │       └── data/
+│   │           ├── source-connector.ts    -> SourceConnector interface & MockSourceConnector
+│   │           ├── persistence-store.ts   -> MemoryPersistenceStore & Postgres persistence adapter
+│   │           └── data-resolver.ts       -> Merges ERP sources + platform persistence + compute columns
+│   │
+│   └── web/                      (@platform/web) -> Frontend SPA (Vite + React 19 + shadcn/ui)
 │       └── src/
-│           ├── index.ts          -> Hono app entrypoint, public & protected routes
-│           ├── iam/
-│           │   ├── password-service.ts    -> Argon2id OWASP hashing & Zod password complexity validator
-│           │   ├── token-service.ts       -> JWT Access (5 min) & Refresh (7 days) HS256 tokens
-│           │   ├── system-permissions.ts  -> Static system:* permissions catalog
-│           │   ├── permission-catalog.ts  -> Recipe scanner & automatic orphan permission pruner
-│           │   ├── permission-resolver.ts -> Permission-first query & action resolver (declaration order)
-│           │   ├── user-store.ts          -> MemoryUserStore with sanitization & initial seeds
-│           │   └── middleware.ts          -> createAuthMiddleware & requirePermission guards
-│           ├── engine/
-│           │   ├── compiler.ts            -> esbuild in-memory transpiler + node:vm isolated sandbox
-│           │   ├── action-executor.ts     -> Action executor with 5s timeout & imperative UI context
-│           │   ├── template-engine.ts     -> Safe query parameterizer (converts {{...}} into @p1, @p2)
-│           │   └── workspace-validator.ts -> Mandatory workspace dates validator (end_date >= start_date)
-│           └── data/
-│               ├── source-connector.ts    -> SourceConnector interface & MockSourceConnector
-│               ├── persistence-store.ts   -> MemoryPersistenceStore & Postgres persistence adapter
-│               └── data-resolver.ts       -> Merges ERP sources + platform persistence + compute columns
+│           ├── components/
+│           │   ├── sdui/         -> SDUITable, SDUICard, SDUIChart, SDUIStatCard
+│           │   ├── forms/        -> DynamicFormFields, WizardDialog
+│           │   ├── layout/       -> AppLayout, Header, Navigation
+│           │   ├── recipes/      -> RecipePermissionsSheet
+│           │   └── ui/           -> 100% Pure shadcn/ui primitives (InputGroup, MoneyInput, MobileCard, etc.)
+│           ├── pages/            -> WorkspacesPage, WorkspaceDetailPage, RecipeDashboardPage, IAMUsersPage, IAMRolesPage, LoginPage
+│           ├── context/          -> AuthContext, ImperativeUIContext, HeaderActionsContext
+│           ├── hooks/            -> use-mobile, use-theme
+│           └── lib/              -> api-client, utils, dynamic-form
 │
 └── recipes/                      (Production Recipes in TypeScript)
     └── fechamento-mes.recipe.ts  -> Reference monthly closing recipe
@@ -152,6 +165,20 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 - The Roles page edit Sheet shows ONLY `system:*` modules. A muted note informs that recipe permissions are configured per Model.
 - The RecipePermissionsSheet lists all roles with Collapsibles; each expands to show the recipe's declared permissions (view, queries, actions) with Switch toggles.
 - Server-side validation: `POST /api/iam/roles` and `PUT /api/iam/roles/:id` validate permission keys against `PermissionCatalogEngine.getAllValidPermissionKeys()`. Invalid keys return HTTP 400. Wildcard `"*"` is allowed.
+
+### 18. Search Inputs via `InputGroup` (No Custom `<div>` Wrappers)
+- Search inputs and inputs with icons MUST use the canonical `InputGroup` primitives (`InputGroup`, `InputGroupAddon`, `InputGroupInput`) from `@/components/ui/input-group`.
+- **NEVER** build custom search containers with `<div className="relative">` and absolute positioned icons.
+
+### 19. Currency & Money Input Standard (`MoneyInput`)
+- All form fields of type `money` (declarative or imperative `ui.dialog.open`) MUST use `<MoneyInput />` from `@/components/ui/money-input`.
+- **NEVER** use `<Input type="number" step="0.01" />` for currency.
+- `MoneyInput` enforces `type="text"`, `inputMode="numeric"` (opening touch numeric keyboard on mobile devices) and real-time cents-based masking in Brazilian Real (`R$ 0,00`), with full support for `prefix`, `precision`, `allowNegative` and typed float synchronization with the backend.
+
+### 20. Mobile Responsive Tables via `MobileCard`
+- All data tables (`SDUITable`, `WorkspacesPage`, `IAMUsersPage`, `IAMRolesPage`, `showTable`) must implement adaptive rendering via `useIsMobile()`:
+  - **Desktop**: Full `<Table>` with `<TableHeader>`, `<TableBody>`, `<TableCell>` and sorting/pagination controls.
+  - **Mobile**: Grid of `<MobileCard>` elements with primary title, secondary subtitle, structured fields list, and action buttons.
 
 ---
 

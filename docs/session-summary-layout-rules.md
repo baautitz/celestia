@@ -1,6 +1,6 @@
 # Relatório Consolidado: Layout, Regras e Atualização do AGENTS.md
 
-Este documento consolida todas as intervenções de **Layout**, **Componentização shadcn/ui**, **Regras Arquiteturais e Comportamentais** implementadas nesta sessão, além do planejamento para enriquecer o [AGENTS.md](file:///c:/Users/vinic/Desktop/flavio/teste/AGENTS.md).
+Este documento consolida todas as intervenções de **Layout**, **Componentização shadcn/ui**, **Regras Arquiteturais e Comportamentais** implementadas nesta sessão, além do planejamento para enriquecer o [AGENTS.md](../AGENTS.md).
 
 ---
 
@@ -24,12 +24,12 @@ Este documento consolida todas as intervenções de **Layout**, **Componentizaç
   - Os campos iniciam 100% limpos com placeholder *"Não vinculado"* (eliminado mock hardcoded).
 
 ### D. Otimização do Cabeçalho Superior (Header Bar Actions)
-- **Criação do `<HeaderActions>`**: Criado o [HeaderActionsContext.tsx](file:///c:/Users/vinic/Desktop/flavio/teste/projects/packages/web/src/context/HeaderActionsContext.tsx) integrado ao [AppLayout.tsx](file:///c:/Users/vinic/Desktop/flavio/teste/projects/packages/web/src/components/layout/AppLayout.tsx).
-- **Elevação dos Botões Primários**: Os botões `[Atualizar]` e `[+ Novo...]` de [WorkspacesPage.tsx](file:///c:/Users/vinic/Desktop/flavio/teste/projects/packages/web/src/pages/WorkspacesPage.tsx), [IAMUsersPage.tsx](file:///c:/Users/vinic/Desktop/flavio/teste/projects/packages/web/src/pages/IAMUsersPage.tsx) e [IAMRolesPage.tsx](file:///c:/Users/vinic/Desktop/flavio/teste/projects/packages/web/src/pages/IAMRolesPage.tsx) agora ficam no topo à direita da barra de navegação, liberando espaço vertical valioso para as tabelas.
+- **Criação do `<HeaderActions>`**: Criado o [HeaderActionsContext.tsx](../packages/web/src/context/HeaderActionsContext.tsx) integrado ao [AppLayout.tsx](../packages/web/src/components/layout/AppLayout.tsx).
+- **Elevação dos Botões Primários**: Os botões `[Atualizar]` e `[+ Novo...]` de [WorkspacesPage.tsx](../packages/web/src/pages/WorkspacesPage.tsx), [IAMUsersPage.tsx](../packages/web/src/pages/IAMUsersPage.tsx) e [IAMRolesPage.tsx](../packages/web/src/pages/IAMRolesPage.tsx) agora ficam no topo à direita da barra de navegação, liberando espaço vertical valioso para as tabelas.
 - **Limpeza Visual**: Removido o badge obsoleto *"Ambiente Seguro"* do header.
 
 ### E. SDUI Table & Permissões Estritas
-- **Ocultação de Slugs Não Autorizados**: No [SDUITable.tsx](file:///c:/Users/vinic/Desktop/flavio/teste/projects/packages/web/src/components/sdui/SDUITable.tsx), as ações são estritamente filtradas (`filter(id => Boolean(availableActions[id]))`). Ações sem permissão não exibem mais slugs técnicos no menu.
+- **Ocultação de Slugs Não Autorizados**: No [SDUITable.tsx](../packages/web/src/components/sdui/SDUITable.tsx), as ações são estritamente filtradas (`filter(id => Boolean(availableActions[id]))`). Ações sem permissão não exibem mais slugs técnicos no menu.
 - **Controle de Exibição de Coluna**: Se uma linha ou tabela não possui nenhuma ação permitida para o usuário logado, o botão `...` e a coluna *"Ações"* são omitidos automaticamente.
 - **Execução Segura de Ações e Confirmações**: Corrigido o fluxo de `ui.confirm` para evitar exclusões otimistas prematuras ao clicar em *Cancelar*, disparando re-fetch dinâmico da coleção apenas quando o usuário confirma.
 
@@ -61,7 +61,7 @@ Este documento consolida todas as intervenções de **Layout**, **Componentizaç
 
 ## 3. Planejamento para Atualização do `AGENTS.md`
 
-Para garantir que futuras sessões e qualquer outro agente sigam exatamente os padrões refinados nesta sessão, propõe-se atualizar o [AGENTS.md](file:///c:/Users/vinic/Desktop/flavio/teste/AGENTS.md) com as seguintes adições:
+Para garantir que futuras sessões e qualquer outro agente sigam exatamente os padrões refinados nesta sessão, propõe-se atualizar o [AGENTS.md](../AGENTS.md) com as seguintes adições:
 
 ### Adição 1: Especificação Estrita de Segurança de Sessão (Zero LocalStorage)
 ```markdown

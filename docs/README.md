@@ -1,8 +1,8 @@
-# Plataforma SDUI — Arquitetura Completa
+# Celestia — Arquitetura Completa & Especificação Técnica
 
-Plataforma de dashboards operacionais e workspaces orientada a **Server-Driven UI (SDUI)**.  
-O administrador escreve **Recipes em TypeScript** que definem dados, layout e ações.  
-O backend interpreta e executa as recipes. O frontend é um **renderer genérico + despachante de RPCs**.
+Plataforma de dashboards operacionais e fechamentos temporais orientada a **Server-Driven UI (SDUI)** e **Permission-First IAM**.  
+O desenvolvedor/administrador escreve **Modelos (Recipes) em TypeScript** que definem fontes de dados do ERP, persistência da plataforma, layout e ações imperativas.  
+O backend compila e executa as recipes em sandboxes seguras. O frontend React 19 + shadcn/ui atua como **renderer genérico e despachante de RPCs**.
 
 ---
 

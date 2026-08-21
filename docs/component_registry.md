@@ -1,4 +1,4 @@
-# Component Registry — Plataforma SDUI
+# Component Registry — Celestia SDUI Platform
 
 Registro completo de componentes da plataforma, divididos em **Componentes Declarativos** (árvore de layout e display) e **Componentes Imperativos** (invocados via código com `await ui.*`).
 
@@ -89,7 +89,7 @@ Componentes definidos estaticamente na seção `ui` e nos `fields[]` dos formul�
 | 1 | `text` | `EDIT` | `Input` | Campo de texto de linha única |
 | 2 | `textarea` | `EDIT` (Multiline) | `Textarea` | Campo de texto multilinha |
 | 3 | `number` | `EDIT` (Number) | `Input type="number"` | Campo numérico com incremento/decremento |
-| 4 | `money` | `EDIT` + Mask | `Input` + Mask | Campo monetário formatado (R$ 0,00) |
+| 4 | `money` | `EDIT` + Mask | `MoneyInput` | Campo monetário formatado (R$ 0,00) com máscara automática e `inputMode="numeric"` |
 | 5 | `select` | `COMBOBOX` | `Select` | Dropdown de seleção estática |
 | 6 | `multi_select` | `LISTBOX` (Multi) | `Combobox` (Multi) | Seleção múltipla com tags/chips |
 | 7 | `combobox` | `COMBOBOX` + Auto | `Combobox` | Select com busca/filtro local |
@@ -100,24 +100,25 @@ Componentes definidos estaticamente na seção `ui` e nos `fields[]` dos formul�
 | 12 | `radio` | `BUTTON` (BS_RADIO) | `RadioGroup` | Seleção exclusiva em lista |
 | 13 | `switch` | `BUTTON` (Toggle) | `Switch` | Alternador on/off visual |
 | 14 | `hidden` | — | `Input type="hidden"` | Campo invisível com valor dinâmico |
-| 15 | `search` | `EDIT` + Icon | `Input` + Search Icon | Campo de busca rápida |
+| 15 | `search` | `EDIT` + Icon | `InputGroup` + `Search` | Campo de busca padronizado com `InputGroup`, `InputGroupAddon` e `InputGroupInput` |
 
 ### 2.2. Dashboard Display (Componentes Visuais da Tela)
 
 | # | `type` | WinAPI | shadcn/ui | Descrição |
 | :--- | :--- | :--- | :--- | :--- |
-| 16 | `data_table` | `WC_LISTVIEW` (Report) | `DataTable` | Tabela com ordenação, busca, paginação e row actions |
-| 17 | `stat_card` | `STATIC` + Icon | `Card` | Card de KPI com valor agregado, título e ícone |
-| 18 | `bar_chart` | GDI Bar Chart | `Chart` (Recharts) | Gráfico de barras verticais ou horizontais |
-| 19 | `line_chart` | GDI Line Chart | `Chart` (Recharts) | Gráfico de evolução temporal |
-| 20 | `pie_chart` | GDI Pie Chart | `Chart` (Recharts) | Gráfico de pizza / distribuição percentual |
-| 21 | `progress` | `PROGRESS_CLASS` | `Progress` | Barra de progresso estática (Meta vs Realizado) |
-| 22 | `badge` | `STATIC` (Color) | `Badge` | Indicador visual de status (Aprovado, Pendente, etc.) |
-| 23 | `label` | `STATIC` | `Label` | Rótulo de texto estático |
-| 24 | `avatar` | `STATIC` (Icon) | `Avatar` | Imagem ou iniciais do usuário/vendedor |
-| 25 | `empty_state` | — | Custom Component | Ilustração/mensagem de lista vazia |
-| 26 | `skeleton` | — | `Skeleton` | Placeholder de carregamento |
-| 27 | `separator` | `STATIC` (Etched) | `Separator` | Linha divisória horizontal ou vertical |
+| 16 | `data_table` | `WC_LISTVIEW` (Report) | `DataTable` | Tabela com ordenação, busca, paginação e row actions (desktop) |
+| 17 | `mobile_card` | `WC_LISTVIEW` (Tile) | `MobileCard` | Card adaptativo estruturado para tabelas em visualização mobile |
+| 18 | `stat_card` | `STATIC` + Icon | `Card` | Card de KPI com valor agregado, título e ícone |
+| 19 | `bar_chart` | GDI Bar Chart | `Chart` (Recharts) | Gráfico de barras verticais ou horizontais |
+| 20 | `line_chart` | GDI Line Chart | `Chart` (Recharts) | Gráfico de evolução temporal |
+| 21 | `pie_chart` | GDI Pie Chart | `Chart` (Recharts) | Gráfico de pizza / distribuição percentual |
+| 22 | `progress` | `PROGRESS_CLASS` | `Progress` | Barra de progresso estática (Meta vs Realizado) |
+| 23 | `badge` | `STATIC` (Color) | `Badge` | Indicador visual de status (Aprovado, Pendente, etc.) |
+| 24 | `label` | `STATIC` | `Label` | Rótulo de texto estático |
+| 25 | `avatar` | `STATIC` (Icon) | `Avatar` | Imagem ou iniciais do usuário/vendedor |
+| 26 | `empty_state` | — | Custom Component | Ilustração/mensagem de lista vazia |
+| 27 | `skeleton` | — | `Skeleton` | Placeholder de carregamento |
+| 28 | `separator` | `STATIC` (Etched) | `Separator` | Linha divisória horizontal ou vertical |
 
 ### 2.3. Layout e Estrutura
 

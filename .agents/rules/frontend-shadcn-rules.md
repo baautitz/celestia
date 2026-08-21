@@ -19,6 +19,9 @@ Every component rendered in the application MUST be built exclusively with offic
   - `<FormDescription>`
   - Combined with `react-hook-form` and `@hookform/resolvers/zod` with typed schemas.
 - **LABELS**: ALWAYS import and use `<Label>` from `@/components/ui/label`. NEVER use raw `<label>` tags.
+- **SEARCH INPUTS**: ALWAYS use `<InputGroup>`, `<InputGroupAddon>`, `<InputGroupInput>` from `@/components/ui/input-group` with `<Search />` icon. NEVER create custom `<div className="relative">` wrappers with absolute icons.
+- **CURRENCY INPUTS**: ALWAYS use `<MoneyInput />` from `@/components/ui/money-input` for `type: "money"` fields. Enforces `inputMode="numeric"` and real-time BRL masking. NEVER use `<Input type="number" step="0.01">`.
+- **RESPONSIVE TABLES**: ALWAYS implement dual rendering with `useIsMobile()`: `<Table>` on desktop and `<MobileCard>` on mobile.
 - **CONTAINERS & SURFACES**: ALWAYS use `<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardDescription>`, `<CardContent>`, `<CardFooter>`.
 - **DATA DISPLAY & TABLES**: ALWAYS use `<Table>`, `<TableHeader>`, `<TableBody>`, `<TableRow>`, `<TableHead>`, `<TableCell>`.
 - **FEEDBACK & MODALS**: ALWAYS use `<Dialog>`, `<AlertDialog>`, `<Badge>`, `<Skeleton>`, `<Separator>`, `<Sonner>`.
@@ -29,11 +32,9 @@ Every component rendered in the application MUST be built exclusively with offic
 
 ## 2. Button Sizing & Ergonomics Policy (Non-Negotiable)
 
-- **NORMAL / DEFAULT SIZES ONLY**: **NEVER use `size="sm"` or compact `h-8` buttons by default.**
-- All buttons must use standard, comfortable, accessible sizes:
-  - Primary & standard buttons: `size="default"` (standard `h-10` height, comfortable padding).
-  - Hero or prominent action buttons: `size="lg"`.
-  - Icon buttons in toolbars: `size="icon"` (standard `h-10 w-10` or minimum `h-9 w-9`).
+- **BUTTON CONVENTIONS**:
+  - Text action buttons: use `size="default"` (standard `h-8` height). **NEVER** use `size="sm"`, `size="xs"`, or `size="lg"` on standard action buttons.
+  - Icon-only buttons: use `size="icon"` (or `className="size-8"`). **NEVER** use `size="icon-sm"` or `size="icon-xs"` except internal Sheet close.
 - Buttons must have clear labels, accessible contrast, and prominent touch targets for enterprise operation.
 
 ---
