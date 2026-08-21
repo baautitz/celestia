@@ -16,7 +16,11 @@ import {
 } from "@/components/ui/table";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -263,16 +267,18 @@ export const SDUITable: React.FC<SDUITableProps> = ({
 
           {/* Barra de Busca */}
           <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 max-w-sm w-full">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-              <Input
+            <InputGroup className="flex-1">
+              <InputGroupInput
                 type="search"
                 placeholder="Buscar..."
-                className="pl-8 text-xs"
+                className="text-xs"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-            </div>
+              <InputGroupAddon>
+                <Search />
+              </InputGroupAddon>
+            </InputGroup>
             <Button type="submit" variant="secondary" size="default">
               Buscar
             </Button>
