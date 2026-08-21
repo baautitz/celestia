@@ -277,7 +277,32 @@ export const defaultFechamentoRecipe = defineRecipe<FechamentoVendedorRow>({
         },
       },
 
-      // ─── LINHA 2: TABELA OPERACIONAL COMPLETA (Paginada) ─────────
+      // ─── LINHA 2: GRÁFICOS SEM PAGINAÇÃO (Séries Agrupadas) ──────
+      {
+        id: "grafico_ranking_vendas",
+        component: "bar_chart",
+        layoutProps: { colSpan: 6 },
+        props: {
+          title: "Ranking de Vendas por Vendedor",
+          source: "inovafarma",
+          nameKey: "vendedor",
+          valueKey: "venda_geral",
+          limit: 10,
+        },
+      },
+      {
+        id: "grafico_pizza_vendas",
+        component: "pie_chart",
+        layoutProps: { colSpan: 6 },
+        props: {
+          title: "Distribuição das Vendas na Equipe",
+          source: "inovafarma",
+          nameKey: "vendedor",
+          valueKey: "venda_geral",
+        },
+      },
+
+      // ─── LINHA 3: TABELA OPERACIONAL COMPLETA (Paginada) ─────────
       {
         id: "tabela_vendedores",
         component: "data_table",
