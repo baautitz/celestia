@@ -16,7 +16,7 @@ interface SDUICardProps {
   endDate: string;
 }
 
-export const SDUICard: React.FC<SDUICardProps> = ({
+export const SDUICard: React.FC<SDUICardProps> = React.memo(({
   id,
   props,
   workspaceId,
@@ -77,7 +77,7 @@ export const SDUICard: React.FC<SDUICardProps> = ({
   };
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {props.title}
@@ -95,4 +95,4 @@ export const SDUICard: React.FC<SDUICardProps> = ({
       </CardContent>
     </Card>
   );
-};
+});
