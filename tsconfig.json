@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@platform/shared": ["./packages/shared/src/index.ts"],
+      "@platform/shared/*": ["./packages/shared/src/*"]
+    }
+  },
+  "include": [
+    "packages/shared/src/**/*",
+    "packages/server/src/**/*",
+    "packages/server/tests/**/*"
+  ],
+  "exclude": ["recipes", "node_modules", "packages/*/dist"]
+}

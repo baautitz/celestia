@@ -1,0 +1,28 @@
+# Deps & build
+node_modules/
+packages/*/dist/
+packages/shared/dist/
+packages/server/dist/
+packages/web/dist/
+dist/
+
+# Recipes — compiladas em memória via esbuild (packages/server/src/engine/compiler.ts)
+# Nunca commitar artefatos ao lado do .ts
+recipes/*.js
+recipes/*.d.ts
+recipes/*.map
+recipes/**/*.js
+recipes/**/*.d.ts
+recipes/**/*.map
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.local
+
+# Build cache & coverage
+*.tsbuildinfo
+coverage/
+.pnpm-store/
