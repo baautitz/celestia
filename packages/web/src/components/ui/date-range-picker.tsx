@@ -27,14 +27,17 @@ export function DateRangePicker({
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
 
-  const formatDate = (date: Date) =>
+  const formatDateShort = (date: Date) =>
+    format(date, "dd 'de' MMM", { locale: ptBR });
+
+  const formatDateFull = (date: Date) =>
     format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
   const label =
     value?.from && value?.to
-      ? `${formatDate(value.from)} — ${formatDate(value.to)}`
+      ? `${formatDateShort(value.from)} — ${formatDateShort(value.to)} ${value.to.getFullYear()}`
       : value?.from
-        ? formatDate(value.from)
+        ? formatDateFull(value.from)
         : "Selecione o período";
 
   return (
@@ -46,7 +49,7 @@ export function DateRangePicker({
             data-empty={!value?.from}
             disabled={disabled}
             className={cn(
-              "justify-start text-left font-normal data-[empty=true]:text-muted-foreground",
+              "h-8 justify-start gap-2 text-left font-normal text-sm data-[empty=true]:text-muted-foreground",
               className
             )}
           />
