@@ -388,11 +388,11 @@ export const WorkspaceDetailPage: React.FC = () => {
               {new Date(startDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })} — {new Date(endDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}
             </Badge>
             {isClosed ? (
-              <Badge variant="secondary" className="flex items-center gap-1 px-2 py-0.5">
-                <CheckCircle2 className="size-3" /> Concluído
+              <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                <CheckCircle2 className="size-3 text-emerald-500" /> Concluído
               </Badge>
             ) : (
-              <Badge variant="default" className="flex items-center gap-1 px-2 py-0.5">
+              <Badge variant="default" className="flex items-center gap-1 w-fit">
                 <Clock className="size-3" /> Aberto
               </Badge>
             )}

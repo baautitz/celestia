@@ -156,7 +156,7 @@ export function RecipePermissionsSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl">
-        <SheetHeader className="p-6 border-b shrink-0">
+        <SheetHeader className=" border-b shrink-0">
           <SheetTitle>Permissões do Modelo</SheetTitle>
           <SheetDescription>
             Configure quais grupos podem acessar e executar ações neste Modelo.
@@ -164,7 +164,7 @@ export function RecipePermissionsSheet({
         </SheetHeader>
 
         <ScrollArea className="flex-1 min-h-0">
-          <div className="p-6 flex flex-col gap-4">
+          <div className="p-4 flex flex-col gap-4">
             {loading ? (
               <div className="flex flex-col gap-4">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -190,7 +190,7 @@ export function RecipePermissionsSheet({
                             render={
                               <Button
                                 variant="ghost"
-                                className="w-full justify-between px-3 py-2.5 h-auto"
+                                className="w-full justify-between py-2 h-auto"
                               />
                             }
                           >
@@ -204,7 +204,7 @@ export function RecipePermissionsSheet({
                             <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
                           </CollapsibleTrigger>
 
-                          <CollapsibleContent className="flex flex-col gap-4 px-3 pb-3 pt-0">
+                          <CollapsibleContent className="flex flex-col gap-3 p-2">
                             {/* Acesso ao Modelo */}
                             <div className="flex flex-col gap-2">
                               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
