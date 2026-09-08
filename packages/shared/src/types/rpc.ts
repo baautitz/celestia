@@ -7,6 +7,7 @@ import type { FormFieldDef } from "./fields.js";
  */
 export interface ActionExecRequest<TRow = Record<string, unknown>, TForm = Record<string, unknown>> {
   recipe_id: string;
+  component_id: string;
   action_id: string;
   row: TRow;
   form_data?: TForm;
@@ -34,6 +35,7 @@ export interface ComponentDataRequest {
   sort_by?: string;
   order?: "asc" | "desc";
   search?: string;
+  profile_id?: string;
 }
 
 /**

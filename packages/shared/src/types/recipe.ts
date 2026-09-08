@@ -1,7 +1,6 @@
 import type { FormFieldDef, FieldType } from "./fields.js";
 import type { ImperativeUIContext } from "./ui.js";
 import type { LayoutDefinition, UIComponentDef } from "./components.js";
-import type { WorkspaceDateRange } from "./workspace.js";
 
 /**
  * Operações disponíveis no objeto persistence injetado na action.
@@ -46,24 +45,28 @@ export interface ActionDef<TRow = any> {
   action(context: ActionContext<TRow, Record<string, unknown>>): Promise<void>;
 }
 
-/**
- * Definição de uma Query SQL vinculada a uma permissão.
- */
+export interface QueryOptionDef {
+  id: string;
+  label: string;
+  permission?: string;
+  sql: string;
+}
+
+export type QueryOptionList = [QueryOptionDef, ...QueryOptionDef[]];
+
+/** Definição de uma query nomeada com variações SQL permissionadas. */
 export interface SourceQueryDef {
-  id?: string;
-  query: string;
+  primaryKey?: string;
   columns?: Array<{
     name: string;
     type: FieldType;
     label?: string;
   }>;
+  options: QueryOptionList;
 }
 
-/**
- * Definição de uma Fonte de Dados externa (ERP).
- */
+/** Definição de um DB cadastrado na plataforma. */
 export interface SourceDef {
-  primaryKey: string;
   queries: Record<string, SourceQueryDef>;
 }
 

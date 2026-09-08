@@ -3,6 +3,41 @@
  */
 export type DataFormat = "currency" | "datetime" | "date" | "number" | "text" | "percent";
 
+export interface QueryOptionMeta {
+  id: string;
+  label: string;
+}
+
+export interface ComponentBindingDef {
+  id: string;
+  source?: string;
+  query?: string;
+  persistence?: string;
+  joinKey: string;
+  primary?: boolean;
+}
+
+export interface ComponentProfileDef {
+  id: string;
+  label: string;
+  options: Record<string, string>;
+}
+
+export interface ComponentProfileBindingMeta {
+  id: string;
+  sourceName?: string;
+  queryName?: string;
+  persistenceName?: string;
+  optionId?: string;
+  optionLabel?: string;
+}
+
+export interface ComponentProfileMeta {
+  id: string;
+  label: string;
+  bindings: ComponentProfileBindingMeta[];
+}
+
 /**
  * Definição de layout em grade responsiva CSS Grid (12 colunas).
  */
@@ -49,6 +84,10 @@ export interface DataTableColumnDef<TRow = Record<string, unknown>> {
 export interface StatCardProps<TRow = Record<string, unknown>> {
   title: string;
   source?: string;
+  query?: string;
+  bindings?: ComponentBindingDef[];
+  profiles?: ComponentProfileDef[];
+  availableProfiles?: ComponentProfileMeta[];
   aggregate?: {
     function: "sum" | "count" | "avg" | "min" | "max";
     field: string;
@@ -65,6 +104,10 @@ export interface StatCardProps<TRow = Record<string, unknown>> {
 export interface DataTableProps<TRow = Record<string, unknown>> {
   title?: string;
   source: string;
+  query?: string;
+  bindings?: ComponentBindingDef[];
+  profiles?: ComponentProfileDef[];
+  availableProfiles?: ComponentProfileMeta[];
   columns: DataTableColumnDef<TRow>[];
   rowActions?: string[];
   pagination?: {
@@ -79,6 +122,10 @@ export interface DataTableProps<TRow = Record<string, unknown>> {
 export interface ChartProps {
   title?: string;
   source: string;
+  query?: string;
+  bindings?: ComponentBindingDef[];
+  profiles?: ComponentProfileDef[];
+  availableProfiles?: ComponentProfileMeta[];
   nameKey: string;
   valueKey: string;
   limit?: number;
