@@ -1,7 +1,6 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@platform/shared": ["./packages/shared/src/index.ts"],
       "@platform/shared/*": ["./packages/shared/src/*"]
