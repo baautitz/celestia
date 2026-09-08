@@ -6,6 +6,7 @@ import type {
   Role,
 } from "@platform/shared";
 import { SYSTEM_PERMISSIONS, getSystemPermissionsByModule } from "./system-permissions.js";
+import { PermissionResolver } from "./permission-resolver.js";
 
 export class PermissionCatalogEngine {
   /**
@@ -45,17 +46,16 @@ export class PermissionCatalogEngine {
     if (recipe.sources) {
       for (const [sourceName, sourceDef] of Object.entries(recipe.sources)) {
         if (sourceDef.queries) {
-          for (const [queryKey, queryObj] of Object.entries(sourceDef.queries)) {
-            // Se a chave da query já estiver formatada com recipe:..., usa ela, senão gera o padrão
-            const permKey = queryKey.startsWith("recipe:")
-              ? queryKey
-              : `recipe:${recipeId}:query:${queryKey}`;
+          for (const [queryName, queryDef] of Object.entries(sourceDef.queries)) {
+            for (const option of queryDef.options) {
+              const permKey = PermissionResolver.getQueryOptionPermission(recipeId, queryName, option);
 
-            queryPermissions.push({
-              key: permKey,
-              label: `Consulta ${sourceName.toUpperCase()}: ${queryKey}`,
-              description: `Permite carregar dados da fonte '${sourceName}' sob a regra '${queryKey}'.`,
-            });
+              queryPermissions.push({
+                key: permKey,
+                label: `Consulta ${sourceName.toUpperCase()}: ${queryName} — ${option.label}`,
+                description: `Permite usar a option '${option.id}' da query '${queryName}' na fonte '${sourceName}'.`,
+              });
+            }
           }
         }
       }

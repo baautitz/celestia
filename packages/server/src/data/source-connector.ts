@@ -18,6 +18,20 @@ export interface SourceConnector {
   close?(): Promise<void>;
 }
 
+export type SourceConnectorRegistry = Record<string, SourceConnector>;
+
+export function resolveSourceConnector(
+  sourceName: string,
+  registry: SourceConnectorRegistry,
+  fallback?: SourceConnector
+): SourceConnector {
+  const connector = registry[sourceName] || fallback;
+  if (!connector) {
+    throw new Error(`Nenhum conector cadastrado para a fonte '${sourceName}'.`);
+  }
+  return connector;
+}
+
 /**
  * Conector Mock para testes unitários e de integração no Vitest.
  */

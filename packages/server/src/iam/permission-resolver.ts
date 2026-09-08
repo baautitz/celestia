@@ -1,47 +1,129 @@
-import type { SourceDef, SourceQueryDef, ActionDef } from "@platform/shared";
+import type { ActionDef, QueryOptionDef, SourceDef, SourceQueryDef } from "@platform/shared";
+
+export interface ResolvedQueryOption {
+  queryName: string;
+  queryDef: SourceQueryDef;
+  option: QueryOptionDef;
+  matchedPermission: string;
+}
 
 export class PermissionResolver {
-  /**
-   * Resolve a query SQL a ser executada com base nas permissões do usuário,
-   * respeitando a ordem de declaração na Recipe (a primeira compatível é selecionada).
-   */
+  static getQueryOptionPermission(
+    recipeId: string,
+    queryName: string,
+    option: QueryOptionDef
+  ): string {
+    return option.permission || `recipe:${recipeId}:query:${queryName}`;
+  }
+
+  static canUsePermission(permission: string, userPermissions?: string[]): boolean {
+    if (!userPermissions || userPermissions.length === 0) return true;
+    return userPermissions.includes("*") || userPermissions.includes(permission);
+  }
+
+  static getAuthorizedQueryOptions(options: {
+    recipeId: string;
+    queryName: string;
+    queryDef: SourceQueryDef;
+    userPermissions?: string[];
+  }): QueryOptionDef[] {
+    const { recipeId, queryName, queryDef, userPermissions } = options;
+    const authorized = queryDef.options.filter((option) =>
+      this.canUsePermission(this.getQueryOptionPermission(recipeId, queryName, option), userPermissions)
+    );
+
+    if (!userPermissions || userPermissions.length === 0) {
+      return queryDef.options.slice(0, 1);
+    }
+
+    return authorized;
+  }
+
+  static resolveQueryOption(options: {
+    recipeId: string;
+    sourceName: string;
+    queryName: string;
+    sourceDef: SourceDef;
+    userPermissions?: string[];
+    optionId?: string;
+  }): ResolvedQueryOption {
+    const { recipeId, sourceName, queryName, sourceDef, userPermissions, optionId } = options;
+    const queryDef = sourceDef.queries[queryName];
+
+    if (!queryDef) {
+      throw new Error(`A query '${queryName}' não existe na fonte '${sourceName}'.`);
+    }
+    if (queryDef.options.length === 0) {
+      throw new Error(`A query '${queryName}' da fonte '${sourceName}' precisa possuir ao menos uma option.`);
+    }
+
+    const authorizedOptions = this.getAuthorizedQueryOptions({
+      recipeId,
+      queryName,
+      queryDef,
+      userPermissions,
+    });
+
+    if (authorizedOptions.length === 0) {
+      throw new Error(
+        `Acesso negado: o usuário não possui permissão para nenhuma option da query '${queryName}' na fonte '${sourceName}'.`
+      );
+    }
+
+    const selectedOption = optionId
+      ? authorizedOptions.find((option) => option.id === optionId)
+      : authorizedOptions[0];
+
+    if (!selectedOption) {
+      throw new Error(
+        `Acesso negado: a option '${optionId}' da query '${queryName}' não está autorizada para o usuário.`
+      );
+    }
+
+    return {
+      queryName,
+      queryDef,
+      option: selectedOption,
+      matchedPermission: this.getQueryOptionPermission(recipeId, queryName, selectedOption),
+    };
+  }
+
   static resolveSourceQuery(options: {
     recipeId: string;
     sourceName: string;
     sourceDef: SourceDef;
     userPermissions: string[];
-  }): { queryDef: SourceQueryDef; matchedPermission: string } {
+  }): ResolvedQueryOption {
     const { recipeId, sourceName, sourceDef, userPermissions } = options;
+    const queryEntries = Object.entries(sourceDef.queries);
 
-    if (!sourceDef.queries || Object.keys(sourceDef.queries).length === 0) {
+    if (queryEntries.length === 0) {
       throw new Error(`A fonte '${sourceName}' não possui nenhuma query declarada.`);
     }
 
-    const permsSet = new Set(userPermissions);
-
-    // Itera na ordem de declaração das chaves do objeto queries
-    for (const [queryKey, queryDef] of Object.entries(sourceDef.queries)) {
-      const fullPermKey = queryKey.startsWith("recipe:")
-        ? queryKey
-        : `recipe:${recipeId}:query:${queryKey}`;
-
-      // Aceita se o usuário tiver a chave completa ou a chave legada direta
-      if (permsSet.has(fullPermKey) || permsSet.has(queryKey)) {
-        return {
-          queryDef,
-          matchedPermission: fullPermKey,
-        };
+    for (const [queryName, queryDef] of queryEntries) {
+      const authorizedOptions = this.getAuthorizedQueryOptions({
+        recipeId,
+        queryName,
+        queryDef,
+        userPermissions,
+      });
+      if (authorizedOptions.length > 0) {
+        return this.resolveQueryOption({
+          recipeId,
+          sourceName,
+          queryName,
+          sourceDef,
+          userPermissions,
+        });
       }
     }
 
     throw new Error(
-      `Acesso negado: o usuário não possui permissão para consultar os dados da fonte '${sourceName}' no dashboard '${recipeId}'.`
+      `Acesso negado: o usuário não possui permissão para consultar a fonte '${sourceName}' no dashboard '${recipeId}'.`
     );
   }
 
-  /**
-   * Valida se o usuário tem permissão para executar uma ação operacional.
-   */
   static canExecuteAction(options: {
     recipeId: string;
     actionDef: ActionDef;
@@ -54,18 +136,11 @@ export class PermissionResolver {
       ? actionDef.permission
       : `recipe:${recipeId}:action:${actionDef.id}`;
 
-    if (permsSet.has(fullPermKey)) return true;
-    if (actionDef.permission && permsSet.has(actionDef.permission)) return true;
-
-    return false;
+    return permsSet.has("*") || permsSet.has(fullPermKey) || Boolean(actionDef.permission && permsSet.has(actionDef.permission));
   }
 
-  /**
-   * Valida se o usuário tem permissão para visualizar o dashboard.
-   */
   static canViewRecipe(recipeId: string, userPermissions: string[]): boolean {
     const permsSet = new Set(userPermissions);
-    const viewKey = `recipe:${recipeId}:view`;
-    return permsSet.has(viewKey);
+    return permsSet.has("*") || permsSet.has(`recipe:${recipeId}:view`);
   }
 }
