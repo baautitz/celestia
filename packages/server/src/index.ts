@@ -7,7 +7,7 @@ import { z } from "zod";
 import { RecipeCompiler } from "./engine/compiler.js";
 import { DataResolver } from "./data/data-resolver.js";
 import { ActionExecutor } from "./engine/action-executor.js";
-import { MockSourceConnector } from "./data/source-connector.js";
+import { MockSourceConnector, resolveSourceConnector, type SourceConnector, type SourceConnectorRegistry } from "./data/source-connector.js";
 import { MemoryPersistenceStore } from "./data/persistence-store.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
@@ -20,7 +20,8 @@ import defaultFechamentoRecipe from "./recipes/default-recipe.js";
 
 export interface CreatePlatformAppOptions {
   compiler?: RecipeCompiler;
-  sourceConnector?: MockSourceConnector;
+  sourceConnector?: SourceConnector;
+  sourceConnectors?: SourceConnectorRegistry;
   persistenceStore?: MemoryPersistenceStore;
   userStore?: UserStore;
   tokenService?: TokenService;
@@ -42,6 +43,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   );
   const compiler = options?.compiler || new RecipeCompiler();
   const sourceConnector = options?.sourceConnector || new MockSourceConnector();
+  const sourceConnectors = options?.sourceConnectors || {};
   const persistenceStore = options?.persistenceStore || new MemoryPersistenceStore();
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
@@ -722,7 +724,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       }
 
       try {
-        const rows = await sourceConnector.query(fieldDef.lookup.query);
+        const lookupConnector = resolveSourceConnector(fieldDef.lookup.source, sourceConnectors, sourceConnector);
+        const rows = await lookupConnector.query(fieldDef.lookup.query);
         const valueKey = fieldDef.lookup.valueKey || "value";
         const labelKey = fieldDef.lookup.labelKey || "label";
 
@@ -761,6 +764,18 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         );
       }
 
+      const schemaComponents = recipe.ui.components.map((component) => ({
+        ...component,
+        props: {
+          ...component.props,
+          availableProfiles: DataResolver.getComponentProfileMetadata(
+            recipe,
+            component,
+            user?.permissions
+          ),
+        },
+      }));
+
       const uiSchema = {
         id: recipe.id,
         name: recipe.name,
@@ -774,7 +789,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           nature: a.nature || "mutation",
           permission: a.permission,
         })),
-        ui: recipe.ui,
+        ui: { ...recipe.ui, components: schemaComponents },
       };
 
       return c.json(uiSchema);
@@ -798,6 +813,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           sort_by: z.string().optional(),
           order: z.enum(["asc", "desc"]).optional(),
           search: z.string().optional(),
+          profile_id: z.string().optional(),
         })
         .refine(
           (data) => {
@@ -823,7 +839,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           workspaceId,
           componentId,
           sourceConnector,
+          sourceConnectors,
           persistenceStore,
+          profileId: query.profile_id,
           context: {
             workspace: {
               startDate: query.start_date,
@@ -871,6 +889,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       "json",
       z.object({
         recipe_id: z.string().default("fechamento_mes"),
+        component_id: z.string(),
         action_id: z.string(),
         row: z.record(z.unknown()),
         form_data: z.record(z.unknown()).optional(),
@@ -882,6 +901,21 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const body = c.req.valid("json");
       const recipe = getRecipe(body.recipe_id);
       const user = c.get("user") as JWTAccessPayload | undefined;
+
+      const component = recipe.ui.components.find((item) => item.id === body.component_id);
+      if (!component || component.component !== "data_table") {
+        return c.json(
+          { error: `Componente de origem '${body.component_id}' não encontrado ou não suporta actions de linha.` },
+          400
+        );
+      }
+
+      const actionBinding = component.props.bindings?.find((binding) => binding.primary) || component.props.bindings?.[0];
+      const actionSource = actionBinding?.source || component.props.source;
+      const actionQuery = actionBinding?.query || component.props.query;
+      if (!actionSource || !actionQuery) {
+        return c.json({ error: "O componente de origem não possui source/query para executar a action." }, 400);
+      }
 
       // Trava de execução se a Área de Trabalho estiver concluída para ações de modificação
       const ws = workspacesMap.get(workspaceId);
@@ -899,6 +933,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         const result = await ActionExecutor.execute({
           recipe,
           actionId: body.action_id,
+          sourceName: actionSource,
+          queryName: actionQuery,
           row: body.row,
           formData: body.form_data,
           workspaceId,

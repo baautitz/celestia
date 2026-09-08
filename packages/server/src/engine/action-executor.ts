@@ -7,7 +7,6 @@ import type {
   PersistenceContext,
   OpenDialogOptions,
   ShowTableOptions,
-  SourceDef,
 } from "@platform/shared";
 import type { PersistenceStore } from "../data/persistence-store.js";
 import { PermissionResolver } from "../iam/permission-resolver.js";
@@ -15,6 +14,8 @@ import { PermissionResolver } from "../iam/permission-resolver.js";
 export interface ExecuteActionOptions {
   recipe: RecipeDef;
   actionId: string;
+  sourceName: string;
+  queryName: string;
   row: Record<string, unknown>;
   formData?: Record<string, unknown>;
   workspaceId: string;
@@ -43,6 +44,8 @@ export class ActionExecutor {
     const {
       recipe,
       actionId,
+      sourceName,
+      queryName,
       row,
       formData,
       workspaceId,
@@ -116,15 +119,32 @@ export class ActionExecutor {
     };
 
     // 2. Constrói as operações de persistência
-    const sourceDef = Object.values(recipe.sources)[0] as SourceDef | undefined;
-    const primaryKeyField = sourceDef?.primaryKey || "id";
-    const targetFkValue = String(row[primaryKeyField] ?? "");
+    const sourceDef = recipe.sources[sourceName];
+    if (!sourceDef) {
+      throw new Error(`Fonte '${sourceName}' não encontrada na recipe '${recipe.id}'.`);
+    }
+
+    const queryDef = sourceDef.queries[queryName];
+    if (!queryDef) {
+      throw new Error(`Query '${queryName}' não encontrada na fonte '${sourceName}'.`);
+    }
+    if (!queryDef.primaryKey) {
+      throw new Error(`A query '${queryName}' não possui primaryKey para actions de linha.`);
+    }
+
+    const targetFkValue = String(row[queryDef.primaryKey] ?? "");
 
     const persistence: PersistenceContext = {
       push: async (targetCollection: string, item: Record<string, unknown>) => {
+        if (!targetFkValue) {
+          throw new Error(`A linha da query '${queryName}' não possui a chave '${queryDef.primaryKey}'.`);
+        }
         return await persistenceStore.pushItem(workspaceId, targetCollection, targetFkValue, item);
       },
       set: async (targetCollection: string, itemId: string | number, payload: Record<string, unknown>) => {
+        if (!targetFkValue) {
+          throw new Error(`A linha da query '${queryName}' não possui a chave '${queryDef.primaryKey}'.`);
+        }
         return await persistenceStore.setScalar(workspaceId, targetCollection, targetFkValue || itemId, payload);
       },
       delete: async (targetCollection: string, itemId: string | number) => {
