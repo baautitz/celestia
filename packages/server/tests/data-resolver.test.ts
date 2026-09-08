@@ -14,10 +14,17 @@ describe("DataResolver (Tabelas Paginadas vs Gráficos & KPIs Totais)", () => {
     workspace: { params: [] },
     sources: {
       inovafarma: {
-        primaryKey: "vendedor_id",
         queries: {
-          default: {
-            query: "SELECT * FROM vendas",
+          vendas: {
+            primaryKey: "vendedor_id",
+            options: [
+              {
+                id: "default",
+                label: "Padrão",
+                permission: "recipe:fechamento_mes:query:vendas_default",
+                sql: "SELECT * FROM vendas",
+              },
+            ],
           },
         },
       },
@@ -60,6 +67,7 @@ describe("DataResolver (Tabelas Paginadas vs Gráficos & KPIs Totais)", () => {
           props: {
             title: "Total em Vendas",
             source: "inovafarma",
+            query: "vendas",
             aggregate: { function: "sum", field: "venda_geral" },
           },
         },
@@ -68,6 +76,7 @@ describe("DataResolver (Tabelas Paginadas vs Gráficos & KPIs Totais)", () => {
           component: "bar_chart",
           props: {
             source: "inovafarma",
+            query: "vendas",
             nameKey: "vendedor",
             valueKey: "venda_geral",
           },
@@ -77,6 +86,7 @@ describe("DataResolver (Tabelas Paginadas vs Gráficos & KPIs Totais)", () => {
           component: "data_table",
           props: {
             source: "inovafarma",
+            query: "vendas",
             columns: [
               { key: "vendedor_id", label: "ID" },
               { key: "vendedor", label: "Vendedor" },

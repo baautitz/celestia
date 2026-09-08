@@ -118,6 +118,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           recipe_id: "fechamento_mes",
+          component_id: "tabela_vendedores",
           action_id: "visualizar_penalidades",
           row: { vendedor_id: 1, vendedor: "Carlos" },
         }),
@@ -132,6 +133,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           recipe_id: "fechamento_mes",
+          component_id: "tabela_vendedores",
           action_id: "adicionar_penalidade",
           row: { vendedor_id: 1, vendedor: "Carlos" },
           form_data: { valor: 10, reason: "Atraso" },

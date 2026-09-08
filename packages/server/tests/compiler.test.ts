@@ -13,9 +13,11 @@ describe("RecipeCompiler (esbuild em memória)", () => {
       workspace: { params: [] },
       sources: {
         mock: {
-          primaryKey: "id",
           queries: {
-            default: { query: "SELECT * FROM mock" }
+            dados: {
+              primaryKey: "id",
+              options: [{ id: "default", label: "Padrão", permission: "recipe:test:query:dados", sql: "SELECT * FROM mock" }]
+            }
           }
         }
       },

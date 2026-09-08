@@ -281,7 +281,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       const recipeGroup = catalog.recipes[0];
       expect(recipeGroup.recipeId).toBe("fechamento_mes");
       expect(recipeGroup.viewPermission.key).toBe("recipe:fechamento_mes:view");
-      expect(recipeGroup.queryPermissions.some((p: PermissionItem) => p.key === "recipe:fechamento_mes:query:all")).toBe(true);
+      expect(recipeGroup.queryPermissions.some((p: PermissionItem) => p.key === "recipe:fechamento_mes:query:vendas_equipe")).toBe(true);
       expect(recipeGroup.actionPermissions.some((p: PermissionItem) => p.key === "recipe:fechamento_mes:action:adicionar_penalidade")).toBe(true);
     });
 
@@ -333,7 +333,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       operadorToken = ((await resOperador.json()) as AuthTokens).accessToken;
     });
 
-    it("Vendedor com permissão 'query:self' e externals.inovafarma=42 deve receber apenas seu próprio registro", async () => {
+    it("Vendedor com permissão 'query:vendas_proprias' e externals.inovafarma=42 deve receber apenas seu próprio registro", async () => {
       const res = await app.request("/api/workspaces/ws_teste/data/tabela_vendedores?recipe_id=fechamento_mes", {
         headers: { Authorization: `Bearer ${vendedorToken}` },
       });
@@ -345,7 +345,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       // A query self tem: WHERE e.id = {{user.externals.inovafarma}} -> interpola 42
     });
 
-    it("Operador com permissão 'query:all' deve receber todos os vendedores da equipe", async () => {
+    it("Operador com permissão 'query:vendas_equipe' deve receber todos os vendedores da equipe", async () => {
       const res = await app.request("/api/workspaces/ws_teste/data/tabela_vendedores?recipe_id=fechamento_mes", {
         headers: { Authorization: `Bearer ${operadorToken}` },
       });
@@ -365,6 +365,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
         },
         body: JSON.stringify({
           recipe_id: "fechamento_mes",
+          component_id: "tabela_vendedores",
           action_id: "adicionar_penalidade",
           row: { vendedor_id: 42, vendedor: "João" },
           form_data: { valor: 50, reason: "Atraso" },
@@ -385,6 +386,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
         },
         body: JSON.stringify({
           recipe_id: "fechamento_mes",
+          component_id: "tabela_vendedores",
           action_id: "adicionar_penalidade",
           row: { vendedor_id: 42, vendedor: "João" },
           form_data: { valor: 50, reason: "Atraso", __confirmed: true },

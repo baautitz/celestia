@@ -20,9 +20,18 @@ describe("Hono API Integration Test (End-to-End)", () => {
     },
     sources: {
       inovafarma: {
-        primaryKey: "vendedor_id",
         queries: {
-          default: { query: "SELECT * FROM vendas" },
+          vendas: {
+            primaryKey: "vendedor_id",
+            options: [
+              {
+                id: "default",
+                label: "Padrão",
+                permission: "recipe:fechamento_mes:query:vendas_default",
+                sql: "SELECT * FROM vendas",
+              },
+            ],
+          },
         },
       },
     },
@@ -56,6 +65,7 @@ describe("Hono API Integration Test (End-to-End)", () => {
           component: "data_table",
           props: {
             source: "inovafarma",
+            query: "vendas",
             columns: [
               { key: "vendedor_id", label: "ID" },
               { key: "vendedor", label: "Vendedor" },
@@ -120,6 +130,7 @@ describe("Hono API Integration Test (End-to-End)", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         recipe_id: "fechamento_mes",
+        component_id: "tabela_vendedores",
         action_id: "aprovar_fechamento",
         row: { vendedor_id: 1, vendedor: "Carlos Vendedor" },
         workspace_version: 1,

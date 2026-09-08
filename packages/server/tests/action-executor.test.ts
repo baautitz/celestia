@@ -12,8 +12,19 @@ describe("ActionExecutor (Execução de Actions Imperativas)", () => {
     workspace: { params: [] },
     sources: {
       inovafarma: {
-        primaryKey: "vendedor_id",
-        queries: {},
+        queries: {
+          vendas: {
+            primaryKey: "vendedor_id",
+            options: [
+              {
+                id: "default",
+                label: "Padrão",
+                permission: "recipe:fechamento_mes:query:vendas_default",
+                sql: "SELECT * FROM vendas",
+              },
+            ],
+          },
+        },
       },
     },
     persistence: [],
@@ -64,6 +75,8 @@ describe("ActionExecutor (Execução de Actions Imperativas)", () => {
     const result = await ActionExecutor.execute({
       recipe: mockRecipe,
       actionId: "adicionar_penalidade",
+      sourceName: "inovafarma",
+      queryName: "vendas",
       row: { vendedor_id: 42, vendedor: "João" },
       formData: { valor: 50, motivo: "Atraso no caixa" },
       workspaceId: "ws_101",
@@ -98,6 +111,8 @@ describe("ActionExecutor (Execução de Actions Imperativas)", () => {
     const result = await ActionExecutor.execute({
       recipe: mockRecipe,
       actionId: "remover_penalidade",
+      sourceName: "inovafarma",
+      queryName: "vendas",
       row: { vendedor_id: 42, penalidade_id: item.id },
       formData: { __confirmed: true },
       workspaceId: "ws_101",
