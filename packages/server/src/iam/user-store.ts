@@ -50,8 +50,8 @@ export class MemoryUserStore implements UserStore {
     const adminPermissions = [
       ...SYSTEM_PERMISSIONS.map((p) => p.key),
       "recipe:fechamento_mes:view",
-      "recipe:fechamento_mes:query:all",
-      "recipe:fechamento_mes:query:self",
+      "recipe:fechamento_mes:query:vendas_equipe",
+      "recipe:fechamento_mes:query:vendas_proprias",
       "recipe:fechamento_mes:action:adicionar_penalidade",
       "recipe:fechamento_mes:action:visualizar_penalidades",
       "recipe:fechamento_mes:action:remover_penalidade",
@@ -73,7 +73,7 @@ export class MemoryUserStore implements UserStore {
         "system:workspaces:create",
         "system:workspaces:close",
         "recipe:fechamento_mes:view",
-        "recipe:fechamento_mes:query:all",
+        "recipe:fechamento_mes:query:vendas_equipe",
         "recipe:fechamento_mes:action:adicionar_penalidade",
         "recipe:fechamento_mes:action:visualizar_penalidades",
         "recipe:fechamento_mes:action:remover_penalidade",
@@ -87,7 +87,7 @@ export class MemoryUserStore implements UserStore {
       description: "Acesso exclusivo ao relatório individual de suas próprias vendas.",
       permissions: [
         "recipe:fechamento_mes:view",
-        "recipe:fechamento_mes:query:self",
+        "recipe:fechamento_mes:query:vendas_proprias",
         "recipe:fechamento_mes:action:visualizar_penalidades",
       ],
     });
