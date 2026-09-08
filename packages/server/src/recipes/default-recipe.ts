@@ -53,43 +53,46 @@ export const defaultFechamentoRecipe = defineRecipe<FechamentoVendedorRow>({
 
   sources: {
     inovafarma: {
-      primaryKey: "vendedor_id",
       queries: {
-        "recipe:fechamento_mes:query:all": {
-          id: "q_vendas_all",
-          query: `
-            SELECT e.id AS vendedor_id, e.name AS vendedor, SUM(v.total) AS venda_geral
-            FROM vendas v
-            INNER JOIN employees e ON v.vendedor_id = e.id
-            INNER JOIN products p ON v.product_id = p.id
-            WHERE v.created_at BETWEEN {{workspace.start_date}} AND {{workspace.end_date}}
-              AND ({{workspace.categories_focus}} IS NULL
-                   OR p.category_id IN ({{workspace.categories_focus}}))
-            GROUP BY e.id, e.name
-          `,
+        vendas: {
+          primaryKey: "vendedor_id",
           columns: [
             { name: "vendedor_id", type: "number", label: "ID Vendedor" },
             { name: "vendedor", type: "text", label: "Vendedor" },
             { name: "venda_geral", type: "money", label: "Venda Geral" },
           ],
-        },
-        "recipe:fechamento_mes:query:self": {
-          id: "q_vendas_self",
-          query: `
-            SELECT e.id AS vendedor_id, e.name AS vendedor, SUM(v.total) AS venda_geral
-            FROM vendas v
-            INNER JOIN employees e ON v.vendedor_id = e.id
-            INNER JOIN products p ON v.product_id = p.id
-            WHERE v.created_at BETWEEN {{workspace.start_date}} AND {{workspace.end_date}}
-              AND e.id = {{user.externals.inovafarma}}
-              AND ({{workspace.categories_focus}} IS NULL
-                   OR p.category_id IN ({{workspace.categories_focus}}))
-            GROUP BY e.id, e.name
-          `,
-          columns: [
-            { name: "vendedor_id", type: "number", label: "ID Vendedor" },
-            { name: "vendedor", type: "text", label: "Vendedor" },
-            { name: "venda_geral", type: "money", label: "Venda Geral" },
+          options: [
+            {
+              id: "equipe",
+              label: "Equipe",
+              permission: "recipe:fechamento_mes:query:vendas_equipe",
+              sql: `
+                SELECT e.id AS vendedor_id, e.name AS vendedor, SUM(v.total) AS venda_geral
+                FROM vendas v
+                INNER JOIN employees e ON v.vendedor_id = e.id
+                INNER JOIN products p ON v.product_id = p.id
+                WHERE v.created_at BETWEEN {{workspace.start_date}} AND {{workspace.end_date}}
+                  AND ({{workspace.categories_focus}} IS NULL
+                       OR p.category_id IN ({{workspace.categories_focus}}))
+                GROUP BY e.id, e.name
+              `,
+            },
+            {
+              id: "proprias",
+              label: "Próprias",
+              permission: "recipe:fechamento_mes:query:vendas_proprias",
+              sql: `
+                SELECT e.id AS vendedor_id, e.name AS vendedor, SUM(v.total) AS venda_geral
+                FROM vendas v
+                INNER JOIN employees e ON v.vendedor_id = e.id
+                INNER JOIN products p ON v.product_id = p.id
+                WHERE v.created_at BETWEEN {{workspace.start_date}} AND {{workspace.end_date}}
+                  AND e.id = {{user.externals.inovafarma}}
+                  AND ({{workspace.categories_focus}} IS NULL
+                       OR p.category_id IN ({{workspace.categories_focus}}))
+                GROUP BY e.id, e.name
+              `,
+            },
           ],
         },
       },
@@ -241,6 +244,7 @@ export const defaultFechamentoRecipe = defineRecipe<FechamentoVendedorRow>({
         props: {
           title: "Total em Vendas",
           source: "inovafarma",
+          query: "vendas",
           aggregate: { function: "sum", field: "venda_geral" },
           format: "currency",
           icon: "DollarSign",
@@ -264,6 +268,8 @@ export const defaultFechamentoRecipe = defineRecipe<FechamentoVendedorRow>({
         layoutProps: { colSpan: 4 },
         props: {
           title: "Total Líquido a Pagar",
+          source: "inovafarma",
+          query: "vendas",
           format: "currency",
           icon: "Wallet",
           compute: (rows: FechamentoVendedorRow[]) =>
@@ -285,6 +291,7 @@ export const defaultFechamentoRecipe = defineRecipe<FechamentoVendedorRow>({
         props: {
           title: "Ranking de Vendas por Vendedor",
           source: "inovafarma",
+          query: "vendas",
           nameKey: "vendedor",
           valueKey: "venda_geral",
           limit: 5,
@@ -297,6 +304,7 @@ export const defaultFechamentoRecipe = defineRecipe<FechamentoVendedorRow>({
         props: {
           title: "Distribuição das Vendas na Equipe",
           source: "inovafarma",
+          query: "vendas",
           nameKey: "vendedor",
           valueKey: "venda_geral",
         },
@@ -310,6 +318,38 @@ export const defaultFechamentoRecipe = defineRecipe<FechamentoVendedorRow>({
         props: {
           title: "Fechamento da Folha por Vendedor",
           source: "inovafarma",
+          query: "vendas",
+          bindings: [
+            {
+              id: "vendas",
+              source: "inovafarma",
+              query: "vendas",
+              joinKey: "vendedor_id",
+              primary: true,
+            },
+            {
+              id: "remuneracao",
+              persistence: "remuneracao_vendedor",
+              joinKey: "vendedor_id",
+            },
+            {
+              id: "penalidades",
+              persistence: "penalidades_vendedor",
+              joinKey: "vendedor_id",
+            },
+          ],
+          profiles: [
+            {
+              id: "equipe",
+              label: "Equipe",
+              options: { vendas: "equipe" },
+            },
+            {
+              id: "proprias",
+              label: "Próprias",
+              options: { vendas: "proprias" },
+            },
+          ],
           columns: [
             { key: "vendedor_id", label: "ID", sortable: true },
             {
