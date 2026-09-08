@@ -25,6 +25,8 @@ import {
   LineChart,
   LabelList,
 } from "recharts";
+import { QueryProfileSelect } from "./QueryProfileSelect";
+import { useQueryProfileSelection } from "@/hooks/use-query-profile-selection";
 
 interface SDUIChartProps {
   id: string;
@@ -48,6 +50,12 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
   const [data, setData] = useState<ChartDataResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [profileId, setProfileId] = useQueryProfileSelection({
+    recipeId,
+    workspaceId,
+    componentId: id,
+    profiles: props.availableProfiles,
+  });
   const { refreshSignal } = useImperativeUI();
 
   useEffect(() => {
@@ -60,6 +68,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
         recipe_id: recipeId,
         start_date: startDate,
         end_date: endDate,
+        profile_id: profileId,
       })
       .then((res) => {
         if (isMounted && res.type === "chart") {
@@ -82,7 +91,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
     return () => {
       isMounted = false;
     };
-  }, [id, workspaceId, recipeId, startDate, endDate, refreshSignal]);
+  }, [id, workspaceId, recipeId, startDate, endDate, profileId, refreshSignal]);
 
   const chartData = data?.data ?? [];
 
@@ -267,19 +276,26 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader className="pb-2 shrink-0">
-        <CardTitle className="text-sm font-medium">
-          {props.title ?? "Gráfico"}
-        </CardTitle>
-        {chartData.length > 0 && !loading && !error && (
-          <CardDescription>
-            {component === "bar_chart"
-              ? `Ranking por vendas — ${chartData.length} vendedor(es)`
-              : component === "pie_chart"
-                ? `Distribuição entre ${chartData.length} vendedor(es)`
-                : `${chartData.length} ponto(s) de dados`}
-          </CardDescription>
-        )}
+      <CardHeader className="flex flex-row items-start justify-between gap-3 pb-2 shrink-0">
+        <div>
+          <CardTitle className="text-sm font-medium">
+            {props.title ?? "Gráfico"}
+          </CardTitle>
+          {chartData.length > 0 && !loading && !error && (
+            <CardDescription>
+              {component === "bar_chart"
+                ? `Ranking por vendas — ${chartData.length} vendedor(es)`
+                : component === "pie_chart"
+                  ? `Distribuição entre ${chartData.length} vendedor(es)`
+                  : `${chartData.length} ponto(s) de dados`}
+            </CardDescription>
+          )}
+        </div>
+        <QueryProfileSelect
+          profiles={props.availableProfiles}
+          value={profileId}
+          onValueChange={setProfileId}
+        />
       </CardHeader>
       <CardContent className="flex-1 min-h-0 pb-3">{renderContent()}</CardContent>
     </Card>

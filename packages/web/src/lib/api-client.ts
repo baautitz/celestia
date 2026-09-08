@@ -218,6 +218,7 @@ class ApiClient {
         sort_by?: string;
         order?: "asc" | "desc";
         search?: string;
+        profile_id?: string;
       }
     ): Promise<ComponentDataResponse> => {
       const searchParams = new URLSearchParams();
@@ -229,6 +230,7 @@ class ApiClient {
       if (params.sort_by) searchParams.set("sort_by", params.sort_by);
       if (params.order) searchParams.set("order", params.order);
       if (params.search) searchParams.set("search", params.search);
+      if (params.profile_id) searchParams.set("profile_id", params.profile_id);
 
       return this.request<ComponentDataResponse>(
         `/api/workspaces/${workspaceId}/data/${componentId}?${searchParams.toString()}`

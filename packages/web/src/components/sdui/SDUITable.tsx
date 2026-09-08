@@ -34,6 +34,8 @@ import { useImperativeUI } from "@/context/ImperativeUIContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
+import { QueryProfileSelect } from "./QueryProfileSelect";
+import { useQueryProfileSelection } from "@/hooks/use-query-profile-selection";
 import {
   Search,
   MoreHorizontal,
@@ -74,6 +76,12 @@ export const SDUITable: React.FC<SDUITableProps> = ({
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState<number>(1);
+  const [profileId, setProfileId] = useQueryProfileSelection({
+    recipeId,
+    workspaceId,
+    componentId: id,
+    profiles: props.availableProfiles,
+  });
   const pageSize = props.pagination?.pageSize || 10;
   const isMobile = useIsMobile();
 
@@ -93,6 +101,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
         sort_by: sortBy,
         order,
         search: search || undefined,
+        profile_id: profileId,
       })
       .then((res) => {
         if (isMounted && res.type === "table") {
@@ -113,7 +122,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
 
   useEffect(() => {
     fetchData();
-  }, [id, workspaceId, recipeId, startDate, endDate, page, sortBy, order, refreshSignal]);
+  }, [id, workspaceId, recipeId, startDate, endDate, page, sortBy, order, profileId, refreshSignal]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,6 +137,11 @@ export const SDUITable: React.FC<SDUITableProps> = ({
       setSortBy(key);
       setOrder("asc");
     }
+  };
+
+  const handleProfileChange = (nextProfileId: string) => {
+    setProfileId(nextProfileId);
+    setPage(1);
   };
 
   const processEffects = async (effects: UIEffect[], row: Record<string, unknown>, actionId: string) => {
@@ -148,6 +162,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
 
         const res = await api.workspaces.execAction(workspaceId, {
           recipe_id: recipeId,
+          component_id: id,
           action_id: actionId,
           row,
           form_data: formValues,
@@ -194,6 +209,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
 
         const res = await api.workspaces.execAction(workspaceId, {
           recipe_id: recipeId,
+          component_id: id,
           action_id: actionId,
           row,
           form_data: { confirmed: true, __confirmed: true },
@@ -211,6 +227,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
     try {
       const result = await api.workspaces.execAction(workspaceId, {
         recipe_id: recipeId,
+        component_id: id,
         action_id: actionId,
         row,
         workspace_version: 1,
@@ -277,6 +294,12 @@ export const SDUITable: React.FC<SDUITableProps> = ({
               Total de {totalRecords} registro(s) apurado(s).
             </p>
           </div>
+
+          <QueryProfileSelect
+            profiles={props.availableProfiles}
+            value={profileId}
+            onValueChange={handleProfileChange}
+          />
 
           {/* Barra de Busca */}
           <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 max-w-sm w-full">

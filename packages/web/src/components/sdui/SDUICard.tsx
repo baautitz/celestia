@@ -6,6 +6,8 @@ import { formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api-client";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
 import { TrendingUp, DollarSign, Users, Activity } from "lucide-react";
+import { QueryProfileSelect } from "./QueryProfileSelect";
+import { useQueryProfileSelection } from "@/hooks/use-query-profile-selection";
 
 interface SDUICardProps {
   id: string;
@@ -26,6 +28,12 @@ export const SDUICard: React.FC<SDUICardProps> = React.memo(({
 }) => {
   const [data, setData] = useState<StatDataResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [profileId, setProfileId] = useQueryProfileSelection({
+    recipeId,
+    workspaceId,
+    componentId: id,
+    profiles: props.availableProfiles,
+  });
   const { refreshSignal } = useImperativeUI();
 
   useEffect(() => {
@@ -37,6 +45,7 @@ export const SDUICard: React.FC<SDUICardProps> = React.memo(({
         recipe_id: recipeId,
         start_date: startDate,
         end_date: endDate,
+        profile_id: profileId,
       })
       .then((res) => {
         if (isMounted && res.type === "stat") {
@@ -53,7 +62,7 @@ export const SDUICard: React.FC<SDUICardProps> = React.memo(({
     return () => {
       isMounted = false;
     };
-  }, [id, workspaceId, recipeId, startDate, endDate, refreshSignal]);
+  }, [id, workspaceId, recipeId, startDate, endDate, profileId, refreshSignal]);
 
   const renderIcon = () => {
     switch (props.icon) {
@@ -78,11 +87,18 @@ export const SDUICard: React.FC<SDUICardProps> = React.memo(({
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {props.title}
         </CardTitle>
-        {renderIcon()}
+        <div className="flex items-center gap-2">
+          <QueryProfileSelect
+            profiles={props.availableProfiles}
+            value={profileId}
+            onValueChange={setProfileId}
+          />
+          {renderIcon()}
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
