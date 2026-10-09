@@ -148,7 +148,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
       );
     }
 
-    if (component === "bar_chart") {
+    if (component === "bar_chart" && props.orientation === "horizontal") {
       return (
         <ChartContainer config={barConfig} className="h-full w-full min-h-[180px] md:min-h-[220px]">
           <BarChart
@@ -194,6 +194,53 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
                 offset={8}
                 className="fill-foreground"
                 fontSize={11}
+                formatter={(v: number) => formatCurrency(v)}
+              />
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      );
+    }
+
+    if (component === "bar_chart") {
+      return (
+        <ChartContainer config={barConfig} className="h-full w-full min-h-[180px] md:min-h-[220px]">
+          <BarChart
+            accessibilityLayer
+            data={chartData}
+            margin={{ left: 12, right: 12, top: 24, bottom: 4 }}
+          >
+            <CartesianGrid vertical={false} />
+            <XAxis
+              dataKey="name"
+              tickLine={false}
+              tickMargin={10}
+              axisLine={false}
+              interval={0}
+              tick={{ fontSize: 11 }}
+              tickFormatter={(v: string) => {
+                const s = String(v);
+                return s.length > 10 ? `${s.slice(0, 9)}…` : s;
+              }}
+            />
+            <YAxis hide tickLine={false} axisLine={false} />
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  labelKey="name"
+                  indicator="dot"
+                  formatter={(value) => formatCurrency(value as number)}
+                />
+              }
+            />
+            <Bar dataKey="value" fill="var(--color-value)" radius={4}>
+              <LabelList
+                position="top"
+                offset={8}
+                className="fill-foreground"
+                fontSize={10}
+                formatter={(v: number) => formatCurrency(v)}
               />
             </Bar>
           </BarChart>

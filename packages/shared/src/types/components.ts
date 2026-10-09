@@ -130,6 +130,11 @@ export interface ChartProps {
   nameKey: string;
   valueKey: string;
   limit?: number;
+  /**
+   * Somente bar_chart. "vertical" (padrão): barras em pé, nomes no eixo X.
+   * "horizontal": barras deitadas, nomes no eixo Y (bom para nomes longos).
+   */
+  orientation?: "vertical" | "horizontal";
   [key: string]: unknown;
 }
 
