@@ -39,7 +39,7 @@ import type { DynamicFormValues } from "@/lib/dynamic-form";
 interface DynamicFormFieldsProps {
   fields: FormFieldDef[];
   form: UseFormReturn<DynamicFormValues>;
-  recipeId: string;
+  recipeId?: string;
 }
 
 type Option = { value: string | number; label: string };
@@ -93,7 +93,7 @@ function useFieldOptions(field: FormFieldDef, recipeId: string) {
 export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
   fields,
   form,
-  recipeId,
+  recipeId = "",
 }) => {
   return (
     <>
@@ -110,6 +110,35 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                     <FormLabel>{field.label}</FormLabel>
                     <FormControl>
                       <Textarea
+                        value={String(rhf.value ?? "")}
+                        disabled={field.readOnly}
+                        required={field.required}
+                        onChange={rhf.onChange}
+                        onBlur={rhf.onBlur}
+                        name={rhf.name}
+                        ref={rhf.ref}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            );
+
+          case "password":
+            return (
+              <FormFieldControl
+                key={field.name}
+                control={form.control}
+                name={field.name}
+                render={({ field: rhf }) => (
+                  <FormItem>
+                    <FormLabel>{field.label}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder={field.placeholder}
                         value={String(rhf.value ?? "")}
                         disabled={field.readOnly}
                         required={field.required}

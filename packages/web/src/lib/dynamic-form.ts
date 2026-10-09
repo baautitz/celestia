@@ -67,6 +67,13 @@ export function buildDynamicSchema(fields: FormFieldDef[]) {
         break;
       }
 
+      case "password": {
+        let s = z.string();
+        if (field.required) s = s.min(1, errorMsg);
+        shape[field.name] = s;
+        break;
+      }
+
       case "switch":
         shape[field.name] = z.boolean();
         break;
