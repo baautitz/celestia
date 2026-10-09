@@ -23,33 +23,34 @@ export const QueryProfileSelect: React.FC<QueryProfileSelectProps> = ({
 }) => {
   if (profiles.length === 0) return null;
 
+  // Perfil com mais de uma consulta/persistência: a lista mostra o detalhe de cada uma para diferenciar os perfis.
+  const describe = (profile: ComponentProfileMeta): string =>
+    profile.bindings.length > 1
+      ? [
+          profile.label,
+          profile.bindings
+            .map((binding) => `${binding.queryName || binding.persistenceName || binding.id}: ${binding.optionLabel || "Persistência"}`)
+            .join(" · "),
+        ].join(" — ")
+      : profile.label;
+
   return (
     <Select
+      items={profiles.map((profile) => ({ value: profile.id, label: profile.label }))}
       value={value ?? profiles[0].id}
       onValueChange={(nextValue: string | null) => {
         if (nextValue) onValueChange(nextValue);
       }}
     >
-      <SelectTrigger aria-label="Perfil de dados" className="w-40">
-        <SelectValue placeholder="Perfil de dados" />
+      <SelectTrigger aria-label="Visão" className="w-auto min-w-40 max-w-64">
+        <SelectValue placeholder="Visão" />
       </SelectTrigger>
       <SelectContent alignItemWithTrigger={false} className="w-max min-w-(--anchor-width)">
         <SelectGroup>
-          <SelectLabel>Perfil de dados</SelectLabel>
+          <SelectLabel>Visão</SelectLabel>
           {profiles.map((profile) => (
             <SelectItem key={profile.id} value={profile.id}>
-              {[
-                profile.label,
-                profile.bindings
-                  .map((binding) => {
-                    const bindingName = binding.queryName || binding.persistenceName || binding.id;
-                    const bindingValue = binding.optionLabel || "Persistência";
-                    return `${bindingName}: ${bindingValue}`;
-                  })
-                  .join(" · "),
-              ]
-                .filter(Boolean)
-                .join(" — ")}
+              {describe(profile)}
             </SelectItem>
           ))}
         </SelectGroup>

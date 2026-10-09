@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import type { DashboardSchemaResponse, WorkspaceRecord } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
 import { SDUIRenderer } from "@/components/sdui/SDUIRenderer";
+import { QueryViewsDialog, getViewComponents } from "@/components/sdui/QueryViewsDialog";
 import { DynamicFormFields } from "@/components/forms/DynamicFormFields";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import {
@@ -54,6 +55,7 @@ import {
   Play,
   Shield,
   Settings,
+  Layers,
   MoreHorizontal,
 } from "lucide-react";
 import { RecipePermissionsSheet } from "@/components/recipes/RecipePermissionsSheet";
@@ -126,20 +128,35 @@ export const RecipeDashboardPage: React.FC = () => {
     [schema]
   );
   const [paramsOpen, setParamsOpen] = useState(false);
+  const [viewsOpen, setViewsOpen] = useState(false);
+  // paramsForm é o rascunho do modal; só ao concluir os valores são aplicados (appliedParams) e os dados refeitos.
   const paramsForm = useForm<Record<string, unknown>>({ defaultValues: {} });
+  const [appliedParams, setAppliedParams] = useState("{}");
   useEffect(() => {
-    paramsForm.reset(buildDynamicDefaultValues(paramFields));
+    const defaults = buildDynamicDefaultValues(paramFields);
+    paramsForm.reset(defaults);
+    setAppliedParams(JSON.stringify(defaults));
   }, [paramFields]);
 
-  const watchedParams = JSON.stringify(paramsForm.watch());
-  const previewParams = useMemo(() => {
-    const normalized = normalizeDynamicFormValues(paramFields, JSON.parse(watchedParams) as Record<string, unknown>);
-    return Object.fromEntries(
-      Object.entries(normalized).filter(
-        ([, value]) => value !== "" && value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0)
-      )
-    );
-  }, [watchedParams, paramFields]);
+  const previewParams = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(normalizeDynamicFormValues(paramFields, JSON.parse(appliedParams) as Record<string, unknown>)).filter(
+          ([, value]) => value !== "" && value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0)
+        )
+      ),
+    [appliedParams, paramFields]
+  );
+
+  // Abre o modal sempre a partir dos valores aplicados (fechar sem concluir descarta o rascunho).
+  const openParams = () => {
+    paramsForm.reset(JSON.parse(appliedParams) as Record<string, unknown>);
+    setParamsOpen(true);
+  };
+  const concludeParams = () => {
+    setAppliedParams(JSON.stringify(paramsForm.getValues()));
+    setParamsOpen(false);
+  };
 
   // Abre o dialog de inicialização
   const handleOpenInit = async () => {
@@ -234,6 +251,8 @@ export const RecipeDashboardPage: React.FC = () => {
     );
   }
 
+  const hasViews = schema ? getViewComponents(schema).length > 0 : false;
+
   if (error || !schema) {
     return (
       <Alert variant="destructive">
@@ -259,11 +278,24 @@ export const RecipeDashboardPage: React.FC = () => {
             type="button"
             variant="outline"
             size="icon"
-            onClick={() => setParamsOpen(true)}
+            onClick={openParams}
             title="Parâmetros do Modelo"
             className="size-8 shrink-0"
           >
             <Settings className="size-4" />
+          </Button>
+        )}
+
+        {hasViews && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setViewsOpen(true)}
+            title="Visões dos dados"
+            className="size-8 shrink-0"
+          >
+            <Layers className="size-4" />
           </Button>
         )}
 
@@ -303,9 +335,15 @@ export const RecipeDashboardPage: React.FC = () => {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {paramFields.length > 0 && (
-              <DropdownMenuItem onClick={() => setParamsOpen(true)}>
+              <DropdownMenuItem onClick={openParams}>
                 <Settings className="size-4" />
                 Parâmetros do Modelo
+              </DropdownMenuItem>
+            )}
+            {hasViews && (
+              <DropdownMenuItem onClick={() => setViewsOpen(true)}>
+                <Layers className="size-4" />
+                Visões dos dados
               </DropdownMenuItem>
             )}
             {hasPermission("system:workspaces:create") && (
@@ -356,13 +394,16 @@ export const RecipeDashboardPage: React.FC = () => {
         readOnly
       />
 
+      {/* Visões: escolhe a consulta (visão) de todos os componentes de uma vez */}
+      <QueryViewsDialog open={viewsOpen} onOpenChange={setViewsOpen} schema={schema} workspaceId="preview" />
+
       {/* Parâmetros do Modelo (ex.: empresa) — valem na prévia, sem Área de Trabalho */}
       <Dialog open={paramsOpen} onOpenChange={setParamsOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Parâmetros do Modelo</DialogTitle>
             <DialogDescription>
-              Os valores se aplicam a esta visualização e viram o padrão ao inicializar uma Área de Trabalho.
+              Ao concluir, os valores se aplicam a esta visualização e viram o padrão ao inicializar uma Área de Trabalho.
             </DialogDescription>
           </DialogHeader>
 
@@ -378,7 +419,10 @@ export const RecipeDashboardPage: React.FC = () => {
             <Button type="button" variant="outline" onClick={() => paramsForm.reset(buildDynamicDefaultValues(paramFields))}>
               Limpar
             </Button>
-            <Button type="button" onClick={() => setParamsOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setParamsOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={concludeParams}>
               Concluir
             </Button>
           </DialogFooter>

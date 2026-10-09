@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import type { DashboardSchemaResponse, WorkspaceRecord } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
 import { SDUIRenderer } from "@/components/sdui/SDUIRenderer";
+import { QueryViewsDialog, getViewComponents } from "@/components/sdui/QueryViewsDialog";
 import { DynamicFormFields } from "@/components/forms/DynamicFormFields";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import {
@@ -48,6 +49,7 @@ import {
   Lock,
   RotateCcw,
   Settings,
+  Layers,
   MoreHorizontal,
 } from "lucide-react";
 
@@ -59,6 +61,7 @@ export const WorkspaceDetailPage: React.FC = () => {
   const { triggerRefresh, confirm } = useImperativeUI();
 
   const [schema, setSchema] = useState<DashboardSchemaResponse | null>(null);
+  const [viewsOpen, setViewsOpen] = useState(false);
   const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceRecord | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -268,6 +271,7 @@ export const WorkspaceDetailPage: React.FC = () => {
   }
 
   const isClosed = workspaceInfo?.status === "closed";
+  const hasViews = getViewComponents(schema).length > 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -283,6 +287,19 @@ export const WorkspaceDetailPage: React.FC = () => {
         >
           <RefreshCw className="size-4" />
         </Button>
+
+        {hasViews && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setViewsOpen(true)}
+            title="Visões dos dados"
+            className="size-8 shrink-0"
+          >
+            <Layers className="size-4" />
+          </Button>
+        )}
 
         {isClosed && (
           <Tooltip>
@@ -344,6 +361,12 @@ export const WorkspaceDetailPage: React.FC = () => {
             <MoreHorizontal className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {hasViews && (
+              <DropdownMenuItem onClick={() => setViewsOpen(true)}>
+                <Layers className="size-4" />
+                Visões dos dados
+              </DropdownMenuItem>
+            )}
             {!isClosed && hasPermission("system:workspaces:update") && (
               <DropdownMenuItem onClick={handleOpenEdit}>
                 <Settings className="size-4" />
@@ -409,6 +432,9 @@ export const WorkspaceDetailPage: React.FC = () => {
         endDate={endDate}
         isWorkspaceClosed={isClosed}
       />
+
+      {/* Visões: escolhe a consulta (visão) de todos os componentes de uma vez */}
+      <QueryViewsDialog open={viewsOpen} onOpenChange={setViewsOpen} schema={schema} workspaceId={workspaceId || "default"} />
 
       {/* Dialog de Edição de Parâmetros */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
