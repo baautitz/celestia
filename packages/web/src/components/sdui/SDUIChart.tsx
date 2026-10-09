@@ -169,7 +169,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
             accessibilityLayer
             data={chartData}
             layout="vertical"
-            margin={{ left: 0, right: 16, top: 4, bottom: 4 }}
+            margin={{ left: 0, right: 24, top: 4, bottom: 4 }}
           >
             <CartesianGrid horizontal={false} />
             <YAxis
@@ -178,15 +178,20 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
               tickLine={false}
               tickMargin={8}
               axisLine={false}
-              width={120}
+              interval={0}
+              width={170}
               tick={{ fontSize: 12 }}
               tickFormatter={(v: string) => {
-                const s = String(v);
-                return s.length > 14 ? `${s.slice(0, 13)}…` : s;
+                // "NATALIA MARIA IRALA SOUZA" -> "NATALIA SOUZA"; o nome completo aparece no tooltip.
+                const parts = String(v).split(" ");
+                const s = parts.length > 2 ? `${parts[0]} ${parts[parts.length - 1]}` : String(v);
+                return s.length > 22 ? `${s.slice(0, 21)}…` : s;
               }}
             />
             <XAxis
               type="number"
+              // Folga de 25% depois da maior barra para o rótulo de valor não ser cortado.
+              domain={[0, (dataMax: number) => dataMax * 1.25]}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v: number) => formatCurrency(v)}
