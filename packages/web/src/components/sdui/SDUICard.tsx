@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import type { StatCardProps, StatDataResponse } from "@platform/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 import { api } from "@/lib/api-client";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
 import { TrendingUp, DollarSign, Users, Activity } from "lucide-react";
@@ -16,6 +16,8 @@ interface SDUICardProps {
   recipeId: string;
   startDate: string;
   endDate: string;
+  /** Parâmetros do Modelo usados quando não há Área de Trabalho (modo prévia). */
+  params?: Record<string, unknown>;
 }
 
 export const SDUICard: React.FC<SDUICardProps> = React.memo(({
@@ -25,6 +27,7 @@ export const SDUICard: React.FC<SDUICardProps> = React.memo(({
   recipeId,
   startDate,
   endDate,
+  params,
 }) => {
   const [data, setData] = useState<StatDataResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -45,6 +48,7 @@ export const SDUICard: React.FC<SDUICardProps> = React.memo(({
         recipe_id: recipeId,
         start_date: startDate,
         end_date: endDate,
+        params,
         profile_id: profileId,
       })
       .then((res) => {
@@ -62,7 +66,7 @@ export const SDUICard: React.FC<SDUICardProps> = React.memo(({
     return () => {
       isMounted = false;
     };
-  }, [id, workspaceId, recipeId, startDate, endDate, profileId, refreshSignal]);
+  }, [id, workspaceId, recipeId, startDate, endDate, params, profileId, refreshSignal]);
 
   const renderIcon = () => {
     switch (props.icon) {
@@ -82,6 +86,8 @@ export const SDUICard: React.FC<SDUICardProps> = React.memo(({
     if (props.format === "currency") {
       return formatCurrency(val);
     }
+    if (props.format === "number") return formatNumber(val);
+    if (props.format === "percent") return formatPercent(val);
     return String(val);
   };
 

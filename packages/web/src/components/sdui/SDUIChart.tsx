@@ -36,6 +36,8 @@ interface SDUIChartProps {
   recipeId: string;
   startDate: string;
   endDate: string;
+  /** Parâmetros do Modelo usados quando não há Área de Trabalho (modo prévia). */
+  params?: Record<string, unknown>;
 }
 
 export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
@@ -46,6 +48,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
   recipeId,
   startDate,
   endDate,
+  params,
 }) => {
   const [data, setData] = useState<ChartDataResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -68,6 +71,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
         recipe_id: recipeId,
         start_date: startDate,
         end_date: endDate,
+        params,
         profile_id: profileId,
       })
       .then((res) => {
@@ -91,7 +95,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
     return () => {
       isMounted = false;
     };
-  }, [id, workspaceId, recipeId, startDate, endDate, profileId, refreshSignal]);
+  }, [id, workspaceId, recipeId, startDate, endDate, params, profileId, refreshSignal]);
 
   const chartData = data?.data ?? [];
 

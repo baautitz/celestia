@@ -250,14 +250,15 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                       <FormLabel>{field.label}</FormLabel>
                       <FormControl>
                         <Select
+                          items={normalized.map((opt) => ({ value: String(opt.value), label: opt.label }))}
                           value={String(rhf.value ?? "")}
                           disabled={field.readOnly}
                           onValueChange={(val: string | null) => rhf.onChange(val ?? "")}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Selecione uma opção" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent alignItemWithTrigger={false} className="w-max min-w-(--anchor-width)">
                             {normalized.map((opt) => (
                               <SelectItem key={String(opt.value)} value={String(opt.value)}>
                                 {opt.label}
@@ -290,14 +291,15 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                         <Skeleton className="h-10 w-full" />
                       ) : (
                         <Select
+                          items={options.map((opt) => ({ value: String(opt.value), label: opt.label }))}
                           value={String(rhf.value ?? "")}
                           disabled={field.readOnly}
                           onValueChange={(val: string | null) => rhf.onChange(val ?? "")}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Selecione uma opção" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent alignItemWithTrigger={false} className="w-max min-w-(--anchor-width)">
                             {options.map((opt) => (
                               <SelectItem key={String(opt.value)} value={String(opt.value)}>
                                 {opt.label}

@@ -15,6 +15,19 @@ export function formatCurrency(value: number | string | undefined | null): strin
   }).format(num)
 }
 
+export function formatNumber(value: number | string | undefined | null): string {
+  const num = Number(value)
+  if (value === undefined || value === null || value === "" || isNaN(num)) return "-"
+  return new Intl.NumberFormat("pt-BR").format(num)
+}
+
+/** Recebe o valor já em pontos percentuais (ex.: 33.5 vira "33,5%"). */
+export function formatPercent(value: number | string | undefined | null): string {
+  const num = Number(value)
+  if (value === undefined || value === null || value === "" || isNaN(num)) return "-"
+  return `${new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(num)}%`
+}
+
 export function formatDate(dateString: string | Date | undefined | null): string {
   if (!dateString) return "-"
   try {

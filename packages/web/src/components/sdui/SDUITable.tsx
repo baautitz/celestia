@@ -32,7 +32,7 @@ import { MobileCard } from "@/components/ui/mobile-card";
 import { api } from "@/lib/api-client";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { QueryProfileSelect } from "./QueryProfileSelect";
 import { useQueryProfileSelection } from "@/hooks/use-query-profile-selection";
@@ -54,6 +54,8 @@ interface SDUITableProps {
   recipeId: string;
   startDate: string;
   endDate: string;
+  /** Parâmetros do Modelo usados quando não há Área de Trabalho (modo prévia). */
+  params?: Record<string, unknown>;
   availableActions?: Record<string, ActionDef>;
   isWorkspaceClosed?: boolean;
   readOnly?: boolean;
@@ -66,6 +68,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
   recipeId,
   startDate,
   endDate,
+  params,
   availableActions = {},
   isWorkspaceClosed = false,
   readOnly = false,
@@ -87,6 +90,11 @@ export const SDUITable: React.FC<SDUITableProps> = ({
 
   const { openDialog, showTableModal, updateTableData, confirm, triggerRefresh, refreshSignal } = useImperativeUI();
 
+  // Mudou algum filtro de parâmetro do Modelo: volta para a primeira página.
+  useEffect(() => {
+    setPage(1);
+  }, [params]);
+
   const fetchData = () => {
     let isMounted = true;
     setLoading(true);
@@ -96,6 +104,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
         recipe_id: recipeId,
         start_date: startDate,
         end_date: endDate,
+        params,
         page,
         page_size: pageSize,
         sort_by: sortBy,
@@ -122,7 +131,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
 
   useEffect(() => {
     fetchData();
-  }, [id, workspaceId, recipeId, startDate, endDate, page, sortBy, order, profileId, refreshSignal]);
+  }, [id, workspaceId, recipeId, startDate, endDate, params, page, sortBy, order, profileId, refreshSignal]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,6 +265,8 @@ export const SDUITable: React.FC<SDUITableProps> = ({
     if (rawVal === undefined || rawVal === null) return "-";
     if (col.format === "currency") return formatCurrency(rawVal as number | string);
     if (col.format === "date") return formatDate(rawVal as string);
+    if (col.format === "number") return formatNumber(rawVal as number | string);
+    if (col.format === "percent") return formatPercent(rawVal as number | string);
     return String(rawVal);
   };
 

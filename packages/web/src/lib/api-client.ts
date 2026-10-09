@@ -287,6 +287,8 @@ class ApiClient {
         order?: "asc" | "desc";
         search?: string;
         profile_id?: string;
+        /** Parâmetros do Modelo (ex.: empresa) para uso sem Área de Trabalho (modo prévia). */
+        params?: Record<string, unknown>;
       }
     ): Promise<ComponentDataResponse> => {
       const searchParams = new URLSearchParams();
@@ -299,6 +301,7 @@ class ApiClient {
       if (params.order) searchParams.set("order", params.order);
       if (params.search) searchParams.set("search", params.search);
       if (params.profile_id) searchParams.set("profile_id", params.profile_id);
+      if (params.params && Object.keys(params.params).length > 0) searchParams.set("params", JSON.stringify(params.params));
 
       return this.request<ComponentDataResponse>(
         `/api/workspaces/${workspaceId}/data/${componentId}?${searchParams.toString()}`

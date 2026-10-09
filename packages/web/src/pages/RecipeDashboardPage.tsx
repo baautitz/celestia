@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import type { DashboardSchemaResponse, WorkspaceRecord } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
@@ -53,6 +53,7 @@ import {
   RefreshCw,
   Play,
   Shield,
+  Settings,
   MoreHorizontal,
 } from "lucide-react";
 import { RecipePermissionsSheet } from "@/components/recipes/RecipePermissionsSheet";
@@ -119,6 +120,27 @@ export const RecipeDashboardPage: React.FC = () => {
     defaultValues: initDefaults,
   });
 
+  // Filtros dos parâmetros do Modelo (exceto as datas, que têm seletor próprio): valem na prévia, sem Área de Trabalho.
+  const paramFields = useMemo(
+    () => initFields.filter((field) => field.name !== "start_date" && field.name !== "end_date"),
+    [schema]
+  );
+  const [paramsOpen, setParamsOpen] = useState(false);
+  const paramsForm = useForm<Record<string, unknown>>({ defaultValues: {} });
+  useEffect(() => {
+    paramsForm.reset(buildDynamicDefaultValues(paramFields));
+  }, [paramFields]);
+
+  const watchedParams = JSON.stringify(paramsForm.watch());
+  const previewParams = useMemo(() => {
+    const normalized = normalizeDynamicFormValues(paramFields, JSON.parse(watchedParams) as Record<string, unknown>);
+    return Object.fromEntries(
+      Object.entries(normalized).filter(
+        ([, value]) => value !== "" && value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0)
+      )
+    );
+  }, [watchedParams, paramFields]);
+
   // Abre o dialog de inicialização
   const handleOpenInit = async () => {
     if (!recipeId || !schema) return;
@@ -135,12 +157,12 @@ export const RecipeDashboardPage: React.FC = () => {
         setDuplicateOpen(true);
       } else {
         // Reseta o formulário e abre o dialog
-        initForm.reset(buildDynamicDefaultValues(initFields));
+        initForm.reset({ ...buildDynamicDefaultValues(initFields), ...previewParams });
         setInitOpen(true);
       }
     } catch {
       // Se a listagem falhar, abre o dialog mesmo assim
-      initForm.reset(buildDynamicDefaultValues(initFields));
+      initForm.reset({ ...buildDynamicDefaultValues(initFields), ...previewParams });
       setInitOpen(true);
     }
   };
@@ -183,7 +205,7 @@ export const RecipeDashboardPage: React.FC = () => {
   // Abre o dialog para criar uma nova sessão ignorando a existente
   const handleCreateAnyway = () => {
     setDuplicateOpen(false);
-    initForm.reset(buildDynamicDefaultValues(initFields));
+    initForm.reset({ ...buildDynamicDefaultValues(initFields), ...previewParams });
     setInitOpen(true);
   };
 
@@ -232,6 +254,19 @@ export const RecipeDashboardPage: React.FC = () => {
           className="hidden sm:inline-flex"
         />
 
+        {paramFields.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setParamsOpen(true)}
+            title="Parâmetros do Modelo"
+            className="size-8 shrink-0"
+          >
+            <Settings className="size-4" />
+          </Button>
+        )}
+
         <Button
           type="button"
           variant="ghost"
@@ -267,6 +302,12 @@ export const RecipeDashboardPage: React.FC = () => {
             <MoreHorizontal className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {paramFields.length > 0 && (
+              <DropdownMenuItem onClick={() => setParamsOpen(true)}>
+                <Settings className="size-4" />
+                Parâmetros do Modelo
+              </DropdownMenuItem>
+            )}
             {hasPermission("system:workspaces:create") && (
               <DropdownMenuItem onClick={handleOpenInit}>
                 <Play className="size-4" />
@@ -311,8 +352,38 @@ export const RecipeDashboardPage: React.FC = () => {
         workspaceId="preview"
         startDate={startDate}
         endDate={endDate}
+        params={previewParams}
         readOnly
       />
+
+      {/* Parâmetros do Modelo (ex.: empresa) — valem na prévia, sem Área de Trabalho */}
+      <Dialog open={paramsOpen} onOpenChange={setParamsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Parâmetros do Modelo</DialogTitle>
+            <DialogDescription>
+              Os valores se aplicam a esta visualização e viram o padrão ao inicializar uma Área de Trabalho.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...paramsForm}>
+            <form onSubmit={(e) => e.preventDefault()} noValidate>
+              <FieldGroup className="py-4">
+                <DynamicFormFields fields={paramFields} form={paramsForm} recipeId={recipeId} />
+              </FieldGroup>
+            </form>
+          </Form>
+
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => paramsForm.reset(buildDynamicDefaultValues(paramFields))}>
+              Limpar
+            </Button>
+            <Button type="button" onClick={() => setParamsOpen(false)}>
+              Concluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de Inicialização */}
       <Dialog open={initOpen} onOpenChange={setInitOpen}>

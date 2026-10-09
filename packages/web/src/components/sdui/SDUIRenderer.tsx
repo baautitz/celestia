@@ -10,6 +10,8 @@ interface SDUIRendererProps {
   workspaceId: string;
   startDate: string;
   endDate: string;
+  /** Parâmetros do Modelo para uso sem Área de Trabalho (modo prévia). */
+  params?: Record<string, unknown>;
   isWorkspaceClosed?: boolean;
   readOnly?: boolean;
 }
@@ -19,6 +21,7 @@ export const SDUIRenderer: React.FC<SDUIRendererProps> = ({
   workspaceId,
   startDate,
   endDate,
+  params,
   isWorkspaceClosed = false,
   readOnly = false,
 }) => {
@@ -102,6 +105,7 @@ export const SDUIRenderer: React.FC<SDUIRendererProps> = ({
             recipeId={schema.id}
             startDate={startDate}
             endDate={endDate}
+            params={params}
           />
         );
 
@@ -115,6 +119,7 @@ export const SDUIRenderer: React.FC<SDUIRendererProps> = ({
             recipeId={schema.id}
             startDate={startDate}
             endDate={endDate}
+            params={params}
             availableActions={actionsMap}
             isWorkspaceClosed={isWorkspaceClosed}
             readOnly={readOnly}
@@ -134,6 +139,7 @@ export const SDUIRenderer: React.FC<SDUIRendererProps> = ({
             recipeId={schema.id}
             startDate={startDate}
             endDate={endDate}
+            params={params}
           />
         );
 
