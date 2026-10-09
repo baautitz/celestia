@@ -29,6 +29,8 @@ export interface CreatePlatformAppOptions {
   sourceConnectors?: SourceConnectorRegistry;
   persistenceStore?: PersistenceStore;
   recipeStore?: RecipeStore;
+  /** Ids de Modelos que existem no banco mas falharam ao compilar no boot: a limpeza de permissões órfãs é pulada para não apagá-las. */
+  failedRecipeIds?: string[];
   connectionStore?: ConnectionStore;
   connectorFactory?: ConnectorFactory;
   userStore?: UserStore;
@@ -75,11 +77,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       seen.add(record.id);
       try {
         const recipe = await compiler.compile(record.id, record.source);
-        if (recipe.id !== record.id) throw new Error(`o id do Modelo ('${recipe.id}') difere do id cadastrado`);
         recipesMap.set(record.id, recipe);
         loadedFromStore.add(record.id);
       } catch (err: unknown) {
-        compiler.invalidate(record.id);
         errors.push({ id: record.id, message: err instanceof Error ? err.message : "Erro ao compilar o Modelo." });
       }
     }
@@ -95,8 +95,15 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     return { loaded: records.length - errors.length, errors };
   }
 
-  // Sincroniza e limpa permissões órfãs das roles na inicialização
-  userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
+  // Sincroniza e limpa permissões órfãs das roles na inicialização.
+  // Se algum Modelo falhou ao compilar, pula a limpeza: ele não é órfão, só está temporariamente quebrado.
+  if (options?.failedRecipeIds?.length) {
+    console.warn(
+      `Limpeza de permissões órfãs ignorada: Modelos com erro (${options.failedRecipeIds.join(", ")}). Corrija e recarregue.`
+    );
+  } else {
+    userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
+  }
 
   // Middleware de Autenticação
   // Administrador (isAdmin) ignora a matriz de permissões: recebe todas as permissões válidas no momento da requisição.
@@ -484,13 +491,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       try {
         recipe = await compiler.compile(id, source);
       } catch (err: unknown) {
-        compiler.invalidate(id);
         const msg = err instanceof Error ? err.message : "Erro ao compilar o Modelo.";
         return c.json({ error: msg }, 400);
-      }
-      if (recipe.id !== id) {
-        compiler.invalidate(id);
-        return c.json({ error: `O id do Modelo ('${recipe.id}') deve ser igual ao id da URL ('${id}').` }, 400);
       }
 
       const record = await recipeStore.save(id, source);
@@ -993,6 +995,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           order: z.enum(["asc", "desc"]).optional(),
           search: z.string().optional(),
           profile_id: z.string().optional(),
+          // Parâmetros do Modelo (JSON) para uso sem Área de Trabalho, como na prévia do Modelo.
+          params: z.string().optional(),
         })
         .refine(
           (data) => {
@@ -1012,6 +1016,19 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const recipe = getRecipe(query.recipe_id);
       const user = c.get("user") as JWTAccessPayload | undefined;
 
+      // Só aceita parâmetros declarados no Modelo; chegam à consulta sempre como bind parameters.
+      let requestParams: Record<string, unknown> | undefined;
+      if (query.params) {
+        try {
+          const parsed: unknown = JSON.parse(query.params);
+          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
+          const declared = new Set(recipe.workspace.params.map((param) => param.name));
+          requestParams = Object.fromEntries(Object.entries(parsed).filter(([name]) => declared.has(name)));
+        } catch {
+          return c.json({ error: "O parâmetro 'params' deve ser um objeto JSON." }, 400);
+        }
+      }
+
       try {
         const result = await DataResolver.resolveComponentData({
           recipe,
@@ -1025,7 +1042,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
             workspace: {
               startDate: query.start_date,
               endDate: query.end_date,
-              params: workspacesMap.get(workspaceId)?.params,
+              params: workspacesMap.get(workspaceId)?.params ?? requestParams,
             },
             user: user
               ? {
@@ -1204,6 +1221,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     const sourceConnectors: SourceConnectorRegistry = {};
     let connectionStore: ConnectionStore | undefined;
     const recipes: Record<string, RecipeDef> = {};
+    const failedRecipeIds: string[] = [];
     if (process.env.POSTGRES_HOST) {
       const [{ db }, { PostgresPersistenceStore }, { PostgresUserStore }, { PostgresRecipeStore }, { PostgresConnectionStore }] = await Promise.all([
         import("./db/client.js"),
@@ -1230,6 +1248,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
         try {
           recipes[record.id] = await compiler.compile(record.id, record.source);
         } catch (err: unknown) {
+          failedRecipeIds.push(record.id);
           console.error(`Modelo '${record.id}' ignorado: ${err instanceof Error ? err.message : err}`);
         }
       }
@@ -1242,6 +1261,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       connectionStore,
       sourceConnectors,
       recipes,
+      failedRecipeIds,
     });
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);

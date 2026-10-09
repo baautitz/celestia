@@ -16,6 +16,7 @@ import { resolveSourceConnector } from "./source-connector.js";
 import { TemplateEngine } from "../engine/template-engine.js";
 import { PermissionResolver, type ResolvedQueryOption } from "../iam/permission-resolver.js";
 import { WorkspaceValidator } from "../engine/workspace-validator.js";
+import { isBatchable } from "../engine/recipe-sandbox.js";
 
 export interface ResolveDataOptions {
   recipe: RecipeDef;
@@ -180,7 +181,7 @@ export class DataResolver {
     if (component.component === "stat_card") {
       const statProps = component.props as StatCardProps;
       if (typeof statProps.compute === "function") {
-        return { type: "stat", value: statProps.compute(rows), title: statProps.title };
+        return { type: "stat", value: await statProps.compute(rows), title: statProps.title };
       }
       if (statProps.field) {
         return { type: "stat", value: Number(rows[0]?.[statProps.field] || 0), title: statProps.title };
@@ -230,10 +231,17 @@ export class DataResolver {
     let tableRows = rows;
     const columns = tableProps.columns as DataTableColumnDef[];
 
-    for (const row of tableRows) {
-      for (const column of columns) {
-        if (typeof column.compute === "function") row[column.key] = column.compute(row);
-      }
+    // Uma coluna por vez (as seguintes enxergam o valor das anteriores). Colunas de Modelos rodam no isolate:
+    // em lote, numa única ida, quando possível.
+    for (const column of columns) {
+      const compute = column.compute;
+      if (typeof compute !== "function") continue;
+      const values = isBatchable<Record<string, unknown>, unknown>(compute)
+        ? await compute.batch(tableRows)
+        : await Promise.all(tableRows.map((row) => compute(row)));
+      tableRows.forEach((row, index) => {
+        row[column.key] = values[index];
+      });
     }
 
     if (pagination?.search) {

@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createPlatformApp } from "../src/index.js";
 import { MemoryRecipeStore } from "../src/data/recipe-store.js";
+import { MemoryUserStore } from "../src/iam/user-store.js";
 import { createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 const validSource = (id: string, withAction = true) => `
@@ -130,9 +131,30 @@ describe("Compilador: isolamento do contexto", () => {
       `export default { id: "x", name: String(${expr}), workspace: { params: [] }, sources: {}, ui: { layout: {}, components: [] } };`;
 
     expect((await compiler.compile("x", probe("typeof process"))).name).toBe("undefined");
-    await expect(compiler.compile("y", `export default { id: "y", name: (0, eval)("1") };`)).rejects.toThrow();
+    // eval/Function existem dentro do isolate, mas só enxergam o próprio isolate.
+    expect((await compiler.compile("x", probe(`(0, eval)("typeof process")`))).name).toBe("undefined");
     await expect(
       compiler.compile("z", `export default { id: "z", name: require("fs").constructor.constructor("return process")() };`)
     ).rejects.toThrow();
+  });
+});
+
+describe("Limpeza de permissões órfãs no boot", () => {
+  const makeStore = () =>
+    new MemoryUserStore({
+      roles: [{ id: "r", name: "R", permissions: ["recipe:quebrado:view", "system:users:read"] }],
+    });
+
+  it("remove permissões de Modelos inexistentes quando tudo carregou bem", async () => {
+    const store = makeStore();
+    createPlatformApp({ userStore: store });
+    await vi.waitFor(async () => expect((await store.getRole("r"))!.permissions).toEqual(["system:users:read"]));
+  });
+
+  it("preserva as permissões quando algum Modelo do banco falhou ao compilar", async () => {
+    const store = makeStore();
+    createPlatformApp({ userStore: store, failedRecipeIds: ["quebrado"] });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect((await store.getRole("r"))!.permissions).toContain("recipe:quebrado:view");
   });
 });
