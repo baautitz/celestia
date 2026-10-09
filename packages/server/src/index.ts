@@ -1035,17 +1035,21 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     });
 
     let persistenceStore: PersistenceStore | undefined;
+    let userStore: UserStore | undefined;
     if (process.env.POSTGRES_HOST) {
-      const [{ db }, { PostgresPersistenceStore }] = await Promise.all([
+      const [{ db }, { PostgresPersistenceStore }, { PostgresUserStore }] = await Promise.all([
         import("./db/client.js"),
         import("./data/postgres-persistence-store.js"),
+        import("./iam/postgres-user-store.js"),
       ]);
       persistenceStore = new PostgresPersistenceStore(db);
+      userStore = new PostgresUserStore(db);
     }
 
     const app = createPlatformApp({
       sourceConnector,
       persistenceStore,
+      userStore,
       recipes: {
         fechamento_mes: defaultFechamentoRecipe,
       },
