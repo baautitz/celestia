@@ -87,6 +87,27 @@ export class PostgresPersistenceStore implements PersistenceStore {
     return toItem(row!);
   }
 
+  async updateItem(
+    workspaceId: string,
+    collectionId: string,
+    itemId: string | number,
+    data: Record<string, unknown>
+  ): Promise<PersistenceItem> {
+    const where = and(
+      eq(persistenceItems.workspaceId, workspaceId),
+      eq(persistenceItems.collectionId, collectionId),
+      sql`${persistenceItems.id}::text = ${String(itemId)}`
+    );
+    const [existing] = await this.db.select().from(persistenceItems).where(where).limit(1);
+    if (!existing) throw new Error(`Item '${itemId}' não encontrado na coleção '${collectionId}'.`);
+    const [row] = await this.db
+      .update(persistenceItems)
+      .set({ data: { ...existing.data, ...data }, updatedAt: new Date() })
+      .where(where)
+      .returning();
+    return toItem(row!);
+  }
+
   async deleteItem(workspaceId: string, collectionId: string, itemId: string | number): Promise<void> {
     await this.db
       .delete(persistenceItems)

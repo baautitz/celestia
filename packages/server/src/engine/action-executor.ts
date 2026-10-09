@@ -143,6 +143,9 @@ export class ActionExecutor {
         return await persistenceStore.pushItem(workspaceId, targetCollection, targetFkValue, item);
       },
       set: async (targetCollection: string, itemId: string | number, payload: Record<string, unknown>) => {
+        // Em coleções 1:N, itemId identifica o item (a linha pode ser o próprio item, sem a chave da query).
+        const isCollection = recipe.persistence.some((p) => p.id === targetCollection && p.mode === "collection");
+        if (isCollection) return await persistenceStore.updateItem(workspaceId, targetCollection, itemId, payload);
         if (!targetFkValue) {
           throw new Error(`A linha da query '${queryName}' não possui a chave '${queryDef.primaryKey}'.`);
         }

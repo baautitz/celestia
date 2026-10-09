@@ -27,8 +27,23 @@ describe("ActionExecutor (Execução de Actions Imperativas)", () => {
         },
       },
     },
-    persistence: [],
+    persistence: [
+      {
+        id: "penalidades_vendedor",
+        targetSource: "inovafarma",
+        targetForeignKey: "vendedor_id",
+        mode: "collection",
+        itemSchema: { value: { type: "money", defaultValue: 0 } },
+      },
+    ],
     actions: [
+      {
+        id: "cancelar_penalidade",
+        label: "Cancelar Penalidade",
+        action: async ({ row, persistence }) => {
+          await persistence.set("penalidades_vendedor", row.id, { value: 0, cancelado: true });
+        },
+      },
       {
         id: "adicionar_penalidade",
         label: "Adicionar Penalidade",
@@ -131,5 +146,24 @@ describe("ActionExecutor (Execução de Actions Imperativas)", () => {
     // Verifica se foi removido
     const items = await persistenceStore.getItems("ws_101", "penalidades_vendedor", 42);
     expect(items).toHaveLength(0);
+  });
+
+  it("deve atualizar um item de coleção por id mesmo quando a linha não tem a chave da query", async () => {
+    const item = await persistenceStore.pushItem("ws_101", "penalidades_vendedor", 42, { value: 10 });
+
+    await ActionExecutor.execute({
+      recipe: mockRecipe,
+      actionId: "cancelar_penalidade",
+      sourceName: "inovafarma",
+      queryName: "vendas",
+      row: { id: item.id, value: 10 },
+      workspaceId: "ws_101",
+      workspaceVersion: 1,
+      persistenceStore,
+    });
+
+    const items = await persistenceStore.getItems("ws_101", "penalidades_vendedor", 42);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.data).toEqual({ value: 0, cancelado: true });
   });
 });

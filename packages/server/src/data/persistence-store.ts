@@ -48,6 +48,16 @@ export interface PersistenceStore {
   ): Promise<PersistenceItem>;
 
   /**
+   * Atualiza (merge) os dados de um item de coleção 1:N pelo seu ID único.
+   */
+  updateItem(
+    workspaceId: string,
+    collectionId: string,
+    itemId: string | number,
+    data: Record<string, unknown>
+  ): Promise<PersistenceItem>;
+
+  /**
    * Remove um item pelo seu ID único.
    */
   deleteItem(workspaceId: string, collectionId: string, itemId: string | number): Promise<void>;
@@ -114,6 +124,21 @@ export class MemoryPersistenceStore implements PersistenceStore {
 
     this.items.push(newItem);
     return newItem;
+  }
+
+  async updateItem(
+    workspaceId: string,
+    collectionId: string,
+    itemId: string | number,
+    data: Record<string, unknown>
+  ): Promise<PersistenceItem> {
+    const item = this.items.find(
+      (i) => i.workspaceId === workspaceId && i.collectionId === collectionId && String(i.id) === String(itemId)
+    );
+    if (!item) throw new Error(`Item '${itemId}' não encontrado na coleção '${collectionId}'.`);
+    item.data = { ...item.data, ...data };
+    item.updatedAt = new Date().toISOString();
+    return item;
   }
 
   async setScalar(
