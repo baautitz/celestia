@@ -16,6 +16,8 @@ export interface User {
   roleId: string;
   externals: ExternalsMap;
   status: "active" | "inactive";
+  /** Administrador: ignora a matriz de permissões (acesso total). Só é alterado pelo CLI. */
+  isAdmin?: boolean;
   createdAt: string;
   updatedAt?: string;
 }
@@ -41,6 +43,7 @@ export interface JWTAccessPayload {
   email?: string;
   role: string;            // ID da Role (ex: "role_vendedor")
   permissions: string[];   // Lista de permissões do usuário
+  isAdmin?: boolean;       // Administrador: o servidor expande para todas as permissões válidas
   externals: ExternalsMap; // Mapeamento de chaves nos ERPs
   iat?: number;
   exp?: number;

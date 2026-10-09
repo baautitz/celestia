@@ -6,3 +6,4 @@ export * from "./workspace.js";
 export * from "./recipe.js";
 export * from "./rpc.js";
 export * from "./erp.js";
+export * from "./recipe-admin.js";
