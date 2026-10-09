@@ -9,6 +9,7 @@ import { DataResolver } from "./data/data-resolver.js";
 import { ActionExecutor } from "./engine/action-executor.js";
 import { MockSourceConnector, resolveSourceConnector, type SourceConnector, type SourceConnectorRegistry } from "./data/source-connector.js";
 import { MemoryPersistenceStore, type PersistenceStore } from "./data/persistence-store.js";
+import { MemoryRecipeStore, type RecipeStore } from "./data/recipe-store.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
@@ -22,6 +23,7 @@ export interface CreatePlatformAppOptions {
   sourceConnector?: SourceConnector;
   sourceConnectors?: SourceConnectorRegistry;
   persistenceStore?: PersistenceStore;
+  recipeStore?: RecipeStore;
   userStore?: UserStore;
   tokenService?: TokenService;
   recipes?: Record<string, RecipeDef>;
@@ -45,6 +47,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const sourceConnector = options?.sourceConnector || new MockSourceConnector();
   const sourceConnectors = options?.sourceConnectors || {};
   const persistenceStore = options?.persistenceStore || new MemoryPersistenceStore();
+  const recipeStore = options?.recipeStore || new MemoryRecipeStore();
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
   const recipesMap = new Map<string, RecipeDef>(Object.entries(options?.recipes || {}));
@@ -390,6 +393,64 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       }
     }
   );
+
+  // ─────────────────────────────────────────────────────────────
+  // 2.1 GESTÃO DE MODELOS EM RUNTIME (código-fonte TypeScript no banco)
+  // ─────────────────────────────────────────────────────────────
+
+  // GET /api/admin/recipes
+  app.get("/api/admin/recipes", auth, requirePermission("system:recipes:read"), async (c) => {
+    const records = await recipeStore.list();
+    return c.json(records.map(({ id, createdAt, updatedAt }) => ({ id, name: recipesMap.get(id)?.name, createdAt, updatedAt })));
+  });
+
+  // GET /api/admin/recipes/:id
+  app.get("/api/admin/recipes/:id", auth, requirePermission("system:recipes:read"), async (c) => {
+    const record = await recipeStore.get(c.req.param("id"));
+    if (!record) return c.json({ error: "Modelo não encontrado." }, 404);
+    return c.json(record);
+  });
+
+  // PUT /api/admin/recipes/:id (cria ou atualiza; compila e valida antes de gravar)
+  app.put(
+    "/api/admin/recipes/:id",
+    auth,
+    requirePermission("system:recipes:manage"),
+    zValidator("json", z.object({ source: z.string().min(1) })),
+    async (c) => {
+      const id = c.req.param("id");
+      const { source } = c.req.valid("json");
+
+      let recipe: RecipeDef;
+      try {
+        recipe = await compiler.compile(id, source);
+      } catch (err: unknown) {
+        compiler.invalidate(id);
+        const msg = err instanceof Error ? err.message : "Erro ao compilar o Modelo.";
+        return c.json({ error: msg }, 400);
+      }
+      if (recipe.id !== id) {
+        compiler.invalidate(id);
+        return c.json({ error: `O id do Modelo ('${recipe.id}') deve ser igual ao id da URL ('${id}').` }, 400);
+      }
+
+      const record = await recipeStore.save(id, source);
+      recipesMap.set(id, recipe);
+      await userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
+      return c.json(record);
+    }
+  );
+
+  // DELETE /api/admin/recipes/:id
+  app.delete("/api/admin/recipes/:id", auth, requirePermission("system:recipes:manage"), async (c) => {
+    const id = c.req.param("id");
+    if (!(await recipeStore.get(id))) return c.json({ error: "Modelo não encontrado." }, 404);
+    await recipeStore.delete(id);
+    compiler.invalidate(id);
+    recipesMap.delete(id);
+    await userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
+    return c.json({ success: true });
+  });
 
   // ─────────────────────────────────────────────────────────────
   // 3. WORKSPACES & SDUI CORE ROUTES (Permission-First)
@@ -999,19 +1060,34 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
   void (async () => {
     let persistenceStore: PersistenceStore | undefined;
     let userStore: UserStore | undefined;
+    let recipeStore: RecipeStore | undefined;
+    const recipes: Record<string, RecipeDef> = {};
     if (process.env.POSTGRES_HOST) {
-      const [{ db }, { PostgresPersistenceStore }, { PostgresUserStore }] = await Promise.all([
+      const [{ db }, { PostgresPersistenceStore }, { PostgresUserStore }, { PostgresRecipeStore }] = await Promise.all([
         import("./db/client.js"),
         import("./data/postgres-persistence-store.js"),
         import("./iam/postgres-user-store.js"),
+        import("./data/postgres-recipe-store.js"),
       ]);
       persistenceStore = new PostgresPersistenceStore(db);
       userStore = new PostgresUserStore(db);
+      recipeStore = new PostgresRecipeStore(db);
+
+      const compiler = new RecipeCompiler();
+      for (const record of await recipeStore.list()) {
+        try {
+          recipes[record.id] = await compiler.compile(record.id, record.source);
+        } catch (err: unknown) {
+          console.error(`Modelo '${record.id}' ignorado: ${err instanceof Error ? err.message : err}`);
+        }
+      }
     }
 
     const app = createPlatformApp({
       persistenceStore,
       userStore,
+      recipeStore,
+      recipes,
     });
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
