@@ -1,5 +1,5 @@
 import type { User } from "@platform/shared";
-import { index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const persistenceItems = pgTable(
   "persistence_items",
@@ -40,6 +40,19 @@ export const users = pgTable("users", {
 export const recipes = pgTable("recipes", {
   id: text("id").primaryKey(),
   source: text("source").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const connections = pgTable("connections", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type", { enum: ["mssql", "postgres"] }).notNull(),
+  host: text("host").notNull(),
+  port: integer("port").notNull(),
+  database: text("database").notNull(),
+  username: text("username").notNull(),
+  passwordEncrypted: text("password_encrypted").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
