@@ -289,17 +289,18 @@ export const SDUITable: React.FC<SDUITableProps> = ({
       <CardHeader className="pb-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <CardTitle className="text-base font-semibold">{props.title}</CardTitle>
+            <div className="flex flex-wrap items-center gap-3">
+              <CardTitle className="text-base font-semibold">{props.title}</CardTitle>
+              <QueryProfileSelect
+                profiles={props.availableProfiles}
+                value={profileId}
+                onValueChange={handleProfileChange}
+              />
+            </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               Total de {totalRecords} registro(s) apurado(s).
             </p>
           </div>
-
-          <QueryProfileSelect
-            profiles={props.availableProfiles}
-            value={profileId}
-            onValueChange={handleProfileChange}
-          />
 
           {/* Barra de Busca */}
           <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 max-w-sm w-full">
