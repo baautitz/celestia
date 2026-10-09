@@ -68,7 +68,10 @@ export interface StatDataResponse {
  */
 export interface ChartDataResponse {
   type: "chart";
+  /** Em gráficos com séries, `name` é o eixo X, `value` o total do ponto e cada série vem na chave dela. */
   data: Array<{ name: string; value: number; [key: string]: unknown }>;
+  /** Presente nos gráficos com séries: `key` é a chave do valor em `data`, `label` o nome exibido. */
+  series?: Array<{ key: string; label: string }>;
 }
 
 export type ComponentDataResponse<TRow = Record<string, unknown>> =

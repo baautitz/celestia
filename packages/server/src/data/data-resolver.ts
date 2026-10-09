@@ -69,6 +69,7 @@ export type ResolveDataResult<TRow = Record<string, unknown>> =
   | {
       type: "chart";
       data: Array<{ name: string; value: number; [key: string]: unknown }>;
+      series?: Array<{ key: string; label: string }>;
     };
 
 interface ResolvedBinding {
@@ -210,6 +211,10 @@ export class DataResolver {
     ) {
       const nameKey = component.props.nameKey || "name";
       const valueKey = component.props.valueKey || "value";
+      const seriesKey = component.props.seriesKey;
+      if (seriesKey && component.component === "line_chart") {
+        return this.buildSeriesChart(rows, nameKey, valueKey, seriesKey, Number(component.props.seriesLimit) || 10, component.props.cumulative === true);
+      }
       const limit = Number(component.props.limit) || rows.length;
       const chartRows = rows.slice().sort((a, b) =>
         component.component === "bar_chart"
@@ -278,6 +283,61 @@ export class DataResolver {
       data: tableRows.slice(startIndex, startIndex + pageSize),
       meta: { page, pageSize, totalRecords, totalPages, sortBy, order },
     };
+  }
+
+  /**
+   * Pivota linhas (x, série, valor) em pontos { name: x, s0: valor, s1: valor, ... }.
+   * Fica com as `seriesLimit` séries de maior total; x sem valor numa série entra como 0.
+   * Com `cumulative`, cada série vira a soma corrida em ordem de x (dias sem valor repetem o acumulado anterior).
+   */
+  private static buildSeriesChart(
+    rows: Array<Record<string, unknown>>,
+    nameKey: string,
+    valueKey: string,
+    seriesKey: string,
+    seriesLimit: number,
+    cumulative: boolean
+  ): { type: "chart"; data: Array<{ name: string; value: number; [key: string]: unknown }>; series: Array<{ key: string; label: string }> } {
+    const totals = new Map<string, number>();
+    for (const row of rows) {
+      const label = String(row[seriesKey] ?? "");
+      totals.set(label, (totals.get(label) ?? 0) + Number(row[valueKey] ?? 0));
+    }
+
+    // Chaves seguras (s0, s1...): nomes de vendedores podem ter ponto ou espaço, que o gráfico trataria como caminho.
+    const series = Array.from(totals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, seriesLimit)
+      .map(([label], index) => ({ key: `s${index}`, label }));
+    const keyByLabel = new Map(series.map((item) => [item.label, item.key]));
+
+    const points = new Map<string, { name: string; value: number; [key: string]: unknown }>();
+    for (const row of rows) {
+      const key = keyByLabel.get(String(row[seriesKey] ?? ""));
+      if (!key) continue;
+      const name = String(row[nameKey] ?? "");
+      const point = points.get(name) ?? { name, value: 0, ...Object.fromEntries(series.map((item) => [item.key, 0])) };
+      const amount = Number(row[valueKey] ?? 0);
+      point[key] = Number(point[key]) + amount;
+      point.value += amount;
+      points.set(name, point);
+    }
+
+    const data = Array.from(points.values()).sort((a, b) => a.name.localeCompare(b.name));
+    if (cumulative) {
+      const running = new Map<string, number>(series.map((item) => [item.key, 0]));
+      for (const point of data) {
+        point.value = 0;
+        for (const item of series) {
+          const total = (running.get(item.key) ?? 0) + Number(point[item.key]);
+          running.set(item.key, total);
+          point[item.key] = total;
+          point.value += total;
+        }
+      }
+    }
+
+    return { type: "chart", data, series };
   }
 
   private static getBindings(component: UIComponentDef, recipe: RecipeDef): ComponentBindingDef[] {

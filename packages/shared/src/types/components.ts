@@ -135,6 +135,15 @@ export interface ChartProps {
    * "horizontal": barras deitadas, nomes no eixo Y (bom para nomes longos).
    */
   orientation?: "vertical" | "horizontal";
+  /**
+   * Somente line_chart. Coluna que separa as séries: uma linha por valor (ex.: "vendedor").
+   * Neste modo `nameKey` é o eixo X (ex.: o dia) e `valueKey` o valor de cada ponto.
+   */
+  seriesKey?: string;
+  /** Máximo de séries (linhas), ficando as de maior total no período. Padrão: 10. */
+  seriesLimit?: number;
+  /** Somente com seriesKey: cada série mostra o acumulado (soma corrida) ao longo do eixo X, em vez do valor de cada ponto. */
+  cumulative?: boolean;
   [key: string]: unknown;
 }
 
