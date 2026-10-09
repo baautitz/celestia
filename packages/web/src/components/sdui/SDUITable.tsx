@@ -32,7 +32,7 @@ import { MobileCard } from "@/components/ui/mobile-card";
 import { api } from "@/lib/api-client";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { QueryProfileSelect } from "./QueryProfileSelect";
 import { useQueryProfileSelection } from "@/hooks/use-query-profile-selection";
@@ -474,7 +474,13 @@ export const SDUITable: React.FC<SDUITableProps> = ({
                     rows.map((row, rowIdx) => (
                       <TableRow key={rowIdx} className="hover:bg-muted/30">
                         {props.columns.map((col) => (
-                          <TableCell key={col.key} className="font-mono text-xs">
+                          <TableCell
+                            key={col.key}
+                            className={cn(
+                              "font-mono text-xs",
+                              col.tone === "danger_if_positive" && Number(getNestedValue(row, col.key)) > 0 && "font-medium text-destructive"
+                            )}
+                          >
                             {formatCellValue(col, row)}
                           </TableCell>
                         ))}

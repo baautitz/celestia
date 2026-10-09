@@ -74,6 +74,8 @@ export interface DataTableColumnDef<TRow = Record<string, unknown>> {
   editType?: "text" | "money" | "number" | "switch" | "select";
   editConfig?: CellEditConfig;
   permission?: string;
+  /** "danger_if_positive": o valor fica em vermelho quando for maior que zero. */
+  tone?: "danger_if_positive";
   /** Função TypeScript pura para cálculo dinâmico da coluna (zero parser!) */
   compute?: (row: TRow) => number | string | boolean;
 }
