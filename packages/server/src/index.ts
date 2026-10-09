@@ -224,6 +224,12 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   });
 
   // GET /api/iam/users
+  // GET /api/iam/sources (ERPs cadastrados, para vincular identificadores do usuário; sem dados de acesso)
+  app.get("/api/iam/sources", auth, requirePermission("system:users:read"), async (c) => {
+    const records = await connectionStore.list();
+    return c.json(records.map(({ id, name }) => ({ id, name })));
+  });
+
   app.get("/api/iam/users", auth, requirePermission("system:users:read"), async (c) => {
     const users = await userStore.listUsers();
     return c.json(users);

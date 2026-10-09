@@ -108,6 +108,15 @@ describe("Conexões com fontes de dados (/api/admin/connections)", () => {
     expect((await send("POST", "/api/admin/connections/inovafarma/test", token)).status).toBe(404);
   });
 
+  it("lista só id e nome das fontes para quem gerencia usuários", async () => {
+    const admin = await tokenOf("carlos.admin");
+    await send("PUT", "/api/admin/connections/inovafarma", admin, body);
+    const res = await send("GET", "/api/iam/sources", admin);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([{ id: "inovafarma", name: "InovaFarma" }]);
+    expect((await send("GET", "/api/iam/sources", await tokenOf("joao.silva"))).status).toBe(403);
+  });
+
   it("nega acesso a quem não tem system:sources:manage", async () => {
     const token = await tokenOf("joao.silva");
     expect((await send("PUT", "/api/admin/connections/inovafarma", token, body)).status).toBe(403);
