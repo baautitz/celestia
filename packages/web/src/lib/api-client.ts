@@ -12,6 +12,9 @@ import type {
   PersistenceSetResponse,
   RecipeSummary,
   WorkspaceRecord,
+  ErpTypeMeta,
+  ErpConnection,
+  ErpConnectionInput,
 } from "@platform/shared";
 
 class ApiClient {
@@ -186,6 +189,37 @@ class ApiClient {
         method: "PUT",
         body: JSON.stringify(updates),
       });
+    },
+  };
+
+  // ─── ERPs (FONTES DE DADOS) ──────────────────────────────────────────────
+  erps = {
+    listTypes: async (): Promise<ErpTypeMeta[]> => {
+      return this.request<ErpTypeMeta[]>("/api/admin/erp-types");
+    },
+
+    list: async (): Promise<ErpConnection[]> => {
+      return this.request<ErpConnection[]>("/api/admin/connections");
+    },
+
+    save: async (id: string, input: ErpConnectionInput): Promise<ErpConnection> => {
+      return this.request<ErpConnection>(`/api/admin/connections/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      });
+    },
+
+    test: async (id: string): Promise<boolean> => {
+      try {
+        await this.request<{ ok: boolean }>(`/api/admin/connections/${id}/test`, { method: "POST" });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    remove: async (id: string): Promise<{ success: boolean }> => {
+      return this.request<{ success: boolean }>(`/api/admin/connections/${id}`, { method: "DELETE" });
     },
   };
 

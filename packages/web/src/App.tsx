@@ -6,6 +6,7 @@ import { WorkspaceDetailPage } from "./pages/WorkspaceDetailPage";
 import { RecipeDashboardPage } from "./pages/RecipeDashboardPage";
 import { IAMUsersPage } from "./pages/IAMUsersPage";
 import { IAMRolesPage } from "./pages/IAMRolesPage";
+import { ERPsPage } from "./pages/ERPsPage";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { Toaster } from "@/components/ui/toast";
@@ -33,6 +34,10 @@ export const App: React.FC = () => {
 
             <Route element={<ProtectedRoute requiredPermission="system:roles:read" />}>
               <Route path="/iam/roles" element={<IAMRolesPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute requiredPermission="system:sources:manage" />}>
+              <Route path="/erps" element={<ERPsPage />} />
             </Route>
           </Route>
         </Route>

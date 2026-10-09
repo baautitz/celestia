@@ -53,6 +53,7 @@ import {
   ChevronRight,
   Building2,
   Layers,
+  Database,
 } from "lucide-react";
 
 const SidebarAutoClose: React.FC = () => {
@@ -108,6 +109,7 @@ export const AppLayout: React.FC = () => {
     if (location.pathname.startsWith("/workspaces")) return "Áreas de Trabalho";
     if (location.pathname.startsWith("/iam/users")) return "Gestão de Usuários";
     if (location.pathname.startsWith("/iam/roles")) return "Grupos de Acesso & Permissões";
+    if (location.pathname.startsWith("/erps")) return "ERPs & Fontes de Dados";
     return "Painel de Controle";
   };
 
@@ -187,7 +189,7 @@ export const AppLayout: React.FC = () => {
             </SidebarMenu>
           </SidebarGroup>
 
-          {hasAnyPermission("system:users:read", "system:roles:read") && (
+          {hasAnyPermission("system:users:read", "system:roles:read", "system:sources:manage") && (
             <SidebarGroup>
               <SidebarGroupLabel>Administração & IAM</SidebarGroupLabel>
               <SidebarMenu>
@@ -212,6 +214,18 @@ export const AppLayout: React.FC = () => {
                     >
                       <Shield className="size-4" />
                       <span>Grupos de Acesso</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {hasAnyPermission("system:sources:manage") && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={location.pathname.startsWith("/erps")}
+                      tooltip="ERPs"
+                      onClick={() => navigate("/erps")}
+                    >
+                      <Database className="size-4" />
+                      <span>ERPs</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
