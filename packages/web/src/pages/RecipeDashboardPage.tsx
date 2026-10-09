@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { toLocalISODate } from "@/lib/utils";
 import { useParams, useNavigate } from "react-router-dom";
 import type { DashboardSchemaResponse, WorkspaceRecord } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
@@ -80,11 +81,11 @@ export const RecipeDashboardPage: React.FC = () => {
 
   // Converte DateRange para strings YYYY-MM-DD
   const startDate = dateRange?.from
-    ? dateRange.from.toISOString().slice(0, 10)
-    : firstDay.toISOString().slice(0, 10);
+    ? toLocalISODate(dateRange.from)
+    : toLocalISODate(firstDay);
   const endDate = dateRange?.to
-    ? dateRange.to.toISOString().slice(0, 10)
-    : lastDay.toISOString().slice(0, 10);
+    ? toLocalISODate(dateRange.to)
+    : toLocalISODate(lastDay);
 
   // Estado do dialog de inicialização
   const [initOpen, setInitOpen] = useState(false);

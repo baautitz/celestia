@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { parseLocalDate, toLocalISODate } from "@/lib/utils";
 import type { FormFieldDef } from "@platform/shared";
 import type { UseFormReturn } from "react-hook-form";
 import {
@@ -403,8 +404,8 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                     <FormLabel>{field.label}</FormLabel>
                     <FormControl>
                       <DatePicker
-                        value={rhf.value ? new Date(rhf.value as string) : undefined}
-                        onChange={(date) => rhf.onChange(date ? date.toISOString().slice(0, 10) : "")}
+                        value={rhf.value ? parseLocalDate(rhf.value as string) : undefined}
+                        onChange={(date) => rhf.onChange(date ? toLocalISODate(date) : "")}
                         disabled={field.readOnly}
                       />
                     </FormControl>

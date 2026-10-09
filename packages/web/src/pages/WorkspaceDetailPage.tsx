@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { parseLocalDate, toLocalISODate } from "@/lib/utils";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import type { DashboardSchemaResponse, WorkspaceRecord } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
@@ -178,8 +179,8 @@ export const WorkspaceDetailPage: React.FC = () => {
     const currentParams: Record<string, unknown> = {
       name: workspaceInfo.name,
       dateRange: {
-        from: new Date(workspaceInfo.startDate),
-        to: new Date(workspaceInfo.endDate),
+        from: parseLocalDate(workspaceInfo.startDate),
+        to: parseLocalDate(workspaceInfo.endDate),
       },
       ...(workspaceInfo.params || {}),
     };
@@ -194,8 +195,8 @@ export const WorkspaceDetailPage: React.FC = () => {
 
     const name = (data.name as string) || "";
     const range = data.dateRange as DateRange | undefined;
-    const newStartDate = range?.from ? range.from.toISOString().slice(0, 10) : workspaceInfo?.startDate || "";
-    const newEndDate = range?.to ? range.to.toISOString().slice(0, 10) : workspaceInfo?.endDate || "";
+    const newStartDate = range?.from ? toLocalISODate(range.from) : workspaceInfo?.startDate || "";
+    const newEndDate = range?.to ? toLocalISODate(range.to) : workspaceInfo?.endDate || "";
 
     if (newEndDate < newStartDate) {
       toast.error("A Data Final não pode ser anterior à Data Inicial.");
@@ -408,7 +409,7 @@ export const WorkspaceDetailPage: React.FC = () => {
               {workspaceId}
             </Badge>
             <Badge variant="outline" className="text-xs px-2 py-0.5">
-              {new Date(startDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })} — {new Date(endDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}
+              {parseLocalDate(startDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })} — {parseLocalDate(endDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}
             </Badge>
             {isClosed ? (
               <Badge variant="secondary" className="flex items-center gap-1 w-fit">
