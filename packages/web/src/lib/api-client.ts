@@ -128,6 +128,10 @@ class ApiClient {
       return this.request<PermissionCatalog>("/api/iam/permissions/catalog");
     },
 
+    listSources: async (): Promise<{ id: string; name: string }[]> => {
+      return this.request<{ id: string; name: string }[]>("/api/iam/sources");
+    },
+
     listUsers: async (): Promise<User[]> => {
       return this.request<User[]>("/api/iam/users");
     },

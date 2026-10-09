@@ -81,6 +81,7 @@ export const IAMUsersPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [roleId, setRoleId] = useState("role_operador");
+  const [sources, setSources] = useState<{ id: string; name: string }[]>([]);
   const [externals, setExternals] = useState<Record<string, string | number>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -92,12 +93,14 @@ export const IAMUsersPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [usersRes, rolesRes] = await Promise.all([
+      const [usersRes, rolesRes, sourcesRes] = await Promise.all([
         api.iam.listUsers(),
         api.iam.listRoles(),
+        api.iam.listSources(),
       ]);
       setUsers(usersRes);
       setRoles(rolesRes);
+      setSources(sourcesRes);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao carregar usuários";
       toast.error(msg);
@@ -110,14 +113,7 @@ export const IAMUsersPage: React.FC = () => {
     fetchData();
   }, []);
 
-  const availableSources = Array.from(
-    new Set([
-      "inovafarma",
-      "sap",
-      ...users.flatMap((u) => Object.keys(u.externals || {})),
-      ...Object.keys(externals),
-    ])
-  );
+  const availableSources = sources.map((source) => source.id);
 
   const openCreateModal = () => {
     setIsEditMode(false);
@@ -561,6 +557,11 @@ export const IAMUsersPage: React.FC = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2">
+                  {availableSources.length === 0 && (
+                    <CardDescription className="text-xs">
+                      Nenhum ERP cadastrado. Cadastre uma fonte de dados para vincular identificadores.
+                    </CardDescription>
+                  )}
                   {availableSources.map((src) => (
                     <div
                       key={src}
