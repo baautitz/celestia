@@ -85,6 +85,7 @@ export interface StatCardProps<TRow = Record<string, unknown>> {
   title: string;
   source?: string;
   query?: string;
+  field?: string;
   bindings?: ComponentBindingDef[];
   profiles?: ComponentProfileDef[];
   availableProfiles?: ComponentProfileMeta[];
