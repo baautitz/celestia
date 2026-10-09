@@ -51,10 +51,26 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
       allowNegative = false,
       placeholder,
       className,
+      onFocus,
+      onClick,
+      onKeyUp,
       ...props
     },
     ref
   ) => {
+    const innerRef = React.useRef<HTMLInputElement | null>(null);
+    const setRefs = (node: HTMLInputElement | null) => {
+      innerRef.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    };
+
+    // Valor monetário preenche da direita para a esquerda: o cursor fica sempre no final.
+    const moveCaretToEnd = () => {
+      const el = innerRef.current;
+      if (el) el.setSelectionRange(el.value.length, el.value.length);
+    };
+
     const initialVal = value !== undefined ? value : defaultValue;
     const [displayValue, setDisplayValue] = React.useState(() =>
       toDisplayString(initialVal, precision, prefix, allowNegative)
@@ -65,6 +81,10 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         setDisplayValue(toDisplayString(value, precision, prefix, allowNegative));
       }
     }, [value, precision, prefix, allowNegative]);
+
+    React.useLayoutEffect(() => {
+      if (document.activeElement === innerRef.current) moveCaretToEnd();
+    }, [displayValue]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
@@ -96,7 +116,7 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
 
     return (
       <Input
-        ref={ref}
+        ref={setRefs}
         type="text"
         inputMode="numeric"
         autoComplete="off"
@@ -104,6 +124,18 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         placeholder={placeholder || `${prefix}0,00`}
         className={cn("tabular-nums", className)}
         onChange={handleChange}
+        onFocus={(e) => {
+          onFocus?.(e);
+          requestAnimationFrame(moveCaretToEnd);
+        }}
+        onClick={(e) => {
+          onClick?.(e);
+          moveCaretToEnd();
+        }}
+        onKeyUp={(e) => {
+          onKeyUp?.(e);
+          if (e.key.startsWith("Arrow") || e.key === "Home") moveCaretToEnd();
+        }}
         {...props}
       />
     );
