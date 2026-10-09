@@ -8,7 +8,7 @@ import { RecipeCompiler } from "./engine/compiler.js";
 import { DataResolver } from "./data/data-resolver.js";
 import { ActionExecutor } from "./engine/action-executor.js";
 import { MockSourceConnector, resolveSourceConnector, type SourceConnector, type SourceConnectorRegistry } from "./data/source-connector.js";
-import { MemoryPersistenceStore } from "./data/persistence-store.js";
+import { MemoryPersistenceStore, type PersistenceStore } from "./data/persistence-store.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
@@ -22,7 +22,7 @@ export interface CreatePlatformAppOptions {
   compiler?: RecipeCompiler;
   sourceConnector?: SourceConnector;
   sourceConnectors?: SourceConnectorRegistry;
-  persistenceStore?: MemoryPersistenceStore;
+  persistenceStore?: PersistenceStore;
   userStore?: UserStore;
   tokenService?: TokenService;
   recipes?: Record<string, RecipeDef>;
@@ -1018,28 +1018,40 @@ export type AppType = ReturnType<typeof createPlatformApp>;
 
 // Inicia servidor se executado diretamente
 if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
-  const sourceConnector = new MockSourceConnector({
-    default: [
-      { vendedor_id: 1, vendedor: "Carlos Vendedor", venda_geral: 10000 },
-      { vendedor_id: 42, vendedor: "João da Silva", venda_geral: 25000 },
-      { vendedor_id: 99, vendedor: "Maria Souza", venda_geral: 15000 },
-    ],
-    categories: [
-      { value: 1, label: "Higiene Pessoal" },
-      { value: 2, label: "Medicamentos" },
-      { value: 3, label: "Vitaminas e Suplementos" },
-      { value: 4, label: "Dermocosméticos" },
-      { value: 5, label: "Equipamentos Médicos" },
-    ],
-  });
+  void (async () => {
+    const sourceConnector = new MockSourceConnector({
+      default: [
+        { vendedor_id: 1, vendedor: "Carlos Vendedor", venda_geral: 10000 },
+        { vendedor_id: 42, vendedor: "João da Silva", venda_geral: 25000 },
+        { vendedor_id: 99, vendedor: "Maria Souza", venda_geral: 15000 },
+      ],
+      categories: [
+        { value: 1, label: "Higiene Pessoal" },
+        { value: 2, label: "Medicamentos" },
+        { value: 3, label: "Vitaminas e Suplementos" },
+        { value: 4, label: "Dermocosméticos" },
+        { value: 5, label: "Equipamentos Médicos" },
+      ],
+    });
 
-  const app = createPlatformApp({
-    sourceConnector,
-    recipes: {
-      fechamento_mes: defaultFechamentoRecipe,
-    },
-  });
-  const port = Number(process.env.PORT) || 3000;
-  console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
-  serve({ fetch: app.fetch, port });
+    let persistenceStore: PersistenceStore | undefined;
+    if (process.env.POSTGRES_HOST) {
+      const [{ db }, { PostgresPersistenceStore }] = await Promise.all([
+        import("./db/client.js"),
+        import("./data/postgres-persistence-store.js"),
+      ]);
+      persistenceStore = new PostgresPersistenceStore(db);
+    }
+
+    const app = createPlatformApp({
+      sourceConnector,
+      persistenceStore,
+      recipes: {
+        fechamento_mes: defaultFechamentoRecipe,
+      },
+    });
+    const port = Number(process.env.PORT) || 3000;
+    console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
+    serve({ fetch: app.fetch, port });
+  })();
 }

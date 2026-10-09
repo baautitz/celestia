@@ -7,7 +7,7 @@
     "build": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=../../.env src/db/migrate.ts"
   },
