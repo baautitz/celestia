@@ -114,6 +114,12 @@ export interface LookupSelectFormFieldDef extends BaseFormFieldDef {
   lookup: LookupConfig;
 }
 
+// ─── 11.1 SENHA / SEGREDO (valor mascarado, nunca devolvido pela API) ─
+export interface PasswordFormFieldDef extends BaseFormFieldDef {
+  type: "password";
+  defaultValue?: never;
+}
+
 // ─── 12. CAMPO OCULTO / CONTROLE ──────────────────────────────────
 export interface HiddenFormFieldDef extends BaseFormFieldDef {
   type: "hidden";
@@ -136,6 +142,7 @@ export type FormFieldDef =
   | SelectFormFieldDef
   | MultiSelectFormFieldDef
   | LookupSelectFormFieldDef
+  | PasswordFormFieldDef
   | HiddenFormFieldDef;
 
 /**
