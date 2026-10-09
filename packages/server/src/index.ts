@@ -7,9 +7,13 @@ import { z } from "zod";
 import { RecipeCompiler } from "./engine/compiler.js";
 import { DataResolver } from "./data/data-resolver.js";
 import { ActionExecutor } from "./engine/action-executor.js";
-import { MockSourceConnector, resolveSourceConnector, type SourceConnector, type SourceConnectorRegistry } from "./data/source-connector.js";
+import { resolveSourceConnector, type SourceConnector, type SourceConnectorRegistry } from "./data/source-connector.js";
 import { MemoryPersistenceStore, type PersistenceStore } from "./data/persistence-store.js";
 import { MemoryRecipeStore, type RecipeStore } from "./data/recipe-store.js";
+import { MemoryConnectionStore, type ConnectionStore } from "./data/connection-store.js";
+import type { ConnectionRecord } from "./data/connection-store.js";
+import { createConnector, type ConnectorFactory } from "./data/connection-factory.js";
+import { encryptSecret } from "./data/secret-box.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
@@ -24,6 +28,8 @@ export interface CreatePlatformAppOptions {
   sourceConnectors?: SourceConnectorRegistry;
   persistenceStore?: PersistenceStore;
   recipeStore?: RecipeStore;
+  connectionStore?: ConnectionStore;
+  connectorFactory?: ConnectorFactory;
   userStore?: UserStore;
   tokenService?: TokenService;
   recipes?: Record<string, RecipeDef>;
@@ -44,10 +50,12 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     })
   );
   const compiler = options?.compiler || new RecipeCompiler();
-  const sourceConnector = options?.sourceConnector || new MockSourceConnector();
+  const sourceConnector = options?.sourceConnector;
   const sourceConnectors = options?.sourceConnectors || {};
   const persistenceStore = options?.persistenceStore || new MemoryPersistenceStore();
   const recipeStore = options?.recipeStore || new MemoryRecipeStore();
+  const connectionStore = options?.connectionStore || new MemoryConnectionStore();
+  const connectorFactory = options?.connectorFactory || createConnector;
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
   const recipesMap = new Map<string, RecipeDef>(Object.entries(options?.recipes || {}));
@@ -449,6 +457,74 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     compiler.invalidate(id);
     recipesMap.delete(id);
     await userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
+    return c.json({ success: true });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 2.2 GESTÃO DE CONEXÕES COM FONTES DE DADOS (a senha nunca é devolvida)
+  // ─────────────────────────────────────────────────────────────
+
+  const publicConnection = ({ passwordEncrypted: _omit, ...rest }: ConnectionRecord) => rest;
+
+  // GET /api/admin/connections
+  app.get("/api/admin/connections", auth, requirePermission("system:sources:manage"), async (c) => {
+    return c.json((await connectionStore.list()).map(publicConnection));
+  });
+
+  // PUT /api/admin/connections/:id (o id é o nome da fonte usado nos Modelos)
+  app.put(
+    "/api/admin/connections/:id",
+    auth,
+    requirePermission("system:sources:manage"),
+    zValidator(
+      "json",
+      z.object({
+        name: z.string().min(1),
+        type: z.literal("mssql"),
+        host: z.string().min(1),
+        port: z.number().int().min(1).max(65535),
+        database: z.string().min(1),
+        username: z.string().min(1),
+        password: z.string().min(1).optional(),
+      })
+    ),
+    async (c) => {
+      const id = c.req.param("id");
+      if (!/^[a-z][a-z0-9_]*$/.test(id)) {
+        return c.json({ error: "O id da conexão deve usar letras minúsculas, números e _ (ex.: inovafarma)." }, 400);
+      }
+      const { password, ...body } = c.req.valid("json");
+      const existing = await connectionStore.get(id);
+      if (!password && !existing) {
+        return c.json({ error: "A senha é obrigatória ao criar uma conexão." }, 400);
+      }
+
+      const record = await connectionStore.save({
+        id,
+        ...body,
+        passwordEncrypted: password ? encryptSecret(password) : existing!.passwordEncrypted,
+      });
+      await sourceConnectors[id]?.close?.();
+      sourceConnectors[id] = connectorFactory(record);
+      return c.json(publicConnection(record));
+    }
+  );
+
+  // POST /api/admin/connections/:id/test
+  app.post("/api/admin/connections/:id/test", auth, requirePermission("system:sources:manage"), async (c) => {
+    const connector = sourceConnectors[c.req.param("id")];
+    if (!connector) return c.json({ error: "Conexão não encontrada." }, 404);
+    const ok = (await connector.healthCheck?.()) ?? false;
+    return c.json({ ok }, ok ? 200 : 502);
+  });
+
+  // DELETE /api/admin/connections/:id
+  app.delete("/api/admin/connections/:id", auth, requirePermission("system:sources:manage"), async (c) => {
+    const id = c.req.param("id");
+    if (!(await connectionStore.get(id))) return c.json({ error: "Conexão não encontrada." }, 404);
+    await connectionStore.delete(id);
+    await sourceConnectors[id]?.close?.();
+    delete sourceConnectors[id];
     return c.json({ success: true });
   });
 
@@ -1061,17 +1137,29 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     let persistenceStore: PersistenceStore | undefined;
     let userStore: UserStore | undefined;
     let recipeStore: RecipeStore | undefined;
+    const sourceConnectors: SourceConnectorRegistry = {};
+    let connectionStore: ConnectionStore | undefined;
     const recipes: Record<string, RecipeDef> = {};
     if (process.env.POSTGRES_HOST) {
-      const [{ db }, { PostgresPersistenceStore }, { PostgresUserStore }, { PostgresRecipeStore }] = await Promise.all([
+      const [{ db }, { PostgresPersistenceStore }, { PostgresUserStore }, { PostgresRecipeStore }, { PostgresConnectionStore }] = await Promise.all([
         import("./db/client.js"),
         import("./data/postgres-persistence-store.js"),
         import("./iam/postgres-user-store.js"),
         import("./data/postgres-recipe-store.js"),
+        import("./data/postgres-connection-store.js"),
       ]);
       persistenceStore = new PostgresPersistenceStore(db);
       userStore = new PostgresUserStore(db);
       recipeStore = new PostgresRecipeStore(db);
+      connectionStore = new PostgresConnectionStore(db);
+
+      for (const record of await connectionStore.list()) {
+        try {
+          sourceConnectors[record.id] = createConnector(record);
+        } catch (err: unknown) {
+          console.error(`Conexão '${record.id}' ignorada: ${err instanceof Error ? err.message : err}`);
+        }
+      }
 
       const compiler = new RecipeCompiler();
       for (const record of await recipeStore.list()) {
@@ -1087,6 +1175,8 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       persistenceStore,
       userStore,
       recipeStore,
+      connectionStore,
+      sourceConnectors,
       recipes,
     });
     const port = Number(process.env.PORT) || 3000;
