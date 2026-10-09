@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/chart";
 import { api } from "@/lib/api-client";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
-import { formatCurrency } from "@/lib/utils";
+import { formatCompactNumber, formatCurrency, formatDate, formatShortDate } from "@/lib/utils";
 import {
   Bar,
   BarChart,
@@ -122,6 +122,16 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
   }, [chartData]);
 
   const lineConfig = barConfig;
+
+  // Gráfico com séries (ex.: uma linha por vendedor): cada série tem uma cor; passando de 5, as linhas ficam tracejadas.
+  const series = data?.series ?? [];
+  const seriesConfig = useMemo<ChartConfig>(
+    () =>
+      Object.fromEntries(
+        series.map((item, index) => [item.key, { label: item.label, color: `var(--chart-${(index % 5) + 1})` }])
+      ),
+    [series]
+  );
 
   const pieData = useMemo(
     () =>
@@ -248,6 +258,47 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
               />
             </Bar>
           </BarChart>
+        </ChartContainer>
+      );
+    }
+
+    if (component === "line_chart" && series.length > 0) {
+      return (
+        <ChartContainer config={seriesConfig} className="h-full w-full min-h-[240px] md:min-h-[300px]">
+          <LineChart accessibilityLayer data={chartData} margin={{ left: 4, right: 12, top: 8, bottom: 4 }}>
+            <CartesianGrid vertical={false} />
+            <XAxis
+              dataKey="name"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={10}
+              tick={{ fontSize: 11 }}
+              tickFormatter={(value: string) => formatShortDate(String(value))}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              width={48}
+              tick={{ fontSize: 11 }}
+              tickFormatter={(value: number) => formatCompactNumber(value)}
+            />
+            <ChartTooltip
+              cursor={false}
+              content={<ChartTooltipContent indicator="line" labelFormatter={(label) => formatDate(String(label))} />}
+            />
+            <ChartLegend content={<ChartLegendContent className="flex-wrap" />} />
+            {series.map((item, index) => (
+              <Line
+                key={item.key}
+                type="monotone"
+                dataKey={item.key}
+                stroke={`var(--color-${item.key})`}
+                strokeWidth={2}
+                strokeDasharray={index >= 5 ? "5 4" : undefined}
+                dot={false}
+              />
+            ))}
+          </LineChart>
         </ChartContainer>
       );
     }

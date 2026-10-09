@@ -28,6 +28,16 @@ export function formatPercent(value: number | string | undefined | null): string
   return `${new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(num)}%`
 }
 
+/** Número em notação compacta pt-BR (ex.: 12,3 mil), para eixos de gráfico. */
+export function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(value)
+}
+
+/** "2026-09-03" vira "03/09"; qualquer outro texto é devolvido como está. */
+export function formatShortDate(value: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value.slice(8, 10)}/${value.slice(5, 7)}` : value
+}
+
 export function formatDate(dateString: string | Date | undefined | null): string {
   if (!dateString) return "-"
   try {
