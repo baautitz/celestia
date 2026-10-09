@@ -10,6 +10,7 @@ import type {
 } from "@platform/shared";
 import type { PersistenceStore } from "../data/persistence-store.js";
 import { PermissionResolver } from "../iam/permission-resolver.js";
+import { isAbortable } from "./recipe-sandbox.js";
 
 export interface ExecuteActionOptions {
   recipe: RecipeDef;
@@ -168,15 +169,23 @@ export class ActionExecutor {
     };
 
     // 4. Executa com timeout estrito
-    const executionPromise = actionDef.action(actionContext);
+    const action = actionDef.action;
+    const executionPromise = action(actionContext);
 
+    let timer: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
+      timer = setTimeout(() => {
+        // Action de Modelo (isolate): encerra o código pendurado em vez de deixá-lo ocupando memória.
+        if (isAbortable(action)) action.abort();
         reject(new Error(`Ação '${actionId}' excedeu o tempo limite de execução (${timeoutMs}ms).`));
       }, timeoutMs);
     });
 
-    await Promise.race([executionPromise, timeoutPromise]);
+    try {
+      await Promise.race([executionPromise, timeoutPromise]);
+    } finally {
+      clearTimeout(timer);
+    }
 
     return {
       success: true,

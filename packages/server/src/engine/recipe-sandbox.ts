@@ -99,6 +99,13 @@ export function isBatchable<TArg, TResult>(fn: unknown): fn is SandboxedFunction
   return typeof fn === "function" && "batch" in fn && typeof fn.batch === "function";
 }
 
+/** Action de Modelo que pode ser interrompida: derruba o isolate para parar o código pendurado. */
+export type AbortableAction = ((ctx: ActionContext) => Promise<void>) & { abort: () => void };
+
+export function isAbortable(fn: unknown): fn is AbortableAction {
+  return typeof fn === "function" && "abort" in fn && typeof fn.abort === "function";
+}
+
 /**
  * Um Modelo carregado num isolate do V8: sem process, fs, rede nem objetos do host.
  * O host só troca JSON com ele; as funções do Modelo viram proxies assíncronos.
@@ -188,8 +195,8 @@ export class SandboxedRecipe {
     return Object.assign(call, { batch });
   }
 
-  private actionProxy(path: string): (ctx: ActionContext) => Promise<void> {
-    return async (ctx) => {
+  private actionProxy(path: string): AbortableAction {
+    const run = async (ctx: ActionContext): Promise<void> => {
       await this.ensureAlive();
       const hostFns = new Map<string, HostFunction>();
       collectHostFunctions({ ui: ctx.ui, persistence: ctx.persistence }, "", hostFns);
@@ -206,5 +213,11 @@ export class SandboxedRecipe {
         this.hostCalls.delete(callId);
       }
     };
+
+    // O próximo uso sobe um isolate novo (ensureAlive); quem estava pendurado é encerrado na hora.
+    const abort = (): void => {
+      if (!this.disposed && !this.isolate.isDisposed) this.isolate.dispose();
+    };
+    return Object.assign(run, { abort });
   }
 }

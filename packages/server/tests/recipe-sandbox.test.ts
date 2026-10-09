@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type { ActionContext, DataTableColumnDef, ImperativeUIContext, UIEffect } from "@platform/shared";
 import { RecipeCompiler } from "../src/engine/compiler.js";
 import { isBatchable } from "../src/engine/recipe-sandbox.js";
+import { ActionExecutor } from "../src/engine/action-executor.js";
 import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
@@ -119,6 +120,43 @@ describe("Modelos em isolate do V8 (recipe-sandbox)", () => {
       const recipe = await compiler.compile("sb_act", recipeSource("sb_act", `{ key: "x", label: "X" }`, actions));
       await expect(recipe.actions[1]!.action(makeCtx([], {}))).rejects.toThrow(/falhou no modelo/);
     });
+  });
+});
+
+describe("action pendurada no isolate", () => {
+  const source = `
+import { defineRecipe } from "@platform/shared";
+export default defineRecipe({
+  id: "sb_hang", name: "Hang", workspace: { params: [] }, persistence: [],
+  sources: { s: { queries: { q: { primaryKey: "id", options: [] } } } },
+  actions: [
+    { id: "trava", label: "T", permission: "recipe:sb_hang:action:trava", action: async () => { await new Promise(() => {}); } },
+    { id: "ok", label: "O", permission: "recipe:sb_hang:action:ok", action: async ({ ui }) => { ui.toast.success("rodou"); } },
+  ],
+  ui: { layout: { type: "grid", columns: 12, gap: 16 }, components: [] },
+});
+`;
+  const run = (recipe: Awaited<ReturnType<RecipeCompiler["compile"]>>, actionId: string, timeoutMs: number) =>
+    ActionExecutor.execute({
+      recipe,
+      actionId,
+      sourceName: "s",
+      queryName: "q",
+      row: { id: 1 },
+      workspaceId: "ws",
+      workspaceVersion: 1,
+      persistenceStore: new MemoryPersistenceStore(),
+      timeoutMs,
+    });
+
+  it("estoura o tempo, encerra o isolate e o Modelo continua utilizável", async () => {
+    const recipe = await new RecipeCompiler().compile("sb_hang", source);
+
+    await expect(run(recipe, "trava", 150)).rejects.toThrow(/excedeu o tempo limite/);
+
+    // Um isolate novo sobe sozinho na próxima chamada: as outras actions seguem funcionando.
+    const result = await run(recipe, "ok", 2000);
+    expect(result.effects).toContainEqual({ type: "toast", variant: "success", message: "rodou" });
   });
 });
 
