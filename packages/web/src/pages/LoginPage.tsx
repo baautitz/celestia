@@ -9,14 +9,11 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  CardFooter,
 } from "@/components/ui/card";
 import { FieldGroup, Field, FieldLabel, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { toast } from "@/components/ui/toast";
-import { ShieldCheck, Crown, Wrench, UserCheck } from "lucide-react";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Informe o nome de usuário"),
@@ -32,13 +29,12 @@ export const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "carlos.admin",
-      password: "Senha@123",
+      username: "",
+      password: "",
     },
   });
 
@@ -56,21 +52,6 @@ export const LoginPage: React.FC = () => {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha na autenticação.";
       toast.error(msg);
-    }
-  };
-
-  const handleSelectDemoProfile = (values: string[]) => {
-    const value = values[0];
-    if (!value) return;
-    if (value === "admin") {
-      setValue("username", "carlos.admin");
-      setValue("password", "Senha@123");
-    } else if (value === "operador") {
-      setValue("username", "maria.souza");
-      setValue("password", "Senha@123");
-    } else if (value === "vendedor") {
-      setValue("username", "joao.silva");
-      setValue("password", "Senha@123");
     }
   };
 
@@ -124,31 +105,6 @@ export const LoginPage: React.FC = () => {
           </form>
         </CardContent>
 
-        <CardFooter className="flex flex-col items-start gap-3 pt-4">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <ShieldCheck className="size-4 text-primary" />
-            <span>Acessos Rápidos de Demonstração:</span>
-          </div>
-
-          <ToggleGroup
-            variant="outline"
-            className="w-full justify-start"
-            onValueChange={handleSelectDemoProfile}
-          >
-            <ToggleGroupItem value="admin" className="flex-1">
-              <Crown className="size-3.5 mr-1 text-amber-500" />
-              Admin
-            </ToggleGroupItem>
-            <ToggleGroupItem value="operador" className="flex-1">
-              <Wrench className="size-3.5 mr-1 text-blue-500" />
-              Operador
-            </ToggleGroupItem>
-            <ToggleGroupItem value="vendedor" className="flex-1">
-              <UserCheck className="size-3.5 mr-1 text-emerald-500" />
-              Vendedor
-            </ToggleGroupItem>
-          </ToggleGroup>
-        </CardFooter>
       </Card>
     </main>
   );
