@@ -6,6 +6,7 @@ import { PasswordService } from "../src/iam/password-service.js";
 import { TokenService } from "../src/iam/token-service.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
 import fechamentoRecipe from "../../../recipes/fechamento-mes.recipe.js";
+import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 import type {
   AuthTokens,
   User,
@@ -33,7 +34,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
     });
 
     persistenceStore = new MemoryPersistenceStore();
-    userStore = new MemoryUserStore();
+    userStore = createSeededUserStore();
     tokenService = new TokenService({
       jwtSecret: "test-secret-key-iam-12345",
       accessTtlSeconds: 300, // 5 min
@@ -45,6 +46,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       persistenceStore,
       userStore,
       tokenService,
+      workspaces: seededWorkspaces,
       recipes: {
         fechamento_mes: fechamentoRecipe,
       },

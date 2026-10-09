@@ -16,7 +16,6 @@ import { PermissionCatalogEngine } from "./iam/permission-catalog.js";
 import { PermissionResolver } from "./iam/permission-resolver.js";
 import { createAuthMiddleware, requirePermission } from "./iam/middleware.js";
 import type { RecipeDef, ActionDef, JWTAccessPayload, WorkspaceRecord } from "@platform/shared";
-import defaultFechamentoRecipe from "./recipes/default-recipe.js";
 
 export interface CreatePlatformAppOptions {
   compiler?: RecipeCompiler;
@@ -26,6 +25,7 @@ export interface CreatePlatformAppOptions {
   userStore?: UserStore;
   tokenService?: TokenService;
   recipes?: Record<string, RecipeDef>;
+  workspaces?: WorkspaceRecord[];
 }
 
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
@@ -48,29 +48,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
   const recipesMap = new Map<string, RecipeDef>(Object.entries(options?.recipes || {}));
-  const workspacesMap = new Map<string, WorkspaceRecord>();
-
-  // Seeds de Áreas de Trabalho padrão
-  workspacesMap.set("ws_fechamento_jan_2026", {
-    id: "ws_fechamento_jan_2026",
-    recipeId: "fechamento_mes",
-    name: "Fechamento Mensal — Janeiro / 2026",
-    startDate: "2026-01-01",
-    endDate: "2026-01-31",
-    status: "open",
-    createdAt: "2026-02-01T08:00:00Z",
-    updatedAt: "2026-02-01T08:00:00Z",
-  });
-  workspacesMap.set("ws_fechamento_dez_2025", {
-    id: "ws_fechamento_dez_2025",
-    recipeId: "fechamento_mes",
-    name: "Fechamento Mensal — Dezembro / 2025",
-    startDate: "2025-12-01",
-    endDate: "2025-12-31",
-    status: "closed",
-    createdAt: "2026-01-02T09:30:00Z",
-    updatedAt: "2026-01-02T09:30:00Z",
-  });
+  const workspacesMap = new Map<string, WorkspaceRecord>((options?.workspaces || []).map((w) => [w.id, w]));
 
   // Sincroniza e limpa permissões órfãs das roles na inicialização
   userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
@@ -1019,21 +997,6 @@ export type AppType = ReturnType<typeof createPlatformApp>;
 // Inicia servidor se executado diretamente
 if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
   void (async () => {
-    const sourceConnector = new MockSourceConnector({
-      default: [
-        { vendedor_id: 1, vendedor: "Carlos Vendedor", venda_geral: 10000 },
-        { vendedor_id: 42, vendedor: "João da Silva", venda_geral: 25000 },
-        { vendedor_id: 99, vendedor: "Maria Souza", venda_geral: 15000 },
-      ],
-      categories: [
-        { value: 1, label: "Higiene Pessoal" },
-        { value: 2, label: "Medicamentos" },
-        { value: 3, label: "Vitaminas e Suplementos" },
-        { value: 4, label: "Dermocosméticos" },
-        { value: 5, label: "Equipamentos Médicos" },
-      ],
-    });
-
     let persistenceStore: PersistenceStore | undefined;
     let userStore: UserStore | undefined;
     if (process.env.POSTGRES_HOST) {
@@ -1047,12 +1010,8 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     }
 
     const app = createPlatformApp({
-      sourceConnector,
       persistenceStore,
       userStore,
-      recipes: {
-        fechamento_mes: defaultFechamentoRecipe,
-      },
     });
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);

@@ -6,7 +6,6 @@ import type {
   RecipeDef,
 } from "@platform/shared";
 import { PasswordService } from "./password-service.js";
-import { SYSTEM_PERMISSIONS } from "./system-permissions.js";
 import { PermissionCatalogEngine } from "./permission-catalog.js";
 
 export interface UserStore {
@@ -32,105 +31,8 @@ export class MemoryUserStore implements UserStore {
   private roles = new Map<string, Role>();
 
   constructor(initialData?: { users?: User[]; roles?: Role[] }) {
-    if (initialData?.roles && initialData.roles.length > 0) {
-      for (const r of initialData.roles) this.roles.set(r.id, r);
-    } else {
-      this.seedDefaultRoles();
-    }
-
-    if (initialData?.users && initialData.users.length > 0) {
-      for (const u of initialData.users) this.users.set(u.id, u);
-    } else {
-      this.seedDefaultUsers();
-    }
-  }
-
-  private seedDefaultRoles() {
-    // Role 1: Administrador (Todas as permissões do sistema + recipes)
-    const adminPermissions = [
-      ...SYSTEM_PERMISSIONS.map((p) => p.key),
-      "recipe:fechamento_mes:view",
-      "recipe:fechamento_mes:query:vendas_equipe",
-      "recipe:fechamento_mes:query:vendas_proprias",
-      "recipe:fechamento_mes:action:adicionar_penalidade",
-      "recipe:fechamento_mes:action:visualizar_penalidades",
-      "recipe:fechamento_mes:action:remover_penalidade",
-    ];
-
-    this.roles.set("role_admin", {
-      id: "role_admin",
-      name: "Administrador",
-      description: "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
-      permissions: adminPermissions,
-    });
-
-    // Role 2: Operador de Fechamento
-    this.roles.set("role_operador", {
-      id: "role_operador",
-      name: "Operador de Fechamento",
-      description: "Acesso ao fechamento geral de vendas e aplicação de penalidades.",
-      permissions: [
-        "system:workspaces:create",
-        "system:workspaces:close",
-        "recipe:fechamento_mes:view",
-        "recipe:fechamento_mes:query:vendas_equipe",
-        "recipe:fechamento_mes:action:adicionar_penalidade",
-        "recipe:fechamento_mes:action:visualizar_penalidades",
-        "recipe:fechamento_mes:action:remover_penalidade",
-      ],
-    });
-
-    // Role 3: Vendedor (Individual)
-    this.roles.set("role_vendedor", {
-      id: "role_vendedor",
-      name: "Vendedor",
-      description: "Acesso exclusivo ao relatório individual de suas próprias vendas.",
-      permissions: [
-        "recipe:fechamento_mes:view",
-        "recipe:fechamento_mes:query:vendas_proprias",
-        "recipe:fechamento_mes:action:visualizar_penalidades",
-      ],
-    });
-  }
-
-  private seedDefaultUsers() {
-    const defaultPasswordHash = PasswordService.hash("Senha@123");
-
-    this.users.set("usr_1001", {
-      id: "usr_1001",
-      fullname: "Carlos Oliveira",
-      username: "carlos.admin",
-      email: "carlos@farmacia.com.br",
-      passwordHash: defaultPasswordHash,
-      roleId: "role_admin",
-      externals: { inovafarma: 1, sap: 9001 },
-      status: "active",
-      createdAt: new Date().toISOString(),
-    });
-
-    this.users.set("usr_1002", {
-      id: "usr_1002",
-      fullname: "João da Silva (Vendedor 42)",
-      username: "joao.silva",
-      email: "joao.silva@farmacia.com.br",
-      passwordHash: defaultPasswordHash,
-      roleId: "role_vendedor",
-      externals: { inovafarma: 42, sap: 9042 },
-      status: "active",
-      createdAt: new Date().toISOString(),
-    });
-
-    this.users.set("usr_1003", {
-      id: "usr_1003",
-      fullname: "Maria Souza (Gerente)",
-      username: "maria.souza",
-      email: "maria.souza@farmacia.com.br",
-      passwordHash: defaultPasswordHash,
-      roleId: "role_operador",
-      externals: { inovafarma: 99, sap: 9099 },
-      status: "active",
-      createdAt: new Date().toISOString(),
-    });
+    for (const r of initialData?.roles || []) this.roles.set(r.id, r);
+    for (const u of initialData?.users || []) this.users.set(u.id, u);
   }
 
   async findByUsername(username: string): Promise<User | null> {

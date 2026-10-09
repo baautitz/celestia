@@ -3,6 +3,7 @@ import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import fechamentoRecipe from "../../../recipes/fechamento-mes.recipe.js";
+import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 
 describe("Bateria E2E Completa: Recipe Fechamento de Mês", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -23,6 +24,8 @@ describe("Bateria E2E Completa: Recipe Fechamento de Mês", () => {
     persistenceStore = new MemoryPersistenceStore();
 
     app = createPlatformApp({
+      userStore: createSeededUserStore(),
+      workspaces: seededWorkspaces,
       sourceConnector,
       persistenceStore,
       recipes: {

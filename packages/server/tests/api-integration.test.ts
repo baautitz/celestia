@@ -3,6 +3,7 @@ import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import type { RecipeDef } from "@platform/shared";
+import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 
 describe("Hono API Integration Test (End-to-End)", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -85,6 +86,8 @@ describe("Hono API Integration Test (End-to-End)", () => {
     });
     persistenceStore = new MemoryPersistenceStore();
     app = createPlatformApp({
+      userStore: createSeededUserStore(),
+      workspaces: seededWorkspaces,
       sourceConnector,
       persistenceStore,
       recipes: {

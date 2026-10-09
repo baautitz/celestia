@@ -4,12 +4,15 @@ import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import { WorkspaceValidator } from "../src/engine/workspace-validator.js";
 import fechamentoRecipe from "../../../recipes/fechamento-mes.recipe.js";
+import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 
 describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
   let app: ReturnType<typeof createPlatformApp>;
 
   beforeEach(() => {
     app = createPlatformApp({
+      userStore: createSeededUserStore(),
+      workspaces: seededWorkspaces,
       sourceConnector: new MockSourceConnector({
         default: [{ vendedor_id: 1, vendedor: "Carlos", venda_geral: 5000 }],
       }),
