@@ -54,6 +54,7 @@ import {
   Building2,
   Layers,
   Database,
+  FileCode,
 } from "lucide-react";
 
 const SidebarAutoClose: React.FC = () => {
@@ -78,7 +79,7 @@ export const AppLayout: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    setLoadingRecipes(true);
+    // Rebusca a cada troca de página para refletir Modelos criados, editados ou com permissões alteradas.
     api.recipes.list().then((data) => {
       setRecipes(data);
       setLoadingRecipes(false);
@@ -86,7 +87,7 @@ export const AppLayout: React.FC = () => {
       setRecipes([]);
       setLoadingRecipes(false);
     });
-  }, [user]);
+  }, [user, location.pathname]);
 
   const handleLogout = async () => {
     await logout();
@@ -110,6 +111,7 @@ export const AppLayout: React.FC = () => {
     if (location.pathname.startsWith("/iam/users")) return "Gestão de Usuários";
     if (location.pathname.startsWith("/iam/roles")) return "Grupos de Acesso & Permissões";
     if (location.pathname.startsWith("/erps")) return "ERPs & Fontes de Dados";
+    if (location.pathname.startsWith("/admin/recipes")) return "Modelos (Código)";
     return "Painel de Controle";
   };
 
@@ -189,7 +191,7 @@ export const AppLayout: React.FC = () => {
             </SidebarMenu>
           </SidebarGroup>
 
-          {hasAnyPermission("system:users:read", "system:roles:read", "system:sources:manage") && (
+          {hasAnyPermission("system:users:read", "system:roles:read", "system:sources:manage", "system:recipes:read") && (
             <SidebarGroup>
               <SidebarGroupLabel>Administração & IAM</SidebarGroupLabel>
               <SidebarMenu>
@@ -214,6 +216,18 @@ export const AppLayout: React.FC = () => {
                     >
                       <Shield className="size-4" />
                       <span>Grupos de Acesso</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {hasAnyPermission("system:recipes:read") && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={location.pathname.startsWith("/admin/recipes")}
+                      tooltip="Gerenciar Modelos"
+                      onClick={() => navigate("/admin/recipes")}
+                    >
+                      <FileCode className="size-4" />
+                      <span>Gerenciar Modelos</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}

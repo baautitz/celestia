@@ -15,6 +15,8 @@ import type {
   ErpTypeMeta,
   ErpConnection,
   ErpConnectionInput,
+  RecipeAdminSummary,
+  RecipeAdminRecord,
 } from "@platform/shared";
 
 class ApiClient {
@@ -220,6 +222,28 @@ class ApiClient {
 
     remove: async (id: string): Promise<{ success: boolean }> => {
       return this.request<{ success: boolean }>(`/api/admin/connections/${id}`, { method: "DELETE" });
+    },
+  };
+
+  // ─── GESTÃO DE MODELOS (CÓDIGO-FONTE EM RUNTIME) ─────────────────────────
+  recipeAdmin = {
+    list: async (): Promise<RecipeAdminSummary[]> => {
+      return this.request<RecipeAdminSummary[]>("/api/admin/recipes");
+    },
+
+    get: async (id: string): Promise<RecipeAdminRecord> => {
+      return this.request<RecipeAdminRecord>(`/api/admin/recipes/${id}`);
+    },
+
+    save: async (id: string, source: string): Promise<RecipeAdminRecord> => {
+      return this.request<RecipeAdminRecord>(`/api/admin/recipes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ source }),
+      });
+    },
+
+    remove: async (id: string): Promise<{ success: boolean }> => {
+      return this.request<{ success: boolean }>(`/api/admin/recipes/${id}`, { method: "DELETE" });
     },
   };
 
