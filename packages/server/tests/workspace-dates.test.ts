@@ -3,7 +3,7 @@ import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import { WorkspaceValidator } from "../src/engine/workspace-validator.js";
-import fechamentoRecipe from "../../../recipes/fechamento-mes.recipe.js";
+import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
 import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 
 describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {

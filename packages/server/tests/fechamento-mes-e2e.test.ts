@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
-import fechamentoRecipe from "../../../recipes/fechamento-mes.recipe.js";
+import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
 import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 
 describe("Bateria E2E Completa: Recipe Fechamento de Mês", () => {

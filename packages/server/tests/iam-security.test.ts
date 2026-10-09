@@ -5,7 +5,7 @@ import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { TokenService } from "../src/iam/token-service.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
-import fechamentoRecipe from "../../../recipes/fechamento-mes.recipe.js";
+import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
 import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 import type {
   AuthTokens,
