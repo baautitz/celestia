@@ -103,6 +103,20 @@ export const SYSTEM_PERMISSIONS: PermissionItem[] = [
     module: "sources",
   },
 
+  // ── Módulo: Modelos (Recipes) ────────────────────────────
+  {
+    key: "system:recipes:read",
+    label: "Visualizar Código dos Modelos",
+    description: "Permite listar os Modelos cadastrados e ler o código-fonte de cada um.",
+    module: "recipes",
+  },
+  {
+    key: "system:recipes:manage",
+    label: "Gerenciar Modelos",
+    description: "Permite criar, editar e excluir Modelos (o código é compilado e validado ao salvar).",
+    module: "recipes",
+  },
+
   // ── Módulo: Auditoria ────────────────────────────────────
   {
     key: "system:audit:read",
