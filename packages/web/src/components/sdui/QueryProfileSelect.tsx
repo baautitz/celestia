@@ -3,6 +3,7 @@ import type { ComponentProfileMeta } from "@platform/shared";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectLabel,
   SelectTrigger,
@@ -32,24 +33,26 @@ export const QueryProfileSelect: React.FC<QueryProfileSelectProps> = ({
       <SelectTrigger aria-label="Perfil de dados" className="w-40">
         <SelectValue placeholder="Perfil de dados" />
       </SelectTrigger>
-      <SelectContent>
-        <SelectLabel>Perfil de dados</SelectLabel>
-        {profiles.map((profile) => (
-          <SelectItem key={profile.id} value={profile.id}>
-            {[
-              profile.label,
-              profile.bindings
-                .map((binding) => {
-                  const bindingName = binding.queryName || binding.persistenceName || binding.id;
-                  const bindingValue = binding.optionLabel || "Persistência";
-                  return `${bindingName}: ${bindingValue}`;
-                })
-                .join(" · "),
-            ]
-              .filter(Boolean)
-              .join(" — ")}
-          </SelectItem>
-        ))}
+      <SelectContent alignItemWithTrigger={false} className="w-max min-w-(--anchor-width)">
+        <SelectGroup>
+          <SelectLabel>Perfil de dados</SelectLabel>
+          {profiles.map((profile) => (
+            <SelectItem key={profile.id} value={profile.id}>
+              {[
+                profile.label,
+                profile.bindings
+                  .map((binding) => {
+                    const bindingName = binding.queryName || binding.persistenceName || binding.id;
+                    const bindingValue = binding.optionLabel || "Persistência";
+                    return `${bindingName}: ${bindingValue}`;
+                  })
+                  .join(" · "),
+              ]
+                .filter(Boolean)
+                .join(" — ")}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   );
