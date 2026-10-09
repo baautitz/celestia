@@ -54,3 +54,15 @@ export const connections = pgTable("connections", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const workspaces = pgTable("workspaces", {
+  id: text("id").primaryKey(),
+  recipeId: text("recipe_id").notNull(),
+  name: text("name").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  status: text("status", { enum: ["open", "closed", "archived"] }).notNull().default("open"),
+  params: jsonb("params").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

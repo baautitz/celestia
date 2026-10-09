@@ -21,6 +21,7 @@ import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js
 import { PermissionCatalogEngine } from "./iam/permission-catalog.js";
 import { PermissionResolver } from "./iam/permission-resolver.js";
 import { createAuthMiddleware, requirePermission } from "./iam/middleware.js";
+import type { WorkspaceStore } from "./data/workspace-store.js";
 import type { RecipeDef, ActionDef, JWTAccessPayload, WorkspaceRecord } from "@platform/shared";
 
 export interface CreatePlatformAppOptions {
@@ -37,6 +38,8 @@ export interface CreatePlatformAppOptions {
   tokenService?: TokenService;
   recipes?: Record<string, RecipeDef>;
   workspaces?: WorkspaceRecord[];
+  /** Quando informado, as Áreas de Trabalho são gravadas nele a cada mudança (o Map em memória é só cache). */
+  workspaceStore?: WorkspaceStore;
 }
 
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
@@ -62,6 +65,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
   const recipesMap = new Map<string, RecipeDef>(Object.entries(options?.recipes || {}));
+  const workspaceStore = options?.workspaceStore;
   const workspacesMap = new Map<string, WorkspaceRecord>((options?.workspaces || []).map((w) => [w.id, w]));
 
   // Recarrega os Modelos do banco (ao clicar em atualizar na tela de Modelos): pega edições feitas direto no Postgres.
@@ -693,6 +697,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       };
 
       workspacesMap.set(id, newWs);
+      await workspaceStore?.save(newWs);
       return c.json(newWs, 201);
     }
   );
@@ -740,6 +745,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       ws.endDate = endDate;
       if (body.params !== undefined) ws.params = body.params;
       ws.updatedAt = new Date().toISOString();
+      await workspaceStore?.save(ws);
 
       return c.json(ws);
     }
@@ -783,6 +789,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         ws.status = "closed";
         ws.updatedAt = new Date().toISOString();
       }
+      await workspaceStore?.save(ws);
 
       return c.json({ success: true, workspace: ws });
     }
@@ -826,6 +833,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         ws.status = "open";
         ws.updatedAt = new Date().toISOString();
       }
+      await workspaceStore?.save(ws);
 
       return c.json({ success: true, workspace: ws });
     }
@@ -853,6 +861,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       }
 
       workspacesMap.delete(id);
+      await workspaceStore?.remove(id);
       return c.json({ success: true });
     }
   );
@@ -1220,20 +1229,25 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     let recipeStore: RecipeStore | undefined;
     const sourceConnectors: SourceConnectorRegistry = {};
     let connectionStore: ConnectionStore | undefined;
+    let workspaceStore: WorkspaceStore | undefined;
+    let workspaces: WorkspaceRecord[] = [];
     const recipes: Record<string, RecipeDef> = {};
     const failedRecipeIds: string[] = [];
     if (process.env.POSTGRES_HOST) {
-      const [{ db }, { PostgresPersistenceStore }, { PostgresUserStore }, { PostgresRecipeStore }, { PostgresConnectionStore }] = await Promise.all([
+      const [{ db }, { PostgresPersistenceStore }, { PostgresUserStore }, { PostgresRecipeStore }, { PostgresConnectionStore }, { PostgresWorkspaceStore }] = await Promise.all([
         import("./db/client.js"),
         import("./data/postgres-persistence-store.js"),
         import("./iam/postgres-user-store.js"),
         import("./data/postgres-recipe-store.js"),
         import("./data/postgres-connection-store.js"),
+        import("./data/postgres-workspace-store.js"),
       ]);
       persistenceStore = new PostgresPersistenceStore(db);
       userStore = new PostgresUserStore(db);
       recipeStore = new PostgresRecipeStore(db);
       connectionStore = new PostgresConnectionStore(db);
+      workspaceStore = new PostgresWorkspaceStore(db);
+      workspaces = await workspaceStore.list();
 
       for (const record of await connectionStore.list()) {
         try {
@@ -1259,6 +1273,8 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       userStore,
       recipeStore,
       connectionStore,
+      workspaceStore,
+      workspaces,
       sourceConnectors,
       recipes,
       failedRecipeIds,
