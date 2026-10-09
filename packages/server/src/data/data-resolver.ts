@@ -182,6 +182,9 @@ export class DataResolver {
       if (typeof statProps.compute === "function") {
         return { type: "stat", value: statProps.compute(rows), title: statProps.title };
       }
+      if (statProps.field) {
+        return { type: "stat", value: Number(rows[0]?.[statProps.field] || 0), title: statProps.title };
+      }
       if (statProps.aggregate) {
         const values = rows.map((row) => Number(row[statProps.aggregate!.field] || 0));
         const aggregate = statProps.aggregate.function;
