@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
-import type { RecipeSummary } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
 import { useHeaderActions } from "@/context/HeaderActionsContext";
+import { useRecipesCatalog } from "@/context/RecipesCatalogContext";
 import { api } from "@/lib/api-client";
 import {
   SidebarProvider,
@@ -74,20 +74,7 @@ export const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [recipes, setRecipes] = useState<RecipeSummary[]>([]);
-  const [loadingRecipes, setLoadingRecipes] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-    // Rebusca a cada troca de página para refletir Modelos criados, editados ou com permissões alteradas.
-    api.recipes.list().then((data) => {
-      setRecipes(data);
-      setLoadingRecipes(false);
-    }).catch(() => {
-      setRecipes([]);
-      setLoadingRecipes(false);
-    });
-  }, [user, location.pathname]);
+  const { recipes, loading: loadingRecipes } = useRecipesCatalog();
 
   const handleLogout = async () => {
     await logout();

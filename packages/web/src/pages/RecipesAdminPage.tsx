@@ -58,6 +58,7 @@ import { toast } from "@/components/ui/toast";
 import { PlusCircle, RefreshCw, MoreHorizontal, Edit2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
+import { useRecipesCatalog } from "@/context/RecipesCatalogContext";
 
 const formSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9_]*$/, "Use letras minúsculas, números e _ (ex.: fechamento_mes)."),
@@ -72,6 +73,7 @@ export const RecipesAdminPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("system:recipes:manage");
   const isMobile = useIsMobile();
+  const { refresh: refreshSidebar } = useRecipesCatalog();
 
   const [recipes, setRecipes] = useState<RecipeAdminSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,6 +114,7 @@ export const RecipesAdminPage: React.FC = () => {
         toast.success("Modelos recarregados do banco.");
       }
       setRecipes(await api.recipeAdmin.list());
+      refreshSidebar();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao recarregar Modelos");
     } finally {
@@ -156,6 +159,7 @@ export const RecipesAdminPage: React.FC = () => {
       toast.success(isEditMode ? "Modelo atualizado com sucesso!" : "Modelo cadastrado com sucesso!");
       setIsSheetOpen(false);
       fetchData();
+      refreshSidebar();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Falha ao salvar Modelo");
     } finally {
@@ -170,6 +174,7 @@ export const RecipesAdminPage: React.FC = () => {
       toast.success("Modelo excluído.");
       setDeleteTarget(null);
       fetchData();
+      refreshSidebar();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Falha ao excluir Modelo");
     }

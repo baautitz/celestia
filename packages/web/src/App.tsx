@@ -10,6 +10,7 @@ import { ERPsPage } from "./pages/ERPsPage";
 import { RecipesAdminPage } from "./pages/RecipesAdminPage";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
+import { RecipesCatalogProvider } from "./context/RecipesCatalogContext";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -22,7 +23,13 @@ export const App: React.FC = () => {
 
         {/* Rotas Protegidas Autenticadas com Layout Corporativo */}
         <Route element={<ProtectedRoute />}>
-          <Route element={<AppLayout />}>
+          <Route
+          element={
+            <RecipesCatalogProvider>
+              <AppLayout />
+            </RecipesCatalogProvider>
+          }
+        >
             <Route path="/" element={<Navigate to="/workspaces" replace />} />
             <Route path="/workspaces" element={<WorkspacesPage />} />
             <Route path="/workspaces/:id" element={<WorkspaceDetailPage />} />
