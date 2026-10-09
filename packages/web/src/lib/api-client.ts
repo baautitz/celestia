@@ -245,6 +245,12 @@ class ApiClient {
     remove: async (id: string): Promise<{ success: boolean }> => {
       return this.request<{ success: boolean }>(`/api/admin/recipes/${id}`, { method: "DELETE" });
     },
+
+    reload: async (): Promise<{ loaded: number; errors: { id: string; message: string }[] }> => {
+      return this.request<{ loaded: number; errors: { id: string; message: string }[] }>("/api/admin/recipes/reload", {
+        method: "POST",
+      });
+    },
   };
 
   // ─── SDUI & WORKSPACE ENDPOINTS ─────────────────────────────────────────

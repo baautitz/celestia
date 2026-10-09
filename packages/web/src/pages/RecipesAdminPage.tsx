@@ -101,6 +101,24 @@ export const RecipesAdminPage: React.FC = () => {
     fetchData();
   }, []);
 
+  // Relê os Modelos do banco no servidor (pega edições feitas direto no Postgres) e atualiza a lista.
+  const handleReload = async () => {
+    try {
+      setLoading(true);
+      const result = await api.recipeAdmin.reload();
+      if (result.errors.length > 0) {
+        toast.error(`Não recarregados: ${result.errors.map((e) => `${e.id} (${e.message})`).join("; ")}`);
+      } else {
+        toast.success("Modelos recarregados do banco.");
+      }
+      setRecipes(await api.recipeAdmin.list());
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao recarregar Modelos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openCreateSheet = () => {
     setEditingId(null);
     form.reset({ id: "", source: "" });
@@ -180,7 +198,13 @@ export const RecipesAdminPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6">
       <HeaderActions>
-        <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={fetchData} disabled={loading}>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-8 shrink-0"
+          onClick={canManage ? handleReload : fetchData}
+          disabled={loading}
+        >
           <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
         </Button>
 
