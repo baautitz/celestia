@@ -22,33 +22,20 @@ export class RecipeCompiler {
       sourcemap: "inline",
     });
 
-    // Cria o contexto isolado para extrair a recipe
-    const sandbox: Record<string, unknown> = {
-      exports: {},
-      module: { exports: {} },
-      require: (moduleName: string) => {
-        if (moduleName === "@platform/shared") {
-          return { defineRecipe: (config: unknown) => config };
-        }
-        return {};
-      },
-      defineRecipe: (config: unknown) => config,
-      console,
-      Date,
-      Math,
-      Number,
-      String,
-      Boolean,
-      Array,
-      Object,
+    // Contexto vazio: nenhum objeto do host é exposto (os intrínsecos Object, Array, Date... são do próprio contexto).
+    // O prelúdio roda dentro do contexto para que require/defineRecipe também sejam do contexto, não do host.
+    const context = createContext(Object.create(null), { codeGeneration: { strings: false, wasm: false } });
+    new Script(
+      `var module = { exports: {} }; var exports = module.exports;
+       var defineRecipe = function (config) { return config; };
+       var require = function () { return { defineRecipe: defineRecipe }; };`
+    ).runInContext(context);
+    new Script(transformResult.code).runInContext(context, { timeout: 1000 });
+
+    const { module: moduleObj, exports: exportsObj } = context as {
+      module?: { exports: { default?: RecipeDef } };
+      exports?: { default?: RecipeDef };
     };
-
-    const context = createContext(sandbox);
-    const script = new Script(transformResult.code);
-    script.runInContext(context, { timeout: 1000 });
-
-    const moduleObj = sandbox.module as { exports: { default?: RecipeDef } } | undefined;
-    const exportsObj = sandbox.exports as { default?: RecipeDef } | undefined;
 
     const recipe = (moduleObj?.exports?.default ||
       exportsObj?.default ||

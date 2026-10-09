@@ -79,3 +79,18 @@ describe("Gestão de Modelos em runtime (/api/admin/recipes)", () => {
     expect(list.status).toBe(403);
   });
 });
+
+describe("Compilador: isolamento do contexto", () => {
+  it("não expõe process nem objetos do host ao código do Modelo", async () => {
+    const { RecipeCompiler } = await import("../src/engine/compiler.js");
+    const compiler = new RecipeCompiler();
+    const probe = (expr: string) =>
+      `export default { id: "x", name: String(${expr}), workspace: { params: [] }, sources: {}, ui: { layout: {}, components: [] } };`;
+
+    expect((await compiler.compile("x", probe("typeof process"))).name).toBe("undefined");
+    await expect(compiler.compile("y", `export default { id: "y", name: (0, eval)("1") };`)).rejects.toThrow();
+    await expect(
+      compiler.compile("z", `export default { id: "z", name: require("fs").constructor.constructor("return process")() };`)
+    ).rejects.toThrow();
+  });
+});
