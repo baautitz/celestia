@@ -37,6 +37,8 @@ export interface ShowTableOptions {
     format?: "currency" | "datetime" | "date" | "number" | "text";
   }>;
   rowActions?: string[];
+  /** Campo booleano: quando verdadeiro, a linha aparece riscada e sem ações (ex.: item cancelado). */
+  strikeField?: string;
   isWorkspaceClosed?: boolean;
 }
 

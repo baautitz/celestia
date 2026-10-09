@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
 
 interface ConfirmOptions {
@@ -343,10 +343,16 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const isStruck = (row: Record<string, unknown>) => {
+    const field = tableState.options?.strikeField;
+    return field !== undefined && Boolean(row[field]);
+  };
+
   const formatTableCell = (format: string | undefined, val: unknown) => {
     if (val === undefined || val === null) return "-";
     if (format === "currency") return formatCurrency(val as number | string);
-    if (format === "date" || format === "datetime") return formatDate(val as string);
+    if (format === "datetime") return formatDateTime(val as string);
+    if (format === "date") return formatDate(val as string);
     return String(val);
   };
 
@@ -418,7 +424,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         value: formatTableCell(col.format, row[col.key]),
                       }))}
                       actions={
-                        tableState.options?.rowActions && tableState.options.rowActions.length > 0 && !tableState.options.isWorkspaceClosed ? (
+                        tableState.options?.rowActions && tableState.options.rowActions.length > 0 && !tableState.options.isWorkspaceClosed && !isStruck(row) ? (
                           <div className="flex items-center gap-1">
                             {tableState.options.rowActions.map((actionId) => (
                               <Button
@@ -464,7 +470,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     </TableRow>
                   ) : (
                     tableState.data.map((row, idx) => (
-                      <TableRow key={idx}>
+                      <TableRow key={idx} className={isStruck(row) ? "text-muted-foreground line-through" : undefined}>
                         {tableState.options?.columns.map((col) => (
                           <TableCell key={col.key} className="font-mono text-xs">
                             {formatTableCell(col.format, row[col.key])}
@@ -472,7 +478,7 @@ export const ImperativeUIProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         ))}
                         {tableState.options?.rowActions && tableState.options.rowActions.length > 0 && !tableState.options.isWorkspaceClosed && (
                           <TableCell className="text-right">
-                            {tableState.options.rowActions.map((actionId) => (
+                            {!isStruck(row) && tableState.options.rowActions.map((actionId) => (
                               <Button
                                 key={actionId}
                                 type="button"

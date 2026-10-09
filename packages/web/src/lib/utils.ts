@@ -53,6 +53,14 @@ export function formatDate(dateString: string | Date | undefined | null): string
   }
 }
 
+/** Data e hora no fuso local: "09/10/2026 03:56". */
+export function formatDateTime(value: string | Date | undefined | null): string {
+  if (!value) return "-"
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return String(value)
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(date)
+}
+
 /** "YYYY-MM-DD" -> Date à meia-noite local (new Date("YYYY-MM-DD") seria UTC e recuaria um dia no Brasil). */
 export function parseLocalDate(value: string): Date {
   const [year, month, day] = value.split("-").map(Number)
