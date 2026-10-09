@@ -2,7 +2,7 @@
 
 > **Audience**: Autonomous Coding Agents, Antigravity, Claude Code, Cursor, Copilot, Cline, Windsurf.  
 > **Platform**: Celestia — Server-Driven UI (SDUI) & Permission-First IAM Enterprise Platform.  
-> **Runtime**: Node.js >= 20.x, TypeScript >= 5.6 (strict mode), pnpm workspaces.
+> **Runtime**: Node.js >= 24.x (required by `isolated-vm` 7), TypeScript >= 5.6 (strict mode), pnpm workspaces.
 
 ---
 
@@ -12,7 +12,7 @@
 
 - **Backend**: [Hono](https://hono.dev/) on Node.js (ultra-fast, typed RPC, minimal overhead).
 - **Security & Caching**: **Argon2id** (`@node-rs/argon2`), stateless JWT (5 min) + Refresh Token (7 days).
-- **SDUI Engine**: TypeScript-defined Recipes compiled in-memory via `esbuild` and executed inside isolated `node:vm` sandboxes.
+- **SDUI Engine**: TypeScript-defined Recipes compiled in-memory via `esbuild` and executed inside isolated V8 isolates (`isolated-vm`).
 - **Frontend**: Vite + React 19 + shadcn/ui + Tailwind CSS v4.
 - **PT-BR UI Terminology**:
   - `Recipe` ➔ **Modelo** (the reusable blueprint/dashboard definition).
@@ -50,7 +50,8 @@ celestia/
 │   │       │   ├── user-store.ts          -> MemoryUserStore with sanitization & initial seeds
 │   │       │   └── middleware.ts          -> createAuthMiddleware & requirePermission guards
 │   │       ├── engine/
-│   │       │   ├── compiler.ts            -> esbuild in-memory transpiler + node:vm isolated sandbox
+│   │       │   ├── compiler.ts            -> esbuild in-memory transpiler; loads the recipe in an isolate
+│   │       │   ├── recipe-sandbox.ts      -> isolated-vm sandbox: manifest + async proxies for compute/actions
 │   │       │   ├── action-executor.ts     -> Action executor with 5s timeout & imperative UI context
 │   │       │   ├── template-engine.ts     -> Safe query parameterizer (converts {{...}} into @p1, @p2)
 │   │       │   └── workspace-validator.ts -> Mandatory workspace dates validator (end_date >= start_date)
@@ -100,6 +101,8 @@ When generating or modifying code in this repository, agents MUST adhere to thes
   - Recipe queries: `recipe:<recipe_id>:query:<nome>` (e.g. `recipe:fechamento_mes:query:all`)
   - Recipe actions: `recipe:<recipe_id>:action:<id>` (e.g. `recipe:fechamento_mes:action:adicionar_penalidade`)
 - **Orphan Pruning**: When actions or queries are deleted from a recipe, `PermissionCatalogEngine.pruneOrphanPermissions` automatically purges them from all roles upon sync/boot.
+- **Administrator bypass (`isAdmin`)**: a user with `users.is_admin = true` ignores the permission matrix. The auth middleware replaces the token's permissions with **every valid permission key at request time** (system + all registered recipes), so every `requirePermission` / `permissions.includes(...)` check keeps working unchanged and new recipes are covered immediately. The flag is NEVER settable through the API (`/api/iam/users` ignores it); only `UserStore.setAdmin`, used by the `create-admin` CLI, changes it. This is the single, deliberate exception to least-privilege: grant it sparingly.
+- **Boot safety**: if a recipe stored in Postgres fails to compile at boot, orphan pruning is skipped for that boot so its permissions are not wiped from roles. `POST /api/admin/recipes/reload` follows the same rule.
 
 ### 4. Query Resolution Order
 - Multiple queries defined on a source are evaluated **in the order of their declaration** in the recipe.
@@ -114,7 +117,9 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 - All `{{workspace.param}}` and `{{user.externals.source}}` tokens must be converted into bind parameters (`@p1`, `@p2`) via `TemplateEngine.parse()`.
 
 ### 7. Sandboxed Action Execution
-- Actions execute in isolated `node:vm` contexts without access to Node globals (`process`, `fs`, `child_process`, `net`).
+- Recipe code (compile, `compute`, `actions`) NEVER runs in the server process. It runs in an `isolated-vm` V8 isolate (`engine/recipe-sandbox.ts`) with no Node globals (`process`, `fs`, `child_process`, `net`) and no host objects, a 64 MB memory limit and per-call CPU timeouts. `node:vm` is NOT a security boundary and must not be used for recipe code.
+- The host exchanges only JSON with the isolate: the recipe is extracted as a manifest where each function becomes an async proxy. `compute` runs per column in a single batch call; actions reach `ui.*` / `persistence.*` through an ordered host-call bridge, so every host function receives and returns JSON-serializable values.
+- Recipe functions are therefore async from the server's point of view: always `await` them (`DataResolver`, `ActionExecutor`).
 - Strict timeout of **5,000 ms** per action execution via `Promise.race`.
 
 ### 8. No Credential Leakage

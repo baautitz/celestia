@@ -11,7 +11,7 @@ O **Celestia** é um ecossistema projetado para unificar dados de ERPs legados e
 - **Backend**: [Hono](https://hono.dev/) sobre Node.js 20+ com tipagem estrita RPC e baixa sobrecarga de memória.
 - **Frontend**: Vite + React 19 + shadcn/ui + Tailwind CSS v4.
 - **Segurança & IAM**: Criptografia de senhas com **Argon2id** (OWASP standard), autenticação JWT (5 min) + Refresh Token (7 dias) e catálogo dinâmico de permissões com poda automática de órfãos.
-- **Motor SDUI**: Compilação in-memory via `esbuild` e execução segura via `node:vm` com timeout estrito de 5.000ms.
+- **Motor SDUI**: Compilação in-memory via `esbuild` e execução isolada em *isolates* do V8 (`isolated-vm`, Node 24+), sem acesso a `process`/`fs`/rede, com limite de memória e timeout por chamada (5.000ms nas actions).
 - **Prevenção de SQL Injection**: Motor de templates com conversão automática de tokens `{{workspace.param}}` em bind parameters (`@p1`, `@p2`).
 
 ---
