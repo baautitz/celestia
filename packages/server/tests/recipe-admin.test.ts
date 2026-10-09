@@ -73,6 +73,39 @@ describe("Gestão de Modelos em runtime (/api/admin/recipes)", () => {
     expect(await ids(await tokenOf("joao.silva"))).not.toContain("novo");
   });
 
+  it("recarrega do banco: pega edição direta, remove apagado e mantém a versão válida se quebrar", async () => {
+    const token = await tokenOf("carlos.admin");
+    const reload = async () => (await (await app.request("/api/admin/recipes/reload", { method: "POST", headers: { Authorization: `Bearer ${token}` } })).json()) as { loaded: number; errors: { id: string }[] };
+    const names = async () =>
+      ((await (await app.request("/api/recipes", { headers: { Authorization: `Bearer ${token}` } })).json()) as { id: string; name: string }[]).map((r) => `${r.id}:${r.name}`);
+
+    // 1. Modelo inserido direto no banco (sem passar pela API)
+    await recipeStore.save("direto", validSource("direto"));
+    expect(await reload()).toEqual({ loaded: 1, errors: [] });
+    expect(await names()).toContain("direto:Modelo Teste");
+
+    // 2. Edição direta do código
+    await recipeStore.save("direto", validSource("direto").replace("Modelo Teste", "Modelo Editado"));
+    await reload();
+    expect(await names()).toContain("direto:Modelo Editado");
+
+    // 3. Código quebrado direto no banco: reporta o erro e mantém a última versão válida
+    await recipeStore.save("direto", "export default defineRecipe({");
+    const broken = await reload();
+    expect(broken.errors.map((e) => e.id)).toEqual(["direto"]);
+    expect(await names()).toContain("direto:Modelo Editado");
+
+    // 4. Apagado direto no banco
+    await recipeStore.delete("direto");
+    await reload();
+    expect(await names()).not.toContain("direto:Modelo Editado");
+  });
+
+  it("recarregar exige system:recipes:manage", async () => {
+    const res = await app.request("/api/admin/recipes/reload", { method: "POST", headers: { Authorization: `Bearer ${await tokenOf("joao.silva")}` } });
+    expect(res.status).toBe(403);
+  });
+
   it("exclui um Modelo", async () => {
     const token = await tokenOf("carlos.admin");
     await put("novo", validSource("novo"), token);

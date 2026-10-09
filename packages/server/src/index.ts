@@ -62,6 +62,39 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const recipesMap = new Map<string, RecipeDef>(Object.entries(options?.recipes || {}));
   const workspacesMap = new Map<string, WorkspaceRecord>((options?.workspaces || []).map((w) => [w.id, w]));
 
+  // Recarrega os Modelos do banco (ao clicar em atualizar na tela de Modelos): pega edições feitas direto no Postgres.
+  // Um Modelo que não compila mantém a última versão válida em uso, e nada é removido das permissões nesse caso.
+  // Os Modelos iniciais (opção recipes) vêm do banco no boot, então também podem ser removidos ao recarregar.
+  const loadedFromStore = new Set<string>(Object.keys(options?.recipes || {}));
+  async function reloadRecipesFromStore(): Promise<{ loaded: number; errors: { id: string; message: string }[] }> {
+    const errors: { id: string; message: string }[] = [];
+    const records = await recipeStore.list();
+    const seen = new Set<string>();
+
+    for (const record of records) {
+      seen.add(record.id);
+      try {
+        const recipe = await compiler.compile(record.id, record.source);
+        if (recipe.id !== record.id) throw new Error(`o id do Modelo ('${recipe.id}') difere do id cadastrado`);
+        recipesMap.set(record.id, recipe);
+        loadedFromStore.add(record.id);
+      } catch (err: unknown) {
+        compiler.invalidate(record.id);
+        errors.push({ id: record.id, message: err instanceof Error ? err.message : "Erro ao compilar o Modelo." });
+      }
+    }
+
+    for (const id of Array.from(loadedFromStore)) {
+      if (seen.has(id)) continue;
+      loadedFromStore.delete(id);
+      recipesMap.delete(id);
+      compiler.invalidate(id);
+    }
+
+    if (errors.length === 0) await userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
+    return { loaded: records.length - errors.length, errors };
+  }
+
   // Sincroniza e limpa permissões órfãs das roles na inicialização
   userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
 
@@ -425,6 +458,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     return c.json(records.map(({ id, createdAt, updatedAt }) => ({ id, name: recipesMap.get(id)?.name, createdAt, updatedAt })));
   });
 
+  // POST /api/admin/recipes/reload (relê os Modelos do banco e recompila os alterados)
+  app.post("/api/admin/recipes/reload", auth, requirePermission("system:recipes:manage"), async (c) => {
+    return c.json(await reloadRecipesFromStore());
+  });
+
   // GET /api/admin/recipes/:id
   app.get("/api/admin/recipes/:id", auth, requirePermission("system:recipes:read"), async (c) => {
     const record = await recipeStore.get(c.req.param("id"));
@@ -456,6 +494,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       }
 
       const record = await recipeStore.save(id, source);
+      loadedFromStore.add(id);
       recipesMap.set(id, recipe);
       await userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
       return c.json(record);
@@ -467,6 +506,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     const id = c.req.param("id");
     if (!(await recipeStore.get(id))) return c.json({ error: "Modelo não encontrado." }, 404);
     await recipeStore.delete(id);
+    loadedFromStore.delete(id);
     compiler.invalidate(id);
     recipesMap.delete(id);
     await userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
