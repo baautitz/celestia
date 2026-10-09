@@ -1,12 +1,11 @@
 export interface ConnectionRecord {
   id: string;
   name: string;
-  type: "mssql" | "postgres";
-  host: string;
-  port: number;
-  database: string;
-  username: string;
-  passwordEncrypted: string;
+  type: string;
+  /** Valores públicos do formulário do tipo (sem segredos). */
+  config: Record<string, unknown>;
+  /** Campos do tipo "password", em JSON cifrado (AES-256-GCM). */
+  secretsEncrypted: string;
   createdAt: string;
   updatedAt: string;
 }

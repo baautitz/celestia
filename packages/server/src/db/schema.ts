@@ -1,5 +1,5 @@
 import type { User } from "@platform/shared";
-import { index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const persistenceItems = pgTable(
   "persistence_items",
@@ -47,12 +47,9 @@ export const recipes = pgTable("recipes", {
 export const connections = pgTable("connections", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  type: text("type", { enum: ["mssql", "postgres"] }).notNull(),
-  host: text("host").notNull(),
-  port: integer("port").notNull(),
-  database: text("database").notNull(),
-  username: text("username").notNull(),
-  passwordEncrypted: text("password_encrypted").notNull(),
+  type: text("type").notNull(),
+  config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+  secretsEncrypted: text("secrets_encrypted").notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

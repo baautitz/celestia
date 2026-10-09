@@ -1,18 +1,16 @@
 import type { ConnectionRecord } from "./connection-store.js";
-import { MssqlSourceConnector } from "./mssql-source-connector.js";
+import { ERP_TYPES } from "./erp-types.js";
 import { decryptSecret } from "./secret-box.js";
 import type { SourceConnector } from "./source-connector.js";
 
 export type ConnectorFactory = (record: ConnectionRecord) => SourceConnector;
 
-export const createConnector: ConnectorFactory = (record) =>
-  new MssqlSourceConnector({
-    server: record.host,
-    port: record.port,
-    database: record.database,
-    user: record.username,
-    password: decryptSecret(record.passwordEncrypted),
-    options: { encrypt: true, trustServerCertificate: false, readOnlyIntent: true },
-    requestTimeout: 30000,
-    pool: { max: 5 },
-  });
+export function readSecrets(record: ConnectionRecord): Record<string, string> {
+  return record.secretsEncrypted ? (JSON.parse(decryptSecret(record.secretsEncrypted)) as Record<string, string>) : {};
+}
+
+export const createConnector: ConnectorFactory = (record) => {
+  const type = ERP_TYPES[record.type];
+  if (!type) throw new Error(`Tipo de ERP '${record.type}' não suportado.`);
+  return type.createConnector({ ...record.config, ...readSecrets(record) });
+};

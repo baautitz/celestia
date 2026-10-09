@@ -12,7 +12,8 @@ import { MemoryPersistenceStore, type PersistenceStore } from "./data/persistenc
 import { MemoryRecipeStore, type RecipeStore } from "./data/recipe-store.js";
 import { MemoryConnectionStore, type ConnectionStore } from "./data/connection-store.js";
 import type { ConnectionRecord } from "./data/connection-store.js";
-import { createConnector, type ConnectorFactory } from "./data/connection-factory.js";
+import { createConnector, readSecrets, type ConnectorFactory } from "./data/connection-factory.js";
+import { ERP_TYPES, parseErpValues } from "./data/erp-types.js";
 import { encryptSecret } from "./data/secret-box.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
@@ -470,7 +471,12 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 2.2 GESTÃO DE CONEXÕES COM FONTES DE DADOS (a senha nunca é devolvida)
   // ─────────────────────────────────────────────────────────────
 
-  const publicConnection = ({ passwordEncrypted: _omit, ...rest }: ConnectionRecord) => rest;
+  const publicConnection = ({ secretsEncrypted: _omit, ...rest }: ConnectionRecord) => rest;
+
+  // GET /api/admin/erp-types (catálogo de tipos de ERP e os campos de cada um)
+  app.get("/api/admin/erp-types", auth, requirePermission("system:sources:manage"), (c) =>
+    c.json(Object.values(ERP_TYPES).map(({ id, label, fields }) => ({ id, label, fields })))
+  );
 
   // GET /api/admin/connections
   app.get("/api/admin/connections", auth, requirePermission("system:sources:manage"), async (c) => {
@@ -486,12 +492,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       "json",
       z.object({
         name: z.string().min(1),
-        type: z.literal("mssql"),
-        host: z.string().min(1),
-        port: z.number().int().min(1).max(65535),
-        database: z.string().min(1),
-        username: z.string().min(1),
-        password: z.string().min(1).optional(),
+        type: z.string().min(1),
+        values: z.record(z.unknown()),
       })
     ),
     async (c) => {
@@ -499,16 +501,25 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (!/^[a-z][a-z0-9_]*$/.test(id)) {
         return c.json({ error: "O id da conexão deve usar letras minúsculas, números e _ (ex.: inovafarma)." }, 400);
       }
-      const { password, ...body } = c.req.valid("json");
+      const { name, type, values } = c.req.valid("json");
+      const typeDef = ERP_TYPES[type];
+      if (!typeDef) return c.json({ error: `Tipo de ERP '${type}' não suportado.` }, 400);
+
       const existing = await connectionStore.get(id);
-      if (!password && !existing) {
-        return c.json({ error: "A senha é obrigatória ao criar uma conexão." }, 400);
+      let parsed: ReturnType<typeof parseErpValues>;
+      try {
+        // Segredo em branco numa edição mantém o valor salvo (só se o tipo não mudou).
+        parsed = parseErpValues(typeDef, values, existing && existing.type === type ? readSecrets(existing) : {});
+      } catch (err: unknown) {
+        return c.json({ error: err instanceof Error ? err.message : "Valores inválidos." }, 400);
       }
 
       const record = await connectionStore.save({
         id,
-        ...body,
-        passwordEncrypted: password ? encryptSecret(password) : existing!.passwordEncrypted,
+        name,
+        type,
+        config: parsed.config,
+        secretsEncrypted: encryptSecret(JSON.stringify(parsed.secrets)),
       });
       await sourceConnectors[id]?.close?.();
       sourceConnectors[id] = connectorFactory(record);

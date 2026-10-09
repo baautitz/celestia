@@ -33,7 +33,8 @@ describe("Conexões com fontes de dados (/api/admin/connections)", () => {
   let connectionStore: MemoryConnectionStore;
   const closed: string[] = [];
 
-  const body = { name: "InovaFarma", type: "mssql", host: "db", port: 1433, database: "erp", username: "ro", password: "Seg@1234" };
+  const values = { host: "db", port: 1433, database: "erp", username: "ro", password: "Seg@1234" };
+  const body = { name: "InovaFarma", type: "mssql", values };
 
   async function tokenOf(username: string): Promise<string> {
     const res = await app.request("/api/auth/login", {
@@ -76,8 +77,9 @@ describe("Conexões com fontes de dados (/api/admin/connections)", () => {
     expect(JSON.stringify(await res.json())).not.toMatch(/Seg@1234|password/i);
 
     const stored = await connectionStore.get("inovafarma");
-    expect(stored!.passwordEncrypted).not.toContain("Seg@1234");
-    expect(decryptSecret(stored!.passwordEncrypted)).toBe("Seg@1234");
+    expect(stored!.secretsEncrypted).not.toContain("Seg@1234");
+    expect(JSON.parse(decryptSecret(stored!.secretsEncrypted))).toEqual({ password: "Seg@1234" });
+    expect(JSON.stringify(stored!.config)).not.toContain("Seg@1234");
 
     const list = await (await send("GET", "/api/admin/connections", token)).text();
     expect(list).not.toMatch(/Seg@1234|password/i);
@@ -86,19 +88,21 @@ describe("Conexões com fontes de dados (/api/admin/connections)", () => {
   it("mantém a senha ao atualizar sem informar uma nova", async () => {
     const token = await tokenOf("carlos.admin");
     await send("PUT", "/api/admin/connections/inovafarma", token, body);
-    const { password: _p, ...semSenha } = body;
-    const res = await send("PUT", "/api/admin/connections/inovafarma", token, { ...semSenha, host: "novo" });
+    const { password: _p, ...semSenha } = values;
+    const res = await send("PUT", "/api/admin/connections/inovafarma", token, { ...body, values: { ...semSenha, host: "novo" } });
     expect(res.status).toBe(200);
     const stored = await connectionStore.get("inovafarma");
-    expect(stored!.host).toBe("novo");
-    expect(decryptSecret(stored!.passwordEncrypted)).toBe("Seg@1234");
+    expect(stored!.config.host).toBe("novo");
+    expect(JSON.parse(decryptSecret(stored!.secretsEncrypted))).toEqual({ password: "Seg@1234" });
     expect(closed).toHaveLength(1);
   });
 
   it("exige senha ao criar, valida o id, testa e exclui", async () => {
     const token = await tokenOf("carlos.admin");
-    const { password: _p, ...semSenha } = body;
-    expect((await send("PUT", "/api/admin/connections/inovafarma", token, semSenha)).status).toBe(400);
+    const { password: _p, ...semSenha } = values;
+    expect((await send("PUT", "/api/admin/connections/inovafarma", token, { ...body, values: semSenha })).status).toBe(400);
+    expect((await send("PUT", "/api/admin/connections/inovafarma", token, { ...body, type: "oracle" })).status).toBe(400);
+    expect((await send("PUT", "/api/admin/connections/inovafarma", token, { ...body, values: { ...values, port: 99999 } })).status).toBe(400);
     expect((await send("PUT", "/api/admin/connections/Inova-Farma", token, body)).status).toBe(400);
 
     await send("PUT", "/api/admin/connections/inovafarma", token, body);
@@ -106,6 +110,14 @@ describe("Conexões com fontes de dados (/api/admin/connections)", () => {
     expect((await send("DELETE", "/api/admin/connections/inovafarma", token)).status).toBe(200);
     expect(await connectionStore.get("inovafarma")).toBeNull();
     expect((await send("POST", "/api/admin/connections/inovafarma/test", token)).status).toBe(404);
+  });
+
+  it("entrega o catálogo de tipos de ERP com os campos de cada um", async () => {
+    const res = await send("GET", "/api/admin/erp-types", await tokenOf("carlos.admin"));
+    const types = (await res.json()) as { id: string; fields: { name: string; type: string }[] }[];
+    expect(types.map((t) => t.id)).toEqual(["mssql"]);
+    expect(types[0]!.fields.map((f) => f.name)).toEqual(["host", "port", "database", "username", "password", "trustServerCertificate"]);
+    expect(types[0]!.fields.find((f) => f.name === "password")!.type).toBe("password");
   });
 
   it("lista só id e nome das fontes para quem gerencia usuários", async () => {
