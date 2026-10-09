@@ -188,6 +188,10 @@ When generating or modifying code in this repository, agents MUST adhere to thes
   2. Request explicit user confirmation.
   3. Execute `git commit` ONLY after user approval.
 
+### 22. Named Drizzle Migrations
+- Every migration MUST have a descriptive snake_case name: `pnpm --filter @platform/server db:generate --name=<descricao>` (e.g. `--name=create_users_and_roles`). Never keep the auto-generated random names (e.g. `white_phantom_reporter`).
+- Apply with `pnpm --filter @platform/server db:migrate`. Migrations live in `packages/server/drizzle/`.
+
 ---
 
 ## 4. Code Generation Recipes & Templates
