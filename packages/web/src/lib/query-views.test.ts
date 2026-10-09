@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ComponentProfileMeta } from "@platform/shared";
-import { allViews, collectQueryViews, currentView, planForAll, planForQuery, type ViewComponent } from "./query-views.js";
+import { collectQueryViews, currentView, planForQuery, type ViewComponent } from "./query-views.js";
 
 const profile = (id: string, label: string, sourceName: string, queryName: string, optionId: string, optionLabel: string): ComponentProfileMeta => ({
   id,
@@ -41,11 +41,5 @@ describe("query-views", () => {
     const [vendasGroup] = collectQueryViews(components);
     expect(planForQuery(vendasGroup!, components, "proprias")).toEqual({ c1: "proprias", c2: "proprias" });
     expect(planForQuery(vendasGroup!, components, "inexistente")).toEqual({});
-  });
-
-  it("override geral pelo id da visão: só muda quem a tem", () => {
-    expect(planForAll(components, "todas")).toEqual({ c1: "todas", c2: "todas", c3: "todas" });
-    expect(planForAll(components, "proprias")).toEqual({ c1: "proprias", c2: "proprias" });
-    expect(allViews(collectQueryViews(components)).map((v) => v.id)).toEqual(["todas", "proprias", "principal"]);
   });
 });

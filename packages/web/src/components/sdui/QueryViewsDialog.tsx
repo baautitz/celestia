@@ -14,10 +14,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { setProfileSelections, useProfileSelections } from "@/hooks/use-query-profile-selection";
 import {
-  allViews,
   collectQueryViews,
   currentView,
-  planForAll,
   planForQuery,
   type ProfilePlan,
   type ViewComponent,
@@ -44,7 +42,6 @@ export function getViewComponents(schema: DashboardSchemaResponse): ViewComponen
 export const QueryViewsDialog: React.FC<QueryViewsDialogProps> = ({ open, onOpenChange, schema, workspaceId }) => {
   const components = useMemo(() => getViewComponents(schema), [schema]);
   const groups = useMemo(() => collectQueryViews(components), [components]);
-  const views = useMemo(() => allViews(groups), [groups]);
   const readSelection = useProfileSelections(schema.id, workspaceId);
 
   // Rascunho: as escolhas só valem ao clicar em Concluir; fechar de outro jeito descarta.
@@ -73,31 +70,6 @@ export const QueryViewsDialog: React.FC<QueryViewsDialogProps> = ({ open, onOpen
 
         <ScrollArea className="max-h-[60vh]">
           <FieldGroup className="py-2 pr-3">
-            {groups.length > 1 && views.length > 1 && (
-              <Field>
-                <FieldLabel>Aplicar a todas as consultas</FieldLabel>
-                <Select
-                  items={views.map((view) => ({ value: view.id, label: view.label }))}
-                  value={null}
-                  onValueChange={(viewId: string | null) => {
-                    if (viewId) setDraft((current) => ({ ...current, ...planForAll(components, viewId) }));
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Escolha uma visão para aplicar em todas" />
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false} className="w-max min-w-(--anchor-width)">
-                    {views.map((view) => (
-                      <SelectItem key={view.id} value={view.id}>
-                        {view.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldDescription>Só muda as consultas que têm a visão escolhida; as demais ficam como estão.</FieldDescription>
-              </Field>
-            )}
-
             {groups.map((group) => {
               const current = currentView(group, components, selected);
               return (

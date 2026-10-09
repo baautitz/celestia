@@ -98,20 +98,3 @@ export function planForQuery(group: QueryViewGroup, components: ViewComponent[],
   }
   return plan;
 }
-
-/** Override geral: aplica a visão (pelo id) em todas as consultas que a tenham; as demais ficam como estão. */
-export function planForAll(components: ViewComponent[], viewId: string): ProfilePlan {
-  const plan: ProfilePlan = {};
-  for (const component of components) {
-    const profileId = profileFor(component, (binding) => binding.optionId === viewId);
-    if (profileId) plan[component.id] = profileId;
-  }
-  return plan;
-}
-
-/** Visões que podem ser aplicadas a todas as consultas de uma vez (união pelo id). */
-export function allViews(groups: QueryViewGroup[]): QueryView[] {
-  const views = new Map<string, QueryView>();
-  for (const group of groups) for (const view of group.views) if (!views.has(view.id)) views.set(view.id, view);
-  return Array.from(views.values());
-}
