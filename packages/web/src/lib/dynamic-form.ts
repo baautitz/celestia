@@ -48,12 +48,18 @@ export function buildDynamicSchema(fields: FormFieldDef[]) {
       case "textarea":
       case "date":
       case "datetime":
-      case "text":
-      case "lookup_select":
-      case "select": {
+      case "text": {
         let s = z.string({ message: field.required ? errorMsg : undefined });
         if (field.required) s = s.min(1, errorMsg);
         shape[field.name] = s;
+        break;
+      }
+
+      // O valor das opções pode ser número (ex.: código vindo do ERP).
+      case "lookup_select":
+      case "select": {
+        const option = z.union([z.string(), z.number()], { message: field.required ? errorMsg : undefined });
+        shape[field.name] = field.required ? option.refine((v) => v !== "", errorMsg) : option;
         break;
       }
 
