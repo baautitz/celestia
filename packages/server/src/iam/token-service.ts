@@ -33,6 +33,7 @@ export class TokenService {
       email: user.email,
       role: user.roleId,
       permissions: role?.permissions || [],
+      ...(user.isAdmin ? { isAdmin: true } : {}),
       externals: user.externals || {},
       iat: now,
       exp,

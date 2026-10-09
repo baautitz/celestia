@@ -66,7 +66,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
 
   // Middleware de Autenticação
-  const auth = createAuthMiddleware(tokenService);
+  // Administrador (isAdmin) ignora a matriz de permissões: recebe todas as permissões válidas no momento da requisição.
+  const withAdminBypass = (payload: JWTAccessPayload): JWTAccessPayload =>
+    payload.isAdmin
+      ? { ...payload, permissions: ["*", ...PermissionCatalogEngine.getAllValidPermissionKeys(Object.fromEntries(recipesMap))] }
+      : payload;
+
+  const auth = createAuthMiddleware(tokenService, withAdminBypass);
 
   // Helper opcional para extrair usuário sem forçar 401
   const optionalAuthMiddleware = async (c: Context, next: Next) => {
@@ -74,7 +80,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     if (authHeader && authHeader.startsWith("Bearer ")) {
       try {
         const payload = await tokenService.verifyAccessToken(authHeader.substring(7));
-        c.set("user", payload);
+        c.set("user", withAdminBypass(payload));
       } catch {
         // Ignora erro em auth opcional
       }
@@ -140,7 +146,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         access_token: accessToken,
         refresh_token: refreshToken,
         expires_in: 300, // 5 minutos em segundos
-        user: payload,
+        user: withAdminBypass(payload),
       });
     }
   );
@@ -191,7 +197,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           access_token: newAccessToken,
           refresh_token: newRefreshToken,
           expires_in: 300,
-          user: userPayload,
+          user: withAdminBypass(userPayload),
         });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Refresh token inválido ou expirado.";
@@ -819,8 +825,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       description: recipe.description,
     }));
 
-    if (user && user.permissions && user.permissions.length > 0) {
-      catalog = catalog.filter((item) => user.permissions!.includes(`recipe:${item.id}:view`));
+    // Quem gerencia permissões precisa enxergar todos os Modelos para configurar o acesso a eles.
+    if (user && !user.permissions?.includes("system:roles:update")) {
+      catalog = catalog.filter((item) => user.permissions?.includes(`recipe:${item.id}:view`));
     }
 
     return c.json(catalog);

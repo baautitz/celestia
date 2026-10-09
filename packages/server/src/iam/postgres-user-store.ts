@@ -20,6 +20,7 @@ function toUser(row: UserRow, withHash = false): User {
     roleId: row.roleId,
     externals: row.externals,
     status: row.status,
+    isAdmin: row.isAdmin,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt?.toISOString(),
   };
@@ -114,6 +115,11 @@ export class PostgresUserStore implements UserStore {
   async deleteUser(id: string): Promise<void> {
     const deleted = await this.db.delete(users).where(eq(users.id, id)).returning({ id: users.id });
     if (deleted.length === 0) throw new Error(`Usuário '${id}' não encontrado.`);
+  }
+
+  async setAdmin(id: string, isAdmin: boolean): Promise<void> {
+    const updated = await this.db.update(users).set({ isAdmin }).where(eq(users.id, id)).returning({ id: users.id });
+    if (updated.length === 0) throw new Error(`Usuário '${id}' não encontrado.`);
   }
 
   async listRoles(): Promise<Role[]> {

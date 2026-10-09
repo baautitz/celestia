@@ -72,6 +72,7 @@ async function main() {
   if (existing && values.force) {
     await store.updateUser(existing.id, { roleId: ADMIN_ROLE_ID, status: "active" });
     await store.resetPassword(existing.id, PasswordService.hash(password));
+    await store.setAdmin(existing.id, true);
     console.log(`Administrador '${existing.username}' atualizado (${existing.id}): senha redefinida, papel Administrador, conta ativa.`);
     return;
   }
@@ -79,6 +80,7 @@ async function main() {
     throw new Error(`Usuário '${existing.username}' já existe. Use --force para redefinir a senha e o papel.`);
   }
   const user = await store.createUser({ username, fullname, email, password, roleId: ADMIN_ROLE_ID });
+  await store.setAdmin(user.id, true);
   console.log(`Administrador '${user.username}' criado (${user.id}).`);
 }
 

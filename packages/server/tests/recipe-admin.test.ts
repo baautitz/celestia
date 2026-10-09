@@ -64,6 +64,15 @@ describe("Gestão de Modelos em runtime (/api/admin/recipes)", () => {
     expect(await recipeStore.get("outro")).toBeNull();
   });
 
+  it("mostra o Modelo novo no catálogo a quem gerencia permissões, e só com view aos demais", async () => {
+    const admin = await tokenOf("carlos.admin");
+    await put("novo", validSource("novo"), admin);
+    const ids = async (token: string) =>
+      ((await (await app.request("/api/recipes", { headers: { Authorization: `Bearer ${token}` } })).json()) as { id: string }[]).map((r) => r.id);
+    expect(await ids(admin)).toContain("novo");
+    expect(await ids(await tokenOf("joao.silva"))).not.toContain("novo");
+  });
+
   it("exclui um Modelo", async () => {
     const token = await tokenOf("carlos.admin");
     await put("novo", validSource("novo"), token);

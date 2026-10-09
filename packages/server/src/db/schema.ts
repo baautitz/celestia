@@ -1,5 +1,5 @@
 import type { User } from "@platform/shared";
-import { index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const persistenceItems = pgTable(
   "persistence_items",
@@ -33,6 +33,7 @@ export const users = pgTable("users", {
     .references(() => roles.id),
   externals: jsonb("externals").$type<User["externals"]>().notNull().default({}),
   status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
+  isAdmin: boolean("is_admin").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at"),
 });

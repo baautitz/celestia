@@ -16,6 +16,8 @@ export interface UserStore {
   updateUser(id: string, input: UpdateUserInput): Promise<User>;
   resetPassword(id: string, newPasswordHash: string): Promise<void>;
   deleteUser(id: string): Promise<void>;
+  /** Define a flag de administrador (acesso total). Não exposta pela API: só CLI e testes. */
+  setAdmin(id: string, isAdmin: boolean): Promise<void>;
 
   listRoles(): Promise<Role[]>;
   getRole(id: string): Promise<Role | null>;
@@ -118,6 +120,12 @@ export class MemoryUserStore implements UserStore {
   async deleteUser(id: string): Promise<void> {
     if (!this.users.has(id)) throw new Error(`Usuário '${id}' não encontrado.`);
     this.users.delete(id);
+  }
+
+  async setAdmin(id: string, isAdmin: boolean): Promise<void> {
+    const user = this.users.get(id);
+    if (!user) throw new Error(`Usuário '${id}' não encontrado.`);
+    user.isAdmin = isAdmin;
   }
 
   async listRoles(): Promise<Role[]> {

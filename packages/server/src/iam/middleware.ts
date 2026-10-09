@@ -9,7 +9,10 @@ declare module "hono" {
   }
 }
 
-export function createAuthMiddleware(tokenService: TokenService): MiddlewareHandler {
+export function createAuthMiddleware(
+  tokenService: TokenService,
+  transform: (payload: JWTAccessPayload) => JWTAccessPayload = (payload) => payload
+): MiddlewareHandler {
   return async (c: Context, next) => {
     const authHeader = c.req.header("Authorization");
     let token: string | undefined;
@@ -30,7 +33,7 @@ export function createAuthMiddleware(tokenService: TokenService): MiddlewareHand
 
     try {
       const payload = await tokenService.verifyAccessToken(token);
-      c.set("user", payload);
+      c.set("user", transform(payload));
       await next();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Token expirado ou inválido.";
