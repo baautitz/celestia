@@ -35,9 +35,6 @@ celestia/
 │           ├── src/pages/               -> Telas da plataforma (Workspaces, Recipes, IAMUsers, IAMRoles, Login)
 │           └── src/context/             -> Contextos globais (AuthContext, ImperativeUIContext, HeaderActions)
 │
-├── recipes/                      (Modelos Declarativos em TypeScript)
-│   └── fechamento-mes.recipe.ts  -> Modelo de referência para fechamento mensal de vendas e comissões
-│
 ├── docs/                         (Documentação Técnica Completa)
 │   ├── README.md                 -> Especificação detalhada da arquitetura e fluxos
 │   ├── component_registry.md     -> Catálogo oficial de componentes Declarativos e Imperativos

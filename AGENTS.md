@@ -72,9 +72,9 @@ celestia/
 │           ├── hooks/            -> use-mobile, use-theme
 │           └── lib/              -> api-client, utils, dynamic-form
 │
-└── recipes/                      (Production Recipes in TypeScript)
-    └── fechamento-mes.recipe.ts  -> Reference monthly closing recipe
 ```
+
+> **Recipes live in Postgres, not in git.** The TypeScript source is stored in the `recipes` table and managed at runtime via `PUT /api/admin/recipes/:id` (`system:recipes:manage`); the server compiles and validates it on save and on boot. The reference monthly-closing recipe is a test fixture: `packages/server/tests/fixtures/fechamento-mes.recipe.ts`.
 
 ---
 
@@ -196,7 +196,7 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 
 ## 4. Code Generation Recipes & Templates
 
-### A. Creating a New Recipe (`.recipe.ts`)
+### A. Creating a New Recipe (TypeScript source saved via `/api/admin/recipes/:id`)
 
 ```typescript
 import { defineRecipe } from "@platform/shared";
