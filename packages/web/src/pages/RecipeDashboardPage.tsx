@@ -274,35 +274,9 @@ export const RecipeDashboardPage: React.FC = () => {
           className="hidden sm:inline-flex"
         />
 
-        {paramFields.length > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={openParams}
-            title="Parâmetros do Dashboard"
-            className="size-8 shrink-0"
-          >
-            <Settings className="size-4" />
-          </Button>
-        )}
-
-        {hasViews && (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => setViewsOpen(true)}
-            title="Visões dos dados"
-            className="size-8 shrink-0"
-          >
-            <Layers className="size-4" />
-          </Button>
-        )}
-
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={fetchData}
           title="Atualizar dados"
@@ -312,68 +286,51 @@ export const RecipeDashboardPage: React.FC = () => {
         </Button>
 
         {hasPermission("system:workspaces:create") && (
-          <Button type="button" size="default" onClick={handleOpenInit} className="hidden lg:inline-flex shrink-0">
-            <Play className="size-4 mr-2" />
-            Inicializar Área de Trabalho
-          </Button>
-        )}
-
-        {hasPermission("system:roles:update") && (
-          <Button type="button" variant="outline" size="default" onClick={() => setPermSheetOpen(true)} className="hidden lg:inline-flex shrink-0">
-            <Shield className="size-4 mr-2" />
-            Permissões
-          </Button>
-        )}
-
-        {/* Dropdown mobile */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button type="button" variant="outline" size="icon" className="size-8 shrink-0 lg:hidden" />
-            }
+          <Button
+            type="button"
+            size="icon"
+            onClick={handleOpenInit}
+            title="Inicializar Área de Trabalho"
+            aria-label="Inicializar Área de Trabalho"
+            className="size-8 shrink-0"
           >
-            <MoreHorizontal className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {paramFields.length > 0 && (
-              <DropdownMenuItem onClick={openParams}>
-                <Settings className="size-4" />
-                Parâmetros do Dashboard
-              </DropdownMenuItem>
-            )}
-            {hasViews && (
-              <DropdownMenuItem onClick={() => setViewsOpen(true)}>
-                <Layers className="size-4" />
-                Visões dos dados
-              </DropdownMenuItem>
-            )}
-            {hasPermission("system:workspaces:create") && (
-              <DropdownMenuItem onClick={handleOpenInit}>
-                <Play className="size-4" />
-                Inicializar Área de Trabalho
-              </DropdownMenuItem>
-            )}
-            {hasPermission("system:roles:update") && (
-              <DropdownMenuItem onClick={() => setPermSheetOpen(true)}>
-                <Shield className="size-4" />
-                Permissões
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <Play className="size-4" />
+          </Button>
+        )}
+
+        {(paramFields.length > 0 || hasViews || hasPermission("system:roles:update")) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button type="button" variant="outline" size="icon" className="size-8 shrink-0" />}
+            >
+              <MoreHorizontal className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {paramFields.length > 0 && (
+                <DropdownMenuItem onClick={openParams}>
+                  <Settings className="size-4" />
+                  Parâmetros do Dashboard
+                </DropdownMenuItem>
+              )}
+              {hasViews && (
+                <DropdownMenuItem onClick={() => setViewsOpen(true)}>
+                  <Layers className="size-4" />
+                  Visões dos dados
+                </DropdownMenuItem>
+              )}
+              {hasPermission("system:roles:update") && (
+                <DropdownMenuItem onClick={() => setPermSheetOpen(true)}>
+                  <Shield className="size-4" />
+                  Permissões
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </HeaderActions>
 
       {/* Título da Página */}
       <div className="flex items-start gap-2 md:gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/dashboards")}
-          title="Voltar para a lista"
-          className="mt-1 shrink-0 size-8 md:size-10"
-        >
-          <ArrowLeft className="size-4 md:size-5" />
-        </Button>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 className="text-xl md:text-2xl font-bold tracking-tight">{schema.name}</h1>
