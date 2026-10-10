@@ -232,7 +232,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
                 offset={8}
                 className="fill-foreground"
                 fontSize={11}
-                formatter={(v: number) => formatCurrency(v)}
+                formatter={(v) => formatCurrency(Number(v))}
               />
             </Bar>
           </BarChart>
@@ -278,7 +278,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
                 offset={8}
                 className="fill-foreground"
                 fontSize={10}
-                formatter={(v: number) => formatCurrency(v)}
+                formatter={(v) => formatCurrency(Number(v))}
               />
             </Bar>
           </BarChart>
