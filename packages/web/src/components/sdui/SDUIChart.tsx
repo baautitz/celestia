@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Circle } from "lucide-react";
 import type { ChartProps, ChartDataResponse } from "@platform/shared";
-import { Card, CardAction, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ChartContainer,
@@ -12,6 +14,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { api } from "@/lib/api-client";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
 import { formatCompactNumber, formatCurrency, formatDate, formatShortDate } from "@/lib/utils";
 import {
@@ -41,6 +44,9 @@ interface SDUIChartProps {
   params?: Record<string, unknown>;
 }
 
+// Classes literais (o Tailwind não gera classes montadas dinamicamente); mesma ordem das cores `--chart-N` das séries.
+const SERIES_TEXT_COLORS = ["text-chart-1", "text-chart-2", "text-chart-3", "text-chart-4", "text-chart-5"];
+
 export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
   id,
   component,
@@ -61,6 +67,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
     profiles: props.availableProfiles,
   });
   const { refreshSignal } = useImperativeUI();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     let isMounted = true;
@@ -183,12 +190,12 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
 
     if (component === "bar_chart" && props.orientation === "horizontal") {
       return (
-        <ChartContainer config={barConfig} className="h-full w-full min-h-[180px] md:min-h-[220px]">
+        <ChartContainer config={barConfig} className="h-full w-full min-h-[320px] lg:min-h-[220px]">
           <BarChart
             accessibilityLayer
             data={chartData}
             layout="vertical"
-            margin={{ left: 0, right: 24, top: 4, bottom: 4 }}
+            margin={{ left: 0, right: isMobile ? 4 : 24, top: 4, bottom: 4 }}
           >
             <CartesianGrid horizontal={false} />
             <YAxis
@@ -198,19 +205,22 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
               tickMargin={8}
               axisLine={false}
               interval={0}
-              width={170}
+              width={isMobile ? 84 : 170}
               tick={{ fontSize: 12 }}
               tickFormatter={(v: string) => {
                 // "NATALIA MARIA IRALA SOUZA" -> "NATALIA SOUZA"; o nome completo aparece no tooltip.
                 const parts = String(v).split(" ");
                 const s = parts.length > 2 ? `${parts[0]} ${parts[parts.length - 1]}` : String(v);
-                return s.length > 22 ? `${s.slice(0, 21)}…` : s;
+                const max = isMobile ? 12 : 22;
+                return s.length > max ? `${s.slice(0, max - 1)}…` : s;
               }}
             />
             <XAxis
               type="number"
-              // Folga de 25% depois da maior barra para o rótulo de valor não ser cortado.
-              domain={[0, (dataMax: number) => dataMax * 1.25]}
+              // No mobile o valor já aparece no rótulo da barra: sem eixo X e com mais folga à direita.
+              hide={isMobile}
+              // Folga depois da maior barra para o rótulo de valor não ser cortado.
+              domain={[0, (dataMax: number) => dataMax * (isMobile ? 1.6 : 1.25)]}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v: number) => formatCurrency(v)}
@@ -288,7 +298,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
 
     if (component === "line_chart" && series.length > 0) {
       return (
-        <ChartContainer config={seriesConfig} className="h-full w-full min-h-[240px] md:min-h-[300px]">
+        <ChartContainer config={seriesConfig} className="h-full w-full min-h-[280px] md:min-h-[300px]">
           <LineChart accessibilityLayer data={chartData} margin={{ left: 4, right: 12, top: 8, bottom: 4 }}>
             <CartesianGrid vertical={false} />
             <XAxis
@@ -310,7 +320,6 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
               cursor={false}
               content={<ChartTooltipContent indicator="line" labelFormatter={(label) => formatDate(String(label))} />}
             />
-            <ChartLegend content={<ChartLegendContent className="flex-wrap" />} />
             {series.map((item, index) => (
               <Line
                 key={item.key}
@@ -417,7 +426,7 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
             </CardDescription>
           )}
         </div>
-        <CardAction className="flex items-center gap-2">
+        <CardAction className="col-start-1 row-span-1 row-start-2 flex flex-wrap items-center gap-2 justify-self-start lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex-nowrap lg:justify-self-end">
           {hasModeToggle && (
             <Select
               items={[
@@ -446,6 +455,17 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
         </CardAction>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 pb-3">{renderContent()}</CardContent>
+      {/* Legenda fora do SVG: a do recharts reserva altura medida antes do layout e deixava o gráfico espremido. */}
+      {!loading && !error && component === "line_chart" && series.length > 0 && (
+        <CardFooter className="flex-wrap gap-2 pt-0">
+          {series.map((item, index) => (
+            <Badge key={item.key} variant="outline" className="gap-1.5 font-normal">
+              <Circle className={`size-2 fill-current ${SERIES_TEXT_COLORS[index % SERIES_TEXT_COLORS.length]}`} />
+              {item.label}
+            </Badge>
+          ))}
+        </CardFooter>
+      )}
     </Card>
   );
 });
