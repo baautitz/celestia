@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/input-group";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { MobileCard } from "@/components/ui/mobile-card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -56,12 +56,13 @@ import {
   CheckCircle2,
   Clock,
   Database,
+import { Switch } from "@/components/ui/switch";
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 
 export const IAMUsersPage: React.FC = () => {
-  const { hasPermission } = useAuth();
+  const { user: currentUser, hasPermission } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +81,7 @@ export const IAMUsersPage: React.FC = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [roleId, setRoleId] = useState("role_operador");
   const [sources, setSources] = useState<{ id: string; name: string }[]>([]);
   const [externals, setExternals] = useState<Record<string, string | number>>({});
@@ -134,6 +136,7 @@ export const IAMUsersPage: React.FC = () => {
     setUsername(u.username);
     setEmail(u.email || "");
     setPassword("");
+    setIsAdmin(u.isAdmin === true);
     setRoleId(u.roleId);
     setExternals(u.externals || {});
     setIsModalOpen(true);
@@ -162,6 +165,7 @@ export const IAMUsersPage: React.FC = () => {
           fullname: fullname.trim(),
           email: email.trim(),
           roleId,
+          ...(currentUser?.isAdmin ? { isAdmin } : {}),
           externals,
         });
         toast.success("Usuário atualizado com sucesso!");
@@ -536,6 +540,21 @@ export const IAMUsersPage: React.FC = () => {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+              {isEditMode && currentUser?.isAdmin && (
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldLabel htmlFor="u-admin">Administrador</FieldLabel>
+                    <FieldDescription>Ignora a matriz de permissões e tem acesso total.</FieldDescription>
+                  </FieldContent>
+                  <Switch
+                    id="u-admin"
+                    checked={isAdmin}
+                    disabled={editingUserId === currentUser.sub}
+                    onCheckedChange={(checked: boolean) => setIsAdmin(checked)}
+                  />
+                </Field>
+              )}
+
                     {roles.map((r) => (
                       <SelectItem key={r.id} value={r.id}>
                         {r.name}
