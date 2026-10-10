@@ -62,8 +62,14 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const errBody = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error(errBody.error || `Erro HTTP ${response.status}`);
+      const errBody: { error?: string | { issues?: { path: (string | number)[]; message: string }[] } } =
+        await response.json().catch(() => ({ error: response.statusText }));
+      // Erros de validação (Zod) chegam como { error: { issues } }; senão { error: "mensagem" }.
+      const detail =
+        typeof errBody.error === "string"
+          ? errBody.error
+          : errBody.error?.issues?.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+      throw new Error(detail || `Erro HTTP ${response.status}`);
     }
 
     return response.json() as Promise<T>;
