@@ -4,11 +4,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Editor from "@monaco-editor/react";
-import { ArrowLeft, Download, Save, Upload } from "lucide-react";
+import { Download, Save, Upload } from "lucide-react";
 import "@/lib/monaco";
 import { useAuth } from "@/context/AuthContext";
 import { useRecipesCatalog } from "@/context/RecipesCatalogContext";
-import { HeaderActions } from "@/context/HeaderActionsContext";
+import { HeaderActions, HeaderBack } from "@/context/HeaderActionsContext";
 import { api } from "@/lib/api-client";
 import { downloadSource } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -168,11 +168,8 @@ export const RecipeEditorPage: React.FC = () => {
         className="flex flex-1 flex-col gap-4 lg:flex-row"
         noValidate
       >
+        <HeaderBack to="/admin/dashboards" />
         <HeaderActions>
-          <Button type="button" variant="outline" onClick={() => navigate("/admin/dashboards")}>
-            <ArrowLeft className="size-3.5 mr-1.5" />
-            Voltar
-          </Button>
           <Button
             type="button"
             variant="outline"

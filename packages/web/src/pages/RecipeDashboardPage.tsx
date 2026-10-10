@@ -41,7 +41,8 @@ import { api } from "@/lib/api-client";
 import { toast } from "@/components/ui/toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { HeaderActions } from "@/context/HeaderActionsContext";
+import { HeaderActions, HeaderBack } from "@/context/HeaderActionsContext";
+import { ExpandableText } from "@/components/layout/ExpandableText";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -50,7 +51,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { DateRange } from "react-day-picker";
 import {
-  ArrowLeft,
   AlertCircle,
   RefreshCw,
   Play,
@@ -329,6 +329,8 @@ export const RecipeDashboardPage: React.FC = () => {
         )}
       </HeaderActions>
 
+      <HeaderBack to="/dashboards" />
+
       {/* Título da Página */}
       <div className="flex items-start gap-2 md:gap-3">
         <div className="flex-1 min-w-0">
@@ -338,7 +340,7 @@ export const RecipeDashboardPage: React.FC = () => {
               {recipeId}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{schema.description}</p>
+          <ExpandableText>{schema.description ?? ""}</ExpandableText>
         </div>
       </div>
 

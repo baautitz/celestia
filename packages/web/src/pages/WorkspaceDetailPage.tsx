@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { parseLocalDate, toLocalISODate } from "@/lib/utils";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import type { DashboardSchemaResponse, WorkspaceRecord } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
 import { SDUIRenderer } from "@/components/sdui/SDUIRenderer";
@@ -32,7 +32,8 @@ import { useImperativeUI } from "@/context/ImperativeUIContext";
 import { toast } from "@/components/ui/toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { HeaderActions } from "@/context/HeaderActionsContext";
+import { HeaderActions, HeaderBack } from "@/context/HeaderActionsContext";
+import { ExpandableText } from "@/components/layout/ExpandableText";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -43,7 +44,6 @@ import {
 import type { DateRange } from "react-day-picker";
 import {
   RefreshCw,
-  ArrowLeft,
   AlertCircle,
   CheckCircle2,
   Clock,
@@ -57,7 +57,6 @@ import {
 export const WorkspaceDetailPage: React.FC = () => {
   const { id: workspaceId } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const { triggerRefresh, confirm } = useImperativeUI();
 
@@ -391,17 +390,10 @@ export const WorkspaceDetailPage: React.FC = () => {
         </DropdownMenu>
       </HeaderActions>
 
+      <HeaderBack to="/workspaces" />
+
       {/* Título da Página */}
       <div className="flex items-start gap-2 md:gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/workspaces")}
-          title="Voltar para a lista"
-          className="mt-1 shrink-0 size-8 md:size-10"
-        >
-          <ArrowLeft className="size-4 md:size-5" />
-        </Button>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 className="text-xl md:text-2xl font-bold tracking-tight">{workspaceInfo?.name || schema.name}</h1>
@@ -421,7 +413,7 @@ export const WorkspaceDetailPage: React.FC = () => {
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{schema.description}</p>
+          <ExpandableText>{schema.description ?? ""}</ExpandableText>
         </div>
       </div>
 
