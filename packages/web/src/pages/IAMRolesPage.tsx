@@ -233,19 +233,11 @@ export const IAMRolesPage: React.FC = () => {
                       },
                     ]}
                     actions={
-                      <DropdownMenu>
-                        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
-                          <MoreHorizontal className="size-4" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {hasPermission("system:roles:update") && (
-                            <DropdownMenuItem onClick={() => openEditSheet(r)} className="cursor-pointer">
-                              <Edit2 className="size-4 mr-2" />
-                              Editar Grupo & Permissões
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      hasPermission("system:roles:update") && (
+                        <Button variant="ghost" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditSheet(r)}>
+                          <Edit2 className="size-4" />
+                        </Button>
+                      )
                     }
                   />
                 ))
@@ -291,19 +283,11 @@ export const IAMRolesPage: React.FC = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
-                            <MoreHorizontal className="size-4" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {hasPermission("system:roles:update") && (
-                              <DropdownMenuItem onClick={() => openEditSheet(r)} className="cursor-pointer">
-                                <Edit2 className="size-4 mr-2" />
-                                Editar Grupo & Permissões
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {hasPermission("system:roles:update") && (
+                          <Button variant="ghost" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditSheet(r)}>
+                            <Edit2 className="size-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -403,7 +387,7 @@ export const IAMRolesPage: React.FC = () => {
               </Card>
 
               <p className="text-xs text-muted-foreground">
-                Permissões de Modelos são configuradas diretamente na página de cada Modelo.
+                Permissões de Dashboards são configuradas diretamente na página de cada Dashboard.
               </p>
             </form>
           </ScrollArea>

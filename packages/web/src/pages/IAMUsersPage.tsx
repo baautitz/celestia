@@ -42,7 +42,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
 import {
@@ -56,8 +55,8 @@ import {
   CheckCircle2,
   Clock,
   Database,
-import { Switch } from "@/components/ui/switch";
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 
@@ -81,8 +80,8 @@ export const IAMUsersPage: React.FC = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
   const [roleId, setRoleId] = useState("role_operador");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [sources, setSources] = useState<{ id: string; name: string }[]>([]);
   const [externals, setExternals] = useState<Record<string, string | number>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -136,8 +135,8 @@ export const IAMUsersPage: React.FC = () => {
     setUsername(u.username);
     setEmail(u.email || "");
     setPassword("");
-    setIsAdmin(u.isAdmin === true);
     setRoleId(u.roleId);
+    setIsAdmin(u.isAdmin === true);
     setExternals(u.externals || {});
     setIsModalOpen(true);
   };
@@ -165,8 +164,8 @@ export const IAMUsersPage: React.FC = () => {
           fullname: fullname.trim(),
           email: email.trim(),
           roleId,
-          ...(currentUser?.isAdmin ? { isAdmin } : {}),
           externals,
+          ...(currentUser?.isAdmin ? { isAdmin } : {}),
         });
         toast.success("Usuário atualizado com sucesso!");
       } else {
@@ -338,43 +337,39 @@ export const IAMUsersPage: React.FC = () => {
                       },
                     ]}
                     actions={
-                      <DropdownMenu>
-                        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
-                          <MoreHorizontal className="size-4" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {hasPermission("system:users:update") && (
-                            <DropdownMenuItem onClick={() => openEditModal(u)} className="cursor-pointer">
-                              <Edit2 className="size-4 mr-2" />
-                              Editar Usuário
-                            </DropdownMenuItem>
-                          )}
-                          {hasPermission("system:users:reset_password") && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedUser(u);
-                                setIsResetOpen(true);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <KeyRound className="size-4 mr-2" />
-                              Redefinir Senha
-                            </DropdownMenuItem>
-                          )}
-                          {hasPermission("system:users:update") && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleToggleStatus(u)}
-                                className={`cursor-pointer ${u.status === "active" ? "text-destructive" : "text-emerald-600"}`}
-                              >
-                                <Power className="size-4 mr-2" />
-                                {u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex justify-end gap-1">
+                        {hasPermission("system:users:update") && (
+                          <Button variant="ghost" size="icon" aria-label="Editar Usuário" title="Editar Usuário" onClick={() => openEditModal(u)}>
+                            <Edit2 className="size-4" />
+                          </Button>
+                        )}
+                        {hasPermission("system:users:reset_password") && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Redefinir Senha"
+                            title="Redefinir Senha"
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setIsResetOpen(true);
+                            }}
+                          >
+                            <KeyRound className="size-4" />
+                          </Button>
+                        )}
+                        {hasPermission("system:users:update") && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={u.status === "active" ? "text-destructive" : "text-emerald-600"}
+                            aria-label={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
+                            title={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
+                            onClick={() => handleToggleStatus(u)}
+                          >
+                            <Power className="size-4" />
+                          </Button>
+                        )}
+                      </div>
                     }
                   />
                 ))
@@ -433,43 +428,39 @@ export const IAMUsersPage: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
-                            <MoreHorizontal className="size-4" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {hasPermission("system:users:update") && (
-                              <DropdownMenuItem onClick={() => openEditModal(u)} className="cursor-pointer">
-                                <Edit2 className="size-4 mr-2" />
-                                Editar Usuário
-                              </DropdownMenuItem>
-                            )}
-                            {hasPermission("system:users:reset_password") && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedUser(u);
-                                  setIsResetOpen(true);
-                                }}
-                                className="cursor-pointer"
-                              >
-                                <KeyRound className="size-4 mr-2" />
-                                Redefinir Senha
-                              </DropdownMenuItem>
-                            )}
-                            {hasPermission("system:users:update") && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleToggleStatus(u)}
-                                  className={`cursor-pointer ${u.status === "active" ? "text-destructive" : "text-emerald-600"}`}
-                                >
-                                  <Power className="size-4 mr-2" />
-                                  {u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex justify-end gap-1">
+                          {hasPermission("system:users:update") && (
+                            <Button variant="ghost" size="icon" aria-label="Editar Usuário" title="Editar Usuário" onClick={() => openEditModal(u)}>
+                              <Edit2 className="size-4" />
+                            </Button>
+                          )}
+                          {hasPermission("system:users:reset_password") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Redefinir Senha"
+                              title="Redefinir Senha"
+                              onClick={() => {
+                                setSelectedUser(u);
+                                setIsResetOpen(true);
+                              }}
+                            >
+                              <KeyRound className="size-4" />
+                            </Button>
+                          )}
+                          {hasPermission("system:users:update") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={u.status === "active" ? "text-destructive" : "text-emerald-600"}
+                              aria-label={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
+                              title={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
+                              onClick={() => handleToggleStatus(u)}
+                            >
+                              <Power className="size-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -540,6 +531,15 @@ export const IAMUsersPage: React.FC = () => {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+                    {roles.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
               {isEditMode && currentUser?.isAdmin && (
                 <Field orientation="horizontal">
                   <FieldContent>
@@ -554,15 +554,6 @@ export const IAMUsersPage: React.FC = () => {
                   />
                 </Field>
               )}
-
-                    {roles.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
 
               {/* Seção 100% shadcn para Identificadores ERP (Fontes Oficiais) */}
               <Card>
