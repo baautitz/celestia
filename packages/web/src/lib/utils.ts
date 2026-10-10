@@ -72,3 +72,13 @@ export function toLocalISODate(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0")
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
+
+/** Baixa o código-fonte de um Dashboard como `<id>.ts`. */
+export function downloadSource(id: string, source: string): void {
+  const url = URL.createObjectURL(new Blob([source], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${id}.ts`;
+  link.click();
+  URL.revokeObjectURL(url);
+}

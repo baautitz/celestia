@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useNavigate } from "react-router-dom";
 import type { RecipeAdminSummary } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -14,29 +12,9 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { MobileCard } from "@/components/ui/mobile-card";
 import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormDescription,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -47,7 +25,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -55,17 +32,11 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
-import { PlusCircle, RefreshCw, MoreHorizontal, Edit2, Trash2 } from "lucide-react";
+import { PlusCircle, RefreshCw, MoreHorizontal, Edit2, Trash2, Download } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { downloadSource } from "@/lib/utils";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 import { useRecipesCatalog } from "@/context/RecipesCatalogContext";
-
-const formSchema = z.object({
-  id: z.string().regex(/^[a-z][a-z0-9_]*$/, "Use letras minúsculas, números e _ (ex.: fechamento_mes)."),
-  source: z.string().min(1, "Cole o código do Modelo ou carregue um arquivo .ts."),
-});
-
-type FormValues = z.infer<typeof formSchema>;
 
 const formatDate = (iso: string) => new Date(iso).toLocaleString("pt-BR");
 
@@ -73,27 +44,19 @@ export const RecipesAdminPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("system:recipes:manage");
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const { refresh: refreshSidebar } = useRecipesCatalog();
 
   const [recipes, setRecipes] = useState<RecipeAdminSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RecipeAdminSummary | null>(null);
-
-  const isEditMode = editingId !== null;
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: { id: "", source: "" },
-  });
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setRecipes(await api.recipeAdmin.list());
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Erro ao carregar Modelos");
+      toast.error(err instanceof Error ? err.message : "Erro ao carregar Dashboards");
     } finally {
       setLoading(false);
     }
@@ -103,7 +66,7 @@ export const RecipesAdminPage: React.FC = () => {
     fetchData();
   }, []);
 
-  // Relê os Modelos do banco no servidor (pega edições feitas direto no Postgres) e atualiza a lista.
+  // Relê os Dashboards do banco no servidor (pega edições feitas direto no Postgres) e atualiza a lista.
   const handleReload = async () => {
     try {
       setLoading(true);
@@ -111,59 +74,14 @@ export const RecipesAdminPage: React.FC = () => {
       if (result.errors.length > 0) {
         toast.error(`Não recarregados: ${result.errors.map((e) => `${e.id} (${e.message})`).join("; ")}`);
       } else {
-        toast.success("Modelos recarregados do banco.");
+        toast.success("Dashboards recarregados do banco.");
       }
       setRecipes(await api.recipeAdmin.list());
       refreshSidebar();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Erro ao recarregar Modelos");
+      toast.error(err instanceof Error ? err.message : "Erro ao recarregar Dashboards");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const openCreateSheet = () => {
-    setEditingId(null);
-    form.reset({ id: "", source: "" });
-    setIsSheetOpen(true);
-  };
-
-  const openEditSheet = async (summary: RecipeAdminSummary) => {
-    try {
-      const record = await api.recipeAdmin.get(summary.id);
-      setEditingId(record.id);
-      form.reset({ id: record.id, source: record.source });
-      setIsSheetOpen(true);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Erro ao carregar o código do Modelo");
-    }
-  };
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    form.setValue("source", text, { shouldValidate: true });
-    // O id do Modelo costuma ser o primeiro `id: "..."` do arquivo; só preenche se estiver vazio.
-    if (!form.getValues("id")) {
-      const match = text.match(/\bid:\s*["']([a-z][a-z0-9_]*)["']/);
-      if (match?.[1]) form.setValue("id", match[1], { shouldValidate: true });
-    }
-    e.target.value = "";
-  };
-
-  const handleSave = async (values: FormValues) => {
-    try {
-      setSaving(true);
-      await api.recipeAdmin.save(values.id, values.source);
-      toast.success(isEditMode ? "Modelo atualizado com sucesso!" : "Modelo cadastrado com sucesso!");
-      setIsSheetOpen(false);
-      fetchData();
-      refreshSidebar();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Falha ao salvar Modelo");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -171,33 +89,57 @@ export const RecipesAdminPage: React.FC = () => {
     if (!deleteTarget) return;
     try {
       await api.recipeAdmin.remove(deleteTarget.id);
-      toast.success("Modelo excluído.");
+      toast.success("Dashboard excluído.");
       setDeleteTarget(null);
       fetchData();
       refreshSidebar();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Falha ao excluir Modelo");
+      toast.error(err instanceof Error ? err.message : "Falha ao excluir Dashboard");
+    }
+  };
+
+  const handleDownload = async (recipe: RecipeAdminSummary) => {
+    try {
+      const record = await api.recipeAdmin.get(recipe.id);
+      downloadSource(record.id, record.source);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao baixar o Dashboard");
     }
   };
 
   const rowMenu = (recipe: RecipeAdminSummary) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
-        <MoreHorizontal className="size-4" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => openEditSheet(recipe)} className="cursor-pointer">
-          <Edit2 className="size-4 mr-2" />
-          {canManage ? "Editar código" : "Ver código"}
-        </DropdownMenuItem>
-        {canManage && (
-          <DropdownMenuItem onClick={() => setDeleteTarget(recipe)} className="cursor-pointer text-destructive">
-            <Trash2 className="size-4 mr-2" />
-            Excluir Modelo
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex justify-end gap-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={canManage ? "Editar" : "Visualizar"}
+        title={canManage ? "Editar" : "Visualizar"}
+        onClick={() => navigate(`/admin/dashboards/${recipe.id}/edit`)}
+      >
+        <Edit2 className="size-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Baixar .ts"
+        title="Baixar .ts"
+        onClick={() => handleDownload(recipe)}
+      >
+        <Download className="size-4" />
+      </Button>
+      {canManage && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive"
+          aria-label="Excluir Dashboard"
+          title="Excluir Dashboard"
+          onClick={() => setDeleteTarget(recipe)}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      )}
+    </div>
   );
 
   return (
@@ -214,9 +156,9 @@ export const RecipesAdminPage: React.FC = () => {
         </Button>
 
         {canManage && (
-          <Button onClick={openCreateSheet} className="hidden lg:inline-flex shrink-0">
+          <Button onClick={() => navigate("/admin/dashboards/new")} className="hidden lg:inline-flex shrink-0">
             <PlusCircle className="size-3.5 mr-1.5" />
-            Novo Modelo
+            Novo Dashboard
           </Button>
         )}
 
@@ -228,9 +170,9 @@ export const RecipesAdminPage: React.FC = () => {
               <MoreHorizontal className="size-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={openCreateSheet} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => navigate("/admin/dashboards/new")} className="cursor-pointer">
                 <PlusCircle className="size-4 mr-2" />
-                Novo Modelo
+                Novo Dashboard
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -238,15 +180,15 @@ export const RecipesAdminPage: React.FC = () => {
       </HeaderActions>
 
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Modelos (Código)</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboards</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Cadastre e edite os Modelos em TypeScript. O código é compilado e validado ao salvar.
+          Cadastre e edite os Dashboards. São compilados e validados ao salvar.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Modelos Cadastrados ({recipes.length})</CardTitle>
+          <CardTitle className="text-base font-semibold">Dashboards Cadastrados ({recipes.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {isMobile ? (
@@ -261,7 +203,7 @@ export const RecipesAdminPage: React.FC = () => {
                   />
                 ))
               ) : recipes.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground text-sm">Nenhum Modelo cadastrado.</p>
+                <p className="text-center py-8 text-muted-foreground text-sm">Nenhum Dashboard cadastrado.</p>
               ) : (
                 recipes.map((recipe) => (
                   <MobileCard
@@ -281,7 +223,7 @@ export const RecipesAdminPage: React.FC = () => {
                   <TableHead>Identificador</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Atualizado em</TableHead>
-                  <TableHead className="text-right w-20">Ações</TableHead>
+                  <TableHead className="text-right w-36">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -297,7 +239,7 @@ export const RecipesAdminPage: React.FC = () => {
                 ) : recipes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
-                      Nenhum Modelo cadastrado.
+                      Nenhum Dashboard cadastrado.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -316,100 +258,12 @@ export const RecipesAdminPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="right" className="flex flex-col p-0 sm:max-w-3xl">
-          <SheetHeader className="p-6 border-b shrink-0">
-            <SheetTitle>{isEditMode ? `Modelo: ${editingId}` : "Novo Modelo"}</SheetTitle>
-            <SheetDescription>
-              {canManage
-                ? "Cole o código TypeScript do Modelo (defineRecipe) ou carregue um arquivo .ts."
-                : "Código-fonte do Modelo (somente leitura)."}
-            </SheetDescription>
-          </SheetHeader>
-
-          <ScrollArea className="flex-1 min-h-0">
-            <Form {...form}>
-              <form
-                id="recipe-form"
-                onSubmit={form.handleSubmit(handleSave)}
-                className="p-6 flex flex-col gap-6"
-                noValidate
-              >
-                {canManage && (
-                  <Field>
-                    <FieldLabel htmlFor="recipe-file">Carregar arquivo .ts</FieldLabel>
-                    <Input id="recipe-file" type="file" accept=".ts,text/plain" onChange={handleFile} />
-                  </Field>
-                )}
-
-                <FormField
-                  control={form.control}
-                  name="id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Identificador do Modelo</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="fechamento_mes"
-                          value={field.value}
-                          disabled={isEditMode || !canManage}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
-                      </FormControl>
-                      <FormDescription>Deve ser igual ao `id` declarado dentro do código.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="source"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Código (TypeScript)</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          className="min-h-96 font-mono text-xs"
-                          spellCheck={false}
-                          value={field.value}
-                          readOnly={!canManage}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </form>
-            </Form>
-          </ScrollArea>
-
-          <SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover">
-            <Button type="button" variant="outline" onClick={() => setIsSheetOpen(false)}>
-              {canManage ? "Cancelar" : "Fechar"}
-            </Button>
-            {canManage && (
-              <Button form="recipe-form" type="submit" disabled={saving}>
-                {saving ? "Compilando e salvando..." : isEditMode ? "Salvar Alterações" : "Cadastrar Modelo"}
-              </Button>
-            )}
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent className="sm:max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Modelo</AlertDialogTitle>
+            <AlertDialogTitle>Excluir Dashboard</AlertDialogTitle>
             <AlertDialogDescription className="break-words">
-              Excluir &quot;{deleteTarget?.name || deleteTarget?.id}&quot; ({deleteTarget?.id}) remove o Modelo e as
+              Excluir &quot;{deleteTarget?.name || deleteTarget?.id}&quot; ({deleteTarget?.id}) remove o Dashboard e as
               permissões dele dos grupos. As Áreas de Trabalho que o usam deixarão de abrir.
             </AlertDialogDescription>
           </AlertDialogHeader>

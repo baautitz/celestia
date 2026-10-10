@@ -45,7 +45,9 @@ export const App: React.FC = () => {
             </Route>
 
             <Route element={<ProtectedRoute requiredPermission="system:recipes:read" />}>
-              <Route path="/admin/recipes" element={<RecipesAdminPage />} />
+              <Route path="/admin/dashboards" element={<RecipesAdminPage />} />
+              <Route path="/admin/dashboards/new" element={<RecipeEditorPage />} />
+              <Route path="/admin/dashboards/:id/edit" element={<RecipeEditorPage />} />
             </Route>
 
             <Route element={<ProtectedRoute requiredPermission="system:sources:manage" />}>
