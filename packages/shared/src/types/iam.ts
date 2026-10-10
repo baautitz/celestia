@@ -16,7 +16,7 @@ export interface User {
   roleId: string;
   externals: ExternalsMap;
   status: "active" | "inactive";
-  /** Administrador: ignora a matriz de permissões (acesso total). Só é alterado pelo CLI. */
+  /** Administrador: ignora a matriz de permissões (acesso total). Alterado pelo CLI create-admin ou por outro administrador. */
   isAdmin?: boolean;
   createdAt: string;
   updatedAt?: string;

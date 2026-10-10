@@ -327,13 +327,28 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         externals: z.record(z.union([z.string(), z.number()])).optional(),
         status: z.enum(["active", "inactive"]).optional(),
         email: z.string().email().optional(),
+        isAdmin: z.boolean().optional(),
       })
     ),
     async (c) => {
       const id = c.req.param("id");
-      const body = c.req.valid("json");
+      const { isAdmin, ...body } = c.req.valid("json");
+      const caller = c.get("user") as JWTAccessPayload;
+      // Único caminho pela API para o flag de administrador: só quem já é admin altera, e ninguém se rebaixa.
+      if (isAdmin !== undefined) {
+        if (!caller.isAdmin) {
+          return c.json({ error: "Somente administradores podem alterar o acesso de administrador." }, 403);
+        }
+        if (id === caller.sub && !isAdmin) {
+          return c.json({ error: "Você não pode remover o seu próprio acesso de administrador." }, 400);
+        }
+      }
       try {
         const updated = await userStore.updateUser(id, body);
+        if (isAdmin !== undefined) {
+          await userStore.setAdmin(id, isAdmin);
+          updated.isAdmin = isAdmin;
+        }
         return c.json(updated);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Erro ao atualizar usuário.";

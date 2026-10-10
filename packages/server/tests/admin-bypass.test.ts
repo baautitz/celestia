@@ -33,10 +33,14 @@ describe("Flag isAdmin (bypass de permissões)", () => {
     const hash = PasswordService.hash(TEST_PASSWORD);
     const base = { fullname: "x", passwordHash: hash, roleId: "role_vazio", externals: {}, status: "active" as const, createdAt: new Date().toISOString() };
     store = new MemoryUserStore({
-      roles: [{ id: "role_vazio", name: "Vazio", permissions: [] }],
+      roles: [
+        { id: "role_vazio", name: "Vazio", permissions: [] },
+        { id: "role_gestor", name: "Gestor", permissions: ["system:users:update"] },
+      ],
       users: [
         { ...base, id: "u1", username: "chefe" },
         { ...base, id: "u2", username: "comum" },
+        { ...base, id: "u3", username: "gestor", roleId: "role_gestor" },
       ],
     });
     await store.setAdmin("u1", true);
@@ -75,7 +79,7 @@ describe("Flag isAdmin (bypass de permissões)", () => {
     expect((await login("comum")).user.permissions).toEqual([]);
   });
 
-  it("a API de usuários não consegue conceder isAdmin", async () => {
+  it("a criação de usuário ignora isAdmin", async () => {
     const admin = await login("chefe");
     const created = await call("/api/iam/users", admin.access_token, {
       method: "POST",
@@ -83,9 +87,24 @@ describe("Flag isAdmin (bypass de permissões)", () => {
     });
     expect([200, 201]).toContain(created.status);
     expect((await store.findByUsername("novo"))!.isAdmin).toBeFalsy();
+  });
 
-    const upd = await call("/api/iam/users/u2", admin.access_token, { method: "PUT", body: JSON.stringify({ isAdmin: true }) });
-    expect(upd.status).toBeLessThan(500);
+  it("só um administrador altera isAdmin, e ninguém se rebaixa", async () => {
+    const put = (token: string, id: string, isAdmin: boolean) =>
+      call(`/api/iam/users/${id}`, token, { method: "PUT", body: JSON.stringify({ isAdmin }) });
+
+    // Quem tem system:users:update mas não é admin não consegue conceder.
+    const gestor = await login("gestor");
+    expect((await put(gestor.access_token, "u2", true)).status).toBe(403);
     expect((await store.findById("u2"))!.isAdmin).toBeFalsy();
+
+    const admin = await login("chefe");
+    expect((await put(admin.access_token, "u2", true)).status).toBe(200);
+    expect((await store.findById("u2"))!.isAdmin).toBe(true);
+    expect((await put(admin.access_token, "u2", false)).status).toBe(200);
+    expect((await store.findById("u2"))!.isAdmin).toBeFalsy();
+
+    expect((await put(admin.access_token, "u1", false)).status).toBe(400);
+    expect((await store.findById("u1"))!.isAdmin).toBe(true);
   });
 });
