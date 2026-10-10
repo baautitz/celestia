@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ArrowRight, Layers } from "lucide-react";
 import { useRecipesCatalog } from "@/context/RecipesCatalogContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -10,12 +10,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MobileCard } from "@/components/ui/mobile-card";
 
 export const DashboardsPage: React.FC = () => {
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { recipes, loading } = useRecipesCatalog();
 
   const openButton = (id: string) => (
-    <Button variant="outline" onClick={() => navigate(`/dashboards/${id}`)}>
+    <Button variant="outline" nativeButton={false} render={<Link to={`/dashboards/${id}`} />}>
       Abrir
       <ArrowRight className="size-4 ml-1" />
     </Button>

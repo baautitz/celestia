@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useLocation, useNavigate, Outlet } from "react-router-dom";
+import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useHeaderActions } from "@/context/HeaderActionsContext";
 import { api } from "@/lib/api-client";
@@ -102,7 +102,7 @@ export const AppLayout: React.FC = () => {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" onClick={() => navigate("/workspaces")}>
+              <SidebarMenuButton size="lg" render={<Link to="/workspaces" />}>
                 <div className="flex aspect-square size-8 items-center justify-center rounded-none bg-primary text-primary-foreground">
                   <Building2 className="size-4" />
                 </div>
@@ -122,7 +122,7 @@ export const AppLayout: React.FC = () => {
                 <SidebarMenuButton
                   isActive={location.pathname === "/workspaces" && !location.pathname.startsWith("/workspaces/")}
                   tooltip="Áreas de Trabalho"
-                  onClick={() => navigate("/workspaces")}
+                  render={<Link to="/workspaces" />}
                 >
                   <LayoutDashboard className="size-4" />
                   <span>Áreas de Trabalho</span>
@@ -133,7 +133,7 @@ export const AppLayout: React.FC = () => {
                 <SidebarMenuButton
                   isActive={location.pathname.startsWith("/dashboards")}
                   tooltip="Dashboards"
-                  onClick={() => navigate("/dashboards")}
+                  render={<Link to="/dashboards" />}
                 >
                   <Layers className="size-4" />
                   <span>Dashboards</span>
@@ -151,7 +151,7 @@ export const AppLayout: React.FC = () => {
                     <SidebarMenuButton
                       isActive={location.pathname.startsWith("/iam/users")}
                       tooltip="Usuários"
-                      onClick={() => navigate("/iam/users")}
+                      render={<Link to="/iam/users" />}
                     >
                       <Users className="size-4" />
                       <span>Usuários</span>
@@ -163,7 +163,7 @@ export const AppLayout: React.FC = () => {
                     <SidebarMenuButton
                       isActive={location.pathname.startsWith("/iam/roles")}
                       tooltip="Grupos"
-                      onClick={() => navigate("/iam/roles")}
+                      render={<Link to="/iam/roles" />}
                     >
                       <Shield className="size-4" />
                       <span>Grupos</span>
@@ -175,7 +175,7 @@ export const AppLayout: React.FC = () => {
                     <SidebarMenuButton
                       isActive={location.pathname.startsWith("/admin/dashboards")}
                       tooltip="Gerenciar Dashboards"
-                      onClick={() => navigate("/admin/dashboards")}
+                      render={<Link to="/admin/dashboards" />}
                     >
                       <FileCode className="size-4" />
                       <span>Gerenciar Dashboards</span>
@@ -187,7 +187,7 @@ export const AppLayout: React.FC = () => {
                     <SidebarMenuButton
                       isActive={location.pathname.startsWith("/erps")}
                       tooltip="ERPs"
-                      onClick={() => navigate("/erps")}
+                      render={<Link to="/erps" />}
                     >
                       <Database className="size-4" />
                       <span>ERPs</span>
@@ -265,7 +265,7 @@ export const AppLayout: React.FC = () => {
             <Breadcrumb className="min-w-0">
               <BreadcrumbList className="items-center">
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink onClick={() => navigate("/workspaces")} className="cursor-pointer text-sm">
+                  <BreadcrumbLink render={<Link to="/workspaces" />} className="cursor-pointer text-sm">
                     Início
                   </BreadcrumbLink>
                 </BreadcrumbItem>

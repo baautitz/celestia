@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { RecipeAdminSummary } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -114,7 +114,8 @@ export const RecipesAdminPage: React.FC = () => {
         size="icon"
         aria-label={canManage ? "Editar" : "Visualizar"}
         title={canManage ? "Editar" : "Visualizar"}
-        onClick={() => navigate(`/admin/dashboards/${recipe.id}/edit`)}
+        nativeButton={false}
+        render={<Link to={`/admin/dashboards/${recipe.id}/edit`} />}
       >
         <Edit2 className="size-4" />
       </Button>
