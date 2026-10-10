@@ -24,7 +24,7 @@ const SHARED_ROOT = "file:///node_modules/@platform/shared";
 typescriptDefaults.setEagerModelSync(true);
 
 typescriptDefaults.setCompilerOptions({
-  target: ScriptTarget.ES2022,
+  target: ScriptTarget.ES2020,
   module: ModuleKind.ESNext,
   moduleResolution: ModuleResolutionKind.NodeJs,
   strict: true,
