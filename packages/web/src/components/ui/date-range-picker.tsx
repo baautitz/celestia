@@ -26,6 +26,36 @@ export function DateRangePicker({
   disabled,
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
+  // O período só é aplicado ao fechar o seletor: até lá, os cliques mexem apenas neste rascunho.
+  const [draft, setDraft] = React.useState<DateRange | undefined>(value);
+  // Primeiro clique define a âncora; o segundo completa o período (a menor data é sempre a inicial).
+  const [anchor, setAnchor] = React.useState<Date | null>(null);
+
+  const handleDayClick = (day: Date) => {
+    if (!anchor) {
+      setAnchor(day);
+      setDraft({ from: day, to: day });
+      return;
+    }
+    const [from, to] = day < anchor ? [day, anchor] : [anchor, day];
+    setDraft({ from, to });
+    setAnchor(null);
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setDraft(value);
+    } else if (
+      !anchor &&
+      draft?.from &&
+      draft?.to &&
+      (draft.from.getTime() !== value?.from?.getTime() || draft.to.getTime() !== value?.to?.getTime())
+    ) {
+      onChange(draft);
+    }
+    setAnchor(null);
+    setOpen(next);
+  };
 
   const formatDateShort = (date: Date) =>
     format(date, "dd 'de' MMM", { locale: ptBR });
@@ -41,7 +71,7 @@ export function DateRangePicker({
         : "Selecione o período";
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
         render={
           <Button
@@ -62,8 +92,10 @@ export function DateRangePicker({
         <Calendar
           mode="range"
           defaultMonth={value?.from}
-          selected={value}
-          onSelect={onChange}
+          selected={draft}
+          // Sem onSelect o react-day-picker usa estado interno e ignora `selected`; a seleção real vem de onDayClick.
+          onSelect={() => undefined}
+          onDayClick={handleDayClick}
           numberOfMonths={2}
         />
       </PopoverContent>
