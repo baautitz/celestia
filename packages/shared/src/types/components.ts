@@ -146,6 +146,11 @@ export interface ChartProps {
   seriesLimit?: number;
   /** Somente com seriesKey: cada série mostra o acumulado (soma corrida) ao longo do eixo X, em vez do valor de cada ponto. */
   cumulative?: boolean;
+  /**
+   * Somente com seriesKey: mostra um seletor "Acumulado / Por dia" no gráfico.
+   * `cumulative` passa a ser só o modo inicial.
+   */
+  cumulativeToggle?: boolean;
   [key: string]: unknown;
 }
 

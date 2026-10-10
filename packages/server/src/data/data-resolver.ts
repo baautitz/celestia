@@ -213,7 +213,7 @@ export class DataResolver {
       const valueKey = component.props.valueKey || "value";
       const seriesKey = component.props.seriesKey;
       if (seriesKey && component.component === "line_chart") {
-        return this.buildSeriesChart(rows, nameKey, valueKey, seriesKey, Number(component.props.seriesLimit) || 10, component.props.cumulative === true);
+        return this.buildSeriesChart(rows, nameKey, valueKey, seriesKey, Number(component.props.seriesLimit) || 10, component.props.cumulative === true && component.props.cumulativeToggle !== true);
       }
       const limit = Number(component.props.limit) || rows.length;
       const chartRows = rows.slice().sort((a, b) =>
@@ -289,6 +289,7 @@ export class DataResolver {
    * Pivota linhas (x, série, valor) em pontos { name: x, s0: valor, s1: valor, ... }.
    * Fica com as `seriesLimit` séries de maior total; x sem valor numa série entra como 0.
    * Com `cumulative`, cada série vira a soma corrida em ordem de x (dias sem valor repetem o acumulado anterior).
+   * Com `cumulativeToggle` os dados seguem por dia e o front acumula conforme o seletor.
    */
   private static buildSeriesChart(
     rows: Array<Record<string, unknown>>,
