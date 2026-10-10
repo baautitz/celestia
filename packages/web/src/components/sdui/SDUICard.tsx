@@ -16,7 +16,7 @@ interface SDUICardProps {
   recipeId: string;
   startDate: string;
   endDate: string;
-  /** Parâmetros do Modelo usados quando não há Área de Trabalho (modo prévia). */
+  /** Parâmetros do Dashboard usados quando não há Área de Trabalho (modo prévia). */
   params?: Record<string, unknown>;
 }
 

@@ -287,7 +287,7 @@ class ApiClient {
         order?: "asc" | "desc";
         search?: string;
         profile_id?: string;
-        /** Parâmetros do Modelo (ex.: empresa) para uso sem Área de Trabalho (modo prévia). */
+        /** Parâmetros do Dashboard (ex.: empresa) para uso sem Área de Trabalho (modo prévia). */
         params?: Record<string, unknown>;
       }
     ): Promise<ComponentDataResponse> => {

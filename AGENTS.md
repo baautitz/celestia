@@ -15,7 +15,7 @@
 - **SDUI Engine**: TypeScript-defined Recipes compiled in-memory via `esbuild` and executed inside isolated V8 isolates (`isolated-vm`).
 - **Frontend**: Vite + React 19 + shadcn/ui + Tailwind CSS v4.
 - **PT-BR UI Terminology**:
-  - `Recipe` ➔ **Modelo** (the reusable blueprint/dashboard definition).
+  - `Recipe` ➔ **Dashboard** (the reusable blueprint/dashboard definition).
   - `Workspace` ➔ **Área de Trabalho** (the active session/closing period).
 
 ---

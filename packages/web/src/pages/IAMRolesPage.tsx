@@ -183,7 +183,7 @@ export const IAMRolesPage: React.FC = () => {
 
       {/* Top Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Grupos & Perfis de Acesso</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Grupos</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Gerencie permissões granulares no modelo Permission-First.
         </p>

@@ -157,9 +157,9 @@ export function RecipePermissionsSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl">
         <SheetHeader className=" border-b shrink-0">
-          <SheetTitle>Permissões do Modelo</SheetTitle>
+          <SheetTitle>Permissões do Dashboard</SheetTitle>
           <SheetDescription>
-            Configure quais grupos podem acessar e executar ações neste Modelo.
+            Configure quais grupos podem acessar e executar ações neste Dashboard.
           </SheetDescription>
         </SheetHeader>
 
@@ -173,7 +173,7 @@ export function RecipePermissionsSheet({
               </div>
             ) : !recipeGroup ? (
               <p className="text-sm text-muted-foreground text-center py-8">
-                Nenhuma permissão declarada para este Modelo.
+                Nenhuma permissão declarada para este Dashboard.
               </p>
             ) : (
               <>
@@ -205,10 +205,10 @@ export function RecipePermissionsSheet({
                           </CollapsibleTrigger>
 
                           <CollapsibleContent className="flex flex-col gap-3 p-2">
-                            {/* Acesso ao Modelo */}
+                            {/* Acesso ao Dashboard */}
                             <div className="flex flex-col gap-2">
                               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                Acesso ao Modelo
+                                Acesso ao Dashboard
                               </span>
                               <div className="flex items-center justify-between gap-4 py-2 border-b border-border/40">
                                 <div className="flex flex-col gap-0.5 min-w-0 flex-1">

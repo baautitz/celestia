@@ -10,7 +10,7 @@ interface SDUIRendererProps {
   workspaceId: string;
   startDate: string;
   endDate: string;
-  /** Parâmetros do Modelo para uso sem Área de Trabalho (modo prévia). */
+  /** Parâmetros do Dashboard para uso sem Área de Trabalho (modo prévia). */
   params?: Record<string, unknown>;
   isWorkspaceClosed?: boolean;
   readOnly?: boolean;

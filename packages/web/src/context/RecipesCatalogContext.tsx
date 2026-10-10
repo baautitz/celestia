@@ -7,7 +7,7 @@ import { api } from "@/lib/api-client";
 interface RecipesCatalogContextType {
   recipes: RecipeSummary[];
   loading: boolean;
-  /** Rebusca o catálogo (usado após criar, editar, excluir ou recarregar Modelos). */
+  /** Rebusca o catálogo (usado após criar, editar, excluir ou recarregar Dashboards). */
   refresh: () => void;
 }
 

@@ -237,9 +237,9 @@ export const ERPsPage: React.FC = () => {
       </HeaderActions>
 
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">ERPs & Fontes de Dados</h1>
+        <h1 className="text-2xl font-bold tracking-tight">ERPs</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Cadastre os ERPs de onde os Modelos leem dados. As conexões são somente leitura.
+          Cadastre os ERPs de onde os Dashboards leem dados. As conexões são somente leitura.
         </p>
       </div>
 
@@ -398,7 +398,7 @@ export const ERPsPage: React.FC = () => {
                   name="id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Identificador (usado nos Modelos)</FormLabel>
+                      <FormLabel>Identificador (usado nos Dashboards)</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="inovafarma"
@@ -436,7 +436,7 @@ export const ERPsPage: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir ERP</AlertDialogTitle>
             <AlertDialogDescription className="break-words">
-              Excluir &quot;{deleteTarget?.name}&quot; ({deleteTarget?.id}) remove a conexão. Os Modelos que usam
+              Excluir &quot;{deleteTarget?.name}&quot; ({deleteTarget?.id}) remove a conexão. Os Dashboards que usam
               essa fonte deixarão de carregar dados.
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -28,7 +28,7 @@ interface QueryViewsDialogProps {
   workspaceId: string;
 }
 
-/** Componentes do Modelo que têm visões (perfis de dados) disponíveis para o usuário. */
+/** Componentes do Dashboard que têm visões (perfis de dados) disponíveis para o usuário. */
 export function getViewComponents(schema: DashboardSchemaResponse): ViewComponent[] {
   return (schema.ui?.components ?? [])
     .filter((component) => (component.props.availableProfiles?.length ?? 0) > 0)
@@ -101,7 +101,7 @@ export const QueryViewsDialog: React.FC<QueryViewsDialogProps> = ({ open, onOpen
             })}
 
             {groups.length === 0 && (
-              <FieldDescription>Este Modelo não tem consultas com visões para escolher.</FieldDescription>
+              <FieldDescription>Este Dashboard não tem consultas com visões para escolher.</FieldDescription>
             )}
           </FieldGroup>
         </ScrollArea>

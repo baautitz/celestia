@@ -143,7 +143,7 @@ export const WorkspacesPage: React.FC = () => {
                     primary=""
                     secondary=""
                     fields={[
-                      { label: "Modelo", value: <Skeleton className="h-4 w-24" /> },
+                      { label: "Dashboard", value: <Skeleton className="h-4 w-24" /> },
                       { label: "Período", value: <Skeleton className="h-4 w-32" /> },
                       { label: "Status", value: <Skeleton className="h-5 w-20" /> },
                     ]}
@@ -152,7 +152,7 @@ export const WorkspacesPage: React.FC = () => {
               ) : workspaces.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground text-sm">
                   <Layers className="size-6 mx-auto mb-2 text-muted-foreground/50" />
-                  Nenhuma Área de Trabalho iniciada. Acesse um Modelo na barra lateral para criar.
+                  Nenhuma Área de Trabalho iniciada. Acesse um Dashboard na barra lateral para criar.
                 </p>
               ) : (
                 workspaces.map((ws) => (
@@ -161,7 +161,7 @@ export const WorkspacesPage: React.FC = () => {
                     primary={ws.name}
                     secondary={ws.id}
                     fields={[
-                      { label: "Modelo", value: ws.recipeId },
+                      { label: "Dashboard", value: ws.recipeId },
                       {
                         label: "Período",
                         value: (
@@ -220,7 +220,7 @@ export const WorkspacesPage: React.FC = () => {
                 <TableRow className="bg-muted/40">
                   <TableHead>Identificador</TableHead>
                   <TableHead>Descrição / Título</TableHead>
-                  <TableHead>Modelo</TableHead>
+                  <TableHead>Dashboard</TableHead>
                   <TableHead>Período Temporal</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ação</TableHead>
@@ -242,7 +242,7 @@ export const WorkspacesPage: React.FC = () => {
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                       <Layers className="size-8 mx-auto mb-2 text-muted-foreground/50" />
-                      Nenhuma Área de Trabalho iniciada. Acesse um Modelo na barra lateral para criar.
+                      Nenhuma Área de Trabalho iniciada. Acesse um Dashboard na barra lateral para criar.
                     </TableCell>
                   </TableRow>
                 ) : (

@@ -98,7 +98,7 @@ export const WorkspaceDetailPage: React.FC = () => {
           const schemaRes = await api.dashboards.getSchema(recipeId);
           if (isMounted) setSchema(schemaRes);
         } catch (err: unknown) {
-          if (isMounted) setError(err instanceof Error ? err.message : "Erro ao carregar o Modelo.");
+          if (isMounted) setError(err instanceof Error ? err.message : "Erro ao carregar o Dashboard.");
         }
       })
       .catch((err: unknown) => {
@@ -265,7 +265,7 @@ export const WorkspaceDetailPage: React.FC = () => {
     return (
       <Alert variant="destructive">
         <AlertCircle className="size-4" />
-        <AlertTitle>Erro ao carregar Modelo</AlertTitle>
+        <AlertTitle>Erro ao carregar Dashboard</AlertTitle>
         <AlertDescription>{error || "Definição de modelo não encontrada."}</AlertDescription>
       </Alert>
     );

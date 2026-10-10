@@ -4,7 +4,7 @@ import type { FormFieldDef } from "@platform/shared";
 export type DynamicFormValues = Record<string, unknown>;
 
 /**
- * Gera os valores padrão a partir da lista de campos do Modelo.
+ * Gera os valores padrão a partir da lista de campos do Dashboard.
  */
 export function buildDynamicDefaultValues(fields: FormFieldDef[]): DynamicFormValues {
   const defaults: DynamicFormValues = {};
@@ -35,7 +35,7 @@ export function buildDynamicDefaultValues(fields: FormFieldDef[]): DynamicFormVa
 }
 
 /**
- * Gera um schema Zod dinâmico a partir da lista de campos do Modelo.
+ * Gera um schema Zod dinâmico a partir da lista de campos do Dashboard.
  * Cada campo receive uma mensagem de validação própria com o label.
  */
 export function buildDynamicSchema(fields: FormFieldDef[]) {

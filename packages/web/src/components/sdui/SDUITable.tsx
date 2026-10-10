@@ -54,7 +54,7 @@ interface SDUITableProps {
   recipeId: string;
   startDate: string;
   endDate: string;
-  /** Parâmetros do Modelo usados quando não há Área de Trabalho (modo prévia). */
+  /** Parâmetros do Dashboard usados quando não há Área de Trabalho (modo prévia). */
   params?: Record<string, unknown>;
   availableActions?: Record<string, ActionDef>;
   isWorkspaceClosed?: boolean;
@@ -90,7 +90,7 @@ export const SDUITable: React.FC<SDUITableProps> = ({
 
   const { openDialog, showTableModal, updateTableData, confirm, triggerRefresh, refreshSignal } = useImperativeUI();
 
-  // Mudou algum filtro de parâmetro do Modelo: volta para a primeira página.
+  // Mudou algum filtro de parâmetro do Dashboard: volta para a primeira página.
   useEffect(() => {
     setPage(1);
   }, [params]);
