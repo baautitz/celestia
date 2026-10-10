@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { ChartProps, ChartDataResponse } from "@platform/shared";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ChartContainer,
@@ -97,7 +98,25 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
     };
   }, [id, workspaceId, recipeId, startDate, endDate, params, profileId, refreshSignal]);
 
-  const chartData = data?.data ?? [];
+  // Seletor Acumulado / Por dia: o servidor manda os pontos por dia e o front acumula cada série.
+  const hasModeToggle = props.cumulativeToggle === true && !!props.seriesKey;
+  const [cumulativeMode, setCumulativeMode] = useState<boolean>(props.cumulative === true);
+
+  const chartData = useMemo(() => {
+    const points = data?.data ?? [];
+    if (!hasModeToggle || !cumulativeMode) return points;
+    const running = new Map<string, number>();
+    return points.map((point) => {
+      const next: typeof point = { ...point, value: 0 };
+      for (const item of data?.series ?? []) {
+        const total = (running.get(item.key) ?? 0) + Number(point[item.key] ?? 0);
+        running.set(item.key, total);
+        next[item.key] = total;
+        next.value += total;
+      }
+      return next;
+    });
+  }, [data, hasModeToggle, cumulativeMode]);
 
   const barConfig = useMemo<ChartConfig>(
     () => ({
@@ -398,11 +417,33 @@ export const SDUIChart: React.FC<SDUIChartProps> = React.memo(({
             </CardDescription>
           )}
         </div>
-        <QueryProfileSelect
-          profiles={props.availableProfiles}
-          value={profileId}
-          onValueChange={setProfileId}
-        />
+        <CardAction className="flex items-center gap-2">
+          {hasModeToggle && (
+            <Select
+              items={[
+                { value: "cumulative", label: "Acumulado" },
+                { value: "daily", label: "Por dia" },
+              ]}
+              value={cumulativeMode ? "cumulative" : "daily"}
+              onValueChange={(next: string | null) => next && setCumulativeMode(next === "cumulative")}
+            >
+              <SelectTrigger aria-label="Modo" className="w-auto min-w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                <SelectGroup>
+                  <SelectItem value="cumulative">Acumulado</SelectItem>
+                  <SelectItem value="daily">Por dia</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          )}
+          <QueryProfileSelect
+            profiles={props.availableProfiles}
+            value={profileId}
+            onValueChange={setProfileId}
+          />
+        </CardAction>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 pb-3">{renderContent()}</CardContent>
     </Card>
