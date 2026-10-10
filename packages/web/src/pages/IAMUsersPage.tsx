@@ -351,6 +351,7 @@ export const IAMUsersPage: React.FC = () => {
                             title="Redefinir Senha"
                             onClick={() => {
                               setSelectedUser(u);
+                              setNewPassword("");
                               setIsResetOpen(true);
                             }}
                           >
@@ -442,6 +443,7 @@ export const IAMUsersPage: React.FC = () => {
                               title="Redefinir Senha"
                               onClick={() => {
                                 setSelectedUser(u);
+                                setNewPassword("");
                                 setIsResetOpen(true);
                               }}
                             >
