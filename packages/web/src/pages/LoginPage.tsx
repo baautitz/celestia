@@ -8,6 +8,7 @@ import {
   Card,
   CardHeader,
   CardTitle,
+  CardDescription,
   CardContent,
 } from "@/components/ui/card";
 import { FieldGroup, Field, FieldLabel, FieldError } from "@/components/ui/field";
@@ -59,7 +60,8 @@ export const LoginPage: React.FC = () => {
     <main className="flex min-h-screen items-center justify-center p-4 bg-muted/20">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center items-center justify-center pb-4 flex flex-col">
-          <CardTitle className="text-xl font-bold">Celestia</CardTitle>
+          <CardTitle className="text-2xl font-bold">Celestia</CardTitle>
+          <CardDescription>Entre com seu usuário e senha para continuar.</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -70,7 +72,7 @@ export const LoginPage: React.FC = () => {
                 <Input
                   {...register("username")}
                   id="username"
-                  placeholder="nome.sobrenome"
+                  autoFocus
                   autoComplete="username"
                   aria-invalid={!!errors.username}
                 />
@@ -85,7 +87,6 @@ export const LoginPage: React.FC = () => {
                   {...register("password")}
                   id="password"
                   type="password"
-                  placeholder="••••••••"
                   autoComplete="current-password"
                   aria-invalid={!!errors.password}
                 />
@@ -99,7 +100,7 @@ export const LoginPage: React.FC = () => {
                 className="w-full mt-2"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Autenticando..." : "Entrar no Celestia"}
+                {isSubmitting ? "Autenticando..." : "Entrar"}
               </Button>
             </FieldGroup>
           </form>
