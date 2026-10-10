@@ -103,7 +103,7 @@ export const RecipeDashboardPage: React.FC = () => {
       const schemaRes = await api.dashboards.getSchema(recipeId);
       setSchema(schemaRes);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erro ao carregar o Modelo.");
+      setError(err instanceof Error ? err.message : "Erro ao carregar o Dashboard.");
     } finally {
       setLoading(false);
     }
@@ -123,7 +123,7 @@ export const RecipeDashboardPage: React.FC = () => {
     defaultValues: initDefaults,
   });
 
-  // Filtros dos parâmetros do Modelo (exceto as datas, que têm seletor próprio): valem na prévia, sem Área de Trabalho.
+  // Filtros dos parâmetros do Dashboard (exceto as datas, que têm seletor próprio): valem na prévia, sem Área de Trabalho.
   const paramFields = useMemo(
     () => initFields.filter((field) => field.name !== "start_date" && field.name !== "end_date"),
     [schema]
@@ -258,8 +258,8 @@ export const RecipeDashboardPage: React.FC = () => {
     return (
       <Alert variant="destructive">
         <AlertCircle className="size-4" />
-        <AlertTitle>Erro ao carregar Modelo</AlertTitle>
-        <AlertDescription>{error || "Modelo não encontrado."}</AlertDescription>
+        <AlertTitle>Erro ao carregar Dashboard</AlertTitle>
+        <AlertDescription>{error || "Dashboard não encontrado."}</AlertDescription>
       </Alert>
     );
   }
@@ -280,7 +280,7 @@ export const RecipeDashboardPage: React.FC = () => {
             variant="outline"
             size="icon"
             onClick={openParams}
-            title="Parâmetros do Modelo"
+            title="Parâmetros do Dashboard"
             className="size-8 shrink-0"
           >
             <Settings className="size-4" />
@@ -338,7 +338,7 @@ export const RecipeDashboardPage: React.FC = () => {
             {paramFields.length > 0 && (
               <DropdownMenuItem onClick={openParams}>
                 <Settings className="size-4" />
-                Parâmetros do Modelo
+                Parâmetros do Dashboard
               </DropdownMenuItem>
             )}
             {hasViews && (
@@ -368,7 +368,7 @@ export const RecipeDashboardPage: React.FC = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/workspaces")}
+          onClick={() => navigate("/dashboards")}
           title="Voltar para a lista"
           className="mt-1 shrink-0 size-8 md:size-10"
         >
@@ -398,11 +398,11 @@ export const RecipeDashboardPage: React.FC = () => {
       {/* Visões: escolhe a consulta (visão) de todos os componentes de uma vez */}
       <QueryViewsDialog open={viewsOpen} onOpenChange={setViewsOpen} schema={schema} workspaceId="preview" />
 
-      {/* Parâmetros do Modelo (ex.: empresa) — valem na prévia, sem Área de Trabalho */}
+      {/* Parâmetros do Dashboard (ex.: empresa) — valem na prévia, sem Área de Trabalho */}
       <Dialog open={paramsOpen} onOpenChange={setParamsOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Parâmetros do Modelo</DialogTitle>
+            <DialogTitle>Parâmetros do Dashboard</DialogTitle>
             <DialogDescription>
               Ao concluir, os valores se aplicam a esta visualização e viram o padrão ao inicializar uma Área de Trabalho.
             </DialogDescription>
@@ -489,7 +489,7 @@ export const RecipeDashboardPage: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Sessão já existe para este período</AlertDialogTitle>
             <AlertDialogDescription className="break-words">
-              Já existe uma Área de Trabalho aberta para o Modelo &quot;{schema.name}&quot; com o período de{" "}
+              Já existe uma Área de Trabalho aberta para o Dashboard &quot;{schema.name}&quot; com o período de{" "}
               <span className="font-medium text-foreground">{existingSession?.startDate}</span> até{" "}
               <span className="font-medium text-foreground">{existingSession?.endDate}</span>{" "}
               <span className="font-mono text-xs break-all">({existingSession?.id})</span>.
@@ -505,7 +505,7 @@ export const RecipeDashboardPage: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Sheet de Permissões do Modelo */}
+      {/* Sheet de Permissões do Dashboard */}
       {recipeId && (
         <RecipePermissionsSheet
           recipeId={recipeId}

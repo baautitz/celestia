@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useHeaderActions } from "@/context/HeaderActionsContext";
-import { useRecipesCatalog } from "@/context/RecipesCatalogContext";
 import { api } from "@/lib/api-client";
 import {
   SidebarProvider,
@@ -14,16 +13,11 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-  SidebarMenuSkeleton,
   SidebarFooter,
   SidebarInset,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -50,7 +44,6 @@ import {
   Shield,
   LogOut,
   ChevronDown,
-  ChevronRight,
   Building2,
   Layers,
   Database,
@@ -74,7 +67,6 @@ export const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { recipes, loading: loadingRecipes } = useRecipesCatalog();
 
   const handleLogout = async () => {
     await logout();
@@ -92,13 +84,14 @@ export const AppLayout: React.FC = () => {
   };
 
   const getPageTitle = () => {
-    if (location.pathname.startsWith("/recipes/")) return "Modelo — Dashboard";
+    if (location.pathname.startsWith("/dashboards/")) return "Dashboard";
+    if (location.pathname.startsWith("/dashboards")) return "Dashboards";
     if (location.pathname.startsWith("/workspaces/")) return "Área de Trabalho";
     if (location.pathname.startsWith("/workspaces")) return "Áreas de Trabalho";
     if (location.pathname.startsWith("/iam/users")) return "Gestão de Usuários";
-    if (location.pathname.startsWith("/iam/roles")) return "Grupos de Acesso & Permissões";
-    if (location.pathname.startsWith("/erps")) return "ERPs & Fontes de Dados";
-    if (location.pathname.startsWith("/admin/recipes")) return "Modelos (Código)";
+    if (location.pathname.startsWith("/iam/roles")) return "Grupos";
+    if (location.pathname.startsWith("/erps")) return "ERPs";
+    if (location.pathname.startsWith("/admin/dashboards")) return "Dashboards";
     return "Painel de Controle";
   };
 
@@ -136,45 +129,16 @@ export const AppLayout: React.FC = () => {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              <Collapsible defaultOpen className="group/collapsible">
-                <SidebarMenuItem>
-                  <CollapsibleTrigger render={<SidebarMenuButton />}>
-                    <Layers className="size-4" />
-                    <span>Modelos</span>
-                    <ChevronRight className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      {loadingRecipes ? (
-                        Array.from({ length: 2 }).map((_, i) => (
-                          <SidebarMenuSubItem key={i}>
-                            <SidebarMenuSkeleton showIcon />
-                          </SidebarMenuSubItem>
-                        ))
-                      ) : recipes.length === 0 ? (
-                        <SidebarMenuSubItem>
-                          <span className="px-2 py-1 text-xs text-muted-foreground">
-                            Nenhum modelo disponível
-                          </span>
-                        </SidebarMenuSubItem>
-                      ) : (
-                        recipes.map((recipe) => (
-                          <SidebarMenuSubItem key={recipe.id}>
-                            <SidebarMenuSubButton
-                              render={<button type="button" />}
-                              isActive={location.pathname === `/recipes/${recipe.id}`}
-                              onClick={() => navigate(`/recipes/${recipe.id}`)}
-                              className="w-full"
-                            >
-                              <span>{recipe.name}</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))
-                      )}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location.pathname.startsWith("/dashboards")}
+                  tooltip="Dashboards"
+                  onClick={() => navigate("/dashboards")}
+                >
+                  <Layers className="size-4" />
+                  <span>Dashboards</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
 
@@ -198,23 +162,23 @@ export const AppLayout: React.FC = () => {
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       isActive={location.pathname.startsWith("/iam/roles")}
-                      tooltip="Grupos de Acesso"
+                      tooltip="Grupos"
                       onClick={() => navigate("/iam/roles")}
                     >
                       <Shield className="size-4" />
-                      <span>Grupos de Acesso</span>
+                      <span>Grupos</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
                 {hasAnyPermission("system:recipes:read") && (
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      isActive={location.pathname.startsWith("/admin/recipes")}
-                      tooltip="Gerenciar Modelos"
-                      onClick={() => navigate("/admin/recipes")}
+                      isActive={location.pathname.startsWith("/admin/dashboards")}
+                      tooltip="Gerenciar Dashboards"
+                      onClick={() => navigate("/admin/dashboards")}
                     >
                       <FileCode className="size-4" />
-                      <span>Gerenciar Modelos</span>
+                      <span>Gerenciar Dashboards</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}

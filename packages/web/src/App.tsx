@@ -9,6 +9,8 @@ import { IAMRolesPage } from "./pages/IAMRolesPage";
 import { ERPsPage } from "./pages/ERPsPage";
 import { RecipesAdminPage } from "./pages/RecipesAdminPage";
 import { AppLayout } from "./components/layout/AppLayout";
+import { RecipeEditorPage } from "./pages/RecipeEditorPage";
+import { DashboardsPage } from "./pages/DashboardsPage";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { RecipesCatalogProvider } from "./context/RecipesCatalogContext";
 import { Toaster } from "@/components/ui/toast";
@@ -33,7 +35,8 @@ export const App: React.FC = () => {
             <Route path="/" element={<Navigate to="/workspaces" replace />} />
             <Route path="/workspaces" element={<WorkspacesPage />} />
             <Route path="/workspaces/:id" element={<WorkspaceDetailPage />} />
-            <Route path="/recipes/:recipeId" element={<RecipeDashboardPage />} />
+            <Route path="/dashboards" element={<DashboardsPage />} />
+            <Route path="/dashboards/:recipeId" element={<RecipeDashboardPage />} />
 
             {/* Rotas com Permissões Específicas do Sistema IAM */}
             <Route element={<ProtectedRoute requiredPermission="system:users:read" />}>
