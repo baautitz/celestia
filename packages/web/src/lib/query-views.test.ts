@@ -8,14 +8,14 @@ const profile = (id: string, label: string, sourceName: string, queryName: strin
   bindings: [{ id: queryName, sourceName, queryName, optionId, optionLabel }],
 });
 
-const vendas = (id: string) => [
+const vendas = () => [
   profile("todas", "Todas", "erp", "vendas", "todas", "Todas"),
   profile("proprias", "Minhas", "erp", "vendas", "proprias", "Somente as minhas"),
 ];
 
 const components: ViewComponent[] = [
-  { id: "c1", title: "Cartão 1", profiles: vendas("c1") },
-  { id: "c2", title: "Cartão 2", profiles: vendas("c2") },
+  { id: "c1", title: "Cartão 1", profiles: vendas() },
+  { id: "c2", title: "Cartão 2", profiles: vendas() },
   { id: "c3", title: "Metas", profiles: [profile("principal", "Principal", "metas", "metas", "principal", "Meta principal"), profile("todas", "Todas", "metas", "metas", "todas", "Todas as metas")] },
   { id: "c4", title: "Só persistência", profiles: [{ id: "p", label: "P", bindings: [{ id: "x", persistenceName: "penalidades" }] }] },
 ];

@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useHeaderActions } from "@/context/HeaderActionsContext";
-import { api } from "@/lib/api-client";
 import {
   SidebarProvider,
   Sidebar,
