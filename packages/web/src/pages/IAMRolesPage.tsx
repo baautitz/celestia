@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import type { Role, PermissionCatalog, PermissionItem } from "@platform/shared";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@platform/ui/components/card";
 import {
   Table,
   TableHeader,
@@ -9,16 +9,16 @@ import {
   TableHead,
   TableBody,
   TableCell,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Skeleton } from "@/components/ui/skeleton";
-import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
-import { MobileCard } from "@/components/ui/mobile-card";
-import { useIsMobile } from "@/hooks/use-mobile";
+} from "@platform/ui/components/table";
+import { Button } from "@platform/ui/components/button";
+import { Input } from "@platform/ui/components/input";
+import { Textarea } from "@platform/ui/components/textarea";
+import { Badge } from "@platform/ui/components/badge";
+import { Switch } from "@platform/ui/components/switch";
+import { Skeleton } from "@platform/ui/components/skeleton";
+import { FieldGroup, Field, FieldLabel } from "@platform/ui/components/field";
+import { MobileCard } from "@platform/ui/components/mobile-card";
+import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import {
   Sheet,
   SheetContent,
@@ -26,15 +26,15 @@ import {
   SheetTitle,
   SheetDescription,
   SheetFooter,
-} from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from "@platform/ui/components/sheet";
+import { ScrollArea } from "@platform/ui/components/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { toast } from "@/components/ui/toast";
+} from "@platform/ui/components/dropdown-menu";
+import { toast } from "@platform/ui/components/toast";
 import {
   Shield,
   PlusCircle,

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { RecipeAdminSummary } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@platform/ui/components/card";
 import {
   Table,
   TableHeader,
@@ -10,11 +10,11 @@ import {
   TableHead,
   TableBody,
   TableCell,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { MobileCard } from "@/components/ui/mobile-card";
-import { useIsMobile } from "@/hooks/use-mobile";
+} from "@platform/ui/components/table";
+import { Button } from "@platform/ui/components/button";
+import { Skeleton } from "@platform/ui/components/skeleton";
+import { MobileCard } from "@platform/ui/components/mobile-card";
+import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -24,14 +24,14 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
   AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+} from "@platform/ui/components/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { toast } from "@/components/ui/toast";
+} from "@platform/ui/components/dropdown-menu";
+import { toast } from "@platform/ui/components/toast";
 import { PlusCircle, RefreshCw, MoreHorizontal, Edit2, Trash2, Download } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { downloadSource } from "@/lib/utils";

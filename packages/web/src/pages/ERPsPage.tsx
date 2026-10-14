@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { ErpConnection, ErpTypeMeta, FormFieldDef } from "@platform/shared";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@platform/ui/components/card";
 import {
   Table,
   TableHeader,
@@ -11,13 +11,13 @@ import {
   TableHead,
   TableBody,
   TableCell,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { MobileCard } from "@/components/ui/mobile-card";
-import { useIsMobile } from "@/hooks/use-mobile";
+} from "@platform/ui/components/table";
+import { Button } from "@platform/ui/components/button";
+import { Input } from "@platform/ui/components/input";
+import { Badge } from "@platform/ui/components/badge";
+import { Skeleton } from "@platform/ui/components/skeleton";
+import { MobileCard } from "@platform/ui/components/mobile-card";
+import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import {
   Form,
   FormField,
@@ -25,14 +25,14 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-} from "@/components/ui/form";
+} from "@platform/ui/components/form";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@platform/ui/components/select";
 import {
   Sheet,
   SheetContent,
@@ -40,7 +40,7 @@ import {
   SheetTitle,
   SheetDescription,
   SheetFooter,
-} from "@/components/ui/sheet";
+} from "@platform/ui/components/sheet";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -50,15 +50,15 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
   AlertDialogAction,
-} from "@/components/ui/alert-dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from "@platform/ui/components/alert-dialog";
+import { ScrollArea } from "@platform/ui/components/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { toast } from "@/components/ui/toast";
+} from "@platform/ui/components/dropdown-menu";
+import { toast } from "@platform/ui/components/toast";
 import { PlusCircle, RefreshCw, MoreHorizontal, Edit2, PlugZap, Trash2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";

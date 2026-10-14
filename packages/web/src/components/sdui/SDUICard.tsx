@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { StatCardProps, StatDataResponse } from "@platform/shared";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@platform/ui/components/card";
+import { Skeleton } from "@platform/ui/components/skeleton";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 import { api } from "@/lib/api-client";
 import { useImperativeUI } from "@/context/ImperativeUIContext";

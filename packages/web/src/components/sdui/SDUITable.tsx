@@ -13,27 +13,27 @@ import {
   TableHead,
   TableBody,
   TableCell,
-} from "@/components/ui/table";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "@platform/ui/components/table";
+import { Card, CardHeader, CardTitle, CardContent } from "@platform/ui/components/card";
+import { Button } from "@platform/ui/components/button";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from "@/components/ui/input-group";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@platform/ui/components/input-group";
+import { Skeleton } from "@platform/ui/components/skeleton";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { MobileCard } from "@/components/ui/mobile-card";
+} from "@platform/ui/components/dropdown-menu";
+import { MobileCard } from "@platform/ui/components/mobile-card";
 import { api } from "@/lib/api-client";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import { cn, formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/utils";
-import { toast } from "@/components/ui/toast";
+import { toast } from "@platform/ui/components/toast";
 import { QueryProfileSelect } from "./QueryProfileSelect";
 import { useQueryProfileSelection } from "@/hooks/use-query-profile-selection";
 import {

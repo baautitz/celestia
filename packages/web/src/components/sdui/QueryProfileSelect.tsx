@@ -8,7 +8,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@platform/ui/components/select";
 
 interface QueryProfileSelectProps {
   profiles?: ComponentProfileMeta[];

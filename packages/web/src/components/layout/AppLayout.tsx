@@ -16,7 +16,7 @@ import {
   SidebarInset,
   SidebarTrigger,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "@platform/ui/components/sidebar";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -24,7 +24,7 @@ import {
   BreadcrumbLink,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@platform/ui/components/breadcrumb";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,11 +33,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+} from "@platform/ui/components/dropdown-menu";
+import { Avatar, AvatarFallback } from "@platform/ui/components/avatar";
+import { Badge } from "@platform/ui/components/badge";
+import { Button } from "@platform/ui/components/button";
+import { Separator } from "@platform/ui/components/separator";
 import {
   LayoutDashboard,
   Users,

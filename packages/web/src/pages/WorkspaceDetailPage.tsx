@@ -6,17 +6,17 @@ import { useAuth } from "@/context/AuthContext";
 import { SDUIRenderer } from "@/components/sdui/SDUIRenderer";
 import { QueryViewsDialog, getViewComponents } from "@/components/sdui/QueryViewsDialog";
 import { DynamicFormFields } from "@/components/forms/DynamicFormFields";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { DateRangePicker } from "@platform/ui/components/date-range-picker";
 import {
   buildDynamicDefaultValues,
   buildDynamicSchema,
   normalizeDynamicFormValues,
 } from "@/lib/dynamic-form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@platform/ui/components/button";
+import { Input } from "@platform/ui/components/input";
+import { Badge } from "@platform/ui/components/badge";
+import { Skeleton } from "@platform/ui/components/skeleton";
+import { Alert, AlertTitle, AlertDescription } from "@platform/ui/components/alert";
 import {
   Dialog,
   DialogContent,
@@ -24,23 +24,23 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { FieldGroup } from "@/components/ui/field";
+} from "@platform/ui/components/dialog";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@platform/ui/components/form";
+import { FieldGroup } from "@platform/ui/components/field";
 import { api } from "@/lib/api-client";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
-import { toast } from "@/components/ui/toast";
+import { toast } from "@platform/ui/components/toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { HeaderActions, HeaderBack } from "@/context/HeaderActionsContext";
 import { ExpandableText } from "@/components/layout/ExpandableText";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@platform/ui/components/tooltip";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+} from "@platform/ui/components/dropdown-menu";
 import type { DateRange } from "react-day-picker";
 import {
   RefreshCw,

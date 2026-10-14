@@ -11,19 +11,19 @@ import { useRecipesCatalog } from "@/context/RecipesCatalogContext";
 import { HeaderActions, HeaderBack } from "@/context/HeaderActionsContext";
 import { api } from "@/lib/api-client";
 import { downloadSource } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "@/components/ui/toast";
+import { Button } from "@platform/ui/components/button";
+import { Card, CardContent } from "@platform/ui/components/card";
+import { Input } from "@platform/ui/components/input";
+import { Field, FieldDescription, FieldLabel } from "@platform/ui/components/field";
+import { Skeleton } from "@platform/ui/components/skeleton";
+import { toast } from "@platform/ui/components/toast";
 import {
   Form,
   FormField,
   FormItem,
   FormControl,
   FormMessage,
-} from "@/components/ui/form";
+} from "@platform/ui/components/form";
 
 const formSchema = z.object({
   source: z.string().min(1, "Escreva o Dashboard ou carregue um arquivo .ts."),

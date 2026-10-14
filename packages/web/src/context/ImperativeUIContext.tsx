@@ -7,7 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "@platform/ui/components/dialog";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -17,7 +17,7 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
   AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+} from "@platform/ui/components/alert-dialog";
 import {
   Table,
   TableHeader,
@@ -25,22 +25,22 @@ import {
   TableHead,
   TableBody,
   TableCell,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { MoneyInput } from "@/components/ui/money-input";
-import { Textarea } from "@/components/ui/textarea";
-import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
-import { MobileCard } from "@/components/ui/mobile-card";
-import { useIsMobile } from "@/hooks/use-mobile";
+} from "@platform/ui/components/table";
+import { Button } from "@platform/ui/components/button";
+import { Input } from "@platform/ui/components/input";
+import { MoneyInput } from "@platform/ui/components/money-input";
+import { Textarea } from "@platform/ui/components/textarea";
+import { FieldGroup, Field, FieldLabel } from "@platform/ui/components/field";
+import { Switch } from "@platform/ui/components/switch";
+import { MobileCard } from "@platform/ui/components/mobile-card";
+import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@platform/ui/components/select";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
 
