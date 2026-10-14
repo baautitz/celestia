@@ -6,7 +6,16 @@
   "exports": {
     "./components/*": "./src/components/*.tsx",
     "./lib/*": "./src/lib/*.ts",
-    "./hooks/*": "./src/hooks/*.ts"
+    "./hooks/*": "./src/hooks/*.ts",
+    "./contracts/*": "./src/contracts/*.ts",
+    "./imperative/*": "./src/imperative/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "vitest": "^2.1.4"
   },
   "peerDependencies": {
     "@base-ui/react": "^1.7.0",
