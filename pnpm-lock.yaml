@@ -108,6 +108,27 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/ui:
+    dependencies:
+      '@base-ui/react':
+        specifier: ^1.7.0
+        version: 1.7.0(@date-fns/tz@1.5.0)(@types/react@19.2.18)(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+      tailwind-merge:
+        specifier: ^3.6.0
+        version: 3.6.0
+
   packages/web:
     dependencies:
       '@base-ui/react':
@@ -125,6 +146,9 @@ importers:
       '@platform/shared':
         specifier: workspace:*
         version: link:../shared
+      '@platform/ui':
+        specifier: workspace:*
+        version: link:../ui
       '@tailwindcss/vite':
         specifier: ^4
         version: 4.3.3(vite@5.4.21(@types/node@22.20.1)(lightningcss@1.32.0))
