@@ -1,3 +1,5 @@
+import type { ReactNode } from "react"
+
 export type WindowId = string & { readonly __windowId: unique symbol }
 
 export type CloseReason = "cancel" | "escape" | "outside" | "discarded" | "unmounted"
@@ -13,8 +15,8 @@ export type WindowSize = "small" | "medium" | "large" | "full"
 
 /** `content` é opaco para o controller; o host decide como renderizá-lo. */
 export interface OpenWindowOptions<TContent = unknown> {
-  title?: string
-  description?: string
+  title?: ReactNode
+  description?: ReactNode
   surface?: WindowSurface
   size?: WindowSize
   content?: TContent
