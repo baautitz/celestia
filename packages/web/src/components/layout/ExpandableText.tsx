@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@platform/ui/components/button";
 
 interface ExpandableTextProps {
   children: string;

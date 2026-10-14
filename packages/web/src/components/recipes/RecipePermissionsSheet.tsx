@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Role, PermissionCatalog, PermissionItem, RecipePermissionGroup } from "@platform/shared";
 import { api } from "@/lib/api-client";
-import { toast } from "@/components/ui/toast";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "@platform/ui/components/toast";
+import { Button } from "@platform/ui/components/button";
+import { Badge } from "@platform/ui/components/badge";
+import { Switch } from "@platform/ui/components/switch";
+import { Skeleton } from "@platform/ui/components/skeleton";
+import { Card, CardContent } from "@platform/ui/components/card";
 import {
   Sheet,
   SheetContent,
@@ -14,13 +14,13 @@ import {
   SheetTitle,
   SheetDescription,
   SheetFooter,
-} from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from "@platform/ui/components/sheet";
+import { ScrollArea } from "@platform/ui/components/scroll-area";
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
-} from "@/components/ui/collapsible";
+} from "@platform/ui/components/collapsible";
 import { Shield, ChevronDownIcon } from "lucide-react";
 
 interface RecipePermissionsSheetProps {

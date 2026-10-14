@@ -8,19 +8,19 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { MoneyInput } from "@/components/ui/money-input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { DatePicker } from "@/components/ui/date-picker";
+} from "@platform/ui/components/form";
+import { Input } from "@platform/ui/components/input";
+import { MoneyInput } from "@platform/ui/components/money-input";
+import { Textarea } from "@platform/ui/components/textarea";
+import { Switch } from "@platform/ui/components/switch";
+import { DatePicker } from "@platform/ui/components/date-picker";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@platform/ui/components/select";
 import {
   Combobox,
   ComboboxChip,
@@ -32,8 +32,8 @@ import {
   ComboboxList,
   ComboboxValue,
   useComboboxAnchor,
-} from "@/components/ui/combobox";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@platform/ui/components/combobox";
+import { Skeleton } from "@platform/ui/components/skeleton";
 import { api } from "@/lib/api-client";
 import type { DynamicFormValues } from "@/lib/dynamic-form";
 

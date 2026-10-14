@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { WorkspaceRecord } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@platform/ui/components/card";
 import {
   Table,
   TableHeader,
@@ -10,13 +10,13 @@ import {
   TableHead,
   TableBody,
   TableCell,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "@/components/ui/toast";
-import { MobileCard } from "@/components/ui/mobile-card";
-import { useIsMobile } from "@/hooks/use-mobile";
+} from "@platform/ui/components/table";
+import { Button } from "@platform/ui/components/button";
+import { Badge } from "@platform/ui/components/badge";
+import { Skeleton } from "@platform/ui/components/skeleton";
+import { toast } from "@platform/ui/components/toast";
+import { MobileCard } from "@platform/ui/components/mobile-card";
+import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -26,7 +26,7 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
   AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+} from "@platform/ui/components/alert-dialog";
 import {
   Calendar,
   ArrowRight,

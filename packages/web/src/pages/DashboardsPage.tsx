@@ -2,12 +2,12 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Layers } from "lucide-react";
 import { useRecipesCatalog } from "@/context/RecipesCatalogContext";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { MobileCard } from "@/components/ui/mobile-card";
+import { useIsMobile } from "@platform/ui/hooks/use-mobile";
+import { Card, CardHeader, CardTitle, CardContent } from "@platform/ui/components/card";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@platform/ui/components/table";
+import { Button } from "@platform/ui/components/button";
+import { Skeleton } from "@platform/ui/components/skeleton";
+import { MobileCard } from "@platform/ui/components/mobile-card";
 
 export const DashboardsPage: React.FC = () => {
   const isMobile = useIsMobile();

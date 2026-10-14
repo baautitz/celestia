@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Circle } from "lucide-react";
 import type { ChartProps, ChartDataResponse } from "@platform/shared";
-import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@platform/ui/components/card";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
+import { Badge } from "@platform/ui/components/badge";
+import { Skeleton } from "@platform/ui/components/skeleton";
 import {
   ChartContainer,
   ChartTooltip,
@@ -12,9 +12,9 @@ import {
   ChartLegend,
   ChartLegendContent,
   type ChartConfig,
-} from "@/components/ui/chart";
+} from "@platform/ui/components/chart";
 import { api } from "@/lib/api-client";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import { useImperativeUI } from "@/context/ImperativeUIContext";
 import { formatCompactNumber, formatCurrency, formatDate, formatShortDate } from "@/lib/utils";
 import {

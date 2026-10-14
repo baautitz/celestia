@@ -10,11 +10,11 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-} from "@/components/ui/card";
-import { FieldGroup, Field, FieldLabel, FieldError } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/toast";
+} from "@platform/ui/components/card";
+import { FieldGroup, Field, FieldLabel, FieldError } from "@platform/ui/components/field";
+import { Input } from "@platform/ui/components/input";
+import { Button } from "@platform/ui/components/button";
+import { toast } from "@platform/ui/components/toast";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Informe o nome de usuário"),

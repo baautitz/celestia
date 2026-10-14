@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { DashboardSchemaResponse } from "@platform/shared";
-import { Button } from "@/components/ui/button";
+import { Button } from "@platform/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -8,10 +8,10 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+} from "@platform/ui/components/dialog";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@platform/ui/components/field";
+import { ScrollArea } from "@platform/ui/components/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { setProfileSelections, useProfileSelections } from "@/hooks/use-query-profile-selection";
 import {
   collectQueryViews,

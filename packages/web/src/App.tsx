@@ -13,8 +13,8 @@ import { RecipeEditorPage } from "./pages/RecipeEditorPage";
 import { DashboardsPage } from "./pages/DashboardsPage";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { RecipesCatalogProvider } from "./context/RecipesCatalogContext";
-import { Toaster } from "@/components/ui/toast";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@platform/ui/components/toast";
+import { TooltipProvider } from "@platform/ui/components/tooltip";
 
 export const App: React.FC = () => {
   return (

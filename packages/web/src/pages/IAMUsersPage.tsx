@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import type { User, Role } from "@platform/shared";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@platform/ui/components/card";
 import {
   Table,
   TableHeader,
@@ -9,26 +9,26 @@ import {
   TableHead,
   TableBody,
   TableCell,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from "@platform/ui/components/table";
+import { Button } from "@platform/ui/components/button";
+import { Input } from "@platform/ui/components/input";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from "@/components/ui/input-group";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription } from "@/components/ui/field";
-import { MobileCard } from "@/components/ui/mobile-card";
-import { useIsMobile } from "@/hooks/use-mobile";
+} from "@platform/ui/components/input-group";
+import { Badge } from "@platform/ui/components/badge";
+import { Skeleton } from "@platform/ui/components/skeleton";
+import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription } from "@platform/ui/components/field";
+import { MobileCard } from "@platform/ui/components/mobile-card";
+import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@platform/ui/components/select";
 import {
   Dialog,
   DialogContent,
@@ -36,14 +36,14 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "@platform/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { toast } from "@/components/ui/toast";
+} from "@platform/ui/components/dropdown-menu";
+import { toast } from "@platform/ui/components/toast";
 import {
   UserPlus,
   KeyRound,
@@ -56,7 +56,7 @@ import {
   Clock,
   Database,
 } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@platform/ui/components/switch";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 
