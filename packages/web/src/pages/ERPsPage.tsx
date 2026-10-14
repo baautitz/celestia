@@ -91,7 +91,11 @@ export const ERPsPage: React.FC = () => {
 
   const isEditMode = editing !== null;
 
-  const form = useForm<DynamicFormValues>({ defaultValues: { name: "", id: "", type: "" } });
+  // O schema depende do tipo escolhido (lido do próprio form), então o resolver o consulta na hora da validação.
+  const form = useForm<DynamicFormValues>({
+    defaultValues: { name: "", id: "", type: "" },
+    resolver: (values, context, options) => zodResolver(schema)(values, context, options),
+  });
   const typeId = form.watch("type") as string;
 
   // Numa edição, a senha em branco mantém a atual: os campos "password" deixam de ser obrigatórios.
