@@ -85,6 +85,10 @@ describe("WindowController", () => {
     const { c, restoreFocus } = setup()
     const a = c.open({})
     const b = c.open({})
+    // "unmounted" nunca restaura foco, nem via dismiss no topo
+    const e = c.open({})
+    c.dismiss(c.snapshot().activeId!, "unmounted")
+    expect(await e).toEqual({ status: "cancelled", reason: "unmounted" })
     c.dismissAll()
     expect(await a).toEqual({ status: "cancelled", reason: "unmounted" })
     expect(await b).toEqual({ status: "cancelled", reason: "unmounted" })

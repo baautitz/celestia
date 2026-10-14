@@ -138,10 +138,12 @@ export class WindowController<TContent = unknown> {
     this.publish()
     top.resolve(result as WindowResult<never>)
 
-    try {
-      this.ports.restoreFocus(top.focusTarget)
-    } catch {
-      // efeitos de foco não podem afetar uma Promise já liquidada
+    if (!(result.status === "cancelled" && result.reason === "unmounted")) {
+      try {
+        this.ports.restoreFocus(top.focusTarget)
+      } catch {
+        // efeitos de foco não podem afetar uma Promise já liquidada
+      }
     }
   }
 
