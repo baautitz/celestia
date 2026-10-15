@@ -1,3 +1,4 @@
+import { NotFoundError } from "./errors.js";
 import type {
   RecipeDef,
   ActionContext,
@@ -59,21 +60,19 @@ export class ActionExecutor {
 
     const actionDef = recipe.actions.find((a: ActionDef) => a.id === actionId);
     if (!actionDef) {
-      throw new Error(`Ação '${actionId}' não encontrada na recipe '${recipe.id}'.`);
+      throw new NotFoundError(`Ação '${actionId}' não encontrada no Modelo '${recipe.id}'.`);
     }
 
     // Valida permissão do usuário para executar esta action (se fornecida lista de permissões)
-    if (userPermissions && userPermissions.length > 0) {
-      const allowed = PermissionResolver.canExecuteAction({
-        recipeId: recipe.id,
-        actionDef,
-        userPermissions,
-      });
-      if (!allowed) {
-        throw new Error(
-          `Acesso negado: o usuário não possui permissão para executar a ação '${actionDef.label || actionId}'.`
-        );
-      }
+    const allowed = PermissionResolver.canExecuteAction({
+      recipeId: recipe.id,
+      actionDef,
+      userPermissions: userPermissions ?? [],
+    });
+    if (!allowed) {
+      throw new Error(
+        `Acesso negado: o usuário não possui permissão para executar a ação '${actionDef.label || actionId}'.`
+      );
     }
 
     const effects: UIEffect[] = [];

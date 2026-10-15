@@ -97,6 +97,7 @@ describe("ActionExecutor (Execução de Actions Imperativas)", () => {
       workspaceId: "ws_101",
       workspaceVersion: 1,
       persistenceStore,
+      userPermissions: ["*"],
     });
 
     expect(result.success).toBe(true);
@@ -133,6 +134,7 @@ describe("ActionExecutor (Execução de Actions Imperativas)", () => {
       workspaceId: "ws_101",
       workspaceVersion: 5,
       persistenceStore,
+      userPermissions: ["*"],
     });
 
     expect(result.success).toBe(true);
@@ -160,6 +162,7 @@ describe("ActionExecutor (Execução de Actions Imperativas)", () => {
       workspaceId: "ws_101",
       workspaceVersion: 1,
       persistenceStore,
+      userPermissions: ["*"],
     });
 
     const items = await persistenceStore.getItems("ws_101", "penalidades_vendedor", 42);

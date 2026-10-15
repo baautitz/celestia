@@ -1,3 +1,4 @@
+import { hasPermission } from "./has-permission.js";
 import type { ActionDef, QueryOptionDef, SourceDef, SourceQueryDef } from "@platform/shared";
 
 export interface ResolvedQueryOption {
@@ -17,8 +18,7 @@ export class PermissionResolver {
   }
 
   static canUsePermission(permission: string, userPermissions?: string[]): boolean {
-    if (!userPermissions || userPermissions.length === 0) return true;
-    return userPermissions.includes("*") || userPermissions.includes(permission);
+    return hasPermission(userPermissions, permission);
   }
 
   static getAuthorizedQueryOptions(options: {
@@ -28,15 +28,9 @@ export class PermissionResolver {
     userPermissions?: string[];
   }): QueryOptionDef[] {
     const { recipeId, queryName, queryDef, userPermissions } = options;
-    const authorized = queryDef.options.filter((option) =>
+    return queryDef.options.filter((option) =>
       this.canUsePermission(this.getQueryOptionPermission(recipeId, queryName, option), userPermissions)
     );
-
-    if (!userPermissions || userPermissions.length === 0) {
-      return queryDef.options.slice(0, 1);
-    }
-
-    return authorized;
   }
 
   static resolveQueryOption(options: {
@@ -130,17 +124,17 @@ export class PermissionResolver {
     userPermissions: string[];
   }): boolean {
     const { recipeId, actionDef, userPermissions } = options;
-    const permsSet = new Set(userPermissions);
-
     const fullPermKey = actionDef.permission?.startsWith("recipe:")
       ? actionDef.permission
       : `recipe:${recipeId}:action:${actionDef.id}`;
 
-    return permsSet.has("*") || permsSet.has(fullPermKey) || Boolean(actionDef.permission && permsSet.has(actionDef.permission));
+    return (
+      hasPermission(userPermissions, fullPermKey) ||
+      Boolean(actionDef.permission && hasPermission(userPermissions, actionDef.permission))
+    );
   }
 
   static canViewRecipe(recipeId: string, userPermissions: string[]): boolean {
-    const permsSet = new Set(userPermissions);
-    return permsSet.has("*") || permsSet.has(`recipe:${recipeId}:view`);
+    return hasPermission(userPermissions, `recipe:${recipeId}:view`);
   }
 }

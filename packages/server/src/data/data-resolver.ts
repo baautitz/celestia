@@ -15,6 +15,7 @@ import type { SourceConnector, SourceConnectorRegistry } from "./source-connecto
 import { resolveSourceConnector } from "./source-connector.js";
 import { TemplateEngine } from "../engine/template-engine.js";
 import { PermissionResolver, type ResolvedQueryOption } from "../iam/permission-resolver.js";
+import { NotFoundError } from "../engine/errors.js";
 import { WorkspaceValidator } from "../engine/workspace-validator.js";
 import { isBatchable } from "../engine/recipe-sandbox.js";
 
@@ -160,7 +161,7 @@ export class DataResolver {
 
     const component = recipe.ui.components.find((item: UIComponentDef) => item.id === componentId);
     if (!component) {
-      throw new Error(`Componente '${componentId}' não encontrado na recipe '${recipe.id}'.`);
+      throw new NotFoundError(`Componente '${componentId}' não encontrado no Modelo '${recipe.id}'.`);
     }
 
     const props = component.props;

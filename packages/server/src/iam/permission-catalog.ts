@@ -121,7 +121,7 @@ export class PermissionCatalogEngine {
 
     const updatedRoles = roles.map((role) => {
       const originalLength = role.permissions.length;
-      const filteredPermissions = role.permissions.filter((p) => validKeys.has(p));
+      const filteredPermissions = role.permissions.filter((p) => p === "*" || validKeys.has(p));
       removedCount += originalLength - filteredPermissions.length;
 
       return {

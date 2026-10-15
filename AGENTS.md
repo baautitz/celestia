@@ -40,7 +40,7 @@ celestia/
 │   │
 │   ├── server/                   (@platform/server) -> Backend API, Compiler, IAM & Data Resolver
 │   │   └── src/
-│   │       ├── index.ts          -> Hono app entrypoint, public & protected routes
+│   │       ├── index.ts          -> Hono app entrypoint, public (health, auth) & protected routes (every other route requires a token)
 │   │       ├── iam/
 │   │       │   ├── password-service.ts    -> Argon2id OWASP hashing & Zod password complexity validator
 │   │       │   ├── token-service.ts       -> JWT Access (5 min) & Refresh (7 days) HS256 tokens
@@ -102,6 +102,7 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 - **No self-service "forgot password"**: password resets are performed exclusively by admins via `POST /api/iam/users/:id/reset-password` (`system:users:reset_password`).
 
 ### 3. Permission-First & Naming Format
+- Convenção de verbos e nomes (orientação, não obrigatória): [docs/conventions/permissions.md](docs/conventions/permissions.md).
 - Every action, source query, and route requires explicit permission strings.
 - **Format**:
   - System modules: `system:<modulo>:<acao>` (e.g. `system:users:create`, `system:workspaces:create`).
@@ -371,6 +372,9 @@ export default defineRecipe({
 ```bash
 # Build all packages in monorepo
 pnpm -r run build
+# Note: server depends on shared and core via dist; `pnpm -r` orders them topologically.
+# Building one package alone: run `pnpm --filter @platform/shared build` and
+# `pnpm --filter @platform/core build` before the server (build/test/dev).
 
 # Run entire Vitest test suite
 pnpm test

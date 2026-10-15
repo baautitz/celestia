@@ -4,7 +4,7 @@ import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import { WorkspaceValidator } from "../src/engine/workspace-validator.js";
 import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
-import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { authHeader, createSeededUserStore, seededWorkspaces , withAuth } from "./helpers/fixtures.js";
 
 describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -21,6 +21,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
         fechamento_mes: fechamentoRecipe,
       },
     });
+    withAuth(app);
   });
 
   // ─── 1. TESTES UNITÁRIOS DO WORKSPACE VALIDATOR ────────────────────────────
@@ -60,7 +61,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
   describe("2. Proteção na Rota de Dados da API", () => {
     it("deve rejeitar com 400 Bad Request se a query enviar data final anterior à data inicial", async () => {
       const res = await app.request(
-        "/api/workspaces/ws_teste/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-31&end_date=2026-01-01"
+        "/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-31&end_date=2026-01-01"
       );
 
       expect(res.status).toBe(400);
@@ -68,7 +69,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
 
     it("deve responder 200 OK quando as datas forem válidas", async () => {
       const res = await app.request(
-        "/api/workspaces/ws_teste/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31"
+        "/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31"
       );
 
       expect(res.status).toBe(200);
@@ -80,7 +81,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
   // ─── 3. TESTES DE CICLO DE VIDA (CRIAR, LISTAR, CONCLUIR E TRAVAR) ─────────
   describe("3. Ciclo de Vida e Trava de Workspaces", () => {
     it("deve listar workspaces cadastradas", async () => {
-      const res = await app.request("/api/workspaces");
+      const res = await app.request("/api/workspaces", { headers: await authHeader(app) });
       expect(res.status).toBe(200);
       const list = (await res.json()) as Array<{ id: string; status: string }>;
       expect(list.length).toBeGreaterThanOrEqual(2);
