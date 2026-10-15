@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import type { ComponentType } from "react"
+import type { ComponentType, ReactNode } from "react"
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../components/alert-dialog.tsx"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/dialog.tsx"
 import { ScrollArea } from "../components/scroll-area.tsx"
@@ -25,7 +25,10 @@ function ManagedWindow({ entry, controller }: {
 }) {
   const { id, options } = entry
   const [footer, setFooter] = useState<HTMLDivElement | null>(null)
+  const [titleOverride, setTitle] = useState<ReactNode>(null)
+  const title = titleOverride ?? options.title
   const handle = useMemo<WindowHandle>(() => ({
+    setTitle,
     resolve: (value) => controller.resolve(id, value),
     dismiss: (reason) => controller.dismiss(id, reason),
     setDirtyCheck: (check) => controller.setDirtyCheck(id, check),
@@ -49,7 +52,7 @@ function ManagedWindow({ entry, controller }: {
           <AlertDialog open onOpenChange={onOpenChange}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>{options.title}</AlertDialogTitle>
+                <AlertDialogTitle>{title}</AlertDialogTitle>
                 {options.description && <AlertDialogDescription>{options.description}</AlertDialogDescription>}
               </AlertDialogHeader>
               {body}
@@ -60,7 +63,7 @@ function ManagedWindow({ entry, controller }: {
           <Sheet open onOpenChange={onOpenChange}>
             <SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl">
               <SheetHeader className="p-6 border-b shrink-0">
-                <SheetTitle>{options.title}</SheetTitle>
+                <SheetTitle>{title}</SheetTitle>
                 {options.description && <SheetDescription>{options.description}</SheetDescription>}
               </SheetHeader>
               <ScrollArea className="flex-1 min-h-0">
@@ -73,7 +76,7 @@ function ManagedWindow({ entry, controller }: {
           <Dialog open onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>{options.title}</DialogTitle>
+                <DialogTitle>{title}</DialogTitle>
                 {options.description && <DialogDescription>{options.description}</DialogDescription>}
               </DialogHeader>
               {body}
