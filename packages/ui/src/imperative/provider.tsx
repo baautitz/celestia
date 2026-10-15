@@ -21,10 +21,16 @@ function activeElement(): FocusTarget | null {
   return document.activeElement instanceof HTMLElement ? document.activeElement : null
 }
 
-function restoreFocus(target: FocusTarget | null): void {
-  if (!(target instanceof HTMLElement)) return
+function restoreFocus(target: FocusTarget | null, windowChanged: () => boolean): void {
+  if (!(target instanceof HTMLElement) || !target.isConnected) return
+  const blocked = () => target.closest("[inert]") !== null
+  if (typeof window === "undefined") {
+    if (!blocked()) target.focus()
+    return
+  }
   requestAnimationFrame(() => {
-    if (target.isConnected && !target.closest("[inert]")) target.focus()
+    // janela aberta em cadeia após o fechamento: não roubar o foco dela
+    if (target.isConnected && !blocked() && !windowChanged()) target.focus()
   })
 }
 
@@ -66,7 +72,10 @@ export function UiProvider({
 }) {
   const [controller] = useState(() => {
     const c: WindowController<WindowContent> = new WindowController<WindowContent>({
-      restoreFocus,
+      restoreFocus: (target) => {
+        const activeId = c.snapshot().activeId
+        restoreFocus(target, () => c.snapshot().activeId !== activeId)
+      },
       confirmDiscard: () =>
         confirm(c, {
           title: "Descartar alterações?",
