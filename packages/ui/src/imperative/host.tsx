@@ -50,7 +50,7 @@ function ManagedWindow({ entry, controller }: {
       <WindowFooterContext.Provider value={footer}>
         {surface === "confirmation" ? (
           <AlertDialog open onOpenChange={onOpenChange}>
-            <AlertDialogContent className={options.size === "large" ? "sm:max-w-lg" : undefined}>
+            <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>{title}</AlertDialogTitle>
                 {options.description && <AlertDialogDescription className="break-words">{options.description}</AlertDialogDescription>}
