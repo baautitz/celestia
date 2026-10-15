@@ -247,7 +247,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("ws.list.anon", "GET", "/api/workspaces");
     await rec("ws.list.filter", "GET", "/api/workspaces?recipe_id=outro", { token: V });
     await rec("ws.detail.ok", "GET", `/api/workspaces/${WS}`);
-    await rec("ws.detail.unknown_returns_default", "GET", "/api/workspaces/ws_inexistente");
+    await rec("ws.detail.unknown_404", "GET", "/api/workspaces/ws_inexistente");
     const wsNew = { recipeId: "fechamento_mes", startDate: "2026-02-01", endDate: "2026-02-28", params: { categories_focus: [1] } };
     await rec("ws.create.403", "POST", "/api/workspaces", { token: V, body: wsNew });
     await rec("ws.create.400_dates", "POST", "/api/workspaces", { token: A, body: { ...wsNew, startDate: "2026-03-01", endDate: "2026-02-01" } });
@@ -266,10 +266,10 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("ws.update.404", "PUT", "/api/workspaces/nao_existe", { token: A, body: { name: "Y Z" } });
     await rec("ws.conclude.403", "POST", `/api/workspaces/${wsId}/conclude`, { token: V });
     await rec("ws.conclude.ok", "POST", `/api/workspaces/${wsId}/conclude`, { token: O });
-    await rec("ws.conclude.unknown_creates", "POST", "/api/workspaces/ws_fantasma/conclude", { token: A });
+    await rec("ws.conclude.unknown_404", "POST", "/api/workspaces/ws_fantasma/conclude", { token: A });
     await rec("ws.reopen.403", "POST", `/api/workspaces/${wsId}/reopen`, { token: V });
     await rec("ws.reopen.ok", "POST", `/api/workspaces/${wsId}/reopen`, { token: A });
-    await rec("ws.reopen.unknown_creates", "POST", "/api/workspaces/ws_fantasma2/reopen", { token: A });
+    await rec("ws.reopen.unknown_404", "POST", "/api/workspaces/ws_fantasma2/reopen", { token: A });
     await rec("ws.delete.403", "DELETE", `/api/workspaces/${wsId}`, { token: V });
     await rec("ws.delete.ok", "DELETE", `/api/workspaces/${wsId}`, { token: A });
     await rec("ws.delete.404", "DELETE", `/api/workspaces/${wsId}`, { token: A });

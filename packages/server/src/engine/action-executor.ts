@@ -1,3 +1,4 @@
+import { NotFoundError } from "./errors.js";
 import type {
   RecipeDef,
   ActionContext,
@@ -59,7 +60,7 @@ export class ActionExecutor {
 
     const actionDef = recipe.actions.find((a: ActionDef) => a.id === actionId);
     if (!actionDef) {
-      throw new Error(`Ação '${actionId}' não encontrada na recipe '${recipe.id}'.`);
+      throw new NotFoundError(`Ação '${actionId}' não encontrada no Modelo '${recipe.id}'.`);
     }
 
     // Valida permissão do usuário para executar esta action (se fornecida lista de permissões)

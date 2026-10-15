@@ -20,6 +20,7 @@ import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
 import { PermissionCatalogEngine } from "./iam/permission-catalog.js";
 import { PermissionResolver } from "./iam/permission-resolver.js";
+import { NotFoundError } from "./engine/errors.js";
 import { createAuthMiddleware, requirePermission } from "./iam/middleware.js";
 import type { WorkspaceStore } from "./data/workspace-store.js";
 import type { RecipeDef, ActionDef, JWTAccessPayload, WorkspaceRecord } from "@platform/shared";
@@ -639,18 +640,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const { id } = c.req.valid("param");
       const ws = workspacesMap.get(id);
-      if (ws) return c.json(ws);
-
-      return c.json({
-        id,
-        recipeId: "fechamento_mes",
-        name: `Área de Trabalho ${id}`,
-        startDate: "2026-01-01",
-        endDate: "2026-01-31",
-        status: "open",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
+      return c.json(ws);
     }
   );
 
@@ -787,23 +778,10 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         );
       }
 
-      let ws = workspacesMap.get(id);
-      if (!ws) {
-        ws = {
-          id,
-          recipeId: "fechamento_mes",
-          name: `Área de Trabalho ${id}`,
-          startDate: "2026-01-01",
-          endDate: "2026-01-31",
-          status: "closed" as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        workspacesMap.set(id, ws);
-      } else {
-        ws.status = "closed";
-        ws.updatedAt = new Date().toISOString();
-      }
+      const ws = workspacesMap.get(id);
+      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
+      ws.status = "closed";
+      ws.updatedAt = new Date().toISOString();
       await workspaceStore?.save(ws);
 
       return c.json({ success: true, workspace: ws });
@@ -831,23 +809,10 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         );
       }
 
-      let ws = workspacesMap.get(id);
-      if (!ws) {
-        ws = {
-          id,
-          recipeId: "fechamento_mes",
-          name: `Área de Trabalho ${id}`,
-          startDate: "2026-01-01",
-          endDate: "2026-01-31",
-          status: "open" as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        workspacesMap.set(id, ws);
-      } else {
-        ws.status = "open";
-        ws.updatedAt = new Date().toISOString();
-      }
+      const ws = workspacesMap.get(id);
+      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
+      ws.status = "open";
+      ws.updatedAt = new Date().toISOString();
       await workspaceStore?.save(ws);
 
       return c.json({ success: true, workspace: ws });
@@ -954,7 +919,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const recipe = getRecipe(id);
+      const recipe = recipesMap.get(id);
+      if (!recipe) return c.json({ error: `Modelo '${id}' não encontrado.` }, 404);
       const user = c.get("user") as JWTAccessPayload | undefined;
 
       // Filtra actions pelas permissões do usuário se logado
@@ -1037,7 +1003,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const { id: workspaceId, componentId } = c.req.valid("param");
       const query = c.req.valid("query");
-      const recipe = getRecipe(query.recipe_id);
+      const recipe = recipesMap.get(query.recipe_id);
+      if (!recipe) return c.json({ error: `Modelo '${query.recipe_id}' não encontrado.` }, 404);
       const user = c.get("user") as JWTAccessPayload | undefined;
 
       // Só aceita parâmetros declarados no Modelo; chegam à consulta sempre como bind parameters.
@@ -1088,6 +1055,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
         return c.json(result);
       } catch (err: unknown) {
+        if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
         const msg = err instanceof Error ? err.message : "Erro ao carregar dados.";
         if (msg.includes("Acesso negado")) {
           return c.json({ error: msg }, 403);
@@ -1119,7 +1087,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const { id: workspaceId } = c.req.valid("param");
       const body = c.req.valid("json");
-      const recipe = getRecipe(body.recipe_id);
+      const recipe = recipesMap.get(body.recipe_id);
+      if (!recipe) return c.json({ error: `Modelo '${body.recipe_id}' não encontrado.` }, 404);
       const user = c.get("user") as JWTAccessPayload | undefined;
 
       const component = recipe.ui.components.find((item) => item.id === body.component_id);
@@ -1140,7 +1109,10 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       // Trava de execução se a Área de Trabalho estiver concluída para ações de modificação
       const ws = workspacesMap.get(workspaceId);
       const actionDef = recipe.actions.find((a: ActionDef) => a.id === body.action_id);
-      const isMutation = actionDef?.nature !== "read";
+      if (!actionDef) {
+        return c.json({ error: `Ação '${body.action_id}' não encontrada no Modelo '${recipe.id}'.` }, 404);
+      }
+      const isMutation = actionDef.nature !== "read";
 
       if (ws && ws.status === "closed" && isMutation) {
         return c.json(
@@ -1165,6 +1137,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
         return c.json(result);
       } catch (err: unknown) {
+        if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
         const msg = err instanceof Error ? err.message : "Erro na execução da ação.";
         if (msg.includes("Acesso negado")) {
           return c.json({ error: msg }, 403);

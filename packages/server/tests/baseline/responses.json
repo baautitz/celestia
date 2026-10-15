@@ -1614,17 +1614,10 @@
       "updatedAt": "<ts>"
     }
   },
-  "ws.detail.unknown_returns_default": {
-    "status": 200,
+  "ws.detail.unknown_404": {
+    "status": 404,
     "body": {
-      "id": "ws_inexistente",
-      "recipeId": "fechamento_mes",
-      "name": "Área de Trabalho ws_inexistente",
-      "startDate": "2026-01-01",
-      "endDate": "2026-01-31",
-      "status": "open",
-      "createdAt": "<ts>",
-      "updatedAt": "<ts>"
+      "error": "Área de Trabalho não encontrada."
     }
   },
   "ws.create.403": {
@@ -1803,20 +1796,10 @@
       }
     }
   },
-  "ws.conclude.unknown_creates": {
-    "status": 200,
+  "ws.conclude.unknown_404": {
+    "status": 404,
     "body": {
-      "success": true,
-      "workspace": {
-        "id": "ws_fantasma",
-        "recipeId": "fechamento_mes",
-        "name": "Área de Trabalho ws_fantasma",
-        "startDate": "2026-01-01",
-        "endDate": "2026-01-31",
-        "status": "closed",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      }
+      "error": "Área de Trabalho não encontrada."
     }
   },
   "ws.reopen.403": {
@@ -1846,20 +1829,10 @@
       }
     }
   },
-  "ws.reopen.unknown_creates": {
-    "status": 200,
+  "ws.reopen.unknown_404": {
+    "status": 404,
     "body": {
-      "success": true,
-      "workspace": {
-        "id": "ws_fantasma2",
-        "recipeId": "fechamento_mes",
-        "name": "Área de Trabalho ws_fantasma2",
-        "startDate": "2026-01-01",
-        "endDate": "2026-01-31",
-        "status": "open",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      }
+      "error": "Área de Trabalho não encontrada."
     }
   },
   "ws.delete.403": {
@@ -3365,8 +3338,10 @@
     }
   },
   "dashboards.schema.unknown_recipe": {
-    "status": 500,
-    "body": "Internal Server Error"
+    "status": 404,
+    "body": {
+      "error": "Modelo 'nada' não encontrado."
+    }
   },
   "data.table.operador": {
     "status": 200,
@@ -3881,9 +3856,9 @@
     }
   },
   "data.unknown_component": {
-    "status": 500,
+    "status": 404,
     "body": {
-      "error": "Componente 'nao_existe' não encontrado na recipe 'fechamento_mes'."
+      "error": "Componente 'nao_existe' não encontrado no Modelo 'fechamento_mes'."
     }
   },
   "actions.dialog.operador": {
@@ -4060,9 +4035,9 @@
     }
   },
   "actions.unknown_action": {
-    "status": 500,
+    "status": 404,
     "body": {
-      "error": "Ação 'nao_existe' não encontrada na recipe 'fechamento_mes'."
+      "error": "Ação 'nao_existe' não encontrada no Modelo 'fechamento_mes'."
     }
   },
   "actions.400_invalid_body": {
