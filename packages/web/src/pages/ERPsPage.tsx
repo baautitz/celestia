@@ -33,7 +33,6 @@ import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imper
 import { PlusCircle, RefreshCw, MoreHorizontal, Edit2, PlugZap, Trash2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 
-const fetchErpLookupOptions = (field: { name: string }) => api.lookups.fetch("", field.name);
 import { HeaderActions } from "@/context/HeaderActionsContext";
 import { DynamicFormFields } from "@platform/ui/forms/DynamicFormFields";
 import {
@@ -196,7 +195,7 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, types }) => {
             />
 
 
-          <DynamicFormFields fields={typeFields} form={form} fetchLookupOptions={fetchErpLookupOptions} />
+          <DynamicFormFields fields={typeFields} form={form} />
         </form>
       </Form>
       <WindowActions>

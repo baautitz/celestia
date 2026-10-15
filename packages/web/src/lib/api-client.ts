@@ -220,13 +220,6 @@ class ApiClient {
       return this.request<{ success: boolean }>(`/api/admin/connections/${id}`, { method: "DELETE" });
     },
   };
-
-  lookups = {
-    fetch: async (recipeId: string, field: string): Promise<Array<{ value: string | number; label: string }>> => {
-      const searchParams = new URLSearchParams({ recipe_id: recipeId, field });
-      return this.request(`/api/lookups?${searchParams.toString()}`);
-    },
-  };
 }
 
 export const api = new ApiClient();
