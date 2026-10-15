@@ -40,6 +40,22 @@ importers:
         specifier: ^2.1.4
         version: 2.1.9(@types/node@22.20.1)(lightningcss@1.32.0)
 
+  packages/core:
+    dependencies:
+      hono:
+        specifier: ^4.6.10
+        version: 4.13.3
+    devDependencies:
+      drizzle-orm:
+        specifier: 1.0.0-rc.4
+        version: 1.0.0-rc.4(@types/mssql@12.3.0)(@types/pg@8.23.1)(mssql@12.7.4)(pg@8.23.1)(zod@3.25.76)
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.4
+        version: 2.1.9(@types/node@22.20.1)(lightningcss@1.32.0)
+
   packages/server:
     dependencies:
       '@hono/node-server':
@@ -51,6 +67,9 @@ importers:
       '@node-rs/argon2':
         specifier: ^2.1.0
         version: 2.1.0
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
       '@platform/shared':
         specifier: workspace:*
         version: link:../shared
