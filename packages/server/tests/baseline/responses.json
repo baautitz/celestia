@@ -1297,7 +1297,13 @@
       }
     }
   },
-  "iam.users.reset.ok": {
+  "iam.users.reset.403_target_admin": {
+    "status": 403,
+    "body": {
+      "error": "Somente administradores podem redefinir a senha de outro administrador."
+    }
+  },
+  "iam.users.reset.ok_common_user": {
     "status": 200,
     "body": {
       "success": true,
@@ -1371,7 +1377,8 @@
           "sap": 9042
         },
         "status": "active",
-        "createdAt": "<ts>"
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
       },
       {
         "id": "usr_1003",

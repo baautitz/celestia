@@ -206,7 +206,8 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.users.reset.401", "POST", `/api/iam/users/${newId}/reset-password`, { body: { newPassword: "Nova@1234" } });
     await rec("iam.users.reset.403", "POST", `/api/iam/users/${newId}/reset-password`, { token: V, body: { newPassword: "Nova@1234" } });
     await rec("iam.users.reset.400_weak", "POST", `/api/iam/users/${newId}/reset-password`, { token: A, body: { newPassword: "fraca" } });
-    await rec("iam.users.reset.ok", "POST", `/api/iam/users/${newId}/reset-password`, { token: A, body: { newPassword: "Nova@1234" } });
+    await rec("iam.users.reset.403_target_admin", "POST", `/api/iam/users/${newId}/reset-password`, { token: A, body: { newPassword: "Nova@1234" } });
+    await rec("iam.users.reset.ok_common_user", "POST", "/api/iam/users/usr_1002/reset-password", { token: A, body: { newPassword: "Nova@1234" } });
     await rec("iam.users.reset.unknown_user", "POST", "/api/iam/users/nao_existe/reset-password", { token: A, body: { newPassword: "Nova@1234" } });
     await rec("iam.users.reset.admin_bypass", "POST", `/api/iam/users/${newId}/reset-password`, { token: R, body: { newPassword: "Outra@1234" } });
 
