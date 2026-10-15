@@ -1,21 +1,21 @@
 # AGENTS.md — Technical Architecture & Operational Directives for AI Agents
 
 > **Audience**: Autonomous Coding Agents, Antigravity, Claude Code, Cursor, Copilot, Cline, Windsurf.  
-> **Platform**: Celestia — Server-Driven UI (SDUI) & Permission-First IAM Enterprise Platform.  
-> **Runtime**: Node.js >= 24.x (required by `isolated-vm` 7), TypeScript >= 5.6 (strict mode), pnpm workspaces.
+> **Platform**: Celestia — Permission-First IAM Enterprise Platform (modular; modules a definir).  
+> **Runtime**: Node.js >= 24.x, TypeScript >= 5.6 (strict mode), pnpm workspaces.
 
 ---
 
 ## 1. System Identity & Mission
 
-**Celestia** is an enterprise **Server-Driven UI (SDUI)** engine with an embedded **Permission-First IAM** system designed for high-stakes enterprise operations (monthly closings, retail auditing, sales commissions, pharmacy/ERP reconciliations).
+**Celestia** is an enterprise platform with an embedded **Permission-First IAM** system, designed for high-stakes enterprise operations (monthly closings, retail auditing, sales commissions, pharmacy/ERP reconciliations).
+
+> **Recipes / SDUI were REMOVED** (user decision). There is no recipe compiler, sandbox, dashboards or recipe permissions (`recipe:*`) anymore. Customer-specific functionality will come as modules under `/integrations` (a definir). **Workspaces will become a module** (`workspaces`, a definir); today they remain in the server without any model link (`recipe_id`/`params` dropped).
 
 - **Backend**: [Hono](https://hono.dev/) on Node.js (ultra-fast, typed RPC, minimal overhead).
-- **Security & Caching**: **Argon2id** (`@node-rs/argon2`), stateless JWT (5 min) + Refresh Token (7 days).
-- **SDUI Engine**: TypeScript-defined Recipes compiled in-memory via `esbuild` and executed inside isolated V8 isolates (`isolated-vm`).
+- **Security**: **Argon2id** (`@node-rs/argon2`), stateless JWT (5 min) + Refresh Token (7 days).
 - **Frontend**: Vite + React 19 + shadcn/ui + Tailwind CSS v4.
 - **PT-BR UI Terminology**:
-  - `Recipe` ➔ **Dashboard** (the reusable blueprint/dashboard definition).
   - `Workspace` ➔ **Área de Trabalho** (the active session/closing period).
 
 ---
@@ -25,65 +25,22 @@
 ```text
 celestia/
 ├── packages/
-│   ├── shared/                   (@platform/shared) -> Source of truth for contracts & types
+│   ├── core/                     (@platform/core) -> Module framework: module contract, loader/graph, events, migrations, permissions (pruneOrphans, ...)
+│   ├── shared/                   (@platform/shared) -> Contracts & types: iam.ts, workspace.ts, erp.ts, fields.ts (re-export of @platform/ui)
+│   ├── server/                   (@platform/server) -> Hono API
 │   │   └── src/
-│   │       ├── types/
-│   │       │   ├── workspace.ts  -> Workspace, WorkspaceDateRange, WorkspaceStatus, WorkspaceSummary
-│   │       │   ├── components.ts -> DataTableColumnDef, DataTableProps, StatCardProps, ChartProps, UIComponentDef, LayoutDefinition
-│   │       │   ├── recipe.ts     -> RecipeDef, defineRecipe, ActionDef, ActionContext, SourceDef, PersistenceDef
-│   │       │   ├── fields.ts     -> FormFieldDef, FieldType, LookupConfig, BaseFormFieldDef, etc.
-│   │       │   ├── iam.ts        -> User, Role, JWTAccessPayload, JWTRefreshPayload, AuthTokens, PermissionCatalog
-│   │       │   ├── ui.ts         -> ImperativeUIContext, UIEffect, OpenDialogOptions, ShowTableOptions, WizardOptions
-│   │       │   ├── rpc.ts        -> ActionExecRequest/Response, ComponentDataRequest/Response, DashboardSchemaResponse
-│   │       │   └── index.ts      -> Central barrel export
-│   │       └── index.ts
-│   │
-│   ├── server/                   (@platform/server) -> Backend API, Compiler, IAM & Data Resolver
-│   │   └── src/
-│   │       ├── index.ts          -> Hono app entrypoint, public (health, auth) & protected routes (every other route requires a token)
-│   │       ├── iam/
-│   │       │   ├── password-service.ts    -> Argon2id OWASP hashing & Zod password complexity validator
-│   │       │   ├── token-service.ts       -> JWT Access (5 min) & Refresh (7 days) HS256 tokens
-│   │       │   ├── system-permissions.ts  -> Static system:* permissions catalog
-│   │       │   ├── permission-catalog.ts  -> Recipe scanner & automatic orphan permission pruner
-│   │       │   ├── permission-resolver.ts -> Permission-first query & action resolver (declaration order)
-│   │       │   ├── user-store.ts          -> MemoryUserStore with sanitization & initial seeds
-│   │       │   └── middleware.ts          -> createAuthMiddleware & requirePermission guards
-│   │       ├── engine/
-│   │       │   ├── compiler.ts            -> esbuild in-memory transpiler; loads the recipe in an isolate
-│   │       │   ├── recipe-sandbox.ts      -> isolated-vm sandbox: manifest + async proxies for compute/actions
-│   │       │   ├── action-executor.ts     -> Action executor with 5s timeout & imperative UI context
-│   │       │   ├── template-engine.ts     -> Safe query parameterizer (converts {{...}} into @p1, @p2)
-│   │       │   └── workspace-validator.ts -> Mandatory workspace dates validator (end_date >= start_date)
-│   │       └── data/
-│   │           ├── source-connector.ts    -> SourceConnector interface & MockSourceConnector
-│   │           ├── persistence-store.ts   -> MemoryPersistenceStore & Postgres persistence adapter
-│   │           └── data-resolver.ts       -> Merges ERP sources + platform persistence + compute columns
-│   │
-│   ├── ui/                       (@platform/ui) -> Shared UI library (shadcn/ui primitives, imperative UI, DataTable)
-│   │   └── src/
-│   │       ├── components/   -> shadcn/ui primitives (dialog, sheet, form, input-group, money-input, mobile-card, toast...)
-│   │       ├── data-table/   -> DataTable (desktop Table + mobile MobileCard)
-│   │       ├── forms/        -> DynamicFormFields, dynamic-form
-│   │       ├── imperative/   -> UiProvider/useUi(), window controller & host, WindowActions/useWindow
-│   │       ├── adapters/     -> feedback-toast (feedback service), navigation-router
-│   │       ├── contracts/    -> module (defineWebModule, NavEntry), windows, services, fields
-│   │       ├── hooks/        -> use-mobile
-│   │       └── lib/          -> utils, format
-│   │
-│   └── web/                      (@platform/web) -> Frontend SPA (Vite + React 19), consumes @platform/ui
-│       └── src/
-│           ├── modules.ts    -> Static module registry (one explicit import per module, menu order)
-│           ├── modules/      -> core.ts (coreModule: Usuarios, Grupos, ERPs entries)
-│           ├── components/layout/ -> AppLayout, ProtectedRoute
-│           ├── pages/        -> IAMUsersPage, IAMRolesPage, ERPsPage, LoginPage
-│           ├── context/      -> AuthContext, HeaderActionsContext
-│           └── lib/          -> api-client
+│   │       ├── index.ts          -> Hono app: health, auth, iam, /api/admin/connections*, /api/admin/erp-types, /api/workspaces*
+│   │       ├── iam/              -> password-service, token-service, system-permissions (SYSTEM_PERMISSIONS, SYSTEM_PERMISSION_KEYS, denyMessage),
+│   │       │                        user-store (memory) / postgres-user-store, middleware, has-permission, can-grant
+│   │       ├── engine/           -> template-engine (SQL {{...}} -> bind params), workspace-validator
+│   │       ├── data/             -> source-connector, mssql-source-connector, connection-factory/store, erp-types, secret-box, read-only-guard, workspace-store
+│   │       ├── db/               -> drizzle schema (roles, users, connections, workspaces), client, migrate
+│   │       └── cli/              -> create-admin, erp-query
+│   ├── ui/                       (@platform/ui) -> shadcn/ui primitives, imperative UI (useUi), DataTable, forms, contracts (defineWebModule)
+│   └── web/                      (@platform/web) -> SPA (Vite + React 19): modules.ts registry, pages IAMUsers/IAMRoles/ERPs/Login
 ```
 
-> **The web no longer has SDUI/Recipe pages** (renderer, workspaces, dashboards and recipe editor were removed from `packages/web`). The backend recipe/workspace engine below is unchanged; how recipes will be surfaced in the UI is "a definir".
-
-> **Recipes live in Postgres, not in git.** The TypeScript source is stored in the `recipes` table and managed at runtime via `PUT /api/admin/recipes/:id` (`system:recipes:manage`); the server compiles and validates it on save and on boot. The reference monthly-closing recipe is a test fixture: `packages/server/tests/fixtures/fechamento-mes.recipe.ts`.
+Migrations live in `packages/server/drizzle/`. The database is rebuilt module by module later (a definir).
 
 ---
 
@@ -106,30 +63,17 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 - Every action, source query, and route requires explicit permission strings.
 - **Format**:
   - System modules: `system:<modulo>:<acao>` (e.g. `system:users:create`, `system:workspaces:create`).
-  - Recipe view: `recipe:<recipe_id>:view`
-  - Recipe queries: `recipe:<recipe_id>:query:<nome>` (e.g. `recipe:fechamento_mes:query:all`)
-  - Recipe actions: `recipe:<recipe_id>:action:<id>` (e.g. `recipe:fechamento_mes:action:adicionar_penalidade`)
-- **Orphan Pruning**: When actions or queries are deleted from a recipe, `PermissionCatalogEngine.pruneOrphanPermissions` automatically purges them from all roles upon sync/boot.
-- **Administrator bypass (`isAdmin`)**: a user with `users.is_admin = true` ignores the permission matrix. The auth middleware replaces the token's permissions with **every valid permission key at request time** (system + all registered recipes), so every `requirePermission` / `permissions.includes(...)` check keeps working unchanged and new recipes are covered immediately. The flag is settable only via `UserStore.setAdmin`: by the `create-admin` CLI, or by `PUT /api/iam/users/:id` with `isAdmin`, which is accepted ONLY from a caller who is already an admin (403 otherwise) and never lets an admin demote themselves (400). `POST /api/iam/users` ignores it. This is the single, deliberate exception to least-privilege: grant it sparingly.
-- **Boot safety**: if a recipe stored in Postgres fails to compile at boot, orphan pruning is skipped for that boot so its permissions are not wiped from roles. `POST /api/admin/recipes/reload` follows the same rule.
-
-### 4. Query Resolution Order
-- Multiple queries defined on a source are evaluated **in the order of their declaration** in the recipe.
-- The **first** query matching the authenticated user's permissions is selected. If no query matches, throw `403 Forbidden`.
+  - Valid keys are exactly `SYSTEM_PERMISSIONS` (+ the wildcard `"*"`). Module permission formats beyond `system:*`: a definir.
+- **Orphan Pruning**: at boot, `UserStore.syncOrphanPermissions(validKeys)` removes from all roles every key not in `SYSTEM_PERMISSION_KEYS` (the wildcard `"*"` is preserved; uses `pruneOrphans` from `@platform/core/permissions`).
+- **Administrator bypass (`isAdmin`)**: a user with `users.is_admin = true` ignores the permission matrix. The auth middleware replaces the token's permissions with **every valid permission key at request time** (`SYSTEM_PERMISSIONS`), so every `requirePermission` / `permissions.includes(...)` check keeps working unchanged. The flag is settable only via `UserStore.setAdmin`: by the `create-admin` CLI, or by `PUT /api/iam/users/:id` with `isAdmin`, which is accepted ONLY from a caller who is already an admin (403 otherwise) and never lets an admin demote themselves (400). `POST /api/iam/users` ignores it. This is the single, deliberate exception to least-privilege: grant it sparingly.
 
 ### 5. Mandatory Workspace Dates & Temporal Protection
-- Every Workspace / Área de Trabalho must have `start_date` and `end_date` (`YYYY-MM-DD`).
+- Every Workspace / Área de Trabalho must have `startDate` and `endDate` (`YYYY-MM-DD`); `POST /api/workspaces` takes `{ name, startDate, endDate }`.
 - **Strict Rule**: `end_date >= start_date`. Any request with `end_date < start_date` must be rejected with HTTP 400 and message `"A Data Final não pode ser anterior à Data Inicial."`.
 
 ### 6. Zero SQL Injection (Template Engine)
 - **NEVER** concatenate user strings or raw variables into SQL queries.
-- All `{{workspace.param}}` and `{{user.externals.source}}` tokens must be converted into bind parameters (`@p1`, `@p2`) via `TemplateEngine.parse()`.
-
-### 7. Sandboxed Action Execution
-- Recipe code (compile, `compute`, `actions`) NEVER runs in the server process. It runs in an `isolated-vm` V8 isolate (`engine/recipe-sandbox.ts`) with no Node globals (`process`, `fs`, `child_process`, `net`) and no host objects, a 64 MB memory limit and per-call CPU timeouts. `node:vm` is NOT a security boundary and must not be used for recipe code.
-- The host exchanges only JSON with the isolate: the recipe is extracted as a manifest where each function becomes an async proxy. `compute` runs per column in a single batch call; actions reach `ui.*` / `persistence.*` through an ordered host-call bridge, so every host function receives and returns JSON-serializable values.
-- Recipe functions are therefore async from the server's point of view: always `await` them (`DataResolver`, `ActionExecutor`).
-- Strict timeout of **5,000 ms** per action execution via `Promise.race`.
+- All `{{...}}` tokens (e.g. `{{workspace.param}}`, `{{user.externals.source}}`) must be converted into bind parameters (`@p1`, `@p2`) via `TemplateEngine.parse()` (`engine/template-engine.ts`; used by connections/modules).
 
 ### 8. No Credential Leakage
 - `passwordHash` must **never** be included in API responses. Always delete or omit `passwordHash` before returning `User` objects.
@@ -171,11 +115,10 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 - Host layout: `SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl"`; `SheetHeader className="p-6 border-b shrink-0"` (`SheetTitle` + `SheetDescription`); `ScrollArea className="flex-1 min-h-0"` > `<div className="p-6 flex flex-col gap-6">`; `SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover"`.
 - Submit pattern: the action button uses `form="<id>"` and the body renders `<form id="<id>">`.
 
-### 17. Permission Management Separation (System vs Recipe)
-- **System permissions** (`system:*`) are configured in the Roles page (`/iam/roles`) via the edit Sheet.
-- **Recipe permissions** (`recipe:*`) were configured via `RecipePermissionsSheet`, removed from the web; the new place is "a definir".
-- The Roles page edit Sheet shows ONLY `system:*` modules. A muted note informs that recipe permissions are configured per Model.
-- Server-side validation: `POST /api/iam/roles` and `PUT /api/iam/roles/:id` validate permission keys against `PermissionCatalogEngine.getAllValidPermissionKeys()`. Invalid keys return HTTP 400. Wildcard `"*"` is allowed.
+### 17. Permission Management
+- **System permissions** (`system:*`) are configured in the Roles page (`/iam/roles`) via the edit Sheet. Where module permissions will be configured: a definir.
+- Server-side validation: `POST /api/iam/roles` and `PUT /api/iam/roles/:id` validate permission keys against `SYSTEM_PERMISSION_KEYS`. Invalid keys return HTTP 400. Wildcard `"*"` is allowed (admin only).
+- `GET /api/iam/permissions/catalog` returns `{ system }`.
 
 ### 18. Search Inputs via `InputGroup` (No Custom `<div>` Wrappers)
 - Search inputs and inputs with icons MUST use the canonical `InputGroup` primitives (`InputGroup`, `InputGroupAddon`, `InputGroupInput`) from `@/components/ui/input-group`.
@@ -192,7 +135,6 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 ### Imperative UI (`useUi()`)
 - Windows (dialogs/sheets), confirmations and feedback (toasts) are opened imperatively through `useUi()` from `@platform/ui/imperative/provider`, mounted once by `UiProvider` in `main.tsx`.
 - Window content uses `useWindow()` and `WindowActions` (footer actions) from `@platform/ui/imperative/use-window`.
-- Server `ImperativeUIContext`/`UIEffect` types in `@platform/shared` remain for recipe actions executed in the sandbox.
 
 ### 21. Granular One-Line Conventional Commits & Mandatory Approval
 - All commits in this repository MUST strictly follow the **One-Line Conventional Commits** format: `<type>(<scope>): <short description in english>` (e.g. `fix(web): filter showTable rowActions by user permissions`).
@@ -217,153 +159,9 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 
 ---
 
-## 4. Code Generation Recipes & Templates
+## 4. Code Generation Templates
 
-### A. Creating a New Recipe (TypeScript source saved via `/api/admin/recipes/:id`)
-
-```typescript
-import { defineRecipe } from "@platform/shared";
-
-export default defineRecipe({
-  id: "comissoes_vendas",
-  name: "Comissões de Vendas",
-  description: "Apuração e cálculo de comissões por vendedor.",
-
-  workspace: {
-    params: [
-      { name: "start_date", label: "Data Inicial", type: "date", required: true },
-      { name: "end_date", label: "Data Final", type: "date", required: true },
-    ],
-  },
-
-  sources: {
-    inovafarma: {
-      primaryKey: "vendedor_id",
-      queries: {
-        all: {
-          id: "q_comissoes_all",
-          query: `
-            SELECT v.id AS vendedor_id, v.nome AS vendedor, SUM(vendas.valor) AS total_vendas
-            FROM vendas
-            INNER JOIN vendedores v ON vendas.vendedor_id = v.id
-            WHERE vendas.data BETWEEN {{workspace.start_date}} AND {{workspace.end_date}}
-            GROUP BY v.id, v.nome
-          `,
-          columns: [
-            { name: "vendedor_id", type: "int", label: "ID" },
-            { name: "vendedor", type: "string", label: "Vendedor" },
-            { name: "total_vendas", type: "money", label: "Total Vendas" },
-          ],
-        },
-        self: {
-          id: "q_comissoes_self",
-          query: `
-            SELECT v.id AS vendedor_id, v.nome AS vendedor, SUM(vendas.valor) AS total_vendas
-            FROM vendas
-            INNER JOIN vendedores v ON vendas.vendedor_id = v.id
-            WHERE vendas.data BETWEEN {{workspace.start_date}} AND {{workspace.end_date}}
-              AND v.id = {{user.externals.inovafarma}}
-            GROUP BY v.id, v.nome
-          `,
-          columns: [
-            { name: "vendedor_id", type: "int", label: "ID" },
-            { name: "vendedor", type: "string", label: "Vendedor" },
-            { name: "total_vendas", type: "money", label: "Total Vendas" },
-          ],
-        },
-      },
-    },
-  },
-
-  persistence: [
-    {
-      id: "ajustes_comissao",
-      targetSource: "inovafarma",
-      targetForeignKey: "vendedor_id",
-      mode: "collection",
-      itemSchema: {
-        valor: { type: "money", label: "Valor (R$)", defaultValue: 0 },
-        motivo: { type: "text", label: "Motivo", defaultValue: "" },
-      },
-      computedFields: {
-        total_ajustes: {
-          type: "money",
-          aggregate: { function: "sum", field: "valor" },
-        },
-      },
-    },
-  ],
-
-  actions: [
-    {
-      id: "adicionar_ajuste",
-      label: "Adicionar Ajuste",
-      icon: "PlusCircle",
-      permission: "recipe:comissoes_vendas:action:adicionar_ajuste",
-      action: async ({ row, ui, persistence }) => {
-        const form = await ui.dialog.open({
-          title: "Adicionar Ajuste de Comissão",
-          fields: [
-            { name: "vendedor", label: "Vendedor", type: "text", readOnly: true, defaultValue: row.vendedor },
-            { name: "valor", label: "Valor (R$)", type: "money", required: true, defaultValue: 10 },
-            { name: "motivo", label: "Motivo", type: "textarea", required: true },
-          ],
-        });
-        if (!form) return;
-
-        await persistence.push("ajustes_comissao", {
-          valor: form.valor,
-          motivo: form.motivo,
-        });
-        ui.toast.success("Ajuste registrado com sucesso!");
-        ui.refresh();
-      },
-    },
-  ],
-
-  ui: {
-    layout: { type: "grid", columns: 12, gap: 16 },
-    components: [
-      {
-        id: "kpi_total_vendas",
-        component: "stat_card",
-        layoutProps: { colSpan: 6 },
-        props: {
-          title: "Total Geral de Vendas",
-          source: "inovafarma",
-          aggregate: { function: "sum", field: "total_vendas" },
-          format: "currency",
-          icon: "DollarSign",
-        },
-      },
-      {
-        id: "tabela_comissoes",
-        component: "data_table",
-        layoutProps: { colSpan: 12 },
-        props: {
-          title: "Apuração de Comissões por Vendedor",
-          source: "inovafarma",
-          columns: [
-            { key: "vendedor_id", label: "ID", sortable: true },
-            { key: "vendedor", label: "Vendedor", sortable: true, searchable: true },
-            { key: "total_vendas", label: "Total Vendas", format: "currency", sortable: true },
-            { key: "ajustes_comissao.total_ajustes", label: "Ajustes", format: "currency", sortable: true },
-            {
-              key: "comissao_final",
-              label: "Comissão Final (5%)",
-              format: "currency",
-              sortable: true,
-              compute: (row) => Number(row.total_vendas || 0) * 0.05 + Number(row.ajustes_comissao?.total_ajustes || 0),
-            },
-          ],
-          rowActions: ["adicionar_ajuste"],
-          pagination: { pageSize: 10 },
-        },
-      },
-    ],
-  },
-});
-```
+Removed together with Recipes. New templates (modules under `/integrations`, `workspaces` module): a definir.
 
 ---
 
