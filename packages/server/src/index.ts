@@ -19,6 +19,7 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
 import { PermissionCatalogEngine } from "./iam/permission-catalog.js";
+import { denyMessage } from "./iam/system-permissions.js";
 import { PermissionResolver } from "./iam/permission-resolver.js";
 import { NotFoundError } from "./engine/errors.js";
 import { createAuthMiddleware, getAuthenticatedUser, requirePermission } from "./iam/middleware.js";
@@ -135,15 +136,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
   // Exige ao menos uma das permissões; ausência de usuário/permissões nega (fail closed).
   const guard =
-    (message: string, ...keys: string[]): MiddlewareHandler =>
+    (...keys: string[]): MiddlewareHandler =>
     async (c, next) => {
       const user = c.get("user") as JWTAccessPayload | undefined;
       const perms = user?.permissions ?? [];
-      if (!keys.some((key) => perms.includes(key))) return c.json({ error: message }, 403);
+      if (!keys.some((key) => perms.includes(key))) return c.json({ error: denyMessage(keys[0]) }, 403);
       await next();
     };
-  const VIEW_RECIPE_DENIED = "Acesso negado: o usuário não possui permissão para visualizar este Modelo.";
-  const READ_WS_DENIED = "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho.";
 
   // Helper para obter recipe registrada
   function getRecipe(recipeId: string): RecipeDef {
@@ -633,7 +632,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.get(
     "/api/workspaces",
     auth,
-    guard(READ_WS_DENIED, "system:workspaces:read"),
+    guard("system:workspaces:read"),
     zValidator("query", z.object({ recipe_id: z.string().optional() })),
     (c) => {
       const { recipe_id } = c.req.valid("query");
@@ -649,7 +648,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.get(
     "/api/workspaces/:id",
     auth,
-    guard(READ_WS_DENIED, "system:workspaces:read"),
+    guard("system:workspaces:read"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
@@ -663,10 +662,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.post(
     "/api/workspaces",
     auth,
-    guard(
-      "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho.",
-      "system:workspaces:create"
-    ),
+    guard("system:workspaces:create"),
     zValidator(
       "json",
       z
@@ -722,10 +718,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.put(
     "/api/workspaces/:id",
     auth,
-    guard(
-      "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho.",
-      "system:workspaces:update"
-    ),
+    guard("system:workspaces:update"),
     zValidator("param", z.object({ id: z.string() })),
     zValidator(
       "json",
@@ -767,10 +760,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.post(
     "/api/workspaces/:id/conclude",
     auth,
-    guard(
-      "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho.",
-      "system:workspaces:close", "system:workspaces:create"
-    ),
+    guard("system:workspaces:close", "system:workspaces:create"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
@@ -789,10 +779,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.post(
     "/api/workspaces/:id/reopen",
     auth,
-    guard(
-      "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen).",
-      "system:workspaces:reopen", "system:workspaces:create"
-    ),
+    guard("system:workspaces:reopen", "system:workspaces:create"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
@@ -811,10 +798,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.delete(
     "/api/workspaces/:id",
     auth,
-    guard(
-      "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete).",
-      "system:workspaces:delete"
-    ),
+    guard("system:workspaces:delete"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
@@ -858,7 +842,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const user = getAuthenticatedUser(c);
 
       if (!PermissionResolver.canViewRecipe(recipe_id, user.permissions)) {
-        return c.json({ error: "Acesso negado: o usuário não possui permissão para visualizar este Modelo." }, 403);
+        return c.json({ error: denyMessage(`recipe:${recipe_id}:view`) }, 403);
       }
 
       let recipe: RecipeDef;
@@ -907,7 +891,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (!recipe) return c.json({ error: `Modelo '${id}' não encontrado.` }, 404);
       const user = getAuthenticatedUser(c);
       if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
-        return c.json({ error: VIEW_RECIPE_DENIED }, 403);
+        return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
       }
 
       const filteredActions = recipe.actions.filter((a: ActionDef) =>
@@ -990,7 +974,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (!recipe) return c.json({ error: `Modelo '${query.recipe_id}' não encontrado.` }, 404);
       const user = getAuthenticatedUser(c);
       if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
-        return c.json({ error: VIEW_RECIPE_DENIED }, 403);
+        return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
       }
 
       // Só aceita parâmetros declarados no Modelo; chegam à consulta sempre como bind parameters.
@@ -1075,7 +1059,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (!recipe) return c.json({ error: `Modelo '${body.recipe_id}' não encontrado.` }, 404);
       const user = getAuthenticatedUser(c);
       if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
-        return c.json({ error: VIEW_RECIPE_DENIED }, 403);
+        return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
       }
 
       const component = recipe.ui.components.find((item) => item.id === body.component_id);
@@ -1144,7 +1128,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.post(
     "/api/workspaces/:id/persistence/set",
     auth,
-    guard("Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho.", "system:workspaces:update"),
+    guard("system:workspaces:update"),
     zValidator("param", z.object({ id: z.string() })),
     zValidator(
       "json",
@@ -1188,7 +1172,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.get(
     "/api/workspaces/:id/persistence/collection/:collection/:foreignKeyValue",
     auth,
-    guard(READ_WS_DENIED, "system:workspaces:read"),
+    guard("system:workspaces:read"),
     zValidator("param", z.object({ id: z.string(), collection: z.string(), foreignKeyValue: z.string() })),
     async (c) => {
       const { id: workspaceId, collection, foreignKeyValue } = c.req.valid("param");
