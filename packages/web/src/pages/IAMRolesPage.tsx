@@ -202,10 +202,6 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
               </Card>
             )}
           />
-
-          <p className="text-xs text-muted-foreground">
-            Permissões de Dashboards são configuradas diretamente na página de cada Dashboard.
-          </p>
         </form>
       </Form>
 
