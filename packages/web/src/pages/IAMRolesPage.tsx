@@ -53,7 +53,7 @@ interface RoleSheetProps {
 }
 
 const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
-  const { resolve } = useWindow<true>();
+  const { resolve, setTitle } = useWindow<true>();
   const { feedback } = useUi();
   const isEditMode = role !== null;
   const [saving, setSaving] = useState(false);
@@ -66,6 +66,11 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
       permissions: role ? [...role.permissions] : [],
     },
   });
+
+  const name = form.watch("name");
+  useEffect(() => {
+    if (isEditMode) setTitle(`Editar Grupo: ${name}`);
+  }, [isEditMode, name, setTitle]);
 
   const onSubmit = async (v: RoleFormValues) => {
     try {
