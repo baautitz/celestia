@@ -1175,69 +1175,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     }
   );
 
-  // 4. POST /api/workspaces/:id/persistence/set (Auto-save de edição inline em células)
-  app.post(
-    "/api/workspaces/:id/persistence/set",
-    auth,
-    guard("system:workspaces:update"),
-    zValidator("param", z.object({ id: z.string() })),
-    zValidator(
-      "json",
-      z.object({
-        target: z.string(),
-        target_foreign_key_value: z.union([z.string(), z.number()]),
-        field: z.string(),
-        value: z.unknown(),
-        workspace_version: z.number().default(1),
-      })
-    ),
-    async (c) => {
-      const { id: workspaceId } = c.req.valid("param");
-      const body = c.req.valid("json");
-
-      // Trava de edição se a Área de Trabalho estiver concluída
-      const ws = workspacesMap.get(workspaceId);
-      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
-      if (ws.status === "closed") {
-        return c.json(
-          { error: "Esta Área de Trabalho está concluída e bloqueada para edições." },
-          400
-        );
-      }
-
-      await persistenceStore.setScalar(
-        workspaceId,
-        body.target,
-        body.target_foreign_key_value,
-        { [body.field]: body.value }
-      );
-
-      return c.json({
-        success: true,
-        new_version: body.workspace_version + 1,
-      });
-    }
-  );
-
-  // 5. GET /api/workspaces/:id/persistence/collection/:collection/:foreignKeyValue (Consulta itens de sub-tabelas)
-  app.get(
-    "/api/workspaces/:id/persistence/collection/:collection/:foreignKeyValue",
-    auth,
-    guard("system:workspaces:read"),
-    zValidator("param", z.object({ id: z.string(), collection: z.string(), foreignKeyValue: z.string() })),
-    async (c) => {
-      const { id: workspaceId, collection, foreignKeyValue } = c.req.valid("param");
-      if (!workspacesMap.has(workspaceId)) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
-      const items = await persistenceStore.getItems(workspaceId, collection, foreignKeyValue);
-      const formatted = items.map((item) => ({
-        id: item.id,
-        created_at: item.createdAt,
-        ...item.data,
-      }));
-      return c.json(formatted);
-    }
-  );
-
   return app;
 }
 

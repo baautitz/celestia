@@ -337,27 +337,6 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     });
   });
 
-  describe("persistence", () => {
-    it("rotas", async () => {
-    // ── persistência (auth + permissões)
-    const pset = (k: string, ws: string, body: unknown, token: string | null = A) => rec(k, "POST", `/api/workspaces/${ws}/persistence/set`, { token: token ?? undefined, body });
-    await pset("persistence.set.ok", WS, { target: "remuneracao_vendedor", target_foreign_key_value: 42, field: "salario_base", value: 2000, workspace_version: 3 });
-    await pset("persistence.set.400_closed", WS_CLOSED, { target: "remuneracao_vendedor", target_foreign_key_value: 42, field: "salario_base", value: 1 });
-    await pset("persistence.set.400_invalid_body", WS, { target: "x" });
-    const sv = { target: "remuneracao_vendedor", target_foreign_key_value: 42, field: "salario_base", value: 1 };
-    await pset("persistence.set.401", WS, sv, null);
-    await pset("persistence.set.403", WS, sv, O);
-    await pset("persistence.set.404_unknown_workspace", "ws_inexistente", sv);
-    const col = `/api/workspaces/${WS}/persistence/collection/penalidades_vendedor`;
-    await rec("persistence.collection.ok", "GET", `${col}/42`, { token: O });
-    await rec("persistence.collection.empty", "GET", `${col}/9999`, { token: O });
-    await rec("persistence.collection.404_unknown_workspace", "GET", "/api/workspaces/ws_inexistente/persistence/collection/penalidades_vendedor/42", { token: O });
-    await rec("persistence.collection.401", "GET", `${col}/42`);
-    await rec("persistence.collection.403", "GET", `${col}/42`, { token: V });
-
-    });
-  });
-
   describe("admin-recipes", () => {
     it("rotas", async () => {
     await fresh();

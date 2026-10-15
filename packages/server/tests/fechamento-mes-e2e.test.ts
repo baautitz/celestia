@@ -99,33 +99,9 @@ describe("Bateria E2E Completa: Recipe Fechamento de Mês", () => {
   });
 
   it("3. [Edição Inline de Células] Salvar salário base e comissão diretamente na célula recalcula KPIs e total a receber", async () => {
-    // Gerente altera Salário Base do Carlos (ID 1) para R$ 2.000,00
-    const resEditSalario = await app.request(`/api/workspaces/${workspaceId}/persistence/set`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(await authHeader(app)) },
-      body: JSON.stringify({
-        target: "remuneracao_vendedor",
-        target_foreign_key_value: 1,
-        field: "salario_base",
-        value: 2000,
-        workspace_version: 1,
-      }),
-    });
-    expect(resEditSalario.status).toBe(200);
-
-    // Gerente adiciona Comissão de R$ 600,00 para o Carlos (ID 1)
-    const resEditComissao = await app.request(`/api/workspaces/${workspaceId}/persistence/set`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(await authHeader(app)) },
-      body: JSON.stringify({
-        target: "remuneracao_vendedor",
-        target_foreign_key_value: 1,
-        field: "comissao_ajustada",
-        value: 600,
-        workspace_version: 2,
-      }),
-    });
-    expect(resEditComissao.status).toBe(200);
+    // Edição inline (HTTP removido): grava direto na persistência, como faria uma ação do Modelo.
+    await persistenceStore.setScalar(workspaceId, "remuneracao_vendedor", 1, { salario_base: 2000 });
+    await persistenceStore.setScalar(workspaceId, "remuneracao_vendedor", 1, { comissao_ajustada: 600 });
 
     // Reconsulta os dados da tabela
     const resTabela = await app.request(

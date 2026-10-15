@@ -151,27 +151,4 @@ describe("Hono API Integration Test (End-to-End)", () => {
     });
     expect(body.newWorkspaceVersion).toBe(2);
   });
-
-  it("POST /api/workspaces/:id/persistence/set deve salvar edição inline de célula", async () => {
-    const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/persistence/set", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(await authHeader(app)) },
-      body: JSON.stringify({
-        target: "remuneracao_vendedor",
-        target_foreign_key_value: 1,
-        field: "salario_base",
-        value: 2200,
-        workspace_version: 3,
-      }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.success).toBe(true);
-    expect(body.new_version).toBe(4);
-
-    // Verifica se gravou na persistência
-    const scalar = await persistenceStore.getScalar("ws_fechamento_jan_2026", "remuneracao_vendedor", 1);
-    expect(scalar?.salario_base).toBe(2200);
-  });
 });

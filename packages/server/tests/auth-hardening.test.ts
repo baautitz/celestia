@@ -52,11 +52,11 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     expect((await post(semView)).status).toBe(403);
   });
 
-  it("sem token: 401 em schema, data, exec e persistência", async () => {
+  it("sem token: 401 em schema, data e exec; rotas de persistência HTTP não existem (404)", async () => {
     expect((await app.request("/api/dashboards/fechamento_mes/schema")).status).toBe(401);
     expect((await app.request(`/api/workspaces/${WS}/data/tabela_vendedores${q}`)).status).toBe(401);
     expect((await post({})).status).toBe(401);
-    expect((await app.request(`/api/workspaces/${WS}/persistence/collection/c/1`)).status).toBe(401);
+    expect((await app.request(`/api/workspaces/${WS}/persistence/collection/c/1`)).status).toBe(404);
   });
 
   it("curinga '*' passa pela checagem de visualização do Modelo", async () => {
@@ -66,7 +66,6 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
   it("curinga '*' não-admin acessa rotas system:* e workspaces", async () => {
     expect((await app.request("/api/iam/users", { headers: curinga })).status).toBe(200);
     expect((await app.request("/api/workspaces", { headers: curinga })).status).toBe(200);
-    expect((await app.request(`/api/workspaces/${WS}/persistence/collection/c/1`, { headers: curinga })).status).toBe(200);
   });
 
   it("role com '*' mantém o curinga após o sync de órfãs", async () => {
