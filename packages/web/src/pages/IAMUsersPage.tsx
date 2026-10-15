@@ -176,11 +176,13 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
                 <FormItem>
                   <FormLabel>Perfil de Acesso</FormLabel>
                   <Select value={field.value} onValueChange={(val: string | null) => val && field.onChange(val)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione o perfil">
-                        {roleId ? getRoleName(roleId) : undefined}
-                      </SelectValue>
-                    </SelectTrigger>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione o perfil">
+                          {roleId ? getRoleName(roleId) : undefined}
+                        </SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
                     <SelectContent>
                       {roles.map((r) => (
                         <SelectItem key={r.id} value={r.id}>
