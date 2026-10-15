@@ -32,6 +32,7 @@
           "system:roles:update",
           "system:roles:delete",
           "system:workspaces:create",
+          "system:workspaces:read",
           "system:workspaces:update",
           "system:workspaces:delete",
           "system:workspaces:close",
@@ -115,6 +116,7 @@
           "system:roles:update",
           "system:roles:delete",
           "system:workspaces:create",
+          "system:workspaces:read",
           "system:workspaces:update",
           "system:workspaces:delete",
           "system:workspaces:close",
@@ -164,6 +166,7 @@
           "system:roles:update",
           "system:roles:delete",
           "system:workspaces:create",
+          "system:workspaces:read",
           "system:workspaces:update",
           "system:workspaces:delete",
           "system:workspaces:close",
@@ -215,6 +218,7 @@
           "system:roles:update",
           "system:roles:delete",
           "system:workspaces:create",
+          "system:workspaces:read",
           "system:workspaces:update",
           "system:workspaces:delete",
           "system:workspaces:close",
@@ -285,6 +289,7 @@
         "system:roles:update",
         "system:roles:delete",
         "system:workspaces:create",
+        "system:workspaces:read",
         "system:workspaces:update",
         "system:workspaces:delete",
         "system:workspaces:close",
@@ -327,6 +332,7 @@
         "system:roles:update",
         "system:roles:delete",
         "system:workspaces:create",
+        "system:workspaces:read",
         "system:workspaces:update",
         "system:workspaces:delete",
         "system:workspaces:close",
@@ -427,6 +433,12 @@
             "key": "system:workspaces:create",
             "label": "Criar Áreas de Trabalho",
             "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:read",
+            "label": "Visualizar Áreas de Trabalho",
+            "description": "Permite listar e abrir áreas de trabalho e consultar seus dados persistidos.",
             "module": "workspaces"
           },
           {
@@ -609,6 +621,12 @@
             "key": "system:workspaces:create",
             "label": "Criar Áreas de Trabalho",
             "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:read",
+            "label": "Visualizar Áreas de Trabalho",
+            "description": "Permite listar e abrir áreas de trabalho e consultar seus dados persistidos.",
             "module": "workspaces"
           },
           {
@@ -873,6 +891,7 @@
           "system:roles:update",
           "system:roles:delete",
           "system:workspaces:create",
+          "system:workspaces:read",
           "system:workspaces:update",
           "system:workspaces:delete",
           "system:workspaces:close",
@@ -894,6 +913,7 @@
         "name": "Operador de Fechamento",
         "description": "Acesso ao fechamento geral de vendas e aplicação de penalidades.",
         "permissions": [
+          "system:workspaces:read",
           "system:workspaces:create",
           "system:workspaces:close",
           "recipe:fechamento_mes:view",
@@ -948,6 +968,7 @@
           "system:roles:update",
           "system:roles:delete",
           "system:workspaces:create",
+          "system:workspaces:read",
           "system:workspaces:update",
           "system:workspaces:delete",
           "system:workspaces:close",
@@ -969,6 +990,7 @@
         "name": "Operador de Fechamento",
         "description": "Acesso ao fechamento geral de vendas e aplicação de penalidades.",
         "permissions": [
+          "system:workspaces:read",
           "system:workspaces:create",
           "system:workspaces:close",
           "recipe:fechamento_mes:view",
@@ -1514,6 +1536,7 @@
           "system:roles:update",
           "system:roles:delete",
           "system:workspaces:create",
+          "system:workspaces:read",
           "system:workspaces:update",
           "system:workspaces:delete",
           "system:workspaces:close",
@@ -1535,6 +1558,7 @@
         "name": "Operador de Fechamento",
         "description": "Acesso ao fechamento geral de vendas e aplicação de penalidades.",
         "permissions": [
+          "system:workspaces:read",
           "system:workspaces:create",
           "system:workspaces:close",
           "recipe:fechamento_mes:view",
@@ -1572,7 +1596,13 @@
       }
     ]
   },
-  "ws.list.anon": {
+  "ws.list.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "ws.list.ok": {
     "status": 200,
     "body": [
       {
@@ -1597,6 +1627,12 @@
       }
     ]
   },
+  "ws.list.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho."
+    }
+  },
   "ws.list.filter": {
     "status": 200,
     "body": []
@@ -1612,6 +1648,18 @@
       "status": "open",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
+    }
+  },
+  "ws.detail.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "ws.detail.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho."
     }
   },
   "ws.detail.unknown_404": {
@@ -4139,6 +4187,24 @@
       }
     }
   },
+  "persistence.set.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "persistence.set.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho."
+    }
+  },
+  "persistence.set.404_unknown_workspace": {
+    "status": 404,
+    "body": {
+      "error": "Área de Trabalho não encontrada."
+    }
+  },
   "persistence.collection.ok": {
     "status": 200,
     "body": [
@@ -4159,6 +4225,18 @@
   "persistence.collection.empty": {
     "status": 200,
     "body": []
+  },
+  "persistence.collection.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "persistence.collection.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho."
+    }
   },
   "admin.recipes.list.initial": {
     "status": 200,
@@ -4348,6 +4426,12 @@
             "key": "system:workspaces:create",
             "label": "Criar Áreas de Trabalho",
             "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:read",
+            "label": "Visualizar Áreas de Trabalho",
+            "description": "Permite listar e abrir áreas de trabalho e consultar seus dados persistidos.",
             "module": "workspaces"
           },
           {

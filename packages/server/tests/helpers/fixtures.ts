@@ -26,6 +26,7 @@ const roles: Role[] = [
     name: "Operador de Fechamento",
     description: "Acesso ao fechamento geral de vendas e aplicação de penalidades.",
     permissions: [
+      "system:workspaces:read",
       "system:workspaces:create",
       "system:workspaces:close",
       "recipe:fechamento_mes:view",
@@ -94,3 +95,17 @@ export const seededWorkspaces: WorkspaceRecord[] = [
     updatedAt: "2026-01-02T09:30:00Z",
   },
 ];
+
+/** Login de um usuário semeado; devolve o header Authorization pronto para `app.request`. */
+export async function authHeader(
+  app: { request: (path: string, init?: RequestInit) => Response | Promise<Response> },
+  username = "carlos.admin"
+): Promise<Record<string, string>> {
+  const res = await app.request("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password: TEST_PASSWORD }),
+  });
+  const { access_token } = (await res.json()) as { access_token: string };
+  return { Authorization: `Bearer ${access_token}` };
+}

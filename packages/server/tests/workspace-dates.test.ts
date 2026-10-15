@@ -4,7 +4,7 @@ import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import { WorkspaceValidator } from "../src/engine/workspace-validator.js";
 import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
-import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { authHeader, createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 
 describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -80,7 +80,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
   // ─── 3. TESTES DE CICLO DE VIDA (CRIAR, LISTAR, CONCLUIR E TRAVAR) ─────────
   describe("3. Ciclo de Vida e Trava de Workspaces", () => {
     it("deve listar workspaces cadastradas", async () => {
-      const res = await app.request("/api/workspaces");
+      const res = await app.request("/api/workspaces", { headers: await authHeader(app) });
       expect(res.status).toBe(200);
       const list = (await res.json()) as Array<{ id: string; status: string }>;
       expect(list.length).toBeGreaterThanOrEqual(2);

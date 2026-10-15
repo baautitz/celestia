@@ -71,6 +71,12 @@ export const SYSTEM_PERMISSIONS: PermissionItem[] = [
     module: "workspaces",
   },
   {
+    key: "system:workspaces:read",
+    label: "Visualizar Áreas de Trabalho",
+    description: "Permite listar e abrir áreas de trabalho e consultar seus dados persistidos.",
+    module: "workspaces",
+  },
+  {
     key: "system:workspaces:update",
     label: "Editar Áreas de Trabalho",
     description: "Permite alterar o título, o período e os parâmetros de áreas de trabalho existentes.",

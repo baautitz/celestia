@@ -3,7 +3,7 @@ import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
-import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { authHeader, createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 
 describe("Bateria E2E Completa: Recipe Fechamento de Mês", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -101,7 +101,7 @@ describe("Bateria E2E Completa: Recipe Fechamento de Mês", () => {
     // Gerente altera Salário Base do Carlos (ID 1) para R$ 2.000,00
     const resEditSalario = await app.request(`/api/workspaces/${workspaceId}/persistence/set`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeader(app)) },
       body: JSON.stringify({
         target: "remuneracao_vendedor",
         target_foreign_key_value: 1,
@@ -115,7 +115,7 @@ describe("Bateria E2E Completa: Recipe Fechamento de Mês", () => {
     // Gerente adiciona Comissão de R$ 600,00 para o Carlos (ID 1)
     const resEditComissao = await app.request(`/api/workspaces/${workspaceId}/persistence/set`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeader(app)) },
       body: JSON.stringify({
         target: "remuneracao_vendedor",
         target_foreign_key_value: 1,

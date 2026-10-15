@@ -1,4 +1,4 @@
-import { Hono, type Context, type Next } from "hono";
+import { Hono, type Context, type MiddlewareHandler, type Next } from "hono";
 import { cors } from "hono/cors";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { serve } from "@hono/node-server";
@@ -132,6 +132,17 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     }
     await next();
   };
+
+  // Exige ao menos uma das permissões; ausência de usuário/permissões nega (fail closed).
+  const guard =
+    (message: string, ...keys: string[]): MiddlewareHandler =>
+    async (c, next) => {
+      const user = c.get("user") as JWTAccessPayload | undefined;
+      const perms = user?.permissions ?? [];
+      if (!keys.some((key) => perms.includes(key))) return c.json({ error: message }, 403);
+      await next();
+    };
+  const READ_WS_DENIED = "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho.";
 
   // Helper para obter recipe registrada
   function getRecipe(recipeId: string): RecipeDef {
@@ -620,7 +631,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 1. GET /api/workspaces (Lista todas as Áreas de Trabalho, com filtro opcional por Modelo)
   app.get(
     "/api/workspaces",
-    optionalAuthMiddleware,
+    auth,
+    guard(READ_WS_DENIED, "system:workspaces:read"),
     zValidator("query", z.object({ recipe_id: z.string().optional() })),
     (c) => {
       const { recipe_id } = c.req.valid("query");
@@ -635,7 +647,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 2. GET /api/workspaces/:id (Detalhes e status da Área de Trabalho)
   app.get(
     "/api/workspaces/:id",
-    optionalAuthMiddleware,
+    auth,
+    guard(READ_WS_DENIED, "system:workspaces:read"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
@@ -1150,6 +1163,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 4. POST /api/workspaces/:id/persistence/set (Auto-save de edição inline em células)
   app.post(
     "/api/workspaces/:id/persistence/set",
+    auth,
+    guard("Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho.", "system:workspaces:update"),
     zValidator("param", z.object({ id: z.string() })),
     zValidator(
       "json",
@@ -1167,7 +1182,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
       // Trava de edição se a Área de Trabalho estiver concluída
       const ws = workspacesMap.get(workspaceId);
-      if (ws && ws.status === "closed") {
+      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
+      if (ws.status === "closed") {
         return c.json(
           { error: "Esta Área de Trabalho está concluída e bloqueada para edições." },
           400
@@ -1191,6 +1207,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 5. GET /api/workspaces/:id/persistence/collection/:collection/:foreignKeyValue (Consulta itens de sub-tabelas)
   app.get(
     "/api/workspaces/:id/persistence/collection/:collection/:foreignKeyValue",
+    auth,
+    guard(READ_WS_DENIED, "system:workspaces:read"),
     zValidator("param", z.object({ id: z.string(), collection: z.string(), foreignKeyValue: z.string() })),
     async (c) => {
       const { id: workspaceId, collection, foreignKeyValue } = c.req.valid("param");
