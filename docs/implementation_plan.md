@@ -1,3 +1,5 @@
+> Nota: descreve o motor de Recipes removido em 2026-10-15; mantido apenas como historico.
+
 # Plano de Implementação — Plataforma SDUI (Backend & Shared Foundation)
 
 Este plano define a arquitetura, bibliotecas, estrutura de arquivos e etapas de implementação com TDD (Vitest) para a base da plataforma SDUI.
