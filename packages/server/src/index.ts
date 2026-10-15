@@ -46,6 +46,15 @@ export interface CreatePlatformAppOptions {
   workspaceStore?: WorkspaceStore;
 }
 
+/** Data civil estrita YYYY-MM-DD (e existente no calendário). */
+const IsoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD.")
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+  }, "Data inexistente.");
+
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const app = new Hono();
 
@@ -734,8 +743,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         .object({
           name: z.string().optional(),
           recipeId: z.string(),
-          startDate: z.string(),
-          endDate: z.string(),
+          startDate: IsoDateSchema,
+          endDate: IsoDateSchema,
           params: z.record(z.unknown()).optional(),
         })
         .refine(
@@ -792,8 +801,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       "json",
       z.object({
         name: z.string().optional(),
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
+        startDate: IsoDateSchema.optional(),
+        endDate: IsoDateSchema.optional(),
         params: z.record(z.unknown()).optional(),
       })
     ),

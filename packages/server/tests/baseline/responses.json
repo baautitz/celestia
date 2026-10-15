@@ -1836,6 +1836,32 @@
       "error": "A Data Final não pode ser anterior à Data Inicial."
     }
   },
+  "ws.update.400_invalid_date": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "validation": "regex",
+            "code": "invalid_string",
+            "message": "Use o formato YYYY-MM-DD.",
+            "path": [
+              "startDate"
+            ]
+          },
+          {
+            "code": "custom",
+            "message": "Data inexistente.",
+            "path": [
+              "startDate"
+            ]
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
   "ws.update.404": {
     "status": 404,
     "body": {

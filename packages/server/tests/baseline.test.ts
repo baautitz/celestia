@@ -271,6 +271,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("ws.update.403", "PUT", `/api/workspaces/${wsId}`, { token: V, body: { name: "Y Z" } });
     await rec("ws.update.ok", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { name: "Renomeada", endDate: "2026-03-05" } });
     await rec("ws.update.400_dates", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { endDate: "2026-01-01" } });
+    await rec("ws.update.400_invalid_date", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { startDate: "abc" } });
     await rec("ws.update.404", "PUT", "/api/workspaces/nao_existe", { token: A, body: { name: "Y Z" } });
     await rec("ws.conclude.403", "POST", `/api/workspaces/${wsId}/conclude`, { token: V });
     await rec("ws.conclude.ok", "POST", `/api/workspaces/${wsId}/conclude`, { token: O });

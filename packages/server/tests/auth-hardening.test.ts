@@ -359,6 +359,22 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect((await app.request("/api/dashboards/nada/schema", { headers: op })).status).toBe(403);
     });
 
+    it("datas de workspace: YYYY-MM-DD estrito no POST e no PUT", async () => {
+      const gerente = await authHeader(app, "carlos.admin");
+      const put = (body: object) =>
+        app.request(`/api/workspaces/${WS}`, { method: "PUT", headers: { "Content-Type": "application/json", ...gerente }, body: JSON.stringify(body) });
+      expect((await put({ startDate: "abc" })).status).toBe(400);
+      expect((await put({ endDate: "2026-02-30" })).status).toBe(400);
+      expect((await put({ endDate: "2025-01-01" })).status).toBe(400);
+      const post = await app.request("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...gerente },
+        body: JSON.stringify({ recipeId: "fechamento_mes", startDate: "01/02/2026", endDate: "2026-02-28" }),
+      });
+      expect(post.status).toBe(400);
+      expect((await put({ endDate: "2026-02-10" })).status).toBe(200);
+    });
+
     it("conclude e reopen exigem close/reopen; só create não basta", async () => {
       for (const action of ["conclude", "reopen"]) {
         const res = await app.request(`/api/workspaces/${WS}/${action}`, { method: "POST", headers: semView });
