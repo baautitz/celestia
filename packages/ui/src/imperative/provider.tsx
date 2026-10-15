@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import type { ReactNode } from "react"
 import { AlertDialogAction, AlertDialogCancel } from "../components/alert-dialog.tsx"
-import { feedbackService } from "../adapters/feedback-sonner.ts"
+import { feedbackService } from "../adapters/feedback-toast.ts"
 import type { FeedbackService, NavigationService, Ui } from "../contracts/services.ts"
 import type { ConfirmOptions, FocusTarget, OpenWindowOptions } from "../contracts/windows.ts"
 import { WindowController } from "./controller.ts"
