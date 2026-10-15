@@ -113,7 +113,6 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                       <Textarea
                         value={String(rhf.value ?? "")}
                         disabled={field.readOnly}
-                        required={field.required}
                         onChange={rhf.onChange}
                         onBlur={rhf.onBlur}
                         name={rhf.name}
@@ -142,7 +141,6 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                         placeholder={field.placeholder}
                         value={String(rhf.value ?? "")}
                         disabled={field.readOnly}
-                        required={field.required}
                         onChange={rhf.onChange}
                         onBlur={rhf.onBlur}
                         name={rhf.name}
@@ -190,7 +188,6 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                       <MoneyInput
                         value={rhf.value as number | string | undefined}
                         disabled={field.readOnly}
-                        required={field.required}
                         prefix={field.prefix || "R$ "}
                         precision={field.precision ?? 2}
                         allowNegative={field.allowNegative ?? false}
@@ -221,7 +218,6 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                         step={field.step ?? 1}
                         value={rhf.value !== undefined && rhf.value !== "" ? String(rhf.value) : ""}
                         disabled={field.readOnly}
-                        required={field.required}
                         onChange={(e) => rhf.onChange(e.target.value === "" ? "" : Number(e.target.value))}
                         onBlur={rhf.onBlur}
                         name={rhf.name}
@@ -428,7 +424,6 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                       <Input
                         value={String(rhf.value ?? "")}
                         disabled={field.readOnly}
-                        required={field.required}
                         onChange={rhf.onChange}
                         onBlur={rhf.onBlur}
                         name={rhf.name}
