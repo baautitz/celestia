@@ -51,13 +51,15 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
     const routes = new Hono();
     if (options.routeMiddleware) routes.use("*", options.routeMiddleware);
     const own = new Map<string, unknown>();
+    const offs: (() => void)[] = [];
+    const track = (off: () => void): (() => void) => (offs.push(off), off);
     const ctx: ModuleContext = {
       moduleId: def.id,
       routes,
       events: {
-        on: (e, h, o) => events.on(e, h, { ...o, module: def.id }),
-        before: (e, h, o) => events.before(e, h, { ...o, module: def.id }),
-        after: (e, h, o) => events.after(e, h, { ...o, module: def.id }),
+        on: (e, h, o) => track(events.on(e, h, { ...o, module: def.id })),
+        before: (e, h, o) => track(events.before(e, h, { ...o, module: def.id })),
+        after: (e, h, o) => track(events.after(e, h, { ...o, module: def.id })),
         run: (e, p, a) => events.run(e, p, a),
       },
       permissions: {
@@ -87,6 +89,7 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
       services.set(def.id, own);
       loaded.push(def.id);
     } catch (e) {
+      offs.forEach((off) => off()); // atomicidade: sem handlers residuais (serviços só são publicados no sucesso)
       failedIds.add(def.id);
       failed.push({ moduleId: def.id, reason: msg(e) });
       logger.error(`Módulo "${def.id}" falhou ao carregar: ${msg(e)}`);
