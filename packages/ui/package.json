@@ -1,0 +1,49 @@
+{
+  "name": "@platform/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./components/*": "./src/components/*.tsx",
+    "./forms/dynamic-form": "./src/forms/dynamic-form.ts",
+    "./forms/*": "./src/forms/*.tsx",
+    "./lib/*": "./src/lib/*.ts",
+    "./hooks/*": "./src/hooks/*.ts",
+    "./contracts/*": "./src/contracts/*.ts",
+    "./contracts/module": "./src/contracts/module.ts",
+    "./data-table/*": "./src/data-table/*.tsx",
+    "./imperative/controller": "./src/imperative/controller.ts",
+    "./imperative/provider": "./src/imperative/provider.tsx",
+    "./imperative/host": "./src/imperative/host.tsx",
+    "./imperative/use-window": "./src/imperative/use-window.tsx",
+    "./adapters/*": "./src/adapters/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@base-ui/react": "^1.7.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^6.28.0"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "@hookform/resolvers": "^3.9.1",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^1.33.0",
+    "next-themes": "^0.4.4",
+    "react-day-picker": "^10.0.1",
+    "react-hook-form": "^7.53.2",
+    "recharts": "^3.8.0",
+    "sonner": "^1.7.0",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "vitest": "^2.1.4"
+  }
+}

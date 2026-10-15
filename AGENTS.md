@@ -60,20 +60,28 @@ celestia/
 │   │           ├── persistence-store.ts   -> MemoryPersistenceStore & Postgres persistence adapter
 │   │           └── data-resolver.ts       -> Merges ERP sources + platform persistence + compute columns
 │   │
-│   └── web/                      (@platform/web) -> Frontend SPA (Vite + React 19 + shadcn/ui)
+│   ├── ui/                       (@platform/ui) -> Shared UI library (shadcn/ui primitives, imperative UI, DataTable)
+│   │   └── src/
+│   │       ├── components/   -> shadcn/ui primitives (dialog, sheet, form, input-group, money-input, mobile-card, toast...)
+│   │       ├── data-table/   -> DataTable (desktop Table + mobile MobileCard)
+│   │       ├── forms/        -> DynamicFormFields, dynamic-form
+│   │       ├── imperative/   -> UiProvider/useUi(), window controller & host, WindowActions/useWindow
+│   │       ├── adapters/     -> feedback-toast (feedback service), navigation-router
+│   │       ├── contracts/    -> module (defineWebModule, NavEntry), windows, services, fields
+│   │       ├── hooks/        -> use-mobile
+│   │       └── lib/          -> utils, format
+│   │
+│   └── web/                      (@platform/web) -> Frontend SPA (Vite + React 19), consumes @platform/ui
 │       └── src/
-│           ├── components/
-│           │   ├── sdui/         -> SDUITable, SDUICard, SDUIChart, SDUIStatCard
-│           │   ├── forms/        -> DynamicFormFields, WizardDialog
-│           │   ├── layout/       -> AppLayout, Header, Navigation
-│           │   ├── recipes/      -> RecipePermissionsSheet
-│           │   └── ui/           -> 100% Pure shadcn/ui primitives (InputGroup, MoneyInput, MobileCard, etc.)
-│           ├── pages/            -> WorkspacesPage, WorkspaceDetailPage, RecipeDashboardPage, IAMUsersPage, IAMRolesPage, LoginPage
-│           ├── context/          -> AuthContext, ImperativeUIContext, HeaderActionsContext
-│           ├── hooks/            -> use-mobile, use-theme
-│           └── lib/              -> api-client, utils, dynamic-form
-│
+│           ├── modules.ts    -> Static module registry (one explicit import per module, menu order)
+│           ├── modules/      -> core.ts (coreModule: Usuarios, Grupos, ERPs entries)
+│           ├── components/layout/ -> AppLayout, ProtectedRoute
+│           ├── pages/        -> IAMUsersPage, IAMRolesPage, ERPsPage, LoginPage
+│           ├── context/      -> AuthContext, HeaderActionsContext
+│           └── lib/          -> api-client
 ```
+
+> **The web no longer has SDUI/Recipe pages** (renderer, workspaces, dashboards and recipe editor were removed from `packages/web`). The backend recipe/workspace engine below is unchanged; how recipes will be surfaced in the UI is "a definir".
 
 > **Recipes live in Postgres, not in git.** The TypeScript source is stored in the `recipes` table and managed at runtime via `PUT /api/admin/recipes/:id` (`system:recipes:manage`); the server compiles and validates it on save and on boot. The reference monthly-closing recipe is a test fixture: `packages/server/tests/fixtures/fechamento-mes.recipe.ts`.
 
@@ -125,10 +133,12 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 ### 8. No Credential Leakage
 - `passwordHash` must **never** be included in API responses. Always delete or omit `passwordHash` before returning `User` objects.
 
-### 9. 100% Pure `shadcn/ui` Standard (No Raw HTML)
-- Every UI element rendered in the application MUST be built exclusively with official `shadcn/ui` primitives located in `@/components/ui/*`.
-- **Forms**: Always use `<Form>`, `<FormField>`, `<FormItem>`, `<FormLabel>`, `<FormControl>`, `<FormMessage>` with `react-hook-form` and `zodResolver`.
-- **Labels**: Always use `<Label>` from `@/components/ui/label`. Never use raw `<label>`.
+### 9. `@platform/ui` Primitives Only (No Raw HTML)
+- Every UI element is built from `@platform/ui/components/*` (shadcn/ui, Base UI). The legacy `@/components/ui` no longer exists.
+- **Forms**: `<Form>`, `<FormField>`, `<FormItem>`, `<FormLabel>`, `<FormControl>`, `<FormMessage>` with `react-hook-form` and `zodResolver`.
+- **Labels**: always `<Label>`; never raw `<label>`.
+- **Theme**: light-only (no theme provider).
+- **Boundary**: outside `packages/ui`, `pnpm check:ui` forbids importing `sonner` or `@base-ui/react/*`, `@/components/ui`, and declarative `open=`/`onOpenChange=` on Dialog/Sheet/AlertDialog/Popover.
 
 ### 11. Custom Tailwind `<div>` Components Prohibited Without Explicit Authorization
 - **NEVER** create custom components or layout wrappers using custom-styled `<div>` tags without explicit prior approval from the user.
@@ -156,19 +166,14 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 - Reference: `buttonVariants` sizes are `default` (`h-8`), `xs` (`h-6`), `sm` (`h-7`), `lg` (`h-9`), `icon`/`icon-xs`/`icon-sm`/`icon-lg`. Project convention uses exclusively `default` and `icon`.
 
 ### 16. Sheet Layout Convention
-- Side: always `side="right"`.
-- Content: `SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl"`.
-- Header: `SheetHeader className="p-6 border-b shrink-0"` with `SheetTitle` + `SheetDescription`.
-- Body: `ScrollArea className="flex-1 min-h-0"` wrapping a `<div className="p-6 flex flex-col gap-6">` (or `gap-4`).
-- Footer: `SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover"` with `variant="outline"` Cancel + primary submit.
-- Submit pattern: `form="role-form"` on the submit button, `<form id="role-form">` inside the scroll area.
-- Reference: `IAMRolesPage.tsx`, `RecipePermissionsSheet.tsx`.
+- Sheets are opened via the `"sheet"` surface of `useUi().windows.open`; the window host in `@platform/ui` implements the layout, so the window component renders ONLY the body and publishes its actions with `<WindowActions>`.
+- Host layout: `SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl"`; `SheetHeader className="p-6 border-b shrink-0"` (`SheetTitle` + `SheetDescription`); `ScrollArea className="flex-1 min-h-0"` > `<div className="p-6 flex flex-col gap-6">`; `SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover"`.
+- Submit pattern: the action button uses `form="<id>"` and the body renders `<form id="<id>">`.
 
 ### 17. Permission Management Separation (System vs Recipe)
 - **System permissions** (`system:*`) are configured in the Roles page (`/iam/roles`) via the edit Sheet.
-- **Recipe permissions** (`recipe:*`) are configured on each Model's page (`/recipes/:recipeId`) via `RecipePermissionsSheet`.
+- **Recipe permissions** (`recipe:*`) were configured via `RecipePermissionsSheet`, removed from the web; the new place is "a definir".
 - The Roles page edit Sheet shows ONLY `system:*` modules. A muted note informs that recipe permissions are configured per Model.
-- The RecipePermissionsSheet lists all roles with Collapsibles; each expands to show the recipe's declared permissions (view, queries, actions) with Switch toggles.
 - Server-side validation: `POST /api/iam/roles` and `PUT /api/iam/roles/:id` validate permission keys against `PermissionCatalogEngine.getAllValidPermissionKeys()`. Invalid keys return HTTP 400. Wildcard `"*"` is allowed.
 
 ### 18. Search Inputs via `InputGroup` (No Custom `<div>` Wrappers)
@@ -180,10 +185,13 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 - **NEVER** use `<Input type="number" step="0.01" />` for currency.
 - `MoneyInput` enforces `type="text"`, `inputMode="numeric"` (opening touch numeric keyboard on mobile devices) and real-time cents-based masking in Brazilian Real (`R$ 0,00`), with full support for `prefix`, `precision`, `allowNegative` and typed float synchronization with the backend.
 
-### 20. Mobile Responsive Tables via `MobileCard`
-- All data tables (`SDUITable`, `WorkspacesPage`, `IAMUsersPage`, `IAMRolesPage`, `showTable`) must implement adaptive rendering via `useIsMobile()`:
-  - **Desktop**: Full `<Table>` with `<TableHeader>`, `<TableBody>`, `<TableCell>` and sorting/pagination controls.
-  - **Mobile**: Grid of `<MobileCard>` elements with primary title, secondary subtitle, structured fields list, and action buttons.
+### 20. Data Tables via `DataTable`
+- Data tables use `DataTable` from `@platform/ui/data-table/data-table`: desktop renders `<Table>`; mobile renders `<MobileCard>` via `useIsMobile()`.
+
+### Imperative UI (`useUi()`)
+- Windows (dialogs/sheets), confirmations and feedback (toasts) are opened imperatively through `useUi()` from `@platform/ui/imperative/provider`, mounted once by `UiProvider` in `main.tsx`.
+- Window content uses `useWindow()` and `WindowActions` (footer actions) from `@platform/ui/imperative/use-window`.
+- Server `ImperativeUIContext`/`UIEffect` types in `@platform/shared` remain for recipe actions executed in the sandbox.
 
 ### 21. Granular One-Line Conventional Commits & Mandatory Approval
 - All commits in this repository MUST strictly follow the **One-Line Conventional Commits** format: `<type>(<scope>): <short description in english>` (e.g. `fix(web): filter showTable rowActions by user permissions`).
@@ -196,6 +204,15 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 ### 22. Named Drizzle Migrations
 - Every migration MUST have a descriptive snake_case name: `pnpm --filter @platform/server db:generate --name=<descricao>` (e.g. `--name=create_users_and_roles`). Never keep the auto-generated random names (e.g. `white_phantom_reporter`).
 - Apply with `pnpm --filter @platform/server db:migrate`. Migrations live in `packages/server/drizzle/`.
+
+---
+
+## 3b. Arquitetura alvo (PLANEJADO, NAO implementado)
+
+- Modulos como bounded contexts, cada um com migrations proprias.
+- Comunicacao entre modulos por eventos `before` (cancelavel) e `after`.
+- Registro de modulos no web (hoje parcial: `modules.ts` + `modules/core.ts`).
+- Demais detalhes: a definir.
 
 ---
 
@@ -357,6 +374,9 @@ pnpm -r run build
 
 # Run entire Vitest test suite
 pnpm test
+
+# UI boundary check
+pnpm check:ui
 
 # Run tests in watch mode
 pnpm --filter @platform/server test:watch

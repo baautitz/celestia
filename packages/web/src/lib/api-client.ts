@@ -4,19 +4,9 @@ import type {
   User,
   Role,
   PermissionCatalog,
-  DashboardSchemaResponse,
-  ComponentDataResponse,
-  ActionExecRequest,
-  ActionExecResponse,
-  PersistenceSetRequest,
-  PersistenceSetResponse,
-  RecipeSummary,
-  WorkspaceRecord,
   ErpTypeMeta,
   ErpConnection,
   ErpConnectionInput,
-  RecipeAdminSummary,
-  RecipeAdminRecord,
 } from "@platform/shared";
 
 class ApiClient {
@@ -231,174 +221,10 @@ class ApiClient {
     },
   };
 
-  // ─── GESTÃO DE MODELOS (CÓDIGO-FONTE EM RUNTIME) ─────────────────────────
-  recipeAdmin = {
-    list: async (): Promise<RecipeAdminSummary[]> => {
-      return this.request<RecipeAdminSummary[]>("/api/admin/recipes");
-    },
-
-    get: async (id: string): Promise<RecipeAdminRecord> => {
-      return this.request<RecipeAdminRecord>(`/api/admin/recipes/${id}`);
-    },
-
-    save: async (id: string, source: string): Promise<RecipeAdminRecord> => {
-      return this.request<RecipeAdminRecord>(`/api/admin/recipes/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ source }),
-      });
-    },
-
-    remove: async (id: string): Promise<{ success: boolean }> => {
-      return this.request<{ success: boolean }>(`/api/admin/recipes/${id}`, { method: "DELETE" });
-    },
-
-    reload: async (): Promise<{ loaded: number; errors: { id: string; message: string }[] }> => {
-      return this.request<{ loaded: number; errors: { id: string; message: string }[] }>("/api/admin/recipes/reload", {
-        method: "POST",
-      });
-    },
-  };
-
-  // ─── SDUI & WORKSPACE ENDPOINTS ─────────────────────────────────────────
-  recipes = {
-    list: async (): Promise<RecipeSummary[]> => {
-      return this.request<RecipeSummary[]>("/api/recipes");
-    },
-  };
-
   lookups = {
     fetch: async (recipeId: string, field: string): Promise<Array<{ value: string | number; label: string }>> => {
       const searchParams = new URLSearchParams({ recipe_id: recipeId, field });
       return this.request(`/api/lookups?${searchParams.toString()}`);
-    },
-  };
-
-  dashboards = {
-    getSchema: async (recipeId: string = "fechamento_mes"): Promise<DashboardSchemaResponse> => {
-      return this.request<DashboardSchemaResponse>(`/api/dashboards/${recipeId}/schema`);
-    },
-  };
-
-  workspaces = {
-    getData: async (
-      workspaceId: string,
-      componentId: string,
-      params: {
-        recipe_id?: string;
-        start_date: string;
-        end_date: string;
-        page?: number;
-        page_size?: number;
-        sort_by?: string;
-        order?: "asc" | "desc";
-        search?: string;
-        profile_id?: string;
-        /** Parâmetros do Dashboard (ex.: empresa) para uso sem Área de Trabalho (modo prévia). */
-        params?: Record<string, unknown>;
-      }
-    ): Promise<ComponentDataResponse> => {
-      const searchParams = new URLSearchParams();
-      searchParams.set("recipe_id", params.recipe_id || "fechamento_mes");
-      searchParams.set("start_date", params.start_date);
-      searchParams.set("end_date", params.end_date);
-      if (params.page) searchParams.set("page", String(params.page));
-      if (params.page_size) searchParams.set("page_size", String(params.page_size));
-      if (params.sort_by) searchParams.set("sort_by", params.sort_by);
-      if (params.order) searchParams.set("order", params.order);
-      if (params.search) searchParams.set("search", params.search);
-      if (params.profile_id) searchParams.set("profile_id", params.profile_id);
-      if (params.params && Object.keys(params.params).length > 0) searchParams.set("params", JSON.stringify(params.params));
-
-      return this.request<ComponentDataResponse>(
-        `/api/workspaces/${workspaceId}/data/${componentId}?${searchParams.toString()}`
-      );
-    },
-
-    execAction: async (
-      workspaceId: string,
-      payload: ActionExecRequest
-    ): Promise<ActionExecResponse> => {
-      return this.request<ActionExecResponse>(`/api/workspaces/${workspaceId}/actions/exec`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    },
-
-    setPersistence: async (
-      workspaceId: string,
-      payload: PersistenceSetRequest
-    ): Promise<PersistenceSetResponse> => {
-      return this.request<PersistenceSetResponse>(`/api/workspaces/${workspaceId}/persistence/set`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    },
-
-    list: async (recipeId?: string): Promise<WorkspaceRecord[]> => {
-      const searchParams = new URLSearchParams();
-      if (recipeId) searchParams.set("recipe_id", recipeId);
-      const query = searchParams.toString();
-      return this.request<WorkspaceRecord[]>(`/api/workspaces${query ? `?${query}` : ""}`);
-    },
-
-    get: async (id: string): Promise<WorkspaceRecord> => {
-      return this.request<WorkspaceRecord>(`/api/workspaces/${id}`);
-    },
-
-    create: async (payload: {
-      name?: string;
-      recipeId: string;
-      startDate: string;
-      endDate: string;
-      params?: Record<string, unknown>;
-    }): Promise<WorkspaceRecord> => {
-      return this.request<WorkspaceRecord>(`/api/workspaces`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    },
-
-    update: async (
-      id: string,
-      payload: {
-        name?: string;
-        startDate?: string;
-        endDate?: string;
-        params?: Record<string, unknown>;
-      }
-    ): Promise<WorkspaceRecord> => {
-      return this.request<WorkspaceRecord>(`/api/workspaces/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(payload),
-      });
-    },
-
-    conclude: async (id: string): Promise<{ success: boolean; workspace: WorkspaceRecord }> => {
-      return this.request(`/api/workspaces/${id}/conclude`, {
-        method: "POST",
-      });
-    },
-
-    reopen: async (id: string): Promise<{ success: boolean; workspace: WorkspaceRecord }> => {
-      return this.request(`/api/workspaces/${id}/reopen`, {
-        method: "POST",
-      });
-    },
-
-    remove: async (id: string): Promise<{ success: boolean }> => {
-      return this.request<{ success: boolean }>(`/api/workspaces/${id}`, {
-        method: "DELETE",
-      });
-    },
-
-    getCollection: async (
-      workspaceId: string,
-      collection: string,
-      foreignKeyValue: string | number
-    ): Promise<Array<Record<string, unknown>>> => {
-      return this.request<Array<Record<string, unknown>>>(
-        `/api/workspaces/${workspaceId}/persistence/collection/${collection}/${foreignKeyValue}`
-      );
     },
   };
 }

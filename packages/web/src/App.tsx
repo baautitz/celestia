@@ -1,20 +1,27 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
-import { WorkspacesPage } from "./pages/WorkspacesPage";
-import { WorkspaceDetailPage } from "./pages/WorkspaceDetailPage";
-import { RecipeDashboardPage } from "./pages/RecipeDashboardPage";
-import { IAMUsersPage } from "./pages/IAMUsersPage";
-import { IAMRolesPage } from "./pages/IAMRolesPage";
-import { ERPsPage } from "./pages/ERPsPage";
-import { RecipesAdminPage } from "./pages/RecipesAdminPage";
 import { AppLayout } from "./components/layout/AppLayout";
-import { RecipeEditorPage } from "./pages/RecipeEditorPage";
-import { DashboardsPage } from "./pages/DashboardsPage";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
-import { RecipesCatalogProvider } from "./context/RecipesCatalogContext";
-import { Toaster } from "@/components/ui/toast";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { allEntries, accessibleEntries } from "./modules";
+import { useAuth } from "./context/AuthContext";
+import { Card, CardHeader, CardTitle, CardDescription } from "@platform/ui/components/card";
+import { Toaster } from "@platform/ui/components/toast";
+import { TooltipProvider } from "@platform/ui/components/tooltip";
+
+const HomeRedirect: React.FC = () => {
+  const { hasPermission } = useAuth();
+  const first = accessibleEntries(hasPermission)[0];
+  if (first) return <Navigate to={first.path} replace />;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sem acesso</CardTitle>
+        <CardDescription>Seu perfil não possui permissão para acessar nenhum módulo.</CardDescription>
+      </CardHeader>
+    </Card>
+  );
+};
 
 export const App: React.FC = () => {
   return (
@@ -25,42 +32,18 @@ export const App: React.FC = () => {
 
         {/* Rotas Protegidas Autenticadas com Layout Corporativo */}
         <Route element={<ProtectedRoute />}>
-          <Route
-          element={
-            <RecipesCatalogProvider>
-              <AppLayout />
-            </RecipesCatalogProvider>
-          }
-        >
-            <Route path="/" element={<Navigate to="/workspaces" replace />} />
-            <Route path="/workspaces" element={<WorkspacesPage />} />
-            <Route path="/workspaces/:id" element={<WorkspaceDetailPage />} />
-            <Route path="/dashboards" element={<DashboardsPage />} />
-            <Route path="/dashboards/:recipeId" element={<RecipeDashboardPage />} />
-
-            {/* Rotas com Permissões Específicas do Sistema IAM */}
-            <Route element={<ProtectedRoute requiredPermission="system:users:read" />}>
-              <Route path="/iam/users" element={<IAMUsersPage />} />
-            </Route>
-
-            <Route element={<ProtectedRoute requiredPermission="system:roles:read" />}>
-              <Route path="/iam/roles" element={<IAMRolesPage />} />
-            </Route>
-
-            <Route element={<ProtectedRoute requiredPermission="system:recipes:read" />}>
-              <Route path="/admin/dashboards" element={<RecipesAdminPage />} />
-              <Route path="/admin/dashboards/new" element={<RecipeEditorPage />} />
-              <Route path="/admin/dashboards/:id/edit" element={<RecipeEditorPage />} />
-            </Route>
-
-            <Route element={<ProtectedRoute requiredPermission="system:sources:manage" />}>
-              <Route path="/erps" element={<ERPsPage />} />
-            </Route>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<HomeRedirect />} />
+            {allEntries.map((entry) => (
+              <Route key={entry.id} element={<ProtectedRoute requiredPermission={entry.permission} />}>
+                <Route path={entry.path} element={<entry.component />} />
+              </Route>
+            ))}
           </Route>
         </Route>
 
         {/* Rota Fallback */}
-        <Route path="*" element={<Navigate to="/workspaces" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
       {/* Toaster Oficial Base UI shadcn */}

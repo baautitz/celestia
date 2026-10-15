@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useHeaderActions } from "@/context/HeaderActionsContext";
-import { api } from "@/lib/api-client";
 import {
   SidebarProvider,
   Sidebar,
@@ -17,7 +16,7 @@ import {
   SidebarInset,
   SidebarTrigger,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "@platform/ui/components/sidebar";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -25,7 +24,7 @@ import {
   BreadcrumbLink,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@platform/ui/components/breadcrumb";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,23 +33,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import {
-  LayoutDashboard,
-  Users,
-  Shield,
-  LogOut,
-  ChevronDown,
-  ArrowLeft,
-  Building2,
-  Layers,
-  Database,
-  FileCode,
-} from "lucide-react";
+} from "@platform/ui/components/dropdown-menu";
+import { Avatar, AvatarFallback } from "@platform/ui/components/avatar";
+import { Badge } from "@platform/ui/components/badge";
+import { Button } from "@platform/ui/components/button";
+import { Separator } from "@platform/ui/components/separator";
+import { LogOut, ChevronDown, ArrowLeft, Building2 } from "lucide-react";
+import { accessibleEntries } from "@/modules";
 
 const SidebarAutoClose: React.FC = () => {
   const { setOpenMobile } = useSidebar();
@@ -64,7 +53,7 @@ const SidebarAutoClose: React.FC = () => {
 };
 
 export const AppLayout: React.FC = () => {
-  const { user, logout, hasAnyPermission } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { actions, backTo } = useHeaderActions();
   const location = useLocation();
   const navigate = useNavigate();
@@ -85,17 +74,12 @@ export const AppLayout: React.FC = () => {
       .toUpperCase();
   };
 
-  const getPageTitle = () => {
-    if (location.pathname.startsWith("/dashboards/")) return "Dashboard";
-    if (location.pathname.startsWith("/dashboards")) return "Dashboards";
-    if (location.pathname.startsWith("/workspaces/")) return "Área de Trabalho";
-    if (location.pathname.startsWith("/workspaces")) return "Áreas de Trabalho";
-    if (location.pathname.startsWith("/iam/users")) return "Gestão de Usuários";
-    if (location.pathname.startsWith("/iam/roles")) return "Grupos";
-    if (location.pathname.startsWith("/erps")) return "ERPs";
-    if (location.pathname.startsWith("/admin/dashboards")) return "Dashboards";
-    return "Painel de Controle";
-  };
+  const entries = accessibleEntries(hasPermission);
+  const groups = [...new Set(entries.map((e) => e.group))].map(
+    (group) => [group, entries.filter((e) => e.group === group)] as const,
+  );
+  const current = entries.find((e) => location.pathname.startsWith(e.path));
+  const pageTitle = current ? (current.title ?? current.label) : "Painel de Controle";
 
   return (
     <SidebarProvider>
@@ -104,7 +88,7 @@ export const AppLayout: React.FC = () => {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" render={<Link to="/workspaces" />}>
+              <SidebarMenuButton size="lg" render={<Link to="/" />}>
                 <div className="flex aspect-square size-8 items-center justify-center rounded-none bg-primary text-primary-foreground">
                   <Building2 className="size-4" />
                 </div>
@@ -117,88 +101,25 @@ export const AppLayout: React.FC = () => {
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Celestia</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={location.pathname === "/workspaces" && !location.pathname.startsWith("/workspaces/")}
-                  tooltip="Áreas de Trabalho"
-                  render={<Link to="/workspaces" />}
-                >
-                  <LayoutDashboard className="size-4" />
-                  <span>Áreas de Trabalho</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={location.pathname.startsWith("/dashboards")}
-                  tooltip="Dashboards"
-                  render={<Link to="/dashboards" />}
-                >
-                  <Layers className="size-4" />
-                  <span>Dashboards</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-
-          {hasAnyPermission("system:users:read", "system:roles:read", "system:sources:manage", "system:recipes:read") && (
-            <SidebarGroup>
-              <SidebarGroupLabel>Administração & IAM</SidebarGroupLabel>
+          {groups.map(([group, items]) => (
+            <SidebarGroup key={group}>
+              <SidebarGroupLabel>{group}</SidebarGroupLabel>
               <SidebarMenu>
-                {hasAnyPermission("system:users:read") && (
-                  <SidebarMenuItem>
+                {items.map((entry) => (
+                  <SidebarMenuItem key={entry.id}>
                     <SidebarMenuButton
-                      isActive={location.pathname.startsWith("/iam/users")}
-                      tooltip="Usuários"
-                      render={<Link to="/iam/users" />}
+                      isActive={location.pathname.startsWith(entry.path)}
+                      tooltip={entry.label}
+                      render={<Link to={entry.path} />}
                     >
-                      <Users className="size-4" />
-                      <span>Usuários</span>
+                      <entry.icon className="size-4" />
+                      <span>{entry.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                )}
-                {hasAnyPermission("system:roles:read") && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={location.pathname.startsWith("/iam/roles")}
-                      tooltip="Grupos"
-                      render={<Link to="/iam/roles" />}
-                    >
-                      <Shield className="size-4" />
-                      <span>Grupos</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-                {hasAnyPermission("system:recipes:read") && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={location.pathname.startsWith("/admin/dashboards")}
-                      tooltip="Gerenciar Dashboards"
-                      render={<Link to="/admin/dashboards" />}
-                    >
-                      <FileCode className="size-4" />
-                      <span>Gerenciar Dashboards</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-                {hasAnyPermission("system:sources:manage") && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={location.pathname.startsWith("/erps")}
-                      tooltip="ERPs"
-                      render={<Link to="/erps" />}
-                    >
-                      <Database className="size-4" />
-                      <span>ERPs</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
+                ))}
               </SidebarMenu>
             </SidebarGroup>
-          )}
+          ))}
         </SidebarContent>
 
         <SidebarFooter>
@@ -280,13 +201,13 @@ export const AppLayout: React.FC = () => {
             <Breadcrumb className="min-w-0">
               <BreadcrumbList className="items-center">
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink render={<Link to="/workspaces" />} className="cursor-pointer text-sm">
+                  <BreadcrumbLink render={<Link to="/" />} className="cursor-pointer text-sm">
                     Início
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block my-auto self-center" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="text-sm font-medium truncate">{getPageTitle()}</BreadcrumbPage>
+                  <BreadcrumbPage className="text-sm font-medium truncate">{pageTitle}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
