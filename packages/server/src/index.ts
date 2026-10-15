@@ -350,6 +350,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (body.status === "inactive" && !caller.isAdmin && (await userStore.findById(id))?.isAdmin) {
         return c.json({ error: ADMIN_TARGET_ONLY }, 403);
       }
+      if (body.status === "inactive" && (await isLastActiveAdmin(id))) {
+        return c.json({ error: LAST_ADMIN }, 409);
+      }
       if (body.roleId) {
         const targetRole = await userStore.getRole(body.roleId);
         if (targetRole) {
@@ -405,9 +408,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // DELETE /api/iam/users/:id
   app.delete("/api/iam/users/:id", auth, requirePermission("system:users:delete"), async (c) => {
     const id = c.req.param("id");
+    if (id === getAuthenticatedUser(c).sub) {
+      return c.json({ error: "Não é possível excluir a si mesmo." }, 409);
+    }
     if (!getAuthenticatedUser(c).isAdmin && (await userStore.findById(id))?.isAdmin) {
       return c.json({ error: ADMIN_TARGET_ONLY }, 403);
     }
+    if (await isLastActiveAdmin(id)) return c.json({ error: LAST_ADMIN }, 409);
     try {
       await userStore.deleteUser(id);
       return c.json({ success: true });
@@ -435,6 +442,12 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     const caller = getAuthenticatedUser(c);
     const missing = missingGrants(caller.permissions, targets, caller.isAdmin === true);
     return missing.length > 0 ? c.json({ error: grantDeniedMessage(missing) }, 403) : undefined;
+  };
+
+  const LAST_ADMIN = "O sistema precisa de ao menos um administrador ativo.";
+  const isLastActiveAdmin = async (id: string): Promise<boolean> => {
+    const admins = (await userStore.listUsers()).filter((u) => u.isAdmin && u.status === "active");
+    return admins.length === 1 && admins[0].id === id;
   };
 
   const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
