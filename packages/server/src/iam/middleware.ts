@@ -16,17 +16,7 @@ export function createAuthMiddleware(
 ): MiddlewareHandler {
   return async (c: Context, next) => {
     const authHeader = c.req.header("Authorization");
-    let token: string | undefined;
-
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      token = authHeader.substring(7);
-    } else {
-      // Suporte a cookie access_token caso enviado
-      token = c.req.header("Cookie")
-        ?.split("; ")
-        .find((row) => row.startsWith("access_token="))
-        ?.split("=")[1];
-    }
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : undefined;
 
     if (!token) {
       return c.json({ error: "Não autenticado: token de acesso não fornecido." }, 401);

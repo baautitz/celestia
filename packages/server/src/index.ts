@@ -67,10 +67,15 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const app = new Hono();
 
   // Middleware CORS para desenvolvimento e produção
+  // Allowlist explícita (CORS_ORIGINS, separada por vírgula); nunca reflete uma origem arbitrária.
+  const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
   app.use(
     "*",
     cors({
-      origin: (origin) => origin || "*",
+      origin: (origin) => (allowedOrigins.includes(origin) ? origin : null),
       credentials: true,
       allowHeaders: ["Content-Type", "Authorization"],
       allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

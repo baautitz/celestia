@@ -430,4 +430,20 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(a.id).not.toBe(b.id);
     });
   });
+
+  describe("CORS e cookie de acesso", () => {
+    it("só reflete origens da allowlist", async () => {
+      const ok = await app.request("/api/health", { headers: { Origin: "http://localhost:5173" } });
+      expect(ok.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
+      const bad = await app.request("/api/health", { headers: { Origin: "https://evil.example" } });
+      expect(bad.headers.get("access-control-allow-origin")).toBeNull();
+    });
+
+    it("cookie access_token não autentica", async () => {
+      const header = await authHeader(app, "carlos.admin");
+      const token = header.Authorization.slice("Bearer ".length);
+      const res = await app.request("/api/auth/me", { headers: { Cookie: `access_token=${token}` } });
+      expect(res.status).toBe(401);
+    });
+  });
 });
