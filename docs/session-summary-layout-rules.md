@@ -1,3 +1,5 @@
+> Documento histórico: descreve o motor de Recipes/SDUI removido em 2026-10-15; mantido apenas como referência.
+
 # Relatório Consolidado: Layout, Regras e Atualização do AGENTS.md
 
 Este documento consolida todas as intervenções de **Layout**, **Componentização shadcn/ui**, **Regras Arquiteturais e Comportamentais** implementadas nesta sessão, além do planejamento para enriquecer o [AGENTS.md](../AGENTS.md).

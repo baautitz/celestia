@@ -1,3 +1,5 @@
+> Documento histórico: descreve o motor de Recipes/SDUI removido em 2026-10-15; mantido apenas como referência.
+
 # Component Registry — Celestia SDUI Platform
 
 Registro completo de componentes da plataforma, divididos em **Componentes Declarativos** (árvore de layout e display) e **Componentes Imperativos** (invocados via código com `await ui.*`).
