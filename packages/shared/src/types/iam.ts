@@ -123,6 +123,7 @@ export interface PermissionItem {
   label: string;       // Nome amigável para exibição
   description?: string;
   module?: string;     // Módulo no caso de system (ex: "users", "roles")
+  deniedMessage?: string; // Mensagem do 403 quando a permissão falta (declarada junto da permissão)
 }
 
 /**

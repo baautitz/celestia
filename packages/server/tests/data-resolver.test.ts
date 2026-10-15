@@ -136,6 +136,7 @@ describe("DataResolver (Tabelas Paginadas vs Gráficos & KPIs Totais)", () => {
       persistenceStore,
       context: {
         workspace: { startDate: "2026-01-01", endDate: "2026-01-31" },
+        user: { id: "u", role: "r", permissions: ["*"], externals: {} },
       },
     });
 
@@ -156,6 +157,7 @@ describe("DataResolver (Tabelas Paginadas vs Gráficos & KPIs Totais)", () => {
       persistenceStore,
       context: {
         workspace: { startDate: "2026-01-01", endDate: "2026-01-31" },
+        user: { id: "u", role: "r", permissions: ["*"], externals: {} },
       },
     });
 
@@ -176,6 +178,7 @@ describe("DataResolver (Tabelas Paginadas vs Gráficos & KPIs Totais)", () => {
       persistenceStore,
       context: {
         workspace: { startDate: "2026-01-01", endDate: "2026-01-31" },
+        user: { id: "u", role: "r", permissions: ["*"], externals: {} },
       },
     });
 

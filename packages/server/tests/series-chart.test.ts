@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { RecipeDef } from "@platform/shared";
+import { createSeededUserStore, withAuth } from "./helpers/fixtures.js";
 import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 
@@ -42,7 +43,8 @@ describe("line_chart com séries (uma linha por vendedor)", () => {
   ];
 
   it("pivota por dia, mantém só as séries de maior total e preenche com 0", async () => {
-    const app = createPlatformApp({ recipes: { series: recipeWith(false) }, sourceConnector: new MockSourceConnector({ default: rows }) });
+    const app = createPlatformApp({ userStore: createSeededUserStore({ admin: true }), recipes: { series: recipeWith(false) }, sourceConnector: new MockSourceConnector({ default: rows }) });
+    withAuth(app, "test.root");
     const res = await app.request("/api/workspaces/preview/data/linhas?recipe_id=series&start_date=2026-09-01&end_date=2026-09-30");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { series: { key: string; label: string }[]; data: Array<Record<string, unknown>> };
@@ -59,7 +61,8 @@ describe("line_chart com séries (uma linha por vendedor)", () => {
   });
 
   it("com cumulative, cada série vira a soma corrida e repete o acumulado nos dias sem venda", async () => {
-    const app = createPlatformApp({ recipes: { series: recipeWith(true) }, sourceConnector: new MockSourceConnector({ default: rows }) });
+    const app = createPlatformApp({ userStore: createSeededUserStore({ admin: true }), recipes: { series: recipeWith(true) }, sourceConnector: new MockSourceConnector({ default: rows }) });
+    withAuth(app, "test.root");
     const res = await app.request("/api/workspaces/preview/data/linhas?recipe_id=series&start_date=2026-09-01&end_date=2026-09-30");
     const body = (await res.json()) as { data: Array<Record<string, number | string>> };
 

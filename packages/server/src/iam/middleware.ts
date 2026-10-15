@@ -1,4 +1,5 @@
 import type { Context, MiddlewareHandler } from "hono";
+import { hasPermission } from "./has-permission.js";
 import type { TokenService } from "./token-service.js";
 import type { JWTAccessPayload } from "@platform/shared";
 
@@ -15,17 +16,7 @@ export function createAuthMiddleware(
 ): MiddlewareHandler {
   return async (c: Context, next) => {
     const authHeader = c.req.header("Authorization");
-    let token: string | undefined;
-
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      token = authHeader.substring(7);
-    } else {
-      // Suporte a cookie access_token caso enviado
-      token = c.req.header("Cookie")
-        ?.split("; ")
-        .find((row) => row.startsWith("access_token="))
-        ?.split("=")[1];
-    }
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : undefined;
 
     if (!token) {
       return c.json({ error: "Não autenticado: token de acesso não fornecido." }, 401);
@@ -35,9 +26,8 @@ export function createAuthMiddleware(
       const payload = await tokenService.verifyAccessToken(token);
       c.set("user", transform(payload));
       await next();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Token expirado ou inválido.";
-      return c.json({ error: `Falha na autenticação: ${msg}` }, 401);
+    } catch {
+      return c.json({ error: "Falha na autenticação: token expirado ou inválido." }, 401);
     }
   };
 }
@@ -49,11 +39,8 @@ export function requirePermission(...requiredPermissions: string[]): MiddlewareH
       return c.json({ error: "Acesso negado: usuário não autenticado." }, 401);
     }
 
-    const userPerms = new Set(user.permissions || []);
-    // Usuário precisa ter ao menos uma das permissões exigidas
-    const hasPermission = requiredPermissions.some((perm) => userPerms.has(perm));
-
-    if (!hasPermission) {
+    // Usuário precisa ter ao menos uma das permissões exigidas ("*" honrado, falha fechado)
+    if (!requiredPermissions.some((perm) => hasPermission(user.permissions, perm))) {
       return c.json(
         {
           error: "Acesso negado: permissões insuficientes.",

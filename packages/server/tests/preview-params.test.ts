@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { RecipeDef } from "@platform/shared";
+import { createSeededUserStore, withAuth } from "./helpers/fixtures.js";
 import { createPlatformApp } from "../src/index.js";
 import type { SourceConnector } from "../src/data/source-connector.js";
 
@@ -57,13 +58,14 @@ describe("Parâmetros do Modelo sem Área de Trabalho (prévia)", () => {
         return [{ id: 1 }];
       },
     };
-    app = createPlatformApp({
+    app = createPlatformApp({ userStore: createSeededUserStore({ admin: true }),
       sourceConnectors: { erp: connector },
       recipes: { com_empresa: recipe },
       workspaces: [
         { id: "ws_real", recipeId: "com_empresa", name: "Real", startDate: "2026-01-01", endDate: "2026-01-31", status: "open", params: { empresa: 9 }, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
       ],
     });
+    withAuth(app, "test.root");
   });
 
   const get = (workspace: string, extra = "") =>

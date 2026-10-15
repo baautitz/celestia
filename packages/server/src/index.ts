@@ -1,4 +1,5 @@
-import { Hono, type Context, type Next } from "hono";
+import { randomUUID } from "node:crypto";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { serve } from "@hono/node-server";
@@ -19,8 +20,12 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
 import { PermissionCatalogEngine } from "./iam/permission-catalog.js";
+import { grantDeniedMessage, missingGrants } from "./iam/can-grant.js";
+import { hasPermission } from "./iam/has-permission.js";
+import { denyMessage } from "./iam/system-permissions.js";
 import { PermissionResolver } from "./iam/permission-resolver.js";
-import { createAuthMiddleware, requirePermission } from "./iam/middleware.js";
+import { NotFoundError } from "./engine/errors.js";
+import { createAuthMiddleware, getAuthenticatedUser, requirePermission } from "./iam/middleware.js";
 import type { WorkspaceStore } from "./data/workspace-store.js";
 import type { RecipeDef, ActionDef, JWTAccessPayload, WorkspaceRecord } from "@platform/shared";
 
@@ -42,14 +47,35 @@ export interface CreatePlatformAppOptions {
   workspaceStore?: WorkspaceStore;
 }
 
+/** Data civil estrita YYYY-MM-DD (e existente no calendário). */
+const IsoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD.")
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+  }, "Data inexistente.");
+
+let dummyHash: string | undefined;
+/** Hash descartável para igualar o tempo do login quando o usuário não existe. */
+function getDummyHash(): string {
+  dummyHash ??= PasswordService.hash(`${randomUUID()}Aa1!`);
+  return dummyHash;
+}
+
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const app = new Hono();
 
   // Middleware CORS para desenvolvimento e produção
+  // Allowlist explícita (CORS_ORIGINS, separada por vírgula); nunca reflete uma origem arbitrária.
+  const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
   app.use(
     "*",
     cors({
-      origin: (origin) => origin || "*",
+      origin: (origin) => (allowedOrigins.includes(origin) ? origin : null),
       credentials: true,
       allowHeaders: ["Content-Type", "Authorization"],
       allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -118,19 +144,14 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
   const auth = createAuthMiddleware(tokenService, withAdminBypass);
 
-  // Helper opcional para extrair usuário sem forçar 401
-  const optionalAuthMiddleware = async (c: Context, next: Next) => {
-    const authHeader = c.req.header("Authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      try {
-        const payload = await tokenService.verifyAccessToken(authHeader.substring(7));
-        c.set("user", withAdminBypass(payload));
-      } catch {
-        // Ignora erro em auth opcional
-      }
-    }
-    await next();
-  };
+  // Exige ao menos uma das permissões; ausência de usuário/permissões nega (fail closed).
+  const guard =
+    (...keys: string[]): MiddlewareHandler =>
+    async (c, next) => {
+      const user = c.get("user") as JWTAccessPayload | undefined;
+      if (!keys.some((key) => hasPermission(user?.permissions, key))) return c.json({ error: denyMessage(keys[0]) }, 403);
+      await next();
+    };
 
   // Helper para obter recipe registrada
   function getRecipe(recipeId: string): RecipeDef {
@@ -162,12 +183,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const { username, password } = c.req.valid("json");
       const user = await userStore.findByUsername(username);
 
-      if (!user || user.status === "inactive") {
-        return c.json({ error: "Credenciais inválidas ou usuário inativo." }, 401);
-      }
-
-      const isPasswordValid = PasswordService.verify(password, user.passwordHash || "");
-      if (!isPasswordValid) {
+      // Mesma mensagem e mesmo custo (hash dummy) para inexistente, senha errada e inativo.
+      const isPasswordValid = PasswordService.verify(password, user?.passwordHash || getDummyHash());
+      if (!user || user.status === "inactive" || !isPasswordValid) {
         return c.json({ error: "Credenciais inválidas." }, 401);
       }
 
@@ -243,9 +261,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           expires_in: 300,
           user: withAdminBypass(userPayload),
         });
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Refresh token inválido ou expirado.";
-        return c.json({ error: msg }, 401);
+      } catch {
+        return c.json({ error: "Refresh token inválido ou expirado." }, 401);
       }
     }
   );
@@ -304,6 +321,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     ),
     async (c) => {
       const body = c.req.valid("json");
+      const targetRole = await userStore.getRole(body.roleId);
+      if (targetRole) {
+        const denied = grantViolation(c, targetRole.permissions);
+        if (denied) return denied;
+      }
       try {
         const newUser = await userStore.createUser(body);
         return c.json(newUser, 201);
@@ -343,6 +365,21 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           return c.json({ error: "Você não pode remover o seu próprio acesso de administrador." }, 400);
         }
       }
+      // Só admin age sobre admin: nenhum campo de um administrador é alterável por não-admin.
+      if (!caller.isAdmin && (await userStore.findById(id))?.isAdmin) {
+        const message = body.status === "inactive" ? ADMIN_TARGET_ONLY : "Somente administradores podem alterar outro administrador.";
+        return c.json({ error: message }, 403);
+      }
+      if (body.status === "inactive" && (await isLastActiveAdmin(id))) {
+        return c.json({ error: LAST_ADMIN }, 409);
+      }
+      if (body.roleId) {
+        const targetRole = await userStore.getRole(body.roleId);
+        if (targetRole) {
+          const denied = grantViolation(c, targetRole.permissions);
+          if (denied) return denied;
+        }
+      }
       try {
         const updated = await userStore.updateUser(id, body);
         if (isAdmin !== undefined) {
@@ -372,6 +409,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const id = c.req.param("id");
       const { newPassword } = c.req.valid("json");
 
+      const target = await userStore.findById(id);
+      if (target?.isAdmin && !getAuthenticatedUser(c).isAdmin) {
+        return c.json({ error: "Somente administradores podem redefinir a senha de outro administrador." }, 403);
+      }
+
       try {
         const newHash = PasswordService.hash(newPassword);
         await userStore.resetPassword(id, newHash);
@@ -386,6 +428,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // DELETE /api/iam/users/:id
   app.delete("/api/iam/users/:id", auth, requirePermission("system:users:delete"), async (c) => {
     const id = c.req.param("id");
+    if (id === getAuthenticatedUser(c).sub) {
+      return c.json({ error: "Não é possível excluir a si mesmo." }, 409);
+    }
+    if (!getAuthenticatedUser(c).isAdmin && (await userStore.findById(id))?.isAdmin) {
+      return c.json({ error: ADMIN_TARGET_ONLY }, 403);
+    }
+    if (await isLastActiveAdmin(id)) return c.json({ error: LAST_ADMIN }, 409);
     try {
       await userStore.deleteUser(id);
       return c.json({ success: true });
@@ -408,6 +457,37 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     return invalid;
   }
 
+  // Responde 403 quando o chamador tenta conceder chaves que não possui; devolve undefined se pode.
+  const grantViolation = (c: Context, targets: readonly string[]) => {
+    const caller = getAuthenticatedUser(c);
+    const missing = missingGrants(caller.permissions, targets, caller.isAdmin === true);
+    return missing.length > 0 ? c.json({ error: grantDeniedMessage(missing) }, 403) : undefined;
+  };
+
+  const LAST_ADMIN = "O sistema precisa de ao menos um administrador ativo.";
+  const isLastActiveAdmin = async (id: string): Promise<boolean> => {
+    const admins = (await userStore.listUsers()).filter((u) => u.isAdmin && u.status === "active");
+    return admins.length === 1 && admins[0].id === id;
+  };
+
+  // Modo prévia (só leitura, `allowPreview`): o id literal "preview" dispensa Área de Trabalho; fora dele o id precisa existir e ser do Modelo.
+  const PREVIEW_WORKSPACE_ID = "preview";
+  const workspaceScopeError = (
+    workspaceId: string,
+    recipeId: string,
+    allowPreview: boolean
+  ): { error: string; status: 400 | 404 } | undefined => {
+    if (allowPreview && workspaceId === PREVIEW_WORKSPACE_ID) return undefined;
+    const ws = workspacesMap.get(workspaceId);
+    if (!ws) return { error: "Área de Trabalho não encontrada.", status: 404 };
+    if (ws.recipeId !== recipeId) return { error: "A Área de Trabalho não pertence a este Modelo.", status: 400 };
+    return undefined;
+  };
+
+  const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
+
+  const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
+
   // POST /api/iam/roles
   app.post(
     "/api/iam/roles",
@@ -424,11 +504,16 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     ),
     async (c) => {
       const body = c.req.valid("json");
+      if (body.permissions.includes("*") && !getAuthenticatedUser(c).isAdmin) {
+        return c.json({ error: WILDCARD_ADMIN_ONLY }, 403);
+      }
 
       const invalid = validatePermissionKeys(body.permissions);
       if (invalid.length > 0) {
         return c.json({ error: `Permissões inválidas: ${invalid.join(", ")}` }, 400);
       }
+      const denied = grantViolation(c, body.permissions);
+      if (denied) return denied;
 
       try {
         const created = await userStore.createRole(body);
@@ -457,11 +542,23 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const id = c.req.param("id");
       const body = c.req.valid("json");
 
+      // Alterar a posse do curinga "*" (conceder ou retirar) é ato de administrador.
+      if (body.permissions && !getAuthenticatedUser(c).isAdmin) {
+        const current = (await userStore.getRole(id))?.permissions ?? [];
+        if (body.permissions.includes("*") !== current.includes("*")) {
+          return c.json({ error: WILDCARD_ADMIN_ONLY }, 403);
+        }
+      }
+
       if (body.permissions) {
         const invalid = validatePermissionKeys(body.permissions);
         if (invalid.length > 0) {
           return c.json({ error: `Permissões inválidas: ${invalid.join(", ")}` }, 400);
         }
+        // Só as chaves ADICIONADAS precisam ser possuídas; remover é permitido.
+        const current = (await userStore.getRole(id))?.permissions ?? [];
+        const denied = grantViolation(c, body.permissions.filter((key) => !current.includes(key)));
+        if (denied) return denied;
       }
 
       try {
@@ -619,7 +716,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 1. GET /api/workspaces (Lista todas as Áreas de Trabalho, com filtro opcional por Modelo)
   app.get(
     "/api/workspaces",
-    optionalAuthMiddleware,
+    auth,
+    guard("system:workspaces:read"),
     zValidator("query", z.object({ recipe_id: z.string().optional() })),
     (c) => {
       const { recipe_id } = c.req.valid("query");
@@ -634,38 +732,30 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 2. GET /api/workspaces/:id (Detalhes e status da Área de Trabalho)
   app.get(
     "/api/workspaces/:id",
-    optionalAuthMiddleware,
+    auth,
+    guard("system:workspaces:read"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
       const ws = workspacesMap.get(id);
-      if (ws) return c.json(ws);
-
-      return c.json({
-        id,
-        recipeId: "fechamento_mes",
-        name: `Área de Trabalho ${id}`,
-        startDate: "2026-01-01",
-        endDate: "2026-01-31",
-        status: "open",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
+      return c.json(ws);
     }
   );
 
   // 3. POST /api/workspaces (Criação de nova Área de Trabalho com datas obrigatórias)
   app.post(
     "/api/workspaces",
-    optionalAuthMiddleware,
+    auth,
+    guard("system:workspaces:create"),
     zValidator(
       "json",
       z
         .object({
           name: z.string().optional(),
           recipeId: z.string(),
-          startDate: z.string(),
-          endDate: z.string(),
+          startDate: IsoDateSchema,
+          endDate: IsoDateSchema,
           params: z.record(z.unknown()).optional(),
         })
         .refine(
@@ -682,14 +772,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     ),
     async (c) => {
       const body = c.req.valid("json");
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      if (user && user.permissions && !user.permissions.includes("system:workspaces:create")) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho." },
-          403
-        );
-      }
 
       let recipe: RecipeDef;
       try {
@@ -697,8 +779,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       } catch {
         return c.json({ error: `Modelo '${body.recipeId}' não encontrado.` }, 400);
       }
+      if (!PermissionResolver.canViewRecipe(recipe.id, getAuthenticatedUser(c).permissions)) {
+        return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
+      }
 
-      const id = `ws_${Date.now()}`;
+      const id = `ws_${randomUUID()}`;
       const newWs: WorkspaceRecord = {
         id,
         recipeId: recipe.id,
@@ -720,28 +805,21 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 3.1 PUT /api/workspaces/:id (Edição de título, período e parâmetros)
   app.put(
     "/api/workspaces/:id",
-    optionalAuthMiddleware,
+    auth,
+    guard("system:workspaces:update"),
     zValidator("param", z.object({ id: z.string() })),
     zValidator(
       "json",
       z.object({
         name: z.string().optional(),
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
+        startDate: IsoDateSchema.optional(),
+        endDate: IsoDateSchema.optional(),
         params: z.record(z.unknown()).optional(),
       })
     ),
     async (c) => {
       const { id } = c.req.valid("param");
       const body = c.req.valid("json");
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      if (user && user.permissions && !user.permissions.includes("system:workspaces:update")) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho." },
-          403
-        );
-      }
 
       const ws = workspacesMap.get(id);
       if (!ws) {
@@ -769,41 +847,16 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 4. POST /api/workspaces/:id/conclude (Conclui e bloqueia a Área de Trabalho)
   app.post(
     "/api/workspaces/:id/conclude",
-    optionalAuthMiddleware,
+    auth,
+    guard("system:workspaces:close"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const user = c.get("user") as JWTAccessPayload | undefined;
 
-      if (
-        user &&
-        user.permissions &&
-        !user.permissions.includes("system:workspaces:close") &&
-        !user.permissions.includes("system:workspaces:create")
-      ) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho." },
-          403
-        );
-      }
-
-      let ws = workspacesMap.get(id);
-      if (!ws) {
-        ws = {
-          id,
-          recipeId: "fechamento_mes",
-          name: `Área de Trabalho ${id}`,
-          startDate: "2026-01-01",
-          endDate: "2026-01-31",
-          status: "closed" as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        workspacesMap.set(id, ws);
-      } else {
-        ws.status = "closed";
-        ws.updatedAt = new Date().toISOString();
-      }
+      const ws = workspacesMap.get(id);
+      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
+      ws.status = "closed";
+      ws.updatedAt = new Date().toISOString();
       await workspaceStore?.save(ws);
 
       return c.json({ success: true, workspace: ws });
@@ -813,41 +866,16 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 5. POST /api/workspaces/:id/reopen (Reabre a Área de Trabalho concluída)
   app.post(
     "/api/workspaces/:id/reopen",
-    optionalAuthMiddleware,
+    auth,
+    guard("system:workspaces:reopen"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const user = c.get("user") as JWTAccessPayload | undefined;
 
-      if (
-        user &&
-        user.permissions &&
-        !user.permissions.includes("system:workspaces:reopen") &&
-        !user.permissions.includes("system:workspaces:create")
-      ) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen)." },
-          403
-        );
-      }
-
-      let ws = workspacesMap.get(id);
-      if (!ws) {
-        ws = {
-          id,
-          recipeId: "fechamento_mes",
-          name: `Área de Trabalho ${id}`,
-          startDate: "2026-01-01",
-          endDate: "2026-01-31",
-          status: "open" as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        workspacesMap.set(id, ws);
-      } else {
-        ws.status = "open";
-        ws.updatedAt = new Date().toISOString();
-      }
+      const ws = workspacesMap.get(id);
+      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
+      ws.status = "open";
+      ws.updatedAt = new Date().toISOString();
       await workspaceStore?.save(ws);
 
       return c.json({ success: true, workspace: ws });
@@ -857,18 +885,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 5.1 DELETE /api/workspaces/:id (Exclui Área de Trabalho — permission-first)
   app.delete(
     "/api/workspaces/:id",
-    optionalAuthMiddleware,
+    auth,
+    guard("system:workspaces:delete"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      if (user && user.permissions && !user.permissions.includes("system:workspaces:delete")) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete)." },
-          403
-        );
-      }
 
       const ws = workspacesMap.get(id);
       if (!ws) {
@@ -882,8 +903,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   );
 
   // 5.1 GET /api/recipes (Catálogo de Modelos disponíveis, filtrado por permissão de visualização)
-  app.get("/api/recipes", optionalAuthMiddleware, async (c) => {
-    const user = c.get("user") as JWTAccessPayload | undefined;
+  app.get("/api/recipes", auth, async (c) => {
+    const user = getAuthenticatedUser(c);
 
     let catalog = Array.from(recipesMap.values()).map((recipe) => ({
       id: recipe.id,
@@ -892,8 +913,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     }));
 
     // Quem gerencia permissões precisa enxergar todos os Modelos para configurar o acesso a eles.
-    if (user && !user.permissions?.includes("system:roles:update")) {
-      catalog = catalog.filter((item) => user.permissions?.includes(`recipe:${item.id}:view`));
+    if (!hasPermission(user.permissions, "system:roles:update")) {
+      catalog = catalog.filter((item) => PermissionResolver.canViewRecipe(item.id, user.permissions));
     }
 
     return c.json(catalog);
@@ -902,14 +923,14 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 5.2 GET /api/lookups (Opções de um campo com lookup definido no Modelo)
   app.get(
     "/api/lookups",
-    optionalAuthMiddleware,
+    auth,
     zValidator("query", z.object({ recipe_id: z.string(), field: z.string() })),
     async (c) => {
       const { recipe_id, field } = c.req.valid("query");
-      const user = c.get("user") as JWTAccessPayload | undefined;
+      const user = getAuthenticatedUser(c);
 
-      if (user && user.permissions && !user.permissions.includes(`recipe:${recipe_id}:view`)) {
-        return c.json({ error: "Acesso negado: o usuário não possui permissão para visualizar este Modelo." }, 403);
+      if (!PermissionResolver.canViewRecipe(recipe_id, user.permissions)) {
+        return c.json({ error: denyMessage(`recipe:${recipe_id}:view`) }, 403);
       }
 
       let recipe: RecipeDef;
@@ -950,24 +971,25 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 6. GET /api/dashboards/:id/schema (Retorna o UI Schema sanitizado sem código SQL)
   app.get(
     "/api/dashboards/:id/schema",
-    optionalAuthMiddleware,
+    auth,
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const recipe = getRecipe(id);
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      // Filtra actions pelas permissões do usuário se logado
-      let filteredActions = recipe.actions;
-      if (user && user.permissions) {
-        filteredActions = recipe.actions.filter((a: ActionDef) =>
-          PermissionResolver.canExecuteAction({
-            recipeId: recipe.id,
-            actionDef: a,
-            userPermissions: user.permissions,
-          })
-        );
+      // Permissão antes de resolver o Modelo: sem ela, existente ou não, a resposta é 403.
+      const user = getAuthenticatedUser(c);
+      if (!PermissionResolver.canViewRecipe(id, user.permissions)) {
+        return c.json({ error: denyMessage(`recipe:${id}:view`) }, 403);
       }
+      const recipe = recipesMap.get(id);
+      if (!recipe) return c.json({ error: `Modelo '${id}' não encontrado.` }, 404);
+
+      const filteredActions = recipe.actions.filter((a: ActionDef) =>
+        PermissionResolver.canExecuteAction({
+          recipeId: recipe.id,
+          actionDef: a,
+          userPermissions: user.permissions,
+        })
+      );
 
       const schemaComponents = recipe.ui.components.map((component) => ({
         ...component,
@@ -976,7 +998,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           availableProfiles: DataResolver.getComponentProfileMetadata(
             recipe,
             component,
-            user?.permissions
+            user.permissions
           ),
         },
       }));
@@ -1004,7 +1026,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 2. GET /api/workspaces/:id/data/:componentId (Retorna dados do componente resolvidos com IAM)
   app.get(
     "/api/workspaces/:id/data/:componentId",
-    optionalAuthMiddleware,
+    auth,
     zValidator("param", z.object({ id: z.string(), componentId: z.string() })),
     zValidator(
       "query",
@@ -1037,8 +1059,15 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const { id: workspaceId, componentId } = c.req.valid("param");
       const query = c.req.valid("query");
-      const recipe = getRecipe(query.recipe_id);
-      const user = c.get("user") as JWTAccessPayload | undefined;
+      // Permissão antes de resolver o Modelo: sem ela, existente ou não, a resposta é 403.
+      const user = getAuthenticatedUser(c);
+      if (!PermissionResolver.canViewRecipe(query.recipe_id, user.permissions)) {
+        return c.json({ error: denyMessage(`recipe:${query.recipe_id}:view`) }, 403);
+      }
+      const recipe = recipesMap.get(query.recipe_id);
+      if (!recipe) return c.json({ error: `Modelo '${query.recipe_id}' não encontrado.` }, 404);
+      const scopeError = workspaceScopeError(workspaceId, recipe.id, true);
+      if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
 
       // Só aceita parâmetros declarados no Modelo; chegam à consulta sempre como bind parameters.
       let requestParams: Record<string, unknown> | undefined;
@@ -1068,14 +1097,12 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
               endDate: query.end_date,
               params: workspacesMap.get(workspaceId)?.params ?? requestParams,
             },
-            user: user
-              ? {
-                  id: user.sub,
-                  role: user.role,
-                  permissions: user.permissions,
-                  externals: user.externals,
-                }
-              : undefined,
+            user: {
+              id: user.sub,
+              role: user.role,
+              permissions: user.permissions,
+              externals: user.externals,
+            },
           },
           pagination: {
             page: query.page,
@@ -1088,6 +1115,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
         return c.json(result);
       } catch (err: unknown) {
+        if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
         const msg = err instanceof Error ? err.message : "Erro ao carregar dados.";
         if (msg.includes("Acesso negado")) {
           return c.json({ error: msg }, 403);
@@ -1103,7 +1131,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 3. POST /api/workspaces/:id/actions/exec (Executa RPC de ação operacional com verificação de permissão)
   app.post(
     "/api/workspaces/:id/actions/exec",
-    optionalAuthMiddleware,
+    auth,
     zValidator("param", z.object({ id: z.string() })),
     zValidator(
       "json",
@@ -1119,8 +1147,16 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const { id: workspaceId } = c.req.valid("param");
       const body = c.req.valid("json");
-      const recipe = getRecipe(body.recipe_id);
-      const user = c.get("user") as JWTAccessPayload | undefined;
+      // Permissão antes de resolver o Modelo: sem ela, existente ou não, a resposta é 403.
+      const user = getAuthenticatedUser(c);
+      if (!PermissionResolver.canViewRecipe(body.recipe_id, user.permissions)) {
+        return c.json({ error: denyMessage(`recipe:${body.recipe_id}:view`) }, 403);
+      }
+      const recipe = recipesMap.get(body.recipe_id);
+      if (!recipe) return c.json({ error: `Modelo '${body.recipe_id}' não encontrado.` }, 404);
+
+      const scopeError = workspaceScopeError(workspaceId, recipe.id, false);
+      if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
 
       const component = recipe.ui.components.find((item) => item.id === body.component_id);
       if (!component || component.component !== "data_table") {
@@ -1140,7 +1176,16 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       // Trava de execução se a Área de Trabalho estiver concluída para ações de modificação
       const ws = workspacesMap.get(workspaceId);
       const actionDef = recipe.actions.find((a: ActionDef) => a.id === body.action_id);
-      const isMutation = actionDef?.nature !== "read";
+      if (!actionDef) {
+        return c.json({ error: `Ação '${body.action_id}' não encontrada no Modelo '${recipe.id}'.` }, 404);
+      }
+      if (!PermissionResolver.canExecuteAction({ recipeId: recipe.id, actionDef, userPermissions: user.permissions })) {
+        return c.json(
+          { error: `Acesso negado: o usuário não possui permissão para executar a ação '${actionDef.label || actionDef.id}'.` },
+          403
+        );
+      }
+      const isMutation = actionDef.nature !== "read";
 
       if (ws && ws.status === "closed" && isMutation) {
         return c.json(
@@ -1160,74 +1205,18 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           workspaceId,
           workspaceVersion: body.workspace_version,
           persistenceStore,
-          userPermissions: user?.permissions,
+          userPermissions: user.permissions,
         });
 
         return c.json(result);
       } catch (err: unknown) {
+        if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
         const msg = err instanceof Error ? err.message : "Erro na execução da ação.";
         if (msg.includes("Acesso negado")) {
           return c.json({ error: msg }, 403);
         }
         return c.json({ error: msg }, 500);
       }
-    }
-  );
-
-  // 4. POST /api/workspaces/:id/persistence/set (Auto-save de edição inline em células)
-  app.post(
-    "/api/workspaces/:id/persistence/set",
-    zValidator("param", z.object({ id: z.string() })),
-    zValidator(
-      "json",
-      z.object({
-        target: z.string(),
-        target_foreign_key_value: z.union([z.string(), z.number()]),
-        field: z.string(),
-        value: z.unknown(),
-        workspace_version: z.number().default(1),
-      })
-    ),
-    async (c) => {
-      const { id: workspaceId } = c.req.valid("param");
-      const body = c.req.valid("json");
-
-      // Trava de edição se a Área de Trabalho estiver concluída
-      const ws = workspacesMap.get(workspaceId);
-      if (ws && ws.status === "closed") {
-        return c.json(
-          { error: "Esta Área de Trabalho está concluída e bloqueada para edições." },
-          400
-        );
-      }
-
-      await persistenceStore.setScalar(
-        workspaceId,
-        body.target,
-        body.target_foreign_key_value,
-        { [body.field]: body.value }
-      );
-
-      return c.json({
-        success: true,
-        new_version: body.workspace_version + 1,
-      });
-    }
-  );
-
-  // 5. GET /api/workspaces/:id/persistence/collection/:collection/:foreignKeyValue (Consulta itens de sub-tabelas)
-  app.get(
-    "/api/workspaces/:id/persistence/collection/:collection/:foreignKeyValue",
-    zValidator("param", z.object({ id: z.string(), collection: z.string(), foreignKeyValue: z.string() })),
-    async (c) => {
-      const { id: workspaceId, collection, foreignKeyValue } = c.req.valid("param");
-      const items = await persistenceStore.getItems(workspaceId, collection, foreignKeyValue);
-      const formatted = items.map((item) => ({
-        id: item.id,
-        created_at: item.createdAt,
-        ...item.data,
-      }));
-      return c.json(formatted);
     }
   );
 

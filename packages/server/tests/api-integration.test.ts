@@ -3,7 +3,7 @@ import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import type { RecipeDef } from "@platform/shared";
-import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { authHeader, createSeededUserStore, seededWorkspaces , withAuth } from "./helpers/fixtures.js";
 
 describe("Hono API Integration Test (End-to-End)", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -86,7 +86,7 @@ describe("Hono API Integration Test (End-to-End)", () => {
     });
     persistenceStore = new MemoryPersistenceStore();
     app = createPlatformApp({
-      userStore: createSeededUserStore(),
+      userStore: createSeededUserStore({ admin: true }),
       workspaces: seededWorkspaces,
       sourceConnector,
       persistenceStore,
@@ -94,6 +94,7 @@ describe("Hono API Integration Test (End-to-End)", () => {
         fechamento_mes: fechamentoRecipe,
       },
     });
+    withAuth(app, "test.root");
   });
 
   it("GET /api/health deve responder status ok", async () => {
@@ -117,7 +118,7 @@ describe("Hono API Integration Test (End-to-End)", () => {
   });
 
   it("GET /api/workspaces/:id/data/tabela_vendedores deve retornar dados fundidos", async () => {
-    const res = await app.request("/api/workspaces/ws_101/data/tabela_vendedores?recipe_id=fechamento_mes");
+    const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes");
     expect(res.status).toBe(200);
     const body = await res.json();
 
@@ -128,7 +129,7 @@ describe("Hono API Integration Test (End-to-End)", () => {
   });
 
   it("POST /api/workspaces/:id/actions/exec deve executar RPC de ação", async () => {
-    const res = await app.request("/api/workspaces/ws_101/actions/exec", {
+    const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/actions/exec", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -149,28 +150,5 @@ describe("Hono API Integration Test (End-to-End)", () => {
       message: "Fechamento do vendedor Carlos Vendedor aprovado!",
     });
     expect(body.newWorkspaceVersion).toBe(2);
-  });
-
-  it("POST /api/workspaces/:id/persistence/set deve salvar edição inline de célula", async () => {
-    const res = await app.request("/api/workspaces/ws_101/persistence/set", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        target: "remuneracao_vendedor",
-        target_foreign_key_value: 1,
-        field: "salario_base",
-        value: 2200,
-        workspace_version: 3,
-      }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.success).toBe(true);
-    expect(body.new_version).toBe(4);
-
-    // Verifica se gravou na persistência
-    const scalar = await persistenceStore.getScalar("ws_101", "remuneracao_vendedor", 1);
-    expect(scalar?.salario_base).toBe(2200);
   });
 });

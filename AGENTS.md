@@ -40,7 +40,7 @@ celestia/
 │   │
 │   ├── server/                   (@platform/server) -> Backend API, Compiler, IAM & Data Resolver
 │   │   └── src/
-│   │       ├── index.ts          -> Hono app entrypoint, public & protected routes
+│   │       ├── index.ts          -> Hono app entrypoint, public (health, auth) & protected routes (every other route requires a token)
 │   │       ├── iam/
 │   │       │   ├── password-service.ts    -> Argon2id OWASP hashing & Zod password complexity validator
 │   │       │   ├── token-service.ts       -> JWT Access (5 min) & Refresh (7 days) HS256 tokens

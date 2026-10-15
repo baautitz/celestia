@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   User,
   Role,
@@ -68,7 +69,7 @@ export class MemoryUserStore implements UserStore {
       throw new Error(`Role '${input.roleId}' não encontrada.`);
     }
 
-    const id = `usr_${Date.now()}`;
+    const id = `usr_${randomUUID()}`;
     const user: User = {
       id,
       fullname: input.fullname,

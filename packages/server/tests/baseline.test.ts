@@ -206,13 +206,15 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.users.reset.401", "POST", `/api/iam/users/${newId}/reset-password`, { body: { newPassword: "Nova@1234" } });
     await rec("iam.users.reset.403", "POST", `/api/iam/users/${newId}/reset-password`, { token: V, body: { newPassword: "Nova@1234" } });
     await rec("iam.users.reset.400_weak", "POST", `/api/iam/users/${newId}/reset-password`, { token: A, body: { newPassword: "fraca" } });
-    await rec("iam.users.reset.ok", "POST", `/api/iam/users/${newId}/reset-password`, { token: A, body: { newPassword: "Nova@1234" } });
+    await rec("iam.users.reset.403_target_admin", "POST", `/api/iam/users/${newId}/reset-password`, { token: A, body: { newPassword: "Nova@1234" } });
+    await rec("iam.users.reset.ok_common_user", "POST", "/api/iam/users/usr_1002/reset-password", { token: A, body: { newPassword: "Nova@1234" } });
     await rec("iam.users.reset.unknown_user", "POST", "/api/iam/users/nao_existe/reset-password", { token: A, body: { newPassword: "Nova@1234" } });
     await rec("iam.users.reset.admin_bypass", "POST", `/api/iam/users/${newId}/reset-password`, { token: R, body: { newPassword: "Outra@1234" } });
 
     await rec("iam.users.delete.401", "DELETE", `/api/iam/users/${newId}`);
     await rec("iam.users.delete.403", "DELETE", `/api/iam/users/${newId}`, { token: V });
-    await rec("iam.users.delete.ok", "DELETE", `/api/iam/users/${newId}`, { token: A });
+    await rec("iam.users.delete.403_target_admin", "DELETE", `/api/iam/users/${newId}`, { token: A });
+    await rec("iam.users.delete.ok", "DELETE", `/api/iam/users/${newId}`, { token: R });
     await rec("iam.users.delete.again", "DELETE", `/api/iam/users/${newId}`, { token: A });
     await rec("iam.users.list.after", "GET", "/api/iam/users", { token: A });
 
@@ -230,6 +232,8 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.roles.create.ok", "POST", "/api/iam/roles", { token: A, body: role });
     await rec("iam.roles.create.duplicate", "POST", "/api/iam/roles", { token: A, body: role });
     await rec("iam.roles.create.ok_wildcard", "POST", "/api/iam/roles", { token: R, body: { ...role, id: "role_curinga", permissions: ["*"] } });
+    await rec("iam.roles.create.403_wildcard_non_admin", "POST", "/api/iam/roles", { token: A, body: { ...role, id: "role_curinga_a", permissions: ["*"] } });
+    await rec("iam.roles.update.403_wildcard_non_admin", "PUT", "/api/iam/roles/role_curinga", { token: A, body: { permissions: ["system:roles:read"] } });
     await rec("iam.roles.update.401", "PUT", "/api/iam/roles/role_teste", { body: { name: "X Y" } });
     await rec("iam.roles.update.403", "PUT", "/api/iam/roles/role_teste", { token: V, body: { name: "X Y" } });
     await rec("iam.roles.update.ok", "PUT", "/api/iam/roles/role_teste", { token: A, body: { name: "Grupo Editado", permissions: ["system:roles:read"] } });
@@ -244,10 +248,14 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   describe("workspaces", () => {
     it("rotas", async () => {
     // ── workspaces (auth opcional: sem token passa; 403 só com token sem permissão)
-    await rec("ws.list.anon", "GET", "/api/workspaces");
-    await rec("ws.list.filter", "GET", "/api/workspaces?recipe_id=outro", { token: V });
-    await rec("ws.detail.ok", "GET", `/api/workspaces/${WS}`);
-    await rec("ws.detail.unknown_returns_default", "GET", "/api/workspaces/ws_inexistente");
+    await rec("ws.list.401", "GET", "/api/workspaces");
+    await rec("ws.list.ok", "GET", "/api/workspaces", { token: O });
+    await rec("ws.list.403", "GET", "/api/workspaces", { token: V });
+    await rec("ws.list.filter", "GET", "/api/workspaces?recipe_id=outro", { token: O });
+    await rec("ws.detail.ok", "GET", `/api/workspaces/${WS}`, { token: O });
+    await rec("ws.detail.401", "GET", `/api/workspaces/${WS}`);
+    await rec("ws.detail.403", "GET", `/api/workspaces/${WS}`, { token: V });
+    await rec("ws.detail.unknown_404", "GET", "/api/workspaces/ws_inexistente", { token: O });
     const wsNew = { recipeId: "fechamento_mes", startDate: "2026-02-01", endDate: "2026-02-28", params: { categories_focus: [1] } };
     await rec("ws.create.403", "POST", "/api/workspaces", { token: V, body: wsNew });
     await rec("ws.create.400_dates", "POST", "/api/workspaces", { token: A, body: { ...wsNew, startDate: "2026-03-01", endDate: "2026-02-01" } });
@@ -259,17 +267,18 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     tick();
     await rec("ws.create.admin_bypass", "POST", "/api/workspaces", { token: R, body: { ...wsNew, name: "Via admin" } });
     tick();
-    await rec("ws.create.anon", "POST", "/api/workspaces", { body: wsNew });
+    await rec("ws.create.401", "POST", "/api/workspaces", { body: wsNew });
     await rec("ws.update.403", "PUT", `/api/workspaces/${wsId}`, { token: V, body: { name: "Y Z" } });
     await rec("ws.update.ok", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { name: "Renomeada", endDate: "2026-03-05" } });
     await rec("ws.update.400_dates", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { endDate: "2026-01-01" } });
+    await rec("ws.update.400_invalid_date", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { startDate: "abc" } });
     await rec("ws.update.404", "PUT", "/api/workspaces/nao_existe", { token: A, body: { name: "Y Z" } });
     await rec("ws.conclude.403", "POST", `/api/workspaces/${wsId}/conclude`, { token: V });
     await rec("ws.conclude.ok", "POST", `/api/workspaces/${wsId}/conclude`, { token: O });
-    await rec("ws.conclude.unknown_creates", "POST", "/api/workspaces/ws_fantasma/conclude", { token: A });
+    await rec("ws.conclude.unknown_404", "POST", "/api/workspaces/ws_fantasma/conclude", { token: A });
     await rec("ws.reopen.403", "POST", `/api/workspaces/${wsId}/reopen`, { token: V });
     await rec("ws.reopen.ok", "POST", `/api/workspaces/${wsId}/reopen`, { token: A });
-    await rec("ws.reopen.unknown_creates", "POST", "/api/workspaces/ws_fantasma2/reopen", { token: A });
+    await rec("ws.reopen.unknown_404", "POST", "/api/workspaces/ws_fantasma2/reopen", { token: A });
     await rec("ws.delete.403", "DELETE", `/api/workspaces/${wsId}`, { token: V });
     await rec("ws.delete.ok", "DELETE", `/api/workspaces/${wsId}`, { token: A });
     await rec("ws.delete.404", "DELETE", `/api/workspaces/${wsId}`, { token: A });
@@ -280,19 +289,21 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   describe("dashboards-data", () => {
     it("rotas", async () => {
     // ── recipes / lookups / dashboards
-    await rec("recipes.catalog.anon", "GET", "/api/recipes");
+    await rec("recipes.catalog.401", "GET", "/api/recipes");
     await rec("recipes.catalog.vendedor", "GET", "/api/recipes", { token: V });
     await rec("recipes.catalog.admin_bypass", "GET", "/api/recipes", { token: R });
     await rec("lookups.ok", "GET", "/api/lookups?recipe_id=fechamento_mes&field=categories_focus", { token: A });
     await rec("lookups.403", "GET", "/api/lookups?recipe_id=outro&field=x", { token: V });
     await rec("lookups.400_no_lookup", "GET", "/api/lookups?recipe_id=fechamento_mes&field=start_date", { token: A });
-    await rec("lookups.404_unknown_recipe", "GET", "/api/lookups?recipe_id=nada&field=x");
-    await rec("lookups.400_missing_query", "GET", "/api/lookups");
-    await rec("dashboards.schema.anon", "GET", "/api/dashboards/fechamento_mes/schema");
+    await rec("lookups.404_unknown_recipe", "GET", "/api/lookups?recipe_id=nada&field=x", { token: R });
+    await rec("lookups.401", "GET", "/api/lookups?recipe_id=fechamento_mes&field=categories_focus");
+    await rec("lookups.400_missing_query", "GET", "/api/lookups", { token: A });
+    await rec("dashboards.schema.401", "GET", "/api/dashboards/fechamento_mes/schema");
     await rec("dashboards.schema.vendedor", "GET", "/api/dashboards/fechamento_mes/schema", { token: V });
     await rec("dashboards.schema.operador", "GET", "/api/dashboards/fechamento_mes/schema", { token: O });
     await rec("dashboards.schema.admin_bypass", "GET", "/api/dashboards/fechamento_mes/schema", { token: R });
-    await rec("dashboards.schema.unknown_recipe", "GET", "/api/dashboards/nada/schema");
+    await rec("dashboards.schema.unknown_recipe", "GET", "/api/dashboards/nada/schema", { token: R });
+    await rec("dashboards.schema.403_unknown_recipe_without_view", "GET", "/api/dashboards/nada/schema", { token: A });
 
     // ── dados dos componentes
     const q = "?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31";
@@ -301,13 +312,15 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("data.table.admin", "GET", `${comp}${q}&profile_id=equipe&sort_by=vendedor&order=desc&page_size=2`, { token: A });
     await rec("data.table.admin_bypass", "GET", `${comp}${q}`, { token: R });
     await rec("data.table.search", "GET", `${comp}${q}&search=a`, { token: O });
-    await rec("data.table.anon", "GET", `${comp}${q}`);
+    await rec("data.table.401", "GET", `${comp}${q}`);
     await rec("data.table.profile_without_permission", "GET", `${comp}${q}&profile_id=proprias`, { token: O });
     await rec("data.kpi.operador", "GET", `/api/workspaces/${WS}/data/kpi_total_vendas${q}`, { token: O });
     await rec("data.chart.operador", "GET", `/api/workspaces/${WS}/data/grafico_ranking_vendas${q}`, { token: O });
     await rec("data.400_dates", "GET", `${comp}?recipe_id=fechamento_mes&start_date=2026-02-01&end_date=2026-01-01`, { token: O });
     await rec("data.400_params_not_object", "GET", `${comp}${q}&params=%5B1%5D`, { token: O });
     await rec("data.ok_params", "GET", `${comp}${q}&params=${encodeURIComponent('{"categories_focus":[1,2],"x":1}')}`, { token: O });
+    await rec("data.404_unknown_workspace", "GET", `/api/workspaces/ws_inexistente/data/tabela_vendedores${q}`, { token: O });
+    await rec("data.ok_preview_workspace", "GET", `/api/workspaces/preview/data/tabela_vendedores${q}`, { token: O });
     await rec("data.unknown_component", "GET", `/api/workspaces/${WS}/data/nao_existe${q}`, { token: O });
 
     // ── ações
@@ -319,24 +332,11 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await exec("actions.submit.admin_bypass", R, { action_id: "adicionar_penalidade", form_data: { valor: 5, reason: "bypass" } });
     await exec("actions.read.vendedor", V, { action_id: "visualizar_penalidades" });
     await exec("actions.vendedor_mutation", V, { action_id: "adicionar_penalidade", form_data: { valor: 1, reason: "x" } });
-    await exec("actions.anon", undefined, { action_id: "visualizar_penalidades" });
+    await exec("actions.401", undefined, { action_id: "visualizar_penalidades" });
     await exec("actions.400_closed_workspace", O, { action_id: "adicionar_penalidade", form_data: { valor: 1, reason: "x" } }, WS_CLOSED);
     await exec("actions.400_unknown_component", O, { action_id: "adicionar_penalidade", component_id: "kpi_total_vendas" });
     await exec("actions.unknown_action", O, { action_id: "nao_existe" });
     await rec("actions.400_invalid_body", "POST", `/api/workspaces/${WS}/actions/exec`, { token: O, body: { action_id: "x" } });
-
-    });
-  });
-
-  describe("persistence", () => {
-    it("rotas", async () => {
-    // ── persistência (rotas sem auth)
-    const pset = (k: string, ws: string, body: unknown) => rec(k, "POST", `/api/workspaces/${ws}/persistence/set`, { body });
-    await pset("persistence.set.ok", WS, { target: "remuneracao_vendedor", target_foreign_key_value: 42, field: "salario_base", value: 2000, workspace_version: 3 });
-    await pset("persistence.set.400_closed", WS_CLOSED, { target: "remuneracao_vendedor", target_foreign_key_value: 42, field: "salario_base", value: 1 });
-    await pset("persistence.set.400_invalid_body", WS, { target: "x" });
-    await rec("persistence.collection.ok", "GET", `/api/workspaces/${WS}/persistence/collection/penalidades_vendedor/42`);
-    await rec("persistence.collection.empty", "GET", `/api/workspaces/${WS}/persistence/collection/penalidades_vendedor/9999`);
 
     });
   });
@@ -404,6 +404,57 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("admin.connections.delete.403", "DELETE", "/api/admin/connections/inovafarma", { token: V });
     await rec("admin.connections.delete.ok", "DELETE", "/api/admin/connections/inovafarma", { token: A });
     await rec("admin.connections.delete.404", "DELETE", "/api/admin/connections/inovafarma", { token: A });
+
+    });
+  });
+
+  describe("iam-grants", () => {
+    it("rotas", async () => {
+    // ── gestor não-admin limitado: a regra "só concede o que possui" fica congelada
+    const gPerms = ["system:users:create", "system:users:update", "system:users:reset_password", "system:users:delete", "system:roles:create", "system:roles:update", "system:roles:read"];
+    await rec("iam.grants.setup_role", "POST", "/api/iam/roles", { token: A, body: { id: "role_gestor", name: "Gestor Limitado", permissions: gPerms } });
+    const mk = (username: string, roleId: string) => ({ fullname: "Usuario Grants", username, password: "Senha@456", roleId, externals: {} });
+    tick();
+    await rec("iam.grants.setup_gestor", "POST", "/api/iam/users", { token: A, body: mk("gestor.limitado", "role_gestor") });
+    tick();
+    const comum = await rec("iam.grants.setup_comum", "POST", "/api/iam/users", { token: A, body: mk("alvo.comum", "role_vendedor") });
+    tick();
+    const adm = await rec("iam.grants.setup_admin_alvo", "POST", "/api/iam/users", { token: A, body: mk("alvo.admin", "role_vendedor") });
+    const comumId = (comum.raw as { id: string }).id;
+    const admId = (adm.raw as { id: string }).id;
+    await rec("iam.grants.setup_admin_flag", "PUT", `/api/iam/users/${admId}`, { token: R, body: { isAdmin: true } });
+    const gl = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "gestor.limitado", password: "Senha@456" }),
+    });
+    const G = ((await gl.json()) as { access_token: string }).access_token;
+
+    await rec("iam.grants.users.update.403_stronger_role", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { roleId: "role_admin" } });
+    await rec("iam.grants.users.update.ok_subset_role", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { roleId: "role_vendedor" } });
+    tick();
+    await rec("iam.grants.users.create.403_stronger_role", "POST", "/api/iam/users", { token: G, body: mk("cumplice.um", "role_admin") });
+    tick();
+    await rec("iam.grants.users.create.ok_subset_role", "POST", "/api/iam/users", { token: G, body: mk("legitimo.um", "role_vendedor") });
+    await rec("iam.grants.roles.create.403_missing_keys", "POST", "/api/iam/roles", { token: G, body: { id: "role_g_x", name: "Grupo GX", permissions: ["system:sources:manage"] } });
+    await rec("iam.grants.roles.create.ok_owned_keys", "POST", "/api/iam/roles", { token: G, body: { id: "role_g_y", name: "Grupo GY", permissions: ["system:roles:read"] } });
+    await rec("iam.grants.roles.update.403_add_missing_key", "PUT", "/api/iam/roles/role_gestor", { token: G, body: { permissions: [...gPerms, "system:sources:manage"] } });
+    await rec("iam.grants.roles.update.ok_remove_key", "PUT", "/api/iam/roles/role_g_y", { token: G, body: { permissions: [] } });
+    await rec("iam.grants.users.reset.403_target_admin", "POST", `/api/iam/users/${admId}/reset-password`, { token: G, body: { newPassword: "Nova@1234" } });
+    await rec("iam.grants.users.update.403_inactivate_admin", "PUT", `/api/iam/users/${admId}`, { token: G, body: { status: "inactive" } });
+    await rec("iam.grants.users.delete.403_target_admin", "DELETE", `/api/iam/users/${admId}`, { token: G });
+    await rec("iam.grants.users.update.403_rename_admin", "PUT", `/api/iam/users/${admId}`, { token: G, body: { fullname: "Nome Trocado" } });
+    await rec("iam.grants.users.update.ok_inactivate_common", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { status: "inactive" } });
+    await rec("iam.grants.users.delete.ok_common", "DELETE", `/api/iam/users/${comumId}`, { token: G });
+    await rec("iam.grants.users.delete.ok_admin_by_admin", "DELETE", `/api/iam/users/${admId}`, { token: R });
+    const rl = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "root.admin", password: TEST_PASSWORD }),
+    });
+    const R2 = ((await rl.json()) as { access_token: string }).access_token;
+    await rec("iam.users.delete.409_self", "DELETE", `/api/iam/users/${rootId}`, { token: R2 });
+    await rec("iam.users.update.409_last_admin_inactivate", "PUT", `/api/iam/users/${rootId}`, { token: R2, body: { status: "inactive" } });
 
     });
   });
