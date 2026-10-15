@@ -1,7 +1,7 @@
 # Protocolo Obrigatório: Proibição Absoluta de Adivinhação & Consulta Mandatória à Documentação Oficial em TUDO
 
 > **Status**: INVARIANTE GLOBAL INEGOCIÁVEL (APLICA-SE A TODOS OS AGENTES E SESSÕES)  
-> **Escopo**: Backend (Hono, JWT, Argon2, SQL), Frontend (React 19, Vite, shadcn/ui, Radix, Base UI, Tailwind CSS v4), Tipagem (TypeScript, Zod), SDUI, Testes e Tooling.
+> **Escopo**: Backend (Hono, JWT, Argon2, SQL), Frontend (React 19, Vite, shadcn/ui, Radix, Base UI, Tailwind CSS v4), Tipagem (TypeScript, Zod), Testes e Tooling.
 
 ---
 
