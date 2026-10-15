@@ -4,7 +4,8 @@ import { glob } from "node:fs/promises"
 import { resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
-const root = resolve(fileURLToPath(new URL("..", import.meta.url)))
+const rootArg = process.argv.indexOf("--root")
+const root = rootArg > -1 ? resolve(process.argv[rootArg + 1]) : resolve(fileURLToPath(new URL("..", import.meta.url)))
 const windowModules = /^@platform\/ui\/components\/(dialog|sheet|alert-dialog|popover)$/
 const violations = []
 
