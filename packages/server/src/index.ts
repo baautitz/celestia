@@ -5,12 +5,7 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { serve } from "@hono/node-server";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { RecipeCompiler } from "./engine/compiler.js";
-import { DataResolver } from "./data/data-resolver.js";
-import { ActionExecutor } from "./engine/action-executor.js";
-import { resolveSourceConnector, type SourceConnector, type SourceConnectorRegistry } from "./data/source-connector.js";
-import { MemoryPersistenceStore, type PersistenceStore } from "./data/persistence-store.js";
-import { MemoryRecipeStore, type RecipeStore } from "./data/recipe-store.js";
+import { type SourceConnectorRegistry } from "./data/source-connector.js";
 import { MemoryConnectionStore, type ConnectionStore } from "./data/connection-store.js";
 import type { ConnectionRecord } from "./data/connection-store.js";
 import { createConnector, readSecrets, type ConnectorFactory } from "./data/connection-factory.js";
@@ -19,29 +14,19 @@ import { encryptSecret } from "./data/secret-box.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
-import { PermissionCatalogEngine } from "./iam/permission-catalog.js";
 import { grantDeniedMessage, missingGrants } from "./iam/can-grant.js";
 import { hasPermission } from "./iam/has-permission.js";
-import { denyMessage } from "./iam/system-permissions.js";
-import { PermissionResolver } from "./iam/permission-resolver.js";
-import { NotFoundError } from "./engine/errors.js";
+import { denyMessage, getSystemPermissionsByModule, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware, getAuthenticatedUser, requirePermission } from "./iam/middleware.js";
 import type { WorkspaceStore } from "./data/workspace-store.js";
-import type { RecipeDef, ActionDef, JWTAccessPayload, WorkspaceRecord } from "@platform/shared";
+import type { JWTAccessPayload, WorkspaceRecord } from "@platform/shared";
 
 export interface CreatePlatformAppOptions {
-  compiler?: RecipeCompiler;
-  sourceConnector?: SourceConnector;
   sourceConnectors?: SourceConnectorRegistry;
-  persistenceStore?: PersistenceStore;
-  recipeStore?: RecipeStore;
-  /** Ids de Modelos que existem no banco mas falharam ao compilar no boot: a limpeza de permissões órfãs é pulada para não apagá-las. */
-  failedRecipeIds?: string[];
   connectionStore?: ConnectionStore;
   connectorFactory?: ConnectorFactory;
   userStore?: UserStore;
   tokenService?: TokenService;
-  recipes?: Record<string, RecipeDef>;
   workspaces?: WorkspaceRecord[];
   /** Quando informado, as Áreas de Trabalho são gravadas nele a cada mudança (o Map em memória é só cache). */
   workspaceStore?: WorkspaceStore;
@@ -81,65 +66,22 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     })
   );
-  const compiler = options?.compiler || new RecipeCompiler();
-  const sourceConnector = options?.sourceConnector;
   const sourceConnectors = options?.sourceConnectors || {};
-  const persistenceStore = options?.persistenceStore || new MemoryPersistenceStore();
-  const recipeStore = options?.recipeStore || new MemoryRecipeStore();
   const connectionStore = options?.connectionStore || new MemoryConnectionStore();
   const connectorFactory = options?.connectorFactory || createConnector;
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
-  const recipesMap = new Map<string, RecipeDef>(Object.entries(options?.recipes || {}));
   const workspaceStore = options?.workspaceStore;
   const workspacesMap = new Map<string, WorkspaceRecord>((options?.workspaces || []).map((w) => [w.id, w]));
 
-  // Recarrega os Modelos do banco (ao clicar em atualizar na tela de Modelos): pega edições feitas direto no Postgres.
-  // Um Modelo que não compila mantém a última versão válida em uso, e nada é removido das permissões nesse caso.
-  // Os Modelos iniciais (opção recipes) vêm do banco no boot, então também podem ser removidos ao recarregar.
-  const loadedFromStore = new Set<string>(Object.keys(options?.recipes || {}));
-  async function reloadRecipesFromStore(): Promise<{ loaded: number; errors: { id: string; message: string }[] }> {
-    const errors: { id: string; message: string }[] = [];
-    const records = await recipeStore.list();
-    const seen = new Set<string>();
-
-    for (const record of records) {
-      seen.add(record.id);
-      try {
-        const recipe = await compiler.compile(record.id, record.source);
-        recipesMap.set(record.id, recipe);
-        loadedFromStore.add(record.id);
-      } catch (err: unknown) {
-        errors.push({ id: record.id, message: err instanceof Error ? err.message : "Erro ao compilar o Modelo." });
-      }
-    }
-
-    for (const id of Array.from(loadedFromStore)) {
-      if (seen.has(id)) continue;
-      loadedFromStore.delete(id);
-      recipesMap.delete(id);
-      compiler.invalidate(id);
-    }
-
-    if (errors.length === 0) await userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
-    return { loaded: records.length - errors.length, errors };
-  }
-
-  // Sincroniza e limpa permissões órfãs das roles na inicialização.
-  // Se algum Modelo falhou ao compilar, pula a limpeza: ele não é órfão, só está temporariamente quebrado.
-  if (options?.failedRecipeIds?.length) {
-    console.warn(
-      `Limpeza de permissões órfãs ignorada: Modelos com erro (${options.failedRecipeIds.join(", ")}). Corrija e recarregue.`
-    );
-  } else {
-    userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
-  }
+  // Remove das roles as permissões que não existem mais no catálogo do sistema (preserva "*").
+  void userStore.syncOrphanPermissions(SYSTEM_PERMISSION_KEYS);
 
   // Middleware de Autenticação
   // Administrador (isAdmin) ignora a matriz de permissões: recebe todas as permissões válidas no momento da requisição.
   const withAdminBypass = (payload: JWTAccessPayload): JWTAccessPayload =>
     payload.isAdmin
-      ? { ...payload, permissions: ["*", ...PermissionCatalogEngine.getAllValidPermissionKeys(Object.fromEntries(recipesMap))] }
+      ? { ...payload, permissions: ["*", ...SYSTEM_PERMISSION_KEYS] }
       : payload;
 
   const auth = createAuthMiddleware(tokenService, withAdminBypass);
@@ -152,15 +94,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (!keys.some((key) => hasPermission(user?.permissions, key))) return c.json({ error: denyMessage(keys[0]) }, 403);
       await next();
     };
-
-  // Helper para obter recipe registrada
-  function getRecipe(recipeId: string): RecipeDef {
-    const recipe = recipesMap.get(recipeId);
-    if (!recipe) {
-      throw new Error(`Recipe '${recipeId}' não encontrada.`);
-    }
-    return recipe;
-  }
 
   // Health check
   app.get("/api/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
@@ -287,8 +220,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
   // GET /api/iam/permissions/catalog
   app.get("/api/iam/permissions/catalog", auth, requirePermission("system:roles:read"), async (c) => {
-    const catalog = PermissionCatalogEngine.buildCatalog(Object.fromEntries(recipesMap));
-    return c.json(catalog);
+    return c.json({ system: getSystemPermissionsByModule() });
   });
 
   // GET /api/iam/users
@@ -452,9 +384,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
   // Valida chaves de permissão contra o catálogo de permissões válidas
   function validatePermissionKeys(permissions: string[]): string[] {
-    const validKeys = PermissionCatalogEngine.getAllValidPermissionKeys(Object.fromEntries(recipesMap));
-    const invalid = permissions.filter((p) => p !== "*" && !validKeys.has(p));
-    return invalid;
+    return permissions.filter((p) => p !== "*" && !SYSTEM_PERMISSION_KEYS.has(p));
   }
 
   // Responde 403 quando o chamador tenta conceder chaves que não possui; devolve undefined se pode.
@@ -468,20 +398,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const isLastActiveAdmin = async (id: string): Promise<boolean> => {
     const admins = (await userStore.listUsers()).filter((u) => u.isAdmin && u.status === "active");
     return admins.length === 1 && admins[0].id === id;
-  };
-
-  // Modo prévia (só leitura, `allowPreview`): o id literal "preview" dispensa Área de Trabalho; fora dele o id precisa existir e ser do Modelo.
-  const PREVIEW_WORKSPACE_ID = "preview";
-  const workspaceScopeError = (
-    workspaceId: string,
-    recipeId: string,
-    allowPreview: boolean
-  ): { error: string; status: 400 | 404 } | undefined => {
-    if (allowPreview && workspaceId === PREVIEW_WORKSPACE_ID) return undefined;
-    const ws = workspacesMap.get(workspaceId);
-    if (!ws) return { error: "Área de Trabalho não encontrada.", status: 404 };
-    if (ws.recipeId !== recipeId) return { error: "A Área de Trabalho não pertence a este Modelo.", status: 400 };
-    return undefined;
   };
 
   const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
@@ -572,66 +488,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   );
 
   // ─────────────────────────────────────────────────────────────
-  // 2.1 GESTÃO DE MODELOS EM RUNTIME (código-fonte TypeScript no banco)
-  // ─────────────────────────────────────────────────────────────
-
-  // GET /api/admin/recipes
-  app.get("/api/admin/recipes", auth, requirePermission("system:recipes:read"), async (c) => {
-    const records = await recipeStore.list();
-    return c.json(records.map(({ id, createdAt, updatedAt }) => ({ id, name: recipesMap.get(id)?.name, createdAt, updatedAt })));
-  });
-
-  // POST /api/admin/recipes/reload (relê os Modelos do banco e recompila os alterados)
-  app.post("/api/admin/recipes/reload", auth, requirePermission("system:recipes:manage"), async (c) => {
-    return c.json(await reloadRecipesFromStore());
-  });
-
-  // GET /api/admin/recipes/:id
-  app.get("/api/admin/recipes/:id", auth, requirePermission("system:recipes:read"), async (c) => {
-    const record = await recipeStore.get(c.req.param("id"));
-    if (!record) return c.json({ error: "Modelo não encontrado." }, 404);
-    return c.json(record);
-  });
-
-  // PUT /api/admin/recipes/:id (cria ou atualiza; compila e valida antes de gravar)
-  app.put(
-    "/api/admin/recipes/:id",
-    auth,
-    requirePermission("system:recipes:manage"),
-    zValidator("json", z.object({ source: z.string().min(1) })),
-    async (c) => {
-      const id = c.req.param("id");
-      const { source } = c.req.valid("json");
-
-      let recipe: RecipeDef;
-      try {
-        recipe = await compiler.compile(id, source);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Erro ao compilar o Modelo.";
-        return c.json({ error: msg }, 400);
-      }
-
-      const record = await recipeStore.save(id, source);
-      loadedFromStore.add(id);
-      recipesMap.set(id, recipe);
-      await userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
-      return c.json(record);
-    }
-  );
-
-  // DELETE /api/admin/recipes/:id
-  app.delete("/api/admin/recipes/:id", auth, requirePermission("system:recipes:manage"), async (c) => {
-    const id = c.req.param("id");
-    if (!(await recipeStore.get(id))) return c.json({ error: "Modelo não encontrado." }, 404);
-    await recipeStore.delete(id);
-    loadedFromStore.delete(id);
-    compiler.invalidate(id);
-    recipesMap.delete(id);
-    await userStore.syncOrphanPermissions(Object.fromEntries(recipesMap));
-    return c.json({ success: true });
-  });
-
-  // ─────────────────────────────────────────────────────────────
   // 2.2 GESTÃO DE CONEXÕES COM FONTES DE DADOS (a senha nunca é devolvida)
   // ─────────────────────────────────────────────────────────────
 
@@ -710,7 +566,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 3. WORKSPACES & SDUI CORE ROUTES (Permission-First)
+  // 3. WORKSPACES (Permission-First)
   // ─────────────────────────────────────────────────────────────
 
   // 1. GET /api/workspaces (Lista todas as Áreas de Trabalho, com filtro opcional por Modelo)
@@ -718,15 +574,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     "/api/workspaces",
     auth,
     guard("system:workspaces:read"),
-    zValidator("query", z.object({ recipe_id: z.string().optional() })),
-    (c) => {
-      const { recipe_id } = c.req.valid("query");
-      let list = Array.from(workspacesMap.values()).reverse();
-      if (recipe_id) {
-        list = list.filter((ws) => ws.recipeId === recipe_id);
-      }
-      return c.json(list);
-    }
+    (c) => c.json(Array.from(workspacesMap.values()).reverse())
   );
 
   // 2. GET /api/workspaces/:id (Detalhes e status da Área de Trabalho)
@@ -752,11 +600,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       "json",
       z
         .object({
-          name: z.string().optional(),
-          recipeId: z.string(),
+          name: z.string().min(1),
           startDate: IsoDateSchema,
           endDate: IsoDateSchema,
-          params: z.record(z.unknown()).optional(),
         })
         .refine(
           (data) => {
@@ -773,25 +619,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const body = c.req.valid("json");
 
-      let recipe: RecipeDef;
-      try {
-        recipe = getRecipe(body.recipeId);
-      } catch {
-        return c.json({ error: `Modelo '${body.recipeId}' não encontrado.` }, 400);
-      }
-      if (!PermissionResolver.canViewRecipe(recipe.id, getAuthenticatedUser(c).permissions)) {
-        return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
-      }
-
       const id = `ws_${randomUUID()}`;
       const newWs: WorkspaceRecord = {
         id,
-        recipeId: recipe.id,
-        name: body.name || `${recipe.name} (${body.startDate} a ${body.endDate})`,
+        name: body.name,
         startDate: body.startDate,
         endDate: body.endDate,
         status: "open",
-        params: body.params,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -802,7 +636,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     }
   );
 
-  // 3.1 PUT /api/workspaces/:id (Edição de título, período e parâmetros)
+  // 3.1 PUT /api/workspaces/:id (Edição de título e período)
   app.put(
     "/api/workspaces/:id",
     auth,
@@ -814,7 +648,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         name: z.string().optional(),
         startDate: IsoDateSchema.optional(),
         endDate: IsoDateSchema.optional(),
-        params: z.record(z.unknown()).optional(),
       })
     ),
     async (c) => {
@@ -836,7 +669,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (body.name !== undefined) ws.name = body.name;
       ws.startDate = startDate;
       ws.endDate = endDate;
-      if (body.params !== undefined) ws.params = body.params;
       ws.updatedAt = new Date().toISOString();
       await workspaceStore?.save(ws);
 
@@ -902,324 +734,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     }
   );
 
-  // 5.1 GET /api/recipes (Catálogo de Modelos disponíveis, filtrado por permissão de visualização)
-  app.get("/api/recipes", auth, async (c) => {
-    const user = getAuthenticatedUser(c);
-
-    let catalog = Array.from(recipesMap.values()).map((recipe) => ({
-      id: recipe.id,
-      name: recipe.name,
-      description: recipe.description,
-    }));
-
-    // Quem gerencia permissões precisa enxergar todos os Modelos para configurar o acesso a eles.
-    if (!hasPermission(user.permissions, "system:roles:update")) {
-      catalog = catalog.filter((item) => PermissionResolver.canViewRecipe(item.id, user.permissions));
-    }
-
-    return c.json(catalog);
-  });
-
-  // 5.2 GET /api/lookups (Opções de um campo com lookup definido no Modelo)
-  app.get(
-    "/api/lookups",
-    auth,
-    zValidator("query", z.object({ recipe_id: z.string(), field: z.string() })),
-    async (c) => {
-      const { recipe_id, field } = c.req.valid("query");
-      const user = getAuthenticatedUser(c);
-
-      if (!PermissionResolver.canViewRecipe(recipe_id, user.permissions)) {
-        return c.json({ error: denyMessage(`recipe:${recipe_id}:view`) }, 403);
-      }
-
-      let recipe: RecipeDef;
-      try {
-        recipe = getRecipe(recipe_id);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Modelo não encontrado.";
-        return c.json({ error: msg }, 404);
-      }
-
-      const fieldDef = recipe.workspace.params.find((p) => p.name === field);
-      if (!fieldDef || !("lookup" in fieldDef) || !fieldDef.lookup) {
-        return c.json(
-          { error: `Campo '${field}' não possui configuração de lookup no Modelo '${recipe_id}'.` },
-          400
-        );
-      }
-
-      try {
-        const lookupConnector = resolveSourceConnector(fieldDef.lookup.source, sourceConnectors, sourceConnector);
-        const rows = await lookupConnector.query(fieldDef.lookup.query);
-        const valueKey = fieldDef.lookup.valueKey || "value";
-        const labelKey = fieldDef.lookup.labelKey || "label";
-
-        const options = rows.map((row) => ({
-          value: row[valueKey] as string | number,
-          label: String(row[labelKey] ?? ""),
-        }));
-
-        return c.json(options);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Erro ao consultar opções do lookup.";
-        return c.json({ error: msg }, 500);
-      }
-    }
-  );
-
-  // 6. GET /api/dashboards/:id/schema (Retorna o UI Schema sanitizado sem código SQL)
-  app.get(
-    "/api/dashboards/:id/schema",
-    auth,
-    zValidator("param", z.object({ id: z.string() })),
-    async (c) => {
-      const { id } = c.req.valid("param");
-      // Permissão antes de resolver o Modelo: sem ela, existente ou não, a resposta é 403.
-      const user = getAuthenticatedUser(c);
-      if (!PermissionResolver.canViewRecipe(id, user.permissions)) {
-        return c.json({ error: denyMessage(`recipe:${id}:view`) }, 403);
-      }
-      const recipe = recipesMap.get(id);
-      if (!recipe) return c.json({ error: `Modelo '${id}' não encontrado.` }, 404);
-
-      const filteredActions = recipe.actions.filter((a: ActionDef) =>
-        PermissionResolver.canExecuteAction({
-          recipeId: recipe.id,
-          actionDef: a,
-          userPermissions: user.permissions,
-        })
-      );
-
-      const schemaComponents = recipe.ui.components.map((component) => ({
-        ...component,
-        props: {
-          ...component.props,
-          availableProfiles: DataResolver.getComponentProfileMetadata(
-            recipe,
-            component,
-            user.permissions
-          ),
-        },
-      }));
-
-      const uiSchema = {
-        id: recipe.id,
-        name: recipe.name,
-        description: recipe.description,
-        workspace: recipe.workspace,
-        actions: filteredActions.map((a: ActionDef) => ({
-          id: a.id,
-          label: a.label,
-          icon: a.icon,
-          variant: a.variant,
-          nature: a.nature || "mutation",
-          permission: a.permission,
-        })),
-        ui: { ...recipe.ui, components: schemaComponents },
-      };
-
-      return c.json(uiSchema);
-    }
-  );
-
-  // 2. GET /api/workspaces/:id/data/:componentId (Retorna dados do componente resolvidos com IAM)
-  app.get(
-    "/api/workspaces/:id/data/:componentId",
-    auth,
-    zValidator("param", z.object({ id: z.string(), componentId: z.string() })),
-    zValidator(
-      "query",
-      z
-        .object({
-          recipe_id: z.string().default("fechamento_mes"),
-          page: z.coerce.number().default(1),
-          page_size: z.coerce.number().default(10),
-          start_date: z.string().default("2026-01-01"),
-          end_date: z.string().default("2026-01-31"),
-          sort_by: z.string().optional(),
-          order: z.enum(["asc", "desc"]).optional(),
-          search: z.string().optional(),
-          profile_id: z.string().optional(),
-          // Parâmetros do Modelo (JSON) para uso sem Área de Trabalho, como na prévia do Modelo.
-          params: z.string().optional(),
-        })
-        .refine(
-          (data) => {
-            const start = new Date(data.start_date);
-            const end = new Date(data.end_date);
-            return end.getTime() >= start.getTime();
-          },
-          {
-            message: "A Data Final não pode ser anterior à Data Inicial.",
-            path: ["end_date"],
-          }
-        )
-    ),
-    async (c) => {
-      const { id: workspaceId, componentId } = c.req.valid("param");
-      const query = c.req.valid("query");
-      // Permissão antes de resolver o Modelo: sem ela, existente ou não, a resposta é 403.
-      const user = getAuthenticatedUser(c);
-      if (!PermissionResolver.canViewRecipe(query.recipe_id, user.permissions)) {
-        return c.json({ error: denyMessage(`recipe:${query.recipe_id}:view`) }, 403);
-      }
-      const recipe = recipesMap.get(query.recipe_id);
-      if (!recipe) return c.json({ error: `Modelo '${query.recipe_id}' não encontrado.` }, 404);
-      const scopeError = workspaceScopeError(workspaceId, recipe.id, true);
-      if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
-
-      // Só aceita parâmetros declarados no Modelo; chegam à consulta sempre como bind parameters.
-      let requestParams: Record<string, unknown> | undefined;
-      if (query.params) {
-        try {
-          const parsed: unknown = JSON.parse(query.params);
-          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
-          const declared = new Set(recipe.workspace.params.map((param) => param.name));
-          requestParams = Object.fromEntries(Object.entries(parsed).filter(([name]) => declared.has(name)));
-        } catch {
-          return c.json({ error: "O parâmetro 'params' deve ser um objeto JSON." }, 400);
-        }
-      }
-
-      try {
-        const result = await DataResolver.resolveComponentData({
-          recipe,
-          workspaceId,
-          componentId,
-          sourceConnector,
-          sourceConnectors,
-          persistenceStore,
-          profileId: query.profile_id,
-          context: {
-            workspace: {
-              startDate: query.start_date,
-              endDate: query.end_date,
-              params: workspacesMap.get(workspaceId)?.params ?? requestParams,
-            },
-            user: {
-              id: user.sub,
-              role: user.role,
-              permissions: user.permissions,
-              externals: user.externals,
-            },
-          },
-          pagination: {
-            page: query.page,
-            pageSize: query.page_size,
-            sortBy: query.sort_by,
-            order: query.order,
-            search: query.search,
-          },
-        });
-
-        return c.json(result);
-      } catch (err: unknown) {
-        if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
-        const msg = err instanceof Error ? err.message : "Erro ao carregar dados.";
-        if (msg.includes("Acesso negado")) {
-          return c.json({ error: msg }, 403);
-        }
-        if (msg.includes("Data Inicial") || msg.includes("Data Final") || msg.includes("datas")) {
-          return c.json({ error: msg }, 400);
-        }
-        return c.json({ error: msg }, 500);
-      }
-    }
-  );
-
-  // 3. POST /api/workspaces/:id/actions/exec (Executa RPC de ação operacional com verificação de permissão)
-  app.post(
-    "/api/workspaces/:id/actions/exec",
-    auth,
-    zValidator("param", z.object({ id: z.string() })),
-    zValidator(
-      "json",
-      z.object({
-        recipe_id: z.string().default("fechamento_mes"),
-        component_id: z.string(),
-        action_id: z.string(),
-        row: z.record(z.unknown()),
-        form_data: z.record(z.unknown()).optional(),
-        workspace_version: z.number().default(1),
-      })
-    ),
-    async (c) => {
-      const { id: workspaceId } = c.req.valid("param");
-      const body = c.req.valid("json");
-      // Permissão antes de resolver o Modelo: sem ela, existente ou não, a resposta é 403.
-      const user = getAuthenticatedUser(c);
-      if (!PermissionResolver.canViewRecipe(body.recipe_id, user.permissions)) {
-        return c.json({ error: denyMessage(`recipe:${body.recipe_id}:view`) }, 403);
-      }
-      const recipe = recipesMap.get(body.recipe_id);
-      if (!recipe) return c.json({ error: `Modelo '${body.recipe_id}' não encontrado.` }, 404);
-
-      const scopeError = workspaceScopeError(workspaceId, recipe.id, false);
-      if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
-
-      const component = recipe.ui.components.find((item) => item.id === body.component_id);
-      if (!component || component.component !== "data_table") {
-        return c.json(
-          { error: `Componente de origem '${body.component_id}' não encontrado ou não suporta actions de linha.` },
-          400
-        );
-      }
-
-      const actionBinding = component.props.bindings?.find((binding) => binding.primary) || component.props.bindings?.[0];
-      const actionSource = actionBinding?.source || component.props.source;
-      const actionQuery = actionBinding?.query || component.props.query;
-      if (!actionSource || !actionQuery) {
-        return c.json({ error: "O componente de origem não possui source/query para executar a action." }, 400);
-      }
-
-      // Trava de execução se a Área de Trabalho estiver concluída para ações de modificação
-      const ws = workspacesMap.get(workspaceId);
-      const actionDef = recipe.actions.find((a: ActionDef) => a.id === body.action_id);
-      if (!actionDef) {
-        return c.json({ error: `Ação '${body.action_id}' não encontrada no Modelo '${recipe.id}'.` }, 404);
-      }
-      if (!PermissionResolver.canExecuteAction({ recipeId: recipe.id, actionDef, userPermissions: user.permissions })) {
-        return c.json(
-          { error: `Acesso negado: o usuário não possui permissão para executar a ação '${actionDef.label || actionDef.id}'.` },
-          403
-        );
-      }
-      const isMutation = actionDef.nature !== "read";
-
-      if (ws && ws.status === "closed" && isMutation) {
-        return c.json(
-          { error: "Esta Área de Trabalho está concluída e bloqueada para ações de modificação." },
-          400
-        );
-      }
-
-      try {
-        const result = await ActionExecutor.execute({
-          recipe,
-          actionId: body.action_id,
-          sourceName: actionSource,
-          queryName: actionQuery,
-          row: body.row,
-          formData: body.form_data,
-          workspaceId,
-          workspaceVersion: body.workspace_version,
-          persistenceStore,
-          userPermissions: user.permissions,
-        });
-
-        return c.json(result);
-      } catch (err: unknown) {
-        if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
-        const msg = err instanceof Error ? err.message : "Erro na execução da ação.";
-        if (msg.includes("Acesso negado")) {
-          return c.json({ error: msg }, 403);
-        }
-        return c.json({ error: msg }, 500);
-      }
-    }
-  );
-
   return app;
 }
 
@@ -1228,27 +742,19 @@ export type AppType = ReturnType<typeof createPlatformApp>;
 // Inicia servidor se executado diretamente
 if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
   void (async () => {
-    let persistenceStore: PersistenceStore | undefined;
     let userStore: UserStore | undefined;
-    let recipeStore: RecipeStore | undefined;
     const sourceConnectors: SourceConnectorRegistry = {};
     let connectionStore: ConnectionStore | undefined;
     let workspaceStore: WorkspaceStore | undefined;
     let workspaces: WorkspaceRecord[] = [];
-    const recipes: Record<string, RecipeDef> = {};
-    const failedRecipeIds: string[] = [];
     if (process.env.POSTGRES_HOST) {
-      const [{ db }, { PostgresPersistenceStore }, { PostgresUserStore }, { PostgresRecipeStore }, { PostgresConnectionStore }, { PostgresWorkspaceStore }] = await Promise.all([
+      const [{ db }, { PostgresUserStore }, { PostgresConnectionStore }, { PostgresWorkspaceStore }] = await Promise.all([
         import("./db/client.js"),
-        import("./data/postgres-persistence-store.js"),
         import("./iam/postgres-user-store.js"),
-        import("./data/postgres-recipe-store.js"),
         import("./data/postgres-connection-store.js"),
         import("./data/postgres-workspace-store.js"),
       ]);
-      persistenceStore = new PostgresPersistenceStore(db);
       userStore = new PostgresUserStore(db);
-      recipeStore = new PostgresRecipeStore(db);
       connectionStore = new PostgresConnectionStore(db);
       workspaceStore = new PostgresWorkspaceStore(db);
       workspaces = await workspaceStore.list();
@@ -1260,29 +766,9 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
           console.error(`Conexão '${record.id}' ignorada: ${err instanceof Error ? err.message : err}`);
         }
       }
-
-      const compiler = new RecipeCompiler();
-      for (const record of await recipeStore.list()) {
-        try {
-          recipes[record.id] = await compiler.compile(record.id, record.source);
-        } catch (err: unknown) {
-          failedRecipeIds.push(record.id);
-          console.error(`Modelo '${record.id}' ignorado: ${err instanceof Error ? err.message : err}`);
-        }
-      }
     }
 
-    const app = createPlatformApp({
-      persistenceStore,
-      userStore,
-      recipeStore,
-      connectionStore,
-      workspaceStore,
-      workspaces,
-      sourceConnectors,
-      recipes,
-      failedRecipeIds,
-    });
+    const app = createPlatformApp({ userStore, connectionStore, workspaceStore, workspaces, sourceConnectors });
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
     serve({ fetch: app.fetch, port });

@@ -1,19 +1,5 @@
 import type { User } from "@platform/shared";
-import { boolean, index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-
-export const persistenceItems = pgTable(
-  "persistence_items",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    workspaceId: text("workspace_id").notNull(),
-    collectionId: text("collection_id").notNull(),
-    targetForeignKey: text("target_foreign_key").notNull(),
-    data: jsonb("data").$type<Record<string, unknown>>().notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => [index("persistence_items_lookup_idx").on(table.workspaceId, table.collectionId, table.targetForeignKey)]
-);
+import { boolean, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const roles = pgTable("roles", {
   id: text("id").primaryKey(),
@@ -38,13 +24,6 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at"),
 });
 
-export const recipes = pgTable("recipes", {
-  id: text("id").primaryKey(),
-  source: text("source").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
 export const connections = pgTable("connections", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -57,12 +36,10 @@ export const connections = pgTable("connections", {
 
 export const workspaces = pgTable("workspaces", {
   id: text("id").primaryKey(),
-  recipeId: text("recipe_id").notNull(),
   name: text("name").notNull(),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   status: text("status", { enum: ["open", "closed", "archived"] }).notNull().default("open"),
-  params: jsonb("params").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

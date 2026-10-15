@@ -3,11 +3,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPlatformApp } from "../src/index.js";
-import { MockSourceConnector } from "../src/data/source-connector.js";
-import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
 import type { SourceConnector } from "../src/data/source-connector.js";
-import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
 import { createSeededUserStore, seededWorkspaces, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 // Baseline executável: congela status+body de todas as rotas HTTP antes da refatoração em módulos.
@@ -54,20 +51,7 @@ async function fresh(): Promise<void> {
   app = createPlatformApp({
     userStore,
     workspaces: seededWorkspaces.map((w) => ({ ...w })),
-    sourceConnector: new MockSourceConnector({
-      default: [
-        { vendedor_id: 1, vendedor: "Carlos Vendedor", venda_geral: 10000 },
-        { vendedor_id: 2, vendedor: "Ana Gerente", venda_geral: 25000 },
-        { vendedor_id: 42, vendedor: "João da Silva", venda_geral: 15000 },
-      ],
-      "FROM categories": [
-        { value: 1, label: "Medicamentos" },
-        { value: 2, label: "Perfumaria" },
-      ],
-    }),
-    persistenceStore: new MemoryPersistenceStore(),
     connectorFactory: (record) => (record.config.host === "bad" ? failingConnector : okConnector),
-    recipes: { fechamento_mes: fechamentoRecipe },
   });
 }
 
@@ -101,19 +85,7 @@ async function rec(key: string, method: string, path: string, opts: Opts = {}): 
 
 const tick = () => vi.setSystemTime(new Date(Date.now() + 1000));
 
-const validSource = (id: string) => `
-import { defineRecipe } from "@platform/shared";
-export default defineRecipe({
-  id: "${id}", name: "Modelo Baseline", workspace: { params: [] }, sources: {},
-  actions: [{ id: "acao_a", label: "A", permission: "recipe:${id}:action:acao_a", action: async () => {} }],
-  ui: { layout: { type: "grid", columns: 12, gap: 16 }, components: [] },
-});
-`;
-
 const WS = "ws_fechamento_jan_2026";
-const WS_CLOSED = "ws_fechamento_dez_2025";
-const comp = `/api/workspaces/${WS}/data/tabela_vendedores`;
-
 describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   beforeAll(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -224,7 +196,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   describe("iam-roles", () => {
     it("rotas", async () => {
     // ── IAM roles
-    const role = { id: "role_teste", name: "Grupo Teste", description: "d", permissions: ["system:users:read", "recipe:fechamento_mes:view"] };
+    const role = { id: "role_teste", name: "Grupo Teste", description: "d", permissions: ["system:users:read", "system:workspaces:read"] };
     await rec("iam.roles.create.401", "POST", "/api/iam/roles", { body: role });
     await rec("iam.roles.create.403", "POST", "/api/iam/roles", { token: V, body: role });
     await rec("iam.roles.create.400_invalid_keys", "POST", "/api/iam/roles", { token: A, body: { ...role, permissions: ["system:foo:bar", "recipe:nada:view"] } });
@@ -251,16 +223,14 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("ws.list.401", "GET", "/api/workspaces");
     await rec("ws.list.ok", "GET", "/api/workspaces", { token: O });
     await rec("ws.list.403", "GET", "/api/workspaces", { token: V });
-    await rec("ws.list.filter", "GET", "/api/workspaces?recipe_id=outro", { token: O });
     await rec("ws.detail.ok", "GET", `/api/workspaces/${WS}`, { token: O });
     await rec("ws.detail.401", "GET", `/api/workspaces/${WS}`);
     await rec("ws.detail.403", "GET", `/api/workspaces/${WS}`, { token: V });
     await rec("ws.detail.unknown_404", "GET", "/api/workspaces/ws_inexistente", { token: O });
-    const wsNew = { recipeId: "fechamento_mes", startDate: "2026-02-01", endDate: "2026-02-28", params: { categories_focus: [1] } };
+    const wsNew = { name: "Fevereiro", startDate: "2026-02-01", endDate: "2026-02-28" };
     await rec("ws.create.403", "POST", "/api/workspaces", { token: V, body: wsNew });
     await rec("ws.create.400_dates", "POST", "/api/workspaces", { token: A, body: { ...wsNew, startDate: "2026-03-01", endDate: "2026-02-01" } });
-    await rec("ws.create.400_missing_fields", "POST", "/api/workspaces", { token: A, body: { recipeId: "fechamento_mes" } });
-    await rec("ws.create.400_unknown_recipe", "POST", "/api/workspaces", { token: A, body: { ...wsNew, recipeId: "nada" } });
+    await rec("ws.create.400_missing_fields", "POST", "/api/workspaces", { token: A, body: { name: "Sem datas" } });
     tick();
     const wsCreated = await rec("ws.create.ok", "POST", "/api/workspaces", { token: A, body: wsNew });
     const wsId = (wsCreated.raw as { id: string }).id;
@@ -286,93 +256,9 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     });
   });
 
-  describe("dashboards-data", () => {
-    it("rotas", async () => {
-    // ── recipes / lookups / dashboards
-    await rec("recipes.catalog.401", "GET", "/api/recipes");
-    await rec("recipes.catalog.vendedor", "GET", "/api/recipes", { token: V });
-    await rec("recipes.catalog.admin_bypass", "GET", "/api/recipes", { token: R });
-    await rec("lookups.ok", "GET", "/api/lookups?recipe_id=fechamento_mes&field=categories_focus", { token: A });
-    await rec("lookups.403", "GET", "/api/lookups?recipe_id=outro&field=x", { token: V });
-    await rec("lookups.400_no_lookup", "GET", "/api/lookups?recipe_id=fechamento_mes&field=start_date", { token: A });
-    await rec("lookups.404_unknown_recipe", "GET", "/api/lookups?recipe_id=nada&field=x", { token: R });
-    await rec("lookups.401", "GET", "/api/lookups?recipe_id=fechamento_mes&field=categories_focus");
-    await rec("lookups.400_missing_query", "GET", "/api/lookups", { token: A });
-    await rec("dashboards.schema.401", "GET", "/api/dashboards/fechamento_mes/schema");
-    await rec("dashboards.schema.vendedor", "GET", "/api/dashboards/fechamento_mes/schema", { token: V });
-    await rec("dashboards.schema.operador", "GET", "/api/dashboards/fechamento_mes/schema", { token: O });
-    await rec("dashboards.schema.admin_bypass", "GET", "/api/dashboards/fechamento_mes/schema", { token: R });
-    await rec("dashboards.schema.unknown_recipe", "GET", "/api/dashboards/nada/schema", { token: R });
-    await rec("dashboards.schema.403_unknown_recipe_without_view", "GET", "/api/dashboards/nada/schema", { token: A });
-
-    // ── dados dos componentes
-    const q = "?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31";
-    await rec("data.table.operador", "GET", `${comp}${q}`, { token: O });
-    await rec("data.table.vendedor", "GET", `${comp}${q}`, { token: V });
-    await rec("data.table.admin", "GET", `${comp}${q}&profile_id=equipe&sort_by=vendedor&order=desc&page_size=2`, { token: A });
-    await rec("data.table.admin_bypass", "GET", `${comp}${q}`, { token: R });
-    await rec("data.table.search", "GET", `${comp}${q}&search=a`, { token: O });
-    await rec("data.table.401", "GET", `${comp}${q}`);
-    await rec("data.table.profile_without_permission", "GET", `${comp}${q}&profile_id=proprias`, { token: O });
-    await rec("data.kpi.operador", "GET", `/api/workspaces/${WS}/data/kpi_total_vendas${q}`, { token: O });
-    await rec("data.chart.operador", "GET", `/api/workspaces/${WS}/data/grafico_ranking_vendas${q}`, { token: O });
-    await rec("data.400_dates", "GET", `${comp}?recipe_id=fechamento_mes&start_date=2026-02-01&end_date=2026-01-01`, { token: O });
-    await rec("data.400_params_not_object", "GET", `${comp}${q}&params=%5B1%5D`, { token: O });
-    await rec("data.ok_params", "GET", `${comp}${q}&params=${encodeURIComponent('{"categories_focus":[1,2],"x":1}')}`, { token: O });
-    await rec("data.404_unknown_workspace", "GET", `/api/workspaces/ws_inexistente/data/tabela_vendedores${q}`, { token: O });
-    await rec("data.ok_preview_workspace", "GET", `/api/workspaces/preview/data/tabela_vendedores${q}`, { token: O });
-    await rec("data.unknown_component", "GET", `/api/workspaces/${WS}/data/nao_existe${q}`, { token: O });
-
-    // ── ações
-    const row = { vendedor_id: 42, vendedor: "João da Silva" };
-    const exec = (k: string, token: string | undefined, body: Record<string, unknown>, ws = WS) =>
-      rec(k, "POST", `/api/workspaces/${ws}/actions/exec`, { token, body: { recipe_id: "fechamento_mes", component_id: "tabela_vendedores", row, ...body } });
-    await exec("actions.dialog.operador", O, { action_id: "adicionar_penalidade" });
-    await exec("actions.submit.operador", O, { action_id: "adicionar_penalidade", form_data: { valor: 10, reason: "atraso" } });
-    await exec("actions.submit.admin_bypass", R, { action_id: "adicionar_penalidade", form_data: { valor: 5, reason: "bypass" } });
-    await exec("actions.read.vendedor", V, { action_id: "visualizar_penalidades" });
-    await exec("actions.vendedor_mutation", V, { action_id: "adicionar_penalidade", form_data: { valor: 1, reason: "x" } });
-    await exec("actions.401", undefined, { action_id: "visualizar_penalidades" });
-    await exec("actions.400_closed_workspace", O, { action_id: "adicionar_penalidade", form_data: { valor: 1, reason: "x" } }, WS_CLOSED);
-    await exec("actions.400_unknown_component", O, { action_id: "adicionar_penalidade", component_id: "kpi_total_vendas" });
-    await exec("actions.unknown_action", O, { action_id: "nao_existe" });
-    await rec("actions.400_invalid_body", "POST", `/api/workspaces/${WS}/actions/exec`, { token: O, body: { action_id: "x" } });
-
-    });
-  });
-
-  describe("admin-recipes", () => {
-    it("rotas", async () => {
-    await fresh();
-    // ── admin recipes (app novo para o estado ser previsível)
-    await fresh();
-    await rec("admin.recipes.list.initial", "GET", "/api/admin/recipes", { token: A });
-    await rec("admin.recipes.list.401", "GET", "/api/admin/recipes");
-    await rec("admin.recipes.list.403", "GET", "/api/admin/recipes", { token: V });
-    await rec("admin.recipes.put.401", "PUT", "/api/admin/recipes/novo", { body: { source: validSource("novo") } });
-    await rec("admin.recipes.put.403", "PUT", "/api/admin/recipes/novo", { token: V, body: { source: validSource("novo") } });
-    await rec("admin.recipes.put.400_compile", "PUT", "/api/admin/recipes/quebrado", { token: A, body: { source: "export default defineRecipe({" } });
-    await rec("admin.recipes.put.400_empty", "PUT", "/api/admin/recipes/vazio", { token: A, body: { source: "" } });
-    await rec("admin.recipes.put.ok", "PUT", "/api/admin/recipes/novo", { token: A, body: { source: validSource("novo") } });
-    await rec("admin.recipes.put.admin_bypass", "PUT", "/api/admin/recipes/outro", { token: R, body: { source: validSource("outro") } });
-    await rec("admin.recipes.get.ok", "GET", "/api/admin/recipes/novo", { token: A });
-    await rec("admin.recipes.get.404", "GET", "/api/admin/recipes/nada", { token: A });
-    await rec("admin.recipes.get.403", "GET", "/api/admin/recipes/novo", { token: V });
-    await rec("admin.recipes.list.after", "GET", "/api/admin/recipes", { token: A });
-    await rec("admin.recipes.catalog_includes_new", "GET", "/api/iam/permissions/catalog", { token: A });
-    await rec("admin.recipes.reload.401", "POST", "/api/admin/recipes/reload");
-    await rec("admin.recipes.reload.403", "POST", "/api/admin/recipes/reload", { token: V });
-    await rec("admin.recipes.reload.ok", "POST", "/api/admin/recipes/reload", { token: A });
-    await rec("admin.recipes.delete.401", "DELETE", "/api/admin/recipes/novo");
-    await rec("admin.recipes.delete.403", "DELETE", "/api/admin/recipes/novo", { token: V });
-    await rec("admin.recipes.delete.ok", "DELETE", "/api/admin/recipes/novo", { token: A });
-    await rec("admin.recipes.delete.404", "DELETE", "/api/admin/recipes/novo", { token: A });
-
-    });
-  });
-
   describe("admin-connections", () => {
     it("rotas", async () => {
+    await fresh();
     // ── admin connections / erp-types
     await rec("admin.erp_types.ok", "GET", "/api/admin/erp-types", { token: A });
     await rec("admin.erp_types.401", "GET", "/api/admin/erp-types");

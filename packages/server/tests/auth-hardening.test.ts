@@ -2,17 +2,13 @@ import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { sign } from "hono/jwt";
 import { TokenService } from "../src/iam/token-service.js";
 import { createPlatformApp } from "../src/index.js";
-import { MockSourceConnector } from "../src/data/source-connector.js";
-import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
-import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
-import { canGrant, missingGrants } from "../src/iam/can-grant.js";
+import { canGrant, grantDeniedMessage, missingGrants } from "../src/iam/can-grant.js";
+import { SYSTEM_PERMISSION_KEYS } from "../src/iam/system-permissions.js";
 import { hasPermission } from "../src/iam/has-permission.js";
 import { PasswordService } from "../src/iam/password-service.js";
-import { PermissionResolver } from "../src/iam/permission-resolver.js";
 import { authHeader, createSeededUserStore, seededWorkspaces, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 const WS = "ws_fechamento_jan_2026";
-const q = "?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31";
 
 describe("hardening de auth: permissão ausente falha fechado", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -21,14 +17,11 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
 
   beforeAll(async () => {
     const userStore = createSeededUserStore();
-    await userStore.createRole({ id: "role_sem_view", name: "Sem Modelo", description: "d", permissions: ["system:workspaces:read"] });
-    await userStore.createUser({ fullname: "Teste Usuario", username: "sem.view", password: TEST_PASSWORD, roleId: "role_sem_view", externals: {} });
+    await userStore.createRole({ id: "role_so_leitura", name: "Só leitura", description: "d", permissions: ["system:workspaces:read"] });
+    await userStore.createUser({ fullname: "Teste Usuario", username: "sem.view", password: TEST_PASSWORD, roleId: "role_so_leitura", externals: {} });
     app = createPlatformApp({
       userStore,
       workspaces: seededWorkspaces.map((w) => ({ ...w })),
-      sourceConnector: new MockSourceConnector({ default: [{ vendedor_id: 1, vendedor: "A", venda_geral: 1 }] }),
-      persistenceStore: new MemoryPersistenceStore(),
-      recipes: { fechamento_mes: fechamentoRecipe },
     });
     // Criado após o boot: o sync de órfãs remove "*" de roles existentes na inicialização.
     await userStore.createRole({ id: "role_curinga", name: "Curinga", description: "d", permissions: ["*"] });
@@ -37,33 +30,15 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     curinga = await authHeader(app, "cur.inga");
   });
 
-  const post = (headers: Record<string, string>) =>
-    app.request(`/api/workspaces/${WS}/actions/exec`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({
-        recipe_id: "fechamento_mes",
-        component_id: "tabela_vendedores",
-        action_id: "visualizar_penalidades",
-        row: { vendedor_id: 1 },
-      }),
-    });
-
-  it("sem recipe:<id>:view: schema, data e exec respondem 403", async () => {
-    expect((await app.request("/api/dashboards/fechamento_mes/schema", { headers: semView })).status).toBe(403);
-    expect((await app.request(`/api/workspaces/${WS}/data/tabela_vendedores${q}`, { headers: semView })).status).toBe(403);
-    expect((await post(semView)).status).toBe(403);
-  });
-
-  it("sem token: 401 em schema, data e exec; rotas de persistência HTTP não existem (404)", async () => {
-    expect((await app.request("/api/dashboards/fechamento_mes/schema")).status).toBe(401);
-    expect((await app.request(`/api/workspaces/${WS}/data/tabela_vendedores${q}`)).status).toBe(401);
-    expect((await post({})).status).toBe(401);
-    expect((await app.request(`/api/workspaces/${WS}/persistence/collection/c/1`)).status).toBe(404);
-  });
-
-  it("curinga '*' passa pela checagem de visualização do Modelo", async () => {
-    expect((await app.request("/api/dashboards/fechamento_mes/schema", { headers: curinga })).status).toBe(200);
+  it("sem permissão: mutações de workspace respondem 403; sem token, 401", async () => {
+    const send = (method: string, path: string, headers: Record<string, string> = {}, body?: object) =>
+      app.request(path, { method, headers: { "Content-Type": "application/json", ...headers }, body: body ? JSON.stringify(body) : undefined });
+    const novo = { name: "Nova", startDate: "2026-02-01", endDate: "2026-02-28" };
+    expect((await send("POST", "/api/workspaces", semView, novo)).status).toBe(403);
+    expect((await send("POST", `/api/workspaces/${WS}/conclude`, semView)).status).toBe(403);
+    expect((await send("DELETE", `/api/workspaces/${WS}`, semView)).status).toBe(403);
+    expect((await send("GET", "/api/workspaces")).status).toBe(401);
+    expect((await send("POST", "/api/workspaces", {}, novo)).status).toBe(401);
   });
 
   it("curinga '*' não-admin acessa rotas system:* e workspaces", async () => {
@@ -74,16 +49,14 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
   it("role com '*' mantém o curinga após o sync de órfãs", async () => {
     const store = createSeededUserStore();
     await store.createRole({ id: "role_c", name: "Curinga", description: "d", permissions: ["*", "recipe:morto:view"] });
-    await store.syncOrphanPermissions({ fechamento_mes: fechamentoRecipe });
+    await store.syncOrphanPermissions(SYSTEM_PERMISSION_KEYS);
     expect((await store.getRole("role_c"))?.permissions).toEqual(["*"]);
   });
 
-  it("PermissionResolver e hasPermission falham fechado sem permissões", () => {
+  it("hasPermission falha fechado sem permissões", () => {
     expect(hasPermission(undefined, "x")).toBe(false);
     expect(hasPermission([], "x")).toBe(false);
     expect(hasPermission(["*"], "x")).toBe(true);
-    expect(PermissionResolver.canViewRecipe("fechamento_mes", [])).toBe(false);
-    expect(PermissionResolver.canUsePermission("x", undefined)).toBe(false);
   });
 
   describe("curinga '*' em roles é ato de administrador", () => {
@@ -96,7 +69,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       const store = createSeededUserStore({ admin: true });
       await store.createRole({ id: "role_gestor", name: "Gestor", description: "d", permissions: ["system:roles:create", "system:roles:update", "system:roles:read"] });
       await store.createUser({ fullname: "Gestor Roles", username: "gestor.roles", password: TEST_PASSWORD, roleId: "role_gestor", externals: {} });
-      app = createPlatformApp({ userStore: store, recipes: { fechamento_mes: fechamentoRecipe } });
+      app = createPlatformApp({ userStore: store });
       gestor = await authHeader(app, "gestor.roles");
       admin = await authHeader(app, "test.root");
       await store.createRole({ id: "role_total", name: "Total", description: "d", permissions: ["*"] });
@@ -148,7 +121,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       await store.setAdmin(alvoAdmin.id, true);
       alvoComumId = comum.id;
       alvoAdminId = alvoAdmin.id;
-      app = createPlatformApp({ userStore: store, recipes: { fechamento_mes: fechamentoRecipe } });
+      app = createPlatformApp({ userStore: store });
       gestor = await authHeader(app, "gestor.grants");
       admin = await authHeader(app, "test.root");
       await store.createRole({ id: "role_total", name: "Total", description: "d", permissions: ["*"] });
@@ -185,7 +158,10 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       const msg = ((await res.json()) as { error: string }).error;
       expect(res.status).toBe(403);
       expect(msg.split(", ").length).toBeLessThanOrEqual(10);
-      expect(msg).toContain("e mais");
+      const many = Array.from({ length: 15 }, (_, i) => `system:x:k${i}`);
+      const long = grantDeniedMessage(many);
+      expect(long.split(", ").length).toBe(10);
+      expect(long).toContain("e mais 5");
     });
 
     it("reset-password: usuário comum ok; admin alvo só por admin", async () => {
@@ -233,7 +209,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       await store.createRole({ id: "role_del", name: "Del", description: "d", permissions: ["system:users:delete", "system:users:update"] });
       const g = await store.createUser({ fullname: "Gestor Del", username: "gestor.del", password: TEST_PASSWORD, roleId: "role_del", externals: {} });
       gerId = g.id;
-      app = createPlatformApp({ userStore: store, recipes: { fechamento_mes: fechamentoRecipe } });
+      app = createPlatformApp({ userStore: store });
       ger = await authHeader(app, "gestor.del");
       root = await authHeader(app, "test.root");
     });
@@ -262,7 +238,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       const a = await store.createUser({ fullname: "Usuario Um", username: "refresh.um", password: TEST_PASSWORD, roleId: "role_r1", externals: {} });
       const b = await store.createUser({ fullname: "Usuario Dois", username: "refresh.dois", password: TEST_PASSWORD, roleId: "role_r1", externals: {} });
       const c = await store.createUser({ fullname: "Usuario Tres", username: "refresh.tres", password: TEST_PASSWORD, roleId: "role_r1", externals: {} });
-      const local = createPlatformApp({ userStore: store, recipes: { fechamento_mes: fechamentoRecipe } });
+      const local = createPlatformApp({ userStore: store });
       const login = async (username: string) => {
         const res = await local.request("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password: TEST_PASSWORD }) });
         return ((await res.json()) as { refresh_token: string }).refresh_token;
@@ -312,63 +288,15 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     });
   });
 
-  describe("escopo da Área de Trabalho em data e exec", () => {
-    let op: Record<string, string>;
+  describe("Áreas de Trabalho: datas e permissões", () => {
     let semView: Record<string, string>;
-    const dataUrl = (ws: string) => `/api/workspaces/${ws}/data/tabela_vendedores${q}`;
 
     beforeAll(async () => {
       const store = createSeededUserStore();
       await store.createRole({ id: "role_cria", name: "Cria", description: "d", permissions: ["system:workspaces:create"] });
-      await store.createUser({ fullname: "Cria Sem View", username: "cria.semview", password: TEST_PASSWORD, roleId: "role_cria", externals: {} });
-      app = createPlatformApp({
-        userStore: store,
-        workspaces: [
-          ...seededWorkspaces.map((w) => ({ ...w })),
-          { id: "ws_outro", recipeId: "outro_modelo", name: "Outro", startDate: "2026-01-01", endDate: "2026-01-31", status: "open", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
-        ],
-        sourceConnector: new MockSourceConnector({ default: [{ vendedor_id: 1, vendedor: "A", venda_geral: 1 }] }),
-        persistenceStore: new MemoryPersistenceStore(),
-        recipes: { fechamento_mes: fechamentoRecipe },
-      });
-      op = await authHeader(app, "maria.souza"); // operador: view do Modelo, sem "*"
-      semView = await authHeader(app, "cria.semview");
-    });
-
-    it("data: workspace inexistente 404; de outro Modelo 400; existente e preview 200", async () => {
-      expect((await app.request(dataUrl("ws_nao_existe"), { headers: op })).status).toBe(404);
-      const other = await app.request(dataUrl("ws_outro"), { headers: op });
-      expect(other.status).toBe(400);
-      expect(((await other.json()) as { error: string }).error).toBe("A Área de Trabalho não pertence a este Modelo.");
-      expect((await app.request(dataUrl(WS), { headers: op })).status).toBe(200);
-      expect((await app.request(dataUrl("preview"), { headers: op })).status).toBe(200);
-    });
-
-    it("exec com id preview e ação que grava: 404 (preview vale só em data)", async () => {
-      const res = await app.request("/api/workspaces/preview/actions/exec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...op },
-        body: JSON.stringify({ recipe_id: "fechamento_mes", component_id: "tabela_vendedores", action_id: "adicionar_penalidade", row: { vendedor_id: 1 }, form_data: { valor: 1, reason: "x" } }),
-      });
-      expect(res.status).toBe(404);
-    });
-
-    it("exec: workspace inexistente 404; de outro Modelo 400", async () => {
-      const exec = (ws: string) =>
-        app.request(`/api/workspaces/${ws}/actions/exec`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...op },
-          body: JSON.stringify({ recipe_id: "fechamento_mes", component_id: "tabela_vendedores", action_id: "visualizar_penalidades", row: { vendedor_id: 1 } }),
-        });
-      expect((await exec("ws_nao_existe")).status).toBe(404);
-      expect((await exec("ws_outro")).status).toBe(400);
-    });
-
-    it("sem recipe:<id>:view: 403 também para Modelo inexistente; '*' recebe 404", async () => {
-      expect((await app.request("/api/dashboards/nada/schema", { headers: semView })).status).toBe(403);
-      expect((await app.request("/api/dashboards/fechamento_mes/schema", { headers: semView })).status).toBe(403);
-      expect((await app.request(`/api/workspaces/${WS}/data/tabela_vendedores?recipe_id=nada&start_date=2026-01-01&end_date=2026-01-31`, { headers: semView })).status).toBe(403);
-      expect((await app.request("/api/dashboards/nada/schema", { headers: op })).status).toBe(403);
+      await store.createUser({ fullname: "Cria Sem Close", username: "cria.semclose", password: TEST_PASSWORD, roleId: "role_cria", externals: {} });
+      app = createPlatformApp({ userStore: store, workspaces: seededWorkspaces.map((w) => ({ ...w })) });
+      semView = await authHeader(app, "cria.semclose");
     });
 
     it("datas de workspace: YYYY-MM-DD estrito no POST e no PUT", async () => {
@@ -381,7 +309,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       const post = await app.request("/api/workspaces", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...gerente },
-        body: JSON.stringify({ recipeId: "fechamento_mes", startDate: "01/02/2026", endDate: "2026-02-28" }),
+        body: JSON.stringify({ name: "Fev", startDate: "01/02/2026", endDate: "2026-02-28" }),
       });
       expect(post.status).toBe(400);
       expect((await put({ endDate: "2026-02-10" })).status).toBe(200);
@@ -394,14 +322,14 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       }
     });
 
-    it("criar workspace exige também recipe:<id>:view", async () => {
+    it("criar exige só system:workspaces:create e o corpo não tem recipeId", async () => {
       const res = await app.request("/api/workspaces", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...semView },
-        body: JSON.stringify({ recipeId: "fechamento_mes", startDate: "2026-02-01", endDate: "2026-02-28" }),
+        body: JSON.stringify({ name: "Fev", startDate: "2026-02-01", endDate: "2026-02-28" }),
       });
-      expect(res.status).toBe(403);
-      expect(((await res.json()) as { error: string }).error).toContain("visualizar este Modelo");
+      expect(res.status).toBe(201);
+      expect(((await res.json()) as { recipeId?: string }).recipeId).toBeUndefined();
     });
   });
 
@@ -410,7 +338,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       const store = createSeededUserStore();
       const inativo = await store.createUser({ fullname: "Usuario Inativo", username: "usuario.inativo", password: TEST_PASSWORD, roleId: "role_vendedor", externals: {} });
       await store.updateUser(inativo.id, { status: "inactive" });
-      const local = createPlatformApp({ userStore: store, recipes: { fechamento_mes: fechamentoRecipe } });
+      const local = createPlatformApp({ userStore: store });
       const spy = vi.spyOn(PasswordService, "verify");
       const login = async (username: string, password: string) => {
         const res = await local.request("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });

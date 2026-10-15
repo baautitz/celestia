@@ -119,7 +119,7 @@ export interface UpdateRoleInput {
  * Item individual no catálogo de permissões.
  */
 export interface PermissionItem {
-  key: string;         // Ex: "system:users:create", "recipe:fechamento_mes:action:adicionar_penalidade"
+  key: string;         // Ex: "system:users:create", "system:workspaces:close"
   label: string;       // Nome amigável para exibição
   description?: string;
   module?: string;     // Módulo no caso de system (ex: "users", "roles")
@@ -127,17 +127,8 @@ export interface PermissionItem {
 }
 
 /**
- * Catálogo completo de permissões exposto para a UI de gestão de Roles.
+ * Catálogo de permissões exposto para a UI de gestão de Roles.
  */
-export interface RecipePermissionGroup {
-  recipeId: string;
-  recipeName: string;
-  viewPermission: PermissionItem;
-  queryPermissions: PermissionItem[];
-  actionPermissions: PermissionItem[];
-}
-
 export interface PermissionCatalog {
   system: Record<string, PermissionItem[]>; // Agrupado por módulo
-  recipes: RecipePermissionGroup[];        // Agrupado por Recipe
 }

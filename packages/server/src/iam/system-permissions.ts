@@ -53,7 +53,7 @@ export const SYSTEM_PERMISSIONS: PermissionItem[] = [
   {
     key: "system:roles:update",
     label: "Editar Permissões do Grupo",
-    description: "Permite alterar quais permissões do sistema e recipes pertencem a cada grupo.",
+    description: "Permite alterar quais permissões do sistema pertencem a cada grupo.",
     module: "roles",
   },
   {
@@ -115,20 +115,6 @@ export const SYSTEM_PERMISSIONS: PermissionItem[] = [
     module: "sources",
   },
 
-  // ── Módulo: Modelos (Recipes) ────────────────────────────
-  {
-    key: "system:recipes:read",
-    label: "Visualizar Código dos Modelos",
-    description: "Permite listar os Modelos cadastrados e ler o código-fonte de cada um.",
-    module: "recipes",
-  },
-  {
-    key: "system:recipes:manage",
-    label: "Gerenciar Modelos",
-    description: "Permite criar, editar e excluir Modelos (o código é compilado e validado ao salvar).",
-    module: "recipes",
-  },
-
   // ── Módulo: Auditoria ────────────────────────────────────
   {
     key: "system:audit:read",
@@ -153,12 +139,12 @@ export function getSystemPermissionsByModule(): Record<string, PermissionItem[]>
   return grouped;
 }
 
-const RECIPE_VIEW_KEY = /^recipe:[^:]+:view$/;
-const RECIPE_VIEW_DENIED = "Acesso negado: o usuário não possui permissão para visualizar este Modelo.";
+/** Todas as chaves válidas (sem o curinga "*"). */
+export const SYSTEM_PERMISSION_KEYS: ReadonlySet<string> = new Set(SYSTEM_PERMISSIONS.map((p) => p.key));
+
 const GENERIC_DENIED = "Acesso negado: permissões insuficientes.";
 
 /** Mensagem do 403 para a permissão `key`: a declarada junto dela, ou a genérica. */
 export function denyMessage(key: string): string {
-  if (RECIPE_VIEW_KEY.test(key)) return RECIPE_VIEW_DENIED;
   return SYSTEM_PERMISSIONS.find((p) => p.key === key)?.deniedMessage ?? GENERIC_DENIED;
 }

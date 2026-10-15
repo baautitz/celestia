@@ -4,10 +4,9 @@ import type {
   Role,
   CreateUserInput,
   UpdateUserInput,
-  RecipeDef,
 } from "@platform/shared";
 import { PasswordService } from "./password-service.js";
-import { PermissionCatalogEngine } from "./permission-catalog.js";
+import { pruneOrphans } from "@platform/core/permissions";
 
 export interface UserStore {
   findByUsername(username: string): Promise<User | null>;
@@ -26,7 +25,8 @@ export interface UserStore {
   updateRole(id: string, input: Partial<Role>): Promise<Role>;
   deleteRole(id: string): Promise<void>;
 
-  syncOrphanPermissions(recipes: Record<string, RecipeDef>): Promise<number>;
+  /** Remove das roles as chaves ausentes de `validKeys` (preserva "*"); devolve quantas foram removidas. */
+  syncOrphanPermissions(validKeys: ReadonlySet<string>): Promise<number>;
 }
 
 export class MemoryUserStore implements UserStore {
@@ -166,17 +166,13 @@ export class MemoryUserStore implements UserStore {
     this.roles.delete(id);
   }
 
-  async syncOrphanPermissions(recipes: Record<string, RecipeDef>): Promise<number> {
-    const currentRoles = Array.from(this.roles.values());
-    const { updatedRoles, removedCount } = PermissionCatalogEngine.pruneOrphanPermissions(
-      currentRoles,
-      recipes
-    );
-
-    for (const r of updatedRoles) {
-      this.roles.set(r.id, r);
+  async syncOrphanPermissions(validKeys: ReadonlySet<string>): Promise<number> {
+    let removed = 0;
+    for (const role of this.roles.values()) {
+      const kept = pruneOrphans(role.permissions, validKeys);
+      removed += role.permissions.length - kept.length;
+      role.permissions = kept;
     }
-
-    return removedCount;
+    return removed;
   }
 }

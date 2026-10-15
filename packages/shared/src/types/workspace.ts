@@ -16,7 +16,6 @@ export type WorkspaceStatus = "open" | "closed" | "archived";
  */
 export interface Workspace {
   id: string;                                   // Ex: "ws_fechamento_jan_2026"
-  recipeId: string;                             // Ex: "fechamento_mes"
   name?: string;                                // Nome amigável (ex: "Fechamento Janeiro/2026")
   params: Record<string, unknown> & WorkspaceDateRange;
   version: number;                              // Controle de concorrência otimista
@@ -31,8 +30,6 @@ export interface Workspace {
  */
 export interface WorkspaceSummary {
   id: string;
-  recipeId: string;
-  recipeName?: string;
   startDate: string;
   endDate: string;
   status: WorkspaceStatus;
@@ -42,17 +39,14 @@ export interface WorkspaceSummary {
 
 /**
  * Contrato canônico de uma Área de Trabalho exposta pela API.
- * As datas são universais e obrigatórias; os demais parâmetros
- * do Modelo são carregados em `params`.
+ * As datas são obrigatórias.
  */
 export interface WorkspaceRecord {
   id: string;
-  recipeId: string;
   name: string;
   startDate: string; // Formato AAAA-MM-DD
   endDate: string; // Formato AAAA-MM-DD
   status: WorkspaceStatus;
-  params?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }

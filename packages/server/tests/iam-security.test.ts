@@ -1,39 +1,23 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createPlatformApp } from "../src/index.js";
-import { MockSourceConnector } from "../src/data/source-connector.js";
-import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { TokenService } from "../src/iam/token-service.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
-import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
+import { SYSTEM_PERMISSION_KEYS } from "../src/iam/system-permissions.js";
 import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 import type {
   AuthTokens,
   User,
   PermissionCatalog,
-  TableDataResponse,
-  ActionExecResponse,
   PermissionItem,
-  UIEffect,
 } from "@platform/shared";
 
 describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () => {
   let app: ReturnType<typeof createPlatformApp>;
-  let sourceConnector: MockSourceConnector;
-  let persistenceStore: MemoryPersistenceStore;
   let userStore: MemoryUserStore;
   let tokenService: TokenService;
 
   beforeEach(() => {
-    sourceConnector = new MockSourceConnector({
-      default: [
-        { vendedor_id: 1, vendedor: "Carlos Vendedor", venda_geral: 10000 },
-        { vendedor_id: 42, vendedor: "João da Silva", venda_geral: 25000 },
-        { vendedor_id: 99, vendedor: "Maria Souza", venda_geral: 15000 },
-      ],
-    });
-
-    persistenceStore = new MemoryPersistenceStore();
     userStore = createSeededUserStore();
     tokenService = new TokenService({
       jwtSecret: "test-secret-key-iam-12345-0123456789",
@@ -42,14 +26,9 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
     });
 
     app = createPlatformApp({
-      sourceConnector,
-      persistenceStore,
       userStore,
       tokenService,
       workspaces: seededWorkspaces,
-      recipes: {
-        fechamento_mes: fechamentoRecipe,
-      },
     });
   });
 
@@ -254,7 +233,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
   });
 
   // ─── 4. CATÁLOGO DE PERMISSÕES & PRUNING DE ÓRFÃS ──────────────────────────
-  describe("4. Catálogo Unificado e Limpeza Automática de Permissões Órfãs", () => {
+  describe("4. Catálogo de Sistema e Limpeza Automática de Permissões Órfãs", () => {
     let adminToken: string;
 
     beforeEach(async () => {
@@ -266,139 +245,87 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       adminToken = ((await resAdmin.json()) as AuthTokens).accessToken;
     });
 
-    it("deve retornar o catálogo completo com permissões de sistema e das recipes registradas", async () => {
+    it("deve retornar o catálogo apenas com permissões de sistema", async () => {
       const res = await app.request("/api/iam/permissions/catalog", {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
 
       expect(res.status).toBe(200);
       const catalog = (await res.json()) as PermissionCatalog;
-
-      // Seção System
-      expect(catalog.system.users).toBeDefined();
+      expect(Object.keys(catalog)).toEqual(["system"]);
       expect(catalog.system.users.some((p: PermissionItem) => p.key === "system:users:reset_password")).toBe(true);
-
-      // Seção Recipes
-      expect(catalog.recipes).toHaveLength(1);
-      const recipeGroup = catalog.recipes[0];
-      expect(recipeGroup.recipeId).toBe("fechamento_mes");
-      expect(recipeGroup.viewPermission.key).toBe("recipe:fechamento_mes:view");
-      expect(recipeGroup.queryPermissions.some((p: PermissionItem) => p.key === "recipe:fechamento_mes:query:vendas_equipe")).toBe(true);
-      expect(recipeGroup.actionPermissions.some((p: PermissionItem) => p.key === "recipe:fechamento_mes:action:adicionar_penalidade")).toBe(true);
+      expect(catalog.system.recipes).toBeUndefined();
     });
 
-    it("deve remover automaticamente permissões órfãs das roles quando uma action é descontinuada", async () => {
-      // Adiciona uma role com permissão fantasma/órfã
+    it("não existem mais as chaves system:recipes:*", () => {
+      expect(SYSTEM_PERMISSION_KEYS.has("system:recipes:read")).toBe(false);
+      expect(SYSTEM_PERMISSION_KEYS.has("system:recipes:manage")).toBe(false);
+    });
+
+    it("deve remover permissões órfãs das roles e preservar o curinga", async () => {
       await userStore.createRole({
         id: "role_teste_orfas",
         name: "Role de Teste",
-        permissions: [
-          "system:users:read",
-          "recipe:fechamento_mes:action:adicionar_penalidade",
-          "recipe:fechamento_mes:action:antiga_removida", // ÓRFÃ!
-          "recipe:dashboard_inexistente:view", // ÓRFÃ!
-        ],
+        permissions: ["*", "system:users:read", "system:antiga:removida", "recipe:dashboard_inexistente:view"],
       });
 
-      // Executa sincronização
-      const removedCount = await userStore.syncOrphanPermissions({
-        fechamento_mes: fechamentoRecipe,
-      });
+      const removedCount = await userStore.syncOrphanPermissions(SYSTEM_PERMISSION_KEYS);
 
       expect(removedCount).toBe(2);
-      const cleanedRole = await userStore.getRole("role_teste_orfas");
-      expect(cleanedRole?.permissions).toEqual([
-        "system:users:read",
-        "recipe:fechamento_mes:action:adicionar_penalidade",
-      ]);
+      expect((await userStore.getRole("role_teste_orfas"))?.permissions).toEqual(["*", "system:users:read"]);
+    });
+
+    it("POST /api/iam/roles rejeita chaves fora do catálogo (inclusive recipe:*) com 400", async () => {
+      const res = await app.request("/api/iam/roles", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${adminToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "role_x", name: "Role X", permissions: ["recipe:fechamento_mes:view"] }),
+      });
+      expect(res.status).toBe(400);
     });
   });
 
-  // ─── 5. SDUI DATA & ACTION ENFORCEMENT POR PERMISSÃO ───────────────────────
-  describe("5. SDUI: Resolução Permission-First de Queries e Proteção de Actions", () => {
+  // ─── 5. ENFORCEMENT DE PERMISSÃO NAS ÁREAS DE TRABALHO ─────────────────────
+  describe("5. Áreas de Trabalho: Proteção por Permissão (não-admin, sem '*')", () => {
     let vendedorToken: string;
     let operadorToken: string;
 
+    const login = async (username: string) => {
+      const res = await app.request("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password: "Senha@123" }),
+      });
+      return ((await res.json()) as AuthTokens).accessToken;
+    };
+    const call = (path: string, token: string, init: RequestInit = {}) =>
+      app.request(path, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
+
     beforeEach(async () => {
-      const resVendedor = await app.request("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "joao.silva", password: "Senha@123" }),
-      });
-      vendedorToken = ((await resVendedor.json()) as AuthTokens).accessToken;
-
-      const resOperador = await app.request("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "maria.souza", password: "Senha@123" }),
-      });
-      operadorToken = ((await resOperador.json()) as AuthTokens).accessToken;
+      vendedorToken = await login("joao.silva");
+      operadorToken = await login("maria.souza");
     });
 
-    it("Vendedor com permissão 'query:vendas_proprias' e externals.inovafarma=42 deve receber apenas seu próprio registro", async () => {
-      const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes", {
-        headers: { Authorization: `Bearer ${vendedorToken}` },
-      });
-
-      expect(res.status).toBe(200);
-      const data = (await res.json()) as TableDataResponse;
-      expect(data.type).toBe("table");
-      // O mock source connector tem 3 vendedores (1, 42, 99).
-      // A query self tem: WHERE e.id = {{user.externals.inovafarma}} -> interpola 42
+    it("sem permissões, listar/criar/concluir/reabrir/excluir devolve 403", async () => {
+      expect((await call("/api/workspaces", vendedorToken)).status).toBe(403);
+      expect((await call("/api/workspaces", vendedorToken, { method: "POST", body: JSON.stringify({ name: "x", startDate: "2026-01-01", endDate: "2026-01-31" }) })).status).toBe(403);
+      for (const action of ["conclude", "reopen"]) {
+        expect((await call(`/api/workspaces/ws_fechamento_jan_2026/${action}`, vendedorToken, { method: "POST" })).status).toBe(403);
+      }
+      expect((await call("/api/workspaces/ws_fechamento_jan_2026", vendedorToken, { method: "DELETE" })).status).toBe(403);
     });
 
-    it("Operador com permissão 'query:vendas_equipe' deve receber todos os vendedores da equipe", async () => {
-      const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes", {
-        headers: { Authorization: `Bearer ${operadorToken}` },
-      });
-
-      expect(res.status).toBe(200);
-      const data = (await res.json()) as TableDataResponse;
-      expect(data.type).toBe("table");
-      expect(data.data).toHaveLength(3);
-    });
-
-    it("Vendedor sem permissão para 'adicionar_penalidade' deve ser bloqueado com 403 Forbidden", async () => {
-      const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/actions/exec", {
+    it("operador lista, cria e conclui, mas não reabre nem exclui", async () => {
+      expect((await call("/api/workspaces", operadorToken)).status).toBe(200);
+      const created = await call("/api/workspaces", operadorToken, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${vendedorToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          recipe_id: "fechamento_mes",
-          component_id: "tabela_vendedores",
-          action_id: "adicionar_penalidade",
-          row: { vendedor_id: 42, vendedor: "João" },
-          form_data: { valor: 50, reason: "Atraso" },
-        }),
+        body: JSON.stringify({ name: "Abril", startDate: "2026-04-01", endDate: "2026-04-30" }),
       });
-
-      expect(res.status).toBe(403);
-      const errorData = (await res.json()) as { error: string };
-      expect(errorData.error).toContain("Acesso negado");
-    });
-
-    it("Operador COM permissão para 'adicionar_penalidade' deve executar com sucesso", async () => {
-      const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/actions/exec", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${operadorToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          recipe_id: "fechamento_mes",
-          component_id: "tabela_vendedores",
-          action_id: "adicionar_penalidade",
-          row: { vendedor_id: 42, vendedor: "João" },
-          form_data: { valor: 50, reason: "Atraso", __confirmed: true },
-        }),
-      });
-
-      expect(res.status).toBe(200);
-      const result = (await res.json()) as ActionExecResponse;
-      expect(result.success).toBe(true);
-      expect(result.effects?.some((e: UIEffect) => e.type === "refresh_data")).toBe(true);
+      expect(created.status).toBe(201);
+      expect(((await created.json()) as { recipeId?: string }).recipeId).toBeUndefined();
+      expect((await call("/api/workspaces/ws_fechamento_jan_2026/conclude", operadorToken, { method: "POST" })).status).toBe(200);
+      expect((await call("/api/workspaces/ws_fechamento_jan_2026/reopen", operadorToken, { method: "POST" })).status).toBe(403);
+      expect((await call("/api/workspaces/ws_fechamento_jan_2026", operadorToken, { method: "DELETE" })).status).toBe(403);
     });
   });
 });

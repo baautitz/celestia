@@ -1,101 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createPlatformApp } from "../src/index.js";
-import { MockSourceConnector } from "../src/data/source-connector.js";
-import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
-import type { RecipeDef } from "@platform/shared";
-import { authHeader, createSeededUserStore, seededWorkspaces , withAuth } from "./helpers/fixtures.js";
+import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
 
-describe("Hono API Integration Test (End-to-End)", () => {
-  let app: ReturnType<typeof createPlatformApp>;
-  let sourceConnector: MockSourceConnector;
-  let persistenceStore: MemoryPersistenceStore;
-
-  const fechamentoRecipe: RecipeDef = {
-    id: "fechamento_mes",
-    name: "Fechamento de Mês",
-    workspace: {
-      params: [
-        { name: "start_date", label: "Data Inicial", type: "date", required: true },
-        { name: "end_date", label: "Data Final", type: "date", required: true },
-      ],
-    },
-    sources: {
-      inovafarma: {
-        queries: {
-          vendas: {
-            primaryKey: "vendedor_id",
-            options: [
-              {
-                id: "default",
-                label: "Padrão",
-                permission: "recipe:fechamento_mes:query:vendas_default",
-                sql: "SELECT * FROM vendas",
-              },
-            ],
-          },
-        },
-      },
-    },
-    persistence: [
-      {
-        id: "remuneracao_vendedor",
-        targetSource: "inovafarma",
-        targetForeignKey: "vendedor_id",
-        mode: "scalar",
-        itemSchema: {
-          salario_base: { type: "money", defaultValue: 1500 },
-          comissao_ajustada: { type: "money", defaultValue: 0 },
-        },
-      },
-    ],
-    actions: [
-      {
-        id: "aprovar_fechamento",
-        label: "Aprovar Fechamento",
-        action: async ({ row, ui }) => {
-          ui.toast.success(`Fechamento do vendedor ${row.vendedor} aprovado!`);
-          ui.refresh();
-        },
-      },
-    ],
-    ui: {
-      layout: { type: "grid", columns: 12 },
-      components: [
-        {
-          id: "tabela_vendedores",
-          component: "data_table",
-          props: {
-            source: "inovafarma",
-            query: "vendas",
-            columns: [
-              { key: "vendedor_id", label: "ID" },
-              { key: "vendedor", label: "Vendedor" },
-              { key: "venda_geral", label: "Venda Geral" },
-            ],
-          },
-        },
-      ],
-    },
-  };
-
-  beforeEach(() => {
-    sourceConnector = new MockSourceConnector({
-      default: [
-        { vendedor_id: 1, vendedor: "Carlos Vendedor", venda_geral: 10000 },
-      ],
-    });
-    persistenceStore = new MemoryPersistenceStore();
-    app = createPlatformApp({
-      userStore: createSeededUserStore({ admin: true }),
-      workspaces: seededWorkspaces,
-      sourceConnector,
-      persistenceStore,
-      recipes: {
-        fechamento_mes: fechamentoRecipe,
-      },
-    });
-    withAuth(app, "test.root");
-  });
+describe("Hono API Integration Test", () => {
+  const app = createPlatformApp({ userStore: createSeededUserStore({ admin: true }), workspaces: seededWorkspaces });
 
   it("GET /api/health deve responder status ok", async () => {
     const res = await app.request("/api/health");
@@ -104,51 +12,9 @@ describe("Hono API Integration Test (End-to-End)", () => {
     expect(body.status).toBe("ok");
   });
 
-  it("GET /api/dashboards/fechamento_mes/schema deve retornar o schema sem expor SQL", async () => {
-    const res = await app.request("/api/dashboards/fechamento_mes/schema");
-    expect(res.status).toBe(200);
-    const schema = await res.json();
-
-    expect(schema.id).toBe("fechamento_mes");
-    expect(schema.name).toBe("Fechamento de Mês");
-    expect(schema.actions).toHaveLength(1);
-    expect(schema.actions[0].id).toBe("aprovar_fechamento");
-    // Não deve conter queries SQL cruas
-    expect((schema as Record<string, unknown>).sources).toBeUndefined();
-  });
-
-  it("GET /api/workspaces/:id/data/tabela_vendedores deve retornar dados fundidos", async () => {
-    const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes");
-    expect(res.status).toBe(200);
-    const body = await res.json();
-
-    expect(body.data).toHaveLength(1);
-    expect(body.data[0].vendedor).toBe("Carlos Vendedor");
-    expect(body.data[0]["remuneracao_vendedor.salario_base"]).toBe(1500);
-    expect(body.meta.totalRecords).toBe(1);
-  });
-
-  it("POST /api/workspaces/:id/actions/exec deve executar RPC de ação", async () => {
-    const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/actions/exec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recipe_id: "fechamento_mes",
-        component_id: "tabela_vendedores",
-        action_id: "aprovar_fechamento",
-        row: { vendedor_id: 1, vendedor: "Carlos Vendedor" },
-        workspace_version: 1,
-      }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.success).toBe(true);
-    expect(body.effects).toContainEqual({
-      type: "toast",
-      variant: "success",
-      message: "Fechamento do vendedor Carlos Vendedor aprovado!",
-    });
-    expect(body.newWorkspaceVersion).toBe(2);
+  it("rotas de Modelos/Dashboards foram removidas", async () => {
+    for (const path of ["/api/recipes", "/api/admin/recipes", "/api/dashboards/x/schema", "/api/lookups"]) {
+      expect((await app.request(path)).status).toBe(404);
+    }
   });
 });

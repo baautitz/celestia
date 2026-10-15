@@ -4,14 +4,6 @@ import { MemoryUserStore } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { TEST_PASSWORD } from "./helpers/fixtures.js";
 
-const validSource = (id: string) => `
-import { defineRecipe } from "@platform/shared";
-export default defineRecipe({
-  id: "${id}", name: "Modelo", workspace: { params: [] }, sources: {}, actions: [],
-  ui: { layout: { type: "grid", columns: 12, gap: 16 }, components: [] },
-});
-`;
-
 describe("Flag isAdmin (bypass de permissões)", () => {
   let app: ReturnType<typeof createPlatformApp>;
   let store: MemoryUserStore;
@@ -53,24 +45,17 @@ describe("Flag isAdmin (bypass de permissões)", () => {
 
     expect((await call("/api/iam/users", admin.access_token)).status).toBe(200);
     expect((await call("/api/iam/users", comum.access_token)).status).toBe(403);
-
-    const put = await call("/api/admin/recipes/novo", admin.access_token, { method: "PUT", body: JSON.stringify({ source: validSource("novo") }) });
-    expect(put.status).toBe(200);
+    expect((await call("/api/admin/connections", admin.access_token)).status).toBe(200);
+    expect((await call("/api/admin/connections", comum.access_token)).status).toBe(403);
   });
 
-  it("vale na hora para Modelos criados depois do login", async () => {
+  it("o token do admin carrega todas as chaves do sistema", async () => {
     const admin = await login("chefe");
-    await call("/api/admin/recipes/novo", admin.access_token, { method: "PUT", body: JSON.stringify({ source: validSource("novo") }) });
-
-    const catalog = (await (await call("/api/recipes", admin.access_token)).json()) as { id: string }[];
-    expect(catalog.map((r) => r.id)).toContain("novo");
-    const schema = await call("/api/dashboards/novo/schema", admin.access_token);
-    expect(schema.status).toBe(200);
-
     const me = (await (await call("/api/auth/me", admin.access_token)).json()) as { permissions: string[]; isAdmin: boolean };
     expect(me.isAdmin).toBe(true);
-    expect(me.permissions).toContain("recipe:novo:view");
+    expect(me.permissions).toContain("*");
     expect(me.permissions).toContain("system:users:create");
+    expect(me.permissions.some((p) => p.startsWith("recipe:"))).toBe(false);
   });
 
   it("o login já devolve as permissões expandidas ao frontend", async () => {
