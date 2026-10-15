@@ -28,6 +28,7 @@ export interface ConfirmOptions {
   confirmLabel?: string
   cancelLabel?: string
   destructive?: boolean
+  size?: Extract<WindowSize, "large">
 }
 
 /** Interface mínima para devolver o foco sem conhecer o DOM. */

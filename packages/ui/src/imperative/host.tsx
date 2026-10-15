@@ -50,10 +50,10 @@ function ManagedWindow({ entry, controller }: {
       <WindowFooterContext.Provider value={footer}>
         {surface === "confirmation" ? (
           <AlertDialog open onOpenChange={onOpenChange}>
-            <AlertDialogContent>
+            <AlertDialogContent className={options.size === "large" ? "sm:max-w-lg" : undefined}>
               <AlertDialogHeader>
                 <AlertDialogTitle>{title}</AlertDialogTitle>
-                {options.description && <AlertDialogDescription>{options.description}</AlertDialogDescription>}
+                {options.description && <AlertDialogDescription className="break-words">{options.description}</AlertDialogDescription>}
               </AlertDialogHeader>
               {body}
               <AlertDialogFooter ref={setFooter} />
@@ -74,7 +74,7 @@ function ManagedWindow({ entry, controller }: {
           </Sheet>
         ) : (
           <Dialog open onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className={options.size === "small" ? "sm:max-w-md" : "sm:max-w-lg"}>
               <DialogHeader>
                 <DialogTitle>{title}</DialogTitle>
                 {options.description && <DialogDescription>{options.description}</DialogDescription>}

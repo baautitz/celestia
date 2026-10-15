@@ -51,6 +51,7 @@ async function confirm(controller: WindowController<WindowContent>, options: Con
     {
       surface: "confirmation",
       title: options.title ?? "Confirmar ação",
+      size: options.size,
       description: options.description,
       content: () => <ConfirmActions {...options} />,
     },
