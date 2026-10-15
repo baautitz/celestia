@@ -61,7 +61,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
   describe("2. Proteção na Rota de Dados da API", () => {
     it("deve rejeitar com 400 Bad Request se a query enviar data final anterior à data inicial", async () => {
       const res = await app.request(
-        "/api/workspaces/ws_teste/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-31&end_date=2026-01-01"
+        "/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-31&end_date=2026-01-01"
       );
 
       expect(res.status).toBe(400);
@@ -69,7 +69,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
 
     it("deve responder 200 OK quando as datas forem válidas", async () => {
       const res = await app.request(
-        "/api/workspaces/ws_teste/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31"
+        "/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31"
       );
 
       expect(res.status).toBe(200);

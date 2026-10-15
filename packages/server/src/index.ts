@@ -450,6 +450,19 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     return admins.length === 1 && admins[0].id === id;
   };
 
+  // Modo prévia: o id literal "preview" dispensa Área de Trabalho; qualquer outro id precisa existir e ser do Modelo.
+  const PREVIEW_WORKSPACE_ID = "preview";
+  const workspaceScopeError = (
+    workspaceId: string,
+    recipeId: string
+  ): { error: string; status: 400 | 404 } | undefined => {
+    if (workspaceId === PREVIEW_WORKSPACE_ID) return undefined;
+    const ws = workspacesMap.get(workspaceId);
+    if (!ws) return { error: "Área de Trabalho não encontrada.", status: 404 };
+    if (ws.recipeId !== recipeId) return { error: "A Área de Trabalho não pertence a este Modelo.", status: 400 };
+    return undefined;
+  };
+
   const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
 
   const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
@@ -745,6 +758,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       } catch {
         return c.json({ error: `Modelo '${body.recipeId}' não encontrado.` }, 400);
       }
+      if (!PermissionResolver.canViewRecipe(recipe.id, getAuthenticatedUser(c).permissions)) {
+        return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
+      }
 
       const id = `ws_${Date.now()}`;
       const newWs: WorkspaceRecord = {
@@ -1027,6 +1043,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
         return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
       }
+      const scopeError = workspaceScopeError(workspaceId, recipe.id);
+      if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
 
       // Só aceita parâmetros declarados no Modelo; chegam à consulta sempre como bind parameters.
       let requestParams: Record<string, unknown> | undefined;
@@ -1112,6 +1130,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
         return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
       }
+
+      const scopeError = workspaceScopeError(workspaceId, recipe.id);
+      if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
 
       const component = recipe.ui.components.find((item) => item.id === body.component_id);
       if (!component || component.component !== "data_table") {

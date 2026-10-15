@@ -306,4 +306,58 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(res.status).toBe(401);
     });
   });
+
+  describe("escopo da Área de Trabalho em data e exec", () => {
+    let op: Record<string, string>;
+    let semView: Record<string, string>;
+    const dataUrl = (ws: string) => `/api/workspaces/${ws}/data/tabela_vendedores${q}`;
+
+    beforeAll(async () => {
+      const store = createSeededUserStore();
+      await store.createRole({ id: "role_cria", name: "Cria", description: "d", permissions: ["system:workspaces:create"] });
+      await store.createUser({ fullname: "Cria Sem View", username: "cria.semview", password: TEST_PASSWORD, roleId: "role_cria", externals: {} });
+      app = createPlatformApp({
+        userStore: store,
+        workspaces: [
+          ...seededWorkspaces.map((w) => ({ ...w })),
+          { id: "ws_outro", recipeId: "outro_modelo", name: "Outro", startDate: "2026-01-01", endDate: "2026-01-31", status: "open", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
+        ],
+        sourceConnector: new MockSourceConnector({ default: [{ vendedor_id: 1, vendedor: "A", venda_geral: 1 }] }),
+        persistenceStore: new MemoryPersistenceStore(),
+        recipes: { fechamento_mes: fechamentoRecipe },
+      });
+      op = await authHeader(app, "maria.souza"); // operador: view do Modelo, sem "*"
+      semView = await authHeader(app, "cria.semview");
+    });
+
+    it("data: workspace inexistente 404; de outro Modelo 400; existente e preview 200", async () => {
+      expect((await app.request(dataUrl("ws_nao_existe"), { headers: op })).status).toBe(404);
+      const other = await app.request(dataUrl("ws_outro"), { headers: op });
+      expect(other.status).toBe(400);
+      expect(((await other.json()) as { error: string }).error).toBe("A Área de Trabalho não pertence a este Modelo.");
+      expect((await app.request(dataUrl(WS), { headers: op })).status).toBe(200);
+      expect((await app.request(dataUrl("preview"), { headers: op })).status).toBe(200);
+    });
+
+    it("exec: workspace inexistente 404; de outro Modelo 400", async () => {
+      const exec = (ws: string) =>
+        app.request(`/api/workspaces/${ws}/actions/exec`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...op },
+          body: JSON.stringify({ recipe_id: "fechamento_mes", component_id: "tabela_vendedores", action_id: "visualizar_penalidades", row: { vendedor_id: 1 } }),
+        });
+      expect((await exec("ws_nao_existe")).status).toBe(404);
+      expect((await exec("ws_outro")).status).toBe(400);
+    });
+
+    it("criar workspace exige também recipe:<id>:view", async () => {
+      const res = await app.request("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...semView },
+        body: JSON.stringify({ recipeId: "fechamento_mes", startDate: "2026-02-01", endDate: "2026-02-28" }),
+      });
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { error: string }).error).toContain("visualizar este Modelo");
+    });
+  });
 });

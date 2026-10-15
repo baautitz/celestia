@@ -3542,6 +3542,78 @@
       }
     }
   },
+  "data.404_unknown_workspace": {
+    "status": 404,
+    "body": {
+      "error": "Área de Trabalho não encontrada."
+    }
+  },
+  "data.ok_preview_workspace": {
+    "status": 200,
+    "body": {
+      "type": "table",
+      "data": [
+        {
+          "vendedor_id": 1,
+          "vendedor": "Carlos Vendedor",
+          "venda_geral": 10000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 2,
+          "vendedor": "Ana Gerente",
+          "venda_geral": 25000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 42,
+          "vendedor": "João da Silva",
+          "venda_geral": 15000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "pageSize": 10,
+        "totalRecords": 3,
+        "totalPages": 1,
+        "order": "asc"
+      }
+    }
+  },
   "data.unknown_component": {
     "status": 404,
     "body": {

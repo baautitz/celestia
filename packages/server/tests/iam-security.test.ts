@@ -336,7 +336,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
     });
 
     it("Vendedor com permissão 'query:vendas_proprias' e externals.inovafarma=42 deve receber apenas seu próprio registro", async () => {
-      const res = await app.request("/api/workspaces/ws_teste/data/tabela_vendedores?recipe_id=fechamento_mes", {
+      const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes", {
         headers: { Authorization: `Bearer ${vendedorToken}` },
       });
 
@@ -348,7 +348,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
     });
 
     it("Operador com permissão 'query:vendas_equipe' deve receber todos os vendedores da equipe", async () => {
-      const res = await app.request("/api/workspaces/ws_teste/data/tabela_vendedores?recipe_id=fechamento_mes", {
+      const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes", {
         headers: { Authorization: `Bearer ${operadorToken}` },
       });
 
@@ -359,7 +359,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
     });
 
     it("Vendedor sem permissão para 'adicionar_penalidade' deve ser bloqueado com 403 Forbidden", async () => {
-      const res = await app.request("/api/workspaces/ws_teste/actions/exec", {
+      const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/actions/exec", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${vendedorToken}`,
@@ -380,7 +380,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
     });
 
     it("Operador COM permissão para 'adicionar_penalidade' deve executar com sucesso", async () => {
-      const res = await app.request("/api/workspaces/ws_teste/actions/exec", {
+      const res = await app.request("/api/workspaces/ws_fechamento_jan_2026/actions/exec", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${operadorToken}`,

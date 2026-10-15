@@ -317,6 +317,8 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("data.400_dates", "GET", `${comp}?recipe_id=fechamento_mes&start_date=2026-02-01&end_date=2026-01-01`, { token: O });
     await rec("data.400_params_not_object", "GET", `${comp}${q}&params=%5B1%5D`, { token: O });
     await rec("data.ok_params", "GET", `${comp}${q}&params=${encodeURIComponent('{"categories_focus":[1,2],"x":1}')}`, { token: O });
+    await rec("data.404_unknown_workspace", "GET", `/api/workspaces/ws_inexistente/data/tabela_vendedores${q}`, { token: O });
+    await rec("data.ok_preview_workspace", "GET", `/api/workspaces/preview/data/tabela_vendedores${q}`, { token: O });
     await rec("data.unknown_component", "GET", `/api/workspaces/${WS}/data/nao_existe${q}`, { token: O });
 
     // ── ações
