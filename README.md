@@ -1,17 +1,17 @@
 # Celestia
 
-Plataforma corporativa com IAM permission-first: um core pequeno, onde funcionalidades entram como modulos.
+Plataforma corporativa com IAM permission-first: um core pequeno, onde funcionalidades entram como módulos.
 
-O motor de Recipes/SDUI foi removido. Modulos de cliente ficarao em `/integrations` (planejado, ainda nao existe).
+O motor de Recipes/SDUI foi removido. Módulos de cliente ficarão em `/integrations` (planejado, ainda não existe).
 
 ## Monorepo
 
-| Pacote | Conteudo |
+| Pacote | Conteúdo |
 |---|---|
-| `packages/core` (`@platform/core`) | Framework de modulos: contrato, loader, eventos, permissoes |
-| `packages/server` (`@platform/server`) | API Hono, IAM (Argon2id, JWT), conexoes ERP, areas de trabalho |
+| `packages/core` (`@platform/core`) | Framework de módulos: contrato, loader, eventos, permissões |
+| `packages/server` (`@platform/server`) | API Hono, IAM (Argon2id, JWT), conexões ERP, áreas de trabalho |
 | `packages/shared` (`@platform/shared`) | Tipos e contratos compartilhados |
-| `packages/ui` (`@platform/ui`) | Primitivos shadcn/ui, UI imperativa, DataTable, formularios |
+| `packages/ui` (`@platform/ui`) | Primitivos shadcn/ui, UI imperativa, DataTable, formulários |
 | `packages/web` (`@platform/web`) | SPA Vite + React 19 + Tailwind v4 |
 
 ## Como rodar
@@ -27,9 +27,9 @@ pnpm dev:server    # API
 pnpm dev:web       # SPA
 ```
 
-## IAM e permissoes
+## IAM e permissões
 
-Usuario tem um papel; papel tem permissoes. Acesso negado por padrao. Convencao de nomes: [docs/conventions/permissions.md](docs/conventions/permissions.md).
+Usuário tem um papel; papel tem permissões. Acesso negado por padrão. Convenção de nomes: [docs/conventions/permissions.md](docs/conventions/permissions.md).
 
 ## Para agentes
 
