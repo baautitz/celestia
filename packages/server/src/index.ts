@@ -1,4 +1,4 @@
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { serve } from "@hono/node-server";
@@ -19,6 +19,7 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
 import { PermissionCatalogEngine } from "./iam/permission-catalog.js";
+import { grantDeniedMessage, missingGrants } from "./iam/can-grant.js";
 import { hasPermission } from "./iam/has-permission.js";
 import { denyMessage } from "./iam/system-permissions.js";
 import { PermissionResolver } from "./iam/permission-resolver.js";
@@ -302,6 +303,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     ),
     async (c) => {
       const body = c.req.valid("json");
+      const targetRole = await userStore.getRole(body.roleId);
+      if (targetRole) {
+        const denied = grantViolation(c, targetRole.permissions);
+        if (denied) return denied;
+      }
       try {
         const newUser = await userStore.createUser(body);
         return c.json(newUser, 201);
@@ -341,6 +347,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           return c.json({ error: "Você não pode remover o seu próprio acesso de administrador." }, 400);
         }
       }
+      if (body.roleId) {
+        const targetRole = await userStore.getRole(body.roleId);
+        if (targetRole) {
+          const denied = grantViolation(c, targetRole.permissions);
+          if (denied) return denied;
+        }
+      }
       try {
         const updated = await userStore.updateUser(id, body);
         if (isAdmin !== undefined) {
@@ -369,6 +382,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const id = c.req.param("id");
       const { newPassword } = c.req.valid("json");
+
+      const target = await userStore.findById(id);
+      if (target?.isAdmin && !getAuthenticatedUser(c).isAdmin) {
+        return c.json({ error: "Somente administradores podem redefinir a senha de outro administrador." }, 403);
+      }
 
       try {
         const newHash = PasswordService.hash(newPassword);
@@ -406,6 +424,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     return invalid;
   }
 
+  // Responde 403 quando o chamador tenta conceder chaves que não possui; devolve undefined se pode.
+  const grantViolation = (c: Context, targets: readonly string[]) => {
+    const caller = getAuthenticatedUser(c);
+    const missing = missingGrants(caller.permissions, targets, caller.isAdmin === true);
+    return missing.length > 0 ? c.json({ error: grantDeniedMessage(missing) }, 403) : undefined;
+  };
+
   const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
 
   // POST /api/iam/roles
@@ -432,6 +457,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (invalid.length > 0) {
         return c.json({ error: `Permissões inválidas: ${invalid.join(", ")}` }, 400);
       }
+      const denied = grantViolation(c, body.permissions);
+      if (denied) return denied;
 
       try {
         const created = await userStore.createRole(body);
@@ -462,8 +489,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
       // Alterar a posse do curinga "*" (conceder ou retirar) é ato de administrador.
       if (body.permissions && !getAuthenticatedUser(c).isAdmin) {
-        const hadWildcard = (await userStore.getRole(id))?.permissions.includes("*") ?? false;
-        if (body.permissions.includes("*") !== hadWildcard) {
+        const current = (await userStore.getRole(id))?.permissions ?? [];
+        if (body.permissions.includes("*") !== current.includes("*")) {
           return c.json({ error: WILDCARD_ADMIN_ONLY }, 403);
         }
       }
@@ -473,6 +500,10 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         if (invalid.length > 0) {
           return c.json({ error: `Permissões inválidas: ${invalid.join(", ")}` }, 400);
         }
+        // Só as chaves ADICIONADAS precisam ser possuídas; remover é permitido.
+        const current = (await userStore.getRole(id))?.permissions ?? [];
+        const denied = grantViolation(c, body.permissions.filter((key) => !current.includes(key)));
+        if (denied) return denied;
       }
 
       try {
