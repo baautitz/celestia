@@ -14,7 +14,7 @@ import {
 import { FieldGroup, Field, FieldLabel, FieldError } from "@platform/ui/components/field";
 import { Input } from "@platform/ui/components/input";
 import { Button } from "@platform/ui/components/button";
-import { toast } from "@platform/ui/components/toast";
+import { useUi } from "@platform/ui/imperative/provider";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Informe o nome de usuário"),
@@ -25,6 +25,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export const LoginPage: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
+  const ui = useUi();
   const navigate = useNavigate();
 
   const {
@@ -41,18 +42,18 @@ export const LoginPage: React.FC = () => {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      navigate("/workspaces", { replace: true });
+      navigate("/", { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
   const onSubmit = async (values: LoginFormValues) => {
     try {
       await login(values.username, values.password);
-      toast.success("Login efetuado com sucesso!");
-      navigate("/workspaces", { replace: true });
+      ui.feedback.notify({ type: "success", title: "Login efetuado com sucesso!" });
+      navigate("/", { replace: true });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha na autenticação.";
-      toast.error(msg);
+      ui.feedback.notify({ type: "error", title: msg });
     }
   };
 
