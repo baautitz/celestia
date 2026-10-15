@@ -33,6 +33,12 @@ const failingConnector: SourceConnector = { query: async () => [], healthCheck: 
 
 let app: ReturnType<typeof createPlatformApp>;
 let rootId = "";
+let A = "";
+let V = "";
+let O = "";
+let R = "";
+const updating = process.env.UPDATE_BASELINE === "1";
+const expected: Record<string, Recorded> = updating ? {} : JSON.parse(readFileSync(FILE, "utf8"));
 
 async function fresh(): Promise<void> {
   const userStore: MemoryUserStore = createSeededUserStore();
@@ -89,6 +95,7 @@ async function rec(key: string, method: string, path: string, opts: Opts = {}): 
   const setCookie = res.headers.get("set-cookie");
   if (setCookie) out.cookie = normalize(setCookie).replace(/Expires=[^;]+/i, "Expires=<date>");
   results[key] = out;
+  if (!updating) expect(out, `chave do caso: ${key}`).toEqual(expected[key]);
   return { raw: parsed };
 }
 
@@ -108,14 +115,10 @@ const WS_CLOSED = "ws_fechamento_dez_2025";
 const comp = `/api/workspaces/${WS}/data/tabela_vendedores`;
 
 describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(T0);
     process.env.CONNECTIONS_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
-  });
-  afterAll(() => vi.useRealTimers());
-
-  it("congela todas as rotas", async () => {
     await fresh();
     const login = async (username: string): Promise<string> => {
       const res = await app.request("/api/auth/login", {
@@ -125,11 +128,18 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
       });
       return ((await res.json()) as { access_token: string }).access_token;
     };
-    const A = await login("carlos.admin"); // role_admin com todas as permissões system:*
-    const V = await login("joao.silva"); // vendedor: sem nenhuma permissão system:*
-    const O = await login("maria.souza"); // operador
-    const R = await login("root.admin"); // isAdmin com role sem permissões
+    A = await login("carlos.admin"); // role_admin com todas as permissões system:*
+    V = await login("joao.silva"); // vendedor: sem nenhuma permissão system:*
+    O = await login("maria.souza"); // operador
+    R = await login("root.admin"); // isAdmin com role sem permissões
+  });
+  afterAll(() => {
+    if (updating) writeFileSync(FILE, JSON.stringify(results, null, 2) + "\n");
+    vi.useRealTimers();
+  });
 
+  describe("auth", () => {
+    it("rotas", async () => {
     // ── saúde
     await rec("health.get", "GET", "/api/health");
 
@@ -151,6 +161,11 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("auth.me.401_no_token", "GET", "/api/auth/me");
     await rec("auth.me.401_bad_token", "GET", "/api/auth/me", { token: "lixo" });
 
+    });
+  });
+
+  describe("iam-users", () => {
+    it("rotas", async () => {
     // ── IAM leitura (sucesso / 401 / 403 / bypass)
     const reads: [string, string][] = [
       ["catalog", "/api/iam/permissions/catalog"],
@@ -201,6 +216,11 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.users.delete.again", "DELETE", `/api/iam/users/${newId}`, { token: A });
     await rec("iam.users.list.after", "GET", "/api/iam/users", { token: A });
 
+    });
+  });
+
+  describe("iam-roles", () => {
+    it("rotas", async () => {
     // ── IAM roles
     const role = { id: "role_teste", name: "Grupo Teste", description: "d", permissions: ["system:users:read", "recipe:fechamento_mes:view"] };
     await rec("iam.roles.create.401", "POST", "/api/iam/roles", { body: role });
@@ -218,6 +238,11 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.roles.update.admin_bypass", "PUT", "/api/iam/roles/role_teste", { token: R, body: { description: "via admin" } });
     await rec("iam.roles.list.after", "GET", "/api/iam/roles", { token: A });
 
+    });
+  });
+
+  describe("workspaces", () => {
+    it("rotas", async () => {
     // ── workspaces (auth opcional: sem token passa; 403 só com token sem permissão)
     await rec("ws.list.anon", "GET", "/api/workspaces");
     await rec("ws.list.filter", "GET", "/api/workspaces?recipe_id=outro", { token: V });
@@ -249,6 +274,11 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("ws.delete.ok", "DELETE", `/api/workspaces/${wsId}`, { token: A });
     await rec("ws.delete.404", "DELETE", `/api/workspaces/${wsId}`, { token: A });
 
+    });
+  });
+
+  describe("dashboards-data", () => {
+    it("rotas", async () => {
     // ── recipes / lookups / dashboards
     await rec("recipes.catalog.anon", "GET", "/api/recipes");
     await rec("recipes.catalog.vendedor", "GET", "/api/recipes", { token: V });
@@ -295,6 +325,11 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await exec("actions.unknown_action", O, { action_id: "nao_existe" });
     await rec("actions.400_invalid_body", "POST", `/api/workspaces/${WS}/actions/exec`, { token: O, body: { action_id: "x" } });
 
+    });
+  });
+
+  describe("persistence", () => {
+    it("rotas", async () => {
     // ── persistência (rotas sem auth)
     const pset = (k: string, ws: string, body: unknown) => rec(k, "POST", `/api/workspaces/${ws}/persistence/set`, { body });
     await pset("persistence.set.ok", WS, { target: "remuneracao_vendedor", target_foreign_key_value: 42, field: "salario_base", value: 2000, workspace_version: 3 });
@@ -303,6 +338,12 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("persistence.collection.ok", "GET", `/api/workspaces/${WS}/persistence/collection/penalidades_vendedor/42`);
     await rec("persistence.collection.empty", "GET", `/api/workspaces/${WS}/persistence/collection/penalidades_vendedor/9999`);
 
+    });
+  });
+
+  describe("admin-recipes", () => {
+    it("rotas", async () => {
+    await fresh();
     // ── admin recipes (app novo para o estado ser previsível)
     await fresh();
     await rec("admin.recipes.list.initial", "GET", "/api/admin/recipes", { token: A });
@@ -327,6 +368,11 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("admin.recipes.delete.ok", "DELETE", "/api/admin/recipes/novo", { token: A });
     await rec("admin.recipes.delete.404", "DELETE", "/api/admin/recipes/novo", { token: A });
 
+    });
+  });
+
+  describe("admin-connections", () => {
+    it("rotas", async () => {
     // ── admin connections / erp-types
     await rec("admin.erp_types.ok", "GET", "/api/admin/erp-types", { token: A });
     await rec("admin.erp_types.401", "GET", "/api/admin/erp-types");
@@ -359,12 +405,10 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("admin.connections.delete.ok", "DELETE", "/api/admin/connections/inovafarma", { token: A });
     await rec("admin.connections.delete.404", "DELETE", "/api/admin/connections/inovafarma", { token: A });
 
-    // ── comparação com a fixture versionada
-    const serialized = JSON.stringify(results, null, 2) + "\n";
-    if (process.env.UPDATE_BASELINE === "1") {
-      writeFileSync(FILE, serialized);
-      return;
-    }
-    expect(JSON.parse(serialized)).toEqual(JSON.parse(readFileSync(FILE, "utf8")));
+    });
+  });
+
+  it("cobre exatamente as chaves da fixture", () => {
+    if (!updating) expect(Object.keys(results).sort()).toEqual(Object.keys(expected).sort());
   });
 });
