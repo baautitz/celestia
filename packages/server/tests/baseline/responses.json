@@ -100,7 +100,7 @@
       "refresh_token": "<token>",
       "expires_in": 300,
       "user": {
-        "sub": "usr_1773144000000",
+        "sub": "usr_<uuid>",
         "username": "root.admin",
         "fullname": "Root Admin",
         "role": "role_vendedor",
@@ -316,7 +316,7 @@
   "auth.me.admin_bypass": {
     "status": 200,
     "body": {
-      "sub": "usr_1773144000000",
+      "sub": "usr_<uuid>",
       "username": "root.admin",
       "fullname": "Root Admin",
       "role": "role_vendedor",
@@ -805,7 +805,7 @@
         "createdAt": "<ts>"
       },
       {
-        "id": "usr_1773144000000",
+        "id": "usr_<uuid>",
         "fullname": "Root Admin",
         "username": "root.admin",
         "roleId": "role_vendedor",
@@ -874,7 +874,7 @@
         "createdAt": "<ts>"
       },
       {
-        "id": "usr_1773144000000",
+        "id": "usr_<uuid>",
         "fullname": "Root Admin",
         "username": "root.admin",
         "roleId": "role_vendedor",
@@ -1110,7 +1110,7 @@
   "iam.users.create.ok": {
     "status": 201,
     "body": {
-      "id": "usr_1773144001000",
+      "id": "usr_<uuid>",
       "fullname": "Novo Usuario",
       "username": "novo.user",
       "roleId": "role_vendedor",
@@ -1136,7 +1136,7 @@
   "iam.users.create.admin_bypass": {
     "status": 201,
     "body": {
-      "id": "usr_1773144002000",
+      "id": "usr_<uuid>",
       "fullname": "Novo Usuario",
       "username": "novo.root",
       "roleId": "role_vendedor",
@@ -1165,7 +1165,7 @@
   "iam.users.update.ok": {
     "status": 200,
     "body": {
-      "id": "usr_1773144001000",
+      "id": "usr_<uuid>",
       "fullname": "Nome Editado",
       "username": "novo.user",
       "email": "a@b.com",
@@ -1216,7 +1216,7 @@
   "iam.users.update.ok_isadmin_by_admin": {
     "status": 200,
     "body": {
-      "id": "usr_1773144001000",
+      "id": "usr_<uuid>",
       "fullname": "Nome Editado",
       "username": "novo.user",
       "email": "a@b.com",
@@ -1353,7 +1353,7 @@
   "iam.users.delete.again": {
     "status": 400,
     "body": {
-      "error": "Usuário 'usr_1773144001000' não encontrado."
+      "error": "Usuário 'usr_<uuid>' não encontrado."
     }
   },
   "iam.users.list.after": {
@@ -1400,7 +1400,7 @@
         "createdAt": "<ts>"
       },
       {
-        "id": "usr_1773144000000",
+        "id": "usr_<uuid>",
         "fullname": "Root Admin",
         "username": "root.admin",
         "roleId": "role_vendedor",
@@ -1410,7 +1410,7 @@
         "isAdmin": true
       },
       {
-        "id": "usr_1773144002000",
+        "id": "usr_<uuid>",
         "fullname": "Novo Usuario",
         "username": "novo.root",
         "roleId": "role_vendedor",
@@ -1767,7 +1767,7 @@
   "ws.create.ok": {
     "status": 201,
     "body": {
-      "id": "ws_1773144003000",
+      "id": "ws_<uuid>",
       "recipeId": "fechamento_mes",
       "name": "Fechamento de Mês (2026-02-01 a 2026-02-28)",
       "startDate": "2026-02-01",
@@ -1785,7 +1785,7 @@
   "ws.create.admin_bypass": {
     "status": 201,
     "body": {
-      "id": "ws_1773144004000",
+      "id": "ws_<uuid>",
       "recipeId": "fechamento_mes",
       "name": "Via admin",
       "startDate": "2026-02-01",
@@ -1815,7 +1815,7 @@
   "ws.update.ok": {
     "status": 200,
     "body": {
-      "id": "ws_1773144003000",
+      "id": "ws_<uuid>",
       "recipeId": "fechamento_mes",
       "name": "Renomeada",
       "startDate": "2026-02-01",
@@ -1879,7 +1879,7 @@
     "body": {
       "success": true,
       "workspace": {
-        "id": "ws_1773144003000",
+        "id": "ws_<uuid>",
         "recipeId": "fechamento_mes",
         "name": "Renomeada",
         "startDate": "2026-02-01",
@@ -1912,7 +1912,7 @@
     "body": {
       "success": true,
       "workspace": {
-        "id": "ws_1773144003000",
+        "id": "ws_<uuid>",
         "recipeId": "fechamento_mes",
         "name": "Renomeada",
         "startDate": "2026-02-01",
@@ -4601,7 +4601,7 @@
   "iam.grants.setup_gestor": {
     "status": 201,
     "body": {
-      "id": "usr_1773144006000",
+      "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "gestor.limitado",
       "roleId": "role_gestor",
@@ -4613,7 +4613,7 @@
   "iam.grants.setup_comum": {
     "status": 201,
     "body": {
-      "id": "usr_1773144007000",
+      "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
       "roleId": "role_vendedor",
@@ -4625,7 +4625,7 @@
   "iam.grants.setup_admin_alvo": {
     "status": 201,
     "body": {
-      "id": "usr_1773144008000",
+      "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.admin",
       "roleId": "role_vendedor",
@@ -4637,7 +4637,7 @@
   "iam.grants.setup_admin_flag": {
     "status": 200,
     "body": {
-      "id": "usr_1773144008000",
+      "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.admin",
       "roleId": "role_vendedor",
@@ -4657,7 +4657,7 @@
   "iam.grants.users.update.ok_subset_role": {
     "status": 200,
     "body": {
-      "id": "usr_1773144007000",
+      "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
       "roleId": "role_vendedor",
@@ -4676,7 +4676,7 @@
   "iam.grants.users.create.ok_subset_role": {
     "status": 201,
     "body": {
-      "id": "usr_1773144010000",
+      "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "legitimo.um",
       "roleId": "role_vendedor",
@@ -4742,7 +4742,7 @@
   "iam.grants.users.update.ok_inactivate_common": {
     "status": 200,
     "body": {
-      "id": "usr_1773144007000",
+      "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
       "roleId": "role_vendedor",

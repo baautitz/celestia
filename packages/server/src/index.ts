@@ -777,7 +777,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
         return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
       }
 
-      const id = `ws_${Date.now()}`;
+      const id = `ws_${randomUUID()}`;
       const newWs: WorkspaceRecord = {
         id,
         recipeId: recipe.id,

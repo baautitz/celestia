@@ -419,4 +419,15 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       spy.mockRestore();
     });
   });
+
+  describe("ids", () => {
+    it("usuários criados no mesmo instante têm ids distintos (usr_ + uuid)", async () => {
+      const store = createSeededUserStore();
+      const input = { fullname: "Usuario Id", password: TEST_PASSWORD, roleId: "role_vendedor", externals: {} };
+      const a = await store.createUser({ ...input, username: "id.um" });
+      const b = await store.createUser({ ...input, username: "id.dois" });
+      expect(a.id).toMatch(/^usr_[0-9a-f-]{36}$/);
+      expect(a.id).not.toBe(b.id);
+    });
+  });
 });
