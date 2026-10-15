@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { parseLocalDate, toLocalISODate } from "@/lib/utils";
 import { useParams, useSearchParams } from "react-router-dom";
-import type { DashboardSchemaResponse, WorkspaceRecord } from "@platform/shared";
+import type { DashboardSchemaResponse, FormFieldDef, WorkspaceRecord } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
 import { SDUIRenderer } from "@/components/sdui/SDUIRenderer";
 import { QueryViewsDialog, getViewComponents } from "@/components/sdui/QueryViewsDialog";
-import { DynamicFormFields } from "@/components/forms/DynamicFormFields";
+import { DynamicFormFields } from "@platform/ui/forms/DynamicFormFields";
 import { DateRangePicker } from "@platform/ui/components/date-range-picker";
 import {
   buildDynamicDefaultValues,
   buildDynamicSchema,
   normalizeDynamicFormValues,
-} from "@/lib/dynamic-form";
+} from "@platform/ui/forms/dynamic-form";
 import { Button } from "@platform/ui/components/button";
 import { Input } from "@platform/ui/components/input";
 import { Badge } from "@platform/ui/components/badge";
@@ -63,6 +63,11 @@ export const WorkspaceDetailPage: React.FC = () => {
   const [schema, setSchema] = useState<DashboardSchemaResponse | null>(null);
   const [viewsOpen, setViewsOpen] = useState(false);
   const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceRecord | null>(null);
+  const lookupRecipeId = workspaceInfo?.recipeId || "";
+  const fetchLookupOptions = useCallback(
+    (field: FormFieldDef) => api.lookups.fetch(lookupRecipeId, field.name),
+    [lookupRecipeId],
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [concluding, setConcluding] = useState(false);
@@ -480,7 +485,7 @@ export const WorkspaceDetailPage: React.FC = () => {
                 />
 
                 {editFields.length > 0 && (
-                  <DynamicFormFields fields={editFields} form={editForm} recipeId={workspaceInfo?.recipeId || ""} />
+                  <DynamicFormFields fields={editFields} form={editForm} fetchLookupOptions={fetchLookupOptions} />
                 )}
               </FieldGroup>
 

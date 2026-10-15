@@ -61,14 +61,16 @@ import {
 import { toast } from "@platform/ui/components/toast";
 import { PlusCircle, RefreshCw, MoreHorizontal, Edit2, PlugZap, Trash2 } from "lucide-react";
 import { api } from "@/lib/api-client";
+
+const fetchErpLookupOptions = (field: { name: string }) => api.lookups.fetch("", field.name);
 import { HeaderActions } from "@/context/HeaderActionsContext";
-import { DynamicFormFields } from "@/components/forms/DynamicFormFields";
+import { DynamicFormFields } from "@platform/ui/forms/DynamicFormFields";
 import {
   buildDynamicDefaultValues,
   buildDynamicSchema,
   normalizeDynamicFormValues,
   type DynamicFormValues,
-} from "@/lib/dynamic-form";
+} from "@platform/ui/forms/dynamic-form";
 
 const baseSchema = z.object({
   name: z.string().min(1, "Informe o nome do ERP."),
@@ -419,7 +421,7 @@ export const ERPsPage: React.FC = () => {
                   )}
                 />
 
-                <DynamicFormFields fields={typeFields} form={form} />
+                <DynamicFormFields fields={typeFields} form={form} fetchLookupOptions={fetchErpLookupOptions} />
               </form>
             </Form>
           </ScrollArea>

@@ -1,17 +1,17 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toLocalISODate } from "@/lib/utils";
 import { useParams, useNavigate } from "react-router-dom";
-import type { DashboardSchemaResponse, WorkspaceRecord } from "@platform/shared";
+import type { DashboardSchemaResponse, FormFieldDef, WorkspaceRecord } from "@platform/shared";
 import { useAuth } from "@/context/AuthContext";
 import { SDUIRenderer } from "@/components/sdui/SDUIRenderer";
 import { QueryViewsDialog, getViewComponents } from "@/components/sdui/QueryViewsDialog";
-import { DynamicFormFields } from "@/components/forms/DynamicFormFields";
+import { DynamicFormFields } from "@platform/ui/forms/DynamicFormFields";
 import { DateRangePicker } from "@platform/ui/components/date-range-picker";
 import {
   buildDynamicDefaultValues,
   buildDynamicSchema,
   normalizeDynamicFormValues,
-} from "@/lib/dynamic-form";
+} from "@platform/ui/forms/dynamic-form";
 import { Button } from "@platform/ui/components/button";
 import { Input } from "@platform/ui/components/input";
 import { Badge } from "@platform/ui/components/badge";
@@ -63,6 +63,10 @@ import { RecipePermissionsSheet } from "@/components/recipes/RecipePermissionsSh
 
 export const RecipeDashboardPage: React.FC = () => {
   const { recipeId } = useParams<{ recipeId: string }>();
+  const fetchLookupOptions = useCallback(
+    (field: FormFieldDef) => api.lookups.fetch(recipeId ?? "", field.name),
+    [recipeId],
+  );
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
 
@@ -370,7 +374,7 @@ export const RecipeDashboardPage: React.FC = () => {
           <Form {...paramsForm}>
             <form onSubmit={(e) => e.preventDefault()} noValidate>
               <FieldGroup className="py-4">
-                <DynamicFormFields fields={paramFields} form={paramsForm} recipeId={recipeId} />
+                <DynamicFormFields fields={paramFields} form={paramsForm} fetchLookupOptions={fetchLookupOptions} />
               </FieldGroup>
             </form>
           </Form>
@@ -425,7 +429,7 @@ export const RecipeDashboardPage: React.FC = () => {
                 />
 
                 {initFields.length > 0 && (
-                  <DynamicFormFields fields={initFields} form={initForm} recipeId={recipeId!} />
+                  <DynamicFormFields fields={initFields} form={initForm} fetchLookupOptions={fetchLookupOptions} />
                 )}
               </FieldGroup>
 
