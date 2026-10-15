@@ -23,6 +23,8 @@ export type DataTableFormat = "currency" | "date" | "number" | "percent";
 export interface DataTableColumn<TRow> {
   key: string;
   label: string;
+  /** Rótulo do campo no MobileCard; padrão: `label`. */
+  mobileLabel?: string;
   /** Valor bruto da célula; usado para formato, busca, ordenação e título do MobileCard. */
   value?: (row: TRow) => CellValue;
   /** Conteúdo customizado (badges etc.); tem precedência sobre `value`/`format` na célula. */
@@ -222,7 +224,7 @@ export function DataTable<TRow>({
                   primary=""
                   secondary=""
                   fields={fieldCols.map((c) => ({
-                    label: c.label,
+                    label: c.mobileLabel ?? c.label,
                     value: <Skeleton className={c.skeletonClassName ?? "h-4 w-20"} />,
                   }))}
                 />
@@ -235,7 +237,7 @@ export function DataTable<TRow>({
                   key={getRowId(row)}
                   primary={text(primaryCol, row)}
                   secondary={secondaryCol ? text(secondaryCol, row) : undefined}
-                  fields={fieldCols.map((c) => ({ label: c.label, value: cellContent(c, row) }))}
+                  fields={fieldCols.map((c) => ({ label: c.mobileLabel ?? c.label, value: cellContent(c, row) }))}
                   actions={rowActions?.(row)}
                 />
               ))
