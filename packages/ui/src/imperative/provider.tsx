@@ -87,7 +87,10 @@ export function UiProvider({
     return c
   })
   const snapshot = useSyncExternalStore(controller.subscribe, controller.snapshot, controller.snapshot)
-  useEffect(() => () => controller.dispose(), [controller])
+  useEffect(() => {
+    controller.revive() // StrictMode: mount -> cleanup -> mount
+    return () => controller.dispose()
+  }, [controller])
 
   const ui = useMemo<Ui<WindowContent>>(
     () => ({

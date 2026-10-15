@@ -99,4 +99,12 @@ describe("WindowController", () => {
     expect(await d).toEqual({ status: "cancelled", reason: "unmounted" })
     expect(await c.open({})).toEqual({ status: "cancelled", reason: "unmounted" })
   })
+
+  it("revive() rearma o controller após dispose (ciclo StrictMode)", () => {
+    const { c } = setup()
+    c.dispose()
+    c.revive()
+    void c.open({})
+    expect(c.snapshot().windows).toHaveLength(1)
+  })
 })
