@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { count, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import type { CreateUserInput, RecipeDef, Role, UpdateUserInput, User } from "@platform/shared";
+import type { CreateUserInput, Role, UpdateUserInput, User } from "@platform/shared";
 import { roles, users } from "../db/schema.js";
 import { PasswordService } from "./password-service.js";
-import { PermissionCatalogEngine } from "./permission-catalog.js";
+import { pruneOrphans } from "@platform/core/permissions";
 import type { UserStore } from "./user-store.js";
 
 type UserRow = typeof users.$inferSelect;
@@ -162,14 +162,14 @@ export class PostgresUserStore implements UserStore {
     await this.db.delete(roles).where(eq(roles.id, id));
   }
 
-  async syncOrphanPermissions(recipes: Record<string, RecipeDef>): Promise<number> {
-    const { updatedRoles, removedCount } = PermissionCatalogEngine.pruneOrphanPermissions(
-      await this.listRoles(),
-      recipes
-    );
-    for (const role of updatedRoles) {
-      await this.db.update(roles).set({ permissions: role.permissions }).where(eq(roles.id, role.id));
+  async syncOrphanPermissions(validKeys: ReadonlySet<string>): Promise<number> {
+    let removed = 0;
+    for (const role of await this.listRoles()) {
+      const kept = pruneOrphans(role.permissions, validKeys);
+      if (kept.length === role.permissions.length) continue;
+      removed += role.permissions.length - kept.length;
+      await this.db.update(roles).set({ permissions: kept }).where(eq(roles.id, role.id));
     }
-    return removedCount;
+    return removed;
   }
 }

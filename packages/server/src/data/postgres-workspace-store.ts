@@ -9,12 +9,10 @@ type Row = typeof workspaces.$inferSelect;
 function toRecord(row: Row): WorkspaceRecord {
   return {
     id: row.id,
-    recipeId: row.recipeId,
     name: row.name,
     startDate: row.startDate,
     endDate: row.endDate,
     status: row.status,
-    params: row.params ?? undefined,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -31,12 +29,10 @@ export class PostgresWorkspaceStore implements WorkspaceStore {
   async save(ws: WorkspaceRecord): Promise<void> {
     const values = {
       id: ws.id,
-      recipeId: ws.recipeId,
       name: ws.name,
       startDate: ws.startDate,
       endDate: ws.endDate,
       status: ws.status,
-      params: ws.params ?? null,
       createdAt: new Date(ws.createdAt),
       updatedAt: new Date(ws.updatedAt),
     };

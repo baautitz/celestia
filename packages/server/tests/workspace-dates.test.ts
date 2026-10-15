@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createPlatformApp } from "../src/index.js";
-import { MockSourceConnector } from "../src/data/source-connector.js";
-import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import { WorkspaceValidator } from "../src/engine/workspace-validator.js";
-import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
 import { authHeader, createSeededUserStore, seededWorkspaces , withAuth } from "./helpers/fixtures.js";
 
 describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
@@ -13,13 +10,6 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
     app = createPlatformApp({
       userStore: createSeededUserStore(),
       workspaces: seededWorkspaces,
-      sourceConnector: new MockSourceConnector({
-        default: [{ vendedor_id: 1, vendedor: "Carlos", venda_geral: 5000 }],
-      }),
-      persistenceStore: new MemoryPersistenceStore(),
-      recipes: {
-        fechamento_mes: fechamentoRecipe,
-      },
     });
     withAuth(app);
   });
@@ -57,28 +47,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
     });
   });
 
-  // ─── 2. TESTES DE INTEGRAÇÃO NA API ────────────────────────────────────────
-  describe("2. Proteção na Rota de Dados da API", () => {
-    it("deve rejeitar com 400 Bad Request se a query enviar data final anterior à data inicial", async () => {
-      const res = await app.request(
-        "/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-31&end_date=2026-01-01"
-      );
-
-      expect(res.status).toBe(400);
-    });
-
-    it("deve responder 200 OK quando as datas forem válidas", async () => {
-      const res = await app.request(
-        "/api/workspaces/ws_fechamento_jan_2026/data/tabela_vendedores?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31"
-      );
-
-      expect(res.status).toBe(200);
-      const json = (await res.json()) as { type: string };
-      expect(json.type).toBe("table");
-    });
-  });
-
-  // ─── 3. TESTES DE CICLO DE VIDA (CRIAR, LISTAR, CONCLUIR E TRAVAR) ─────────
+  // ─── 2. TESTES DE CICLO DE VIDA (CRIAR, LISTAR, CONCLUIR E TRAVAR) ─────────
   describe("3. Ciclo de Vida e Trava de Workspaces", () => {
     it("deve listar workspaces cadastradas", async () => {
       const res = await app.request("/api/workspaces", { headers: await authHeader(app) });
@@ -93,7 +62,6 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipeId: "fechamento_mes",
           name: "Fechamento Março/2026",
           startDate: "2026-03-01",
           endDate: "2026-03-31",
@@ -106,7 +74,25 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
       expect(created.name).toBe("Fechamento Março/2026");
     });
 
-    it("deve concluir uma workspace, bloquear actions de mutação, permitir actions de leitura e reabrir", async () => {
+    it("deve rejeitar com 400 a criação com data final anterior à inicial", async () => {
+      const res = await app.request("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Invertida", startDate: "2026-03-31", endDate: "2026-03-01" }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("deve rejeitar com 400 a edição que deixa data final anterior à inicial", async () => {
+      const res = await app.request("/api/workspaces/ws_fechamento_jan_2026", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endDate: "2025-12-31" }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("deve concluir e reabrir uma workspace", async () => {
       // 1. Conclui a workspace
       const concludeRes = await app.request("/api/workspaces/ws_fechamento_jan_2026/conclude", {
         method: "POST",
@@ -116,39 +102,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
       expect(concludeJson.success).toBe(true);
       expect(concludeJson.workspace.status).toBe("closed");
 
-      // 2. Action de LEITURA (nature: 'read' - Ver Penalidades) DEVE ser permitida mesmo concluída
-      const readActionRes = await app.request("/api/workspaces/ws_fechamento_jan_2026/actions/exec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipe_id: "fechamento_mes",
-          component_id: "tabela_vendedores",
-          action_id: "visualizar_penalidades",
-          row: { vendedor_id: 1, vendedor: "Carlos" },
-        }),
-      });
-      expect(readActionRes.status).toBe(200);
-      const readActionJson = (await readActionRes.json()) as { effects: Array<{ type: string }> };
-      expect(readActionJson.effects.some((e) => e.type === "show_table")).toBe(true);
-
-      // 3. Action de MUTAÇÃO (nature: 'mutation' - Adicionar Penalidade) DEVE ser rejeitada com 400
-      const mutationActionRes = await app.request("/api/workspaces/ws_fechamento_jan_2026/actions/exec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipe_id: "fechamento_mes",
-          component_id: "tabela_vendedores",
-          action_id: "adicionar_penalidade",
-          row: { vendedor_id: 1, vendedor: "Carlos" },
-          form_data: { valor: 10, reason: "Atraso" },
-        }),
-      });
-
-      expect(mutationActionRes.status).toBe(400);
-      const errJson = (await mutationActionRes.json()) as { error: string };
-      expect(errJson.error).toContain("concluída e bloqueada para ações de modificação");
-
-      // 4. Reabre a workspace
+      // 2. Reabre a workspace
       const reopenRes = await app.request("/api/workspaces/ws_fechamento_jan_2026/reopen", {
         method: "POST",
       });
