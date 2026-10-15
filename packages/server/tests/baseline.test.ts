@@ -441,6 +441,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.grants.users.reset.403_target_admin", "POST", `/api/iam/users/${admId}/reset-password`, { token: G, body: { newPassword: "Nova@1234" } });
     await rec("iam.grants.users.update.403_inactivate_admin", "PUT", `/api/iam/users/${admId}`, { token: G, body: { status: "inactive" } });
     await rec("iam.grants.users.delete.403_target_admin", "DELETE", `/api/iam/users/${admId}`, { token: G });
+    await rec("iam.grants.users.update.403_rename_admin", "PUT", `/api/iam/users/${admId}`, { token: G, body: { fullname: "Nome Trocado" } });
     await rec("iam.grants.users.update.ok_inactivate_common", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { status: "inactive" } });
     await rec("iam.grants.users.delete.ok_common", "DELETE", `/api/iam/users/${comumId}`, { token: G });
     await rec("iam.grants.users.delete.ok_admin_by_admin", "DELETE", `/api/iam/users/${admId}`, { token: R });

@@ -4701,6 +4701,12 @@
       "error": "Somente administradores podem excluir ou inativar outro administrador."
     }
   },
+  "iam.grants.users.update.403_rename_admin": {
+    "status": 403,
+    "body": {
+      "error": "Somente administradores podem excluir ou inativar outro administrador."
+    }
+  },
   "iam.grants.users.update.ok_inactivate_common": {
     "status": 200,
     "body": {

@@ -201,7 +201,9 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(denied.status).toBe(403);
       expect(((await denied.json()) as { error: string }).error).toBe("Somente administradores podem excluir ou inativar outro administrador.");
       expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, { status: "inactive" })).status).toBe(403);
-      expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, { fullname: "Outro Nome" })).status).toBe(200);
+      for (const patch of [{ fullname: "Outro Nome" }, { email: "x@y.com" }, { externals: { sap: 1 } }, { roleId: "role_pequeno" }]) {
+        expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, patch)).status).toBe(403);
+      }
       expect((await send("PUT", `/api/iam/users/${alvoComumId}`, gestor, { status: "inactive" })).status).toBe(200);
       expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, admin, { status: "inactive" })).status).toBe(200);
       expect((await app.request(`/api/iam/users/${alvoAdminId}`, { method: "DELETE", headers: admin })).status).toBe(200);

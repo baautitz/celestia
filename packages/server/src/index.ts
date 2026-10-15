@@ -347,7 +347,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           return c.json({ error: "Você não pode remover o seu próprio acesso de administrador." }, 400);
         }
       }
-      if (body.status === "inactive" && !caller.isAdmin && (await userStore.findById(id))?.isAdmin) {
+      // Só admin age sobre admin: nenhum campo de um administrador é alterável por não-admin.
+      if (!caller.isAdmin && (await userStore.findById(id))?.isAdmin) {
         return c.json({ error: ADMIN_TARGET_ONLY }, 403);
       }
       if (body.status === "inactive" && (await isLastActiveAdmin(id))) {
