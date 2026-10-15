@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { sign } from "hono/jwt";
+import { TokenService } from "../src/iam/token-service.js";
 import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
@@ -274,6 +276,34 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(ok.status).toBe(200);
       const body = (await ok.json()) as { user: { permissions: string[] } };
       expect(body.user.permissions).toEqual(["system:roles:read"]);
+    });
+  });
+
+  describe("segredo JWT", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("produção sem JWT_SECRET lança", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("JWT_SECRET", "");
+      expect(() => new TokenService()).toThrow(/JWT_SECRET/);
+    });
+
+    it("segredo com menos de 32 caracteres lança", () => {
+      expect(() => new TokenService({ jwtSecret: "curto" })).toThrow(/32/);
+      vi.stubEnv("JWT_SECRET", "curto");
+      expect(() => new TokenService()).toThrow(/32/);
+    });
+
+    it("token assinado com a constante antiga é rejeitado", async () => {
+      vi.stubEnv("JWT_SECRET", "");
+      const forged = await sign(
+        { sub: "x", username: "x", permissions: ["*"], isAdmin: true, iat: 1, exp: 9999999999 },
+        "sdui-platform-super-secret-key-2026"
+      );
+      const res = await app.request("/api/auth/me", { headers: { Authorization: `Bearer ${forged}` } });
+      expect(res.status).toBe(401);
     });
   });
 });

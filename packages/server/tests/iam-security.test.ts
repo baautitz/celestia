@@ -36,7 +36,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
     persistenceStore = new MemoryPersistenceStore();
     userStore = createSeededUserStore();
     tokenService = new TokenService({
-      jwtSecret: "test-secret-key-iam-12345",
+      jwtSecret: "test-secret-key-iam-12345-0123456789",
       accessTtlSeconds: 300, // 5 min
       refreshTtlSeconds: 7 * 24 * 3600, // 7 dias
     });

@@ -1,6 +1,28 @@
 import { sign, verify } from "hono/jwt";
 import type { JWTAccessPayload, JWTRefreshPayload, User, Role } from "@platform/shared";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+
+const MIN_SECRET_LENGTH = 32;
+let ephemeralSecret: string | undefined;
+
+/** Segredo JWT: explícito (>= 32 chars); sem ele, erro em produção e segredo efêmero do processo fora dela. */
+function resolveSecret(explicit?: string): string {
+  const secret = explicit || process.env.JWT_SECRET;
+  if (secret) {
+    if (secret.length < MIN_SECRET_LENGTH) {
+      throw new Error(`JWT_SECRET precisa ter ao menos ${MIN_SECRET_LENGTH} caracteres.`);
+    }
+    return secret;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET não definido: obrigatório em produção.");
+  }
+  if (!ephemeralSecret) {
+    ephemeralSecret = randomBytes(32).toString("hex");
+    console.warn("JWT_SECRET não definido: usando segredo efêmero deste processo (tokens não sobrevivem a reinício).");
+  }
+  return ephemeralSecret;
+}
 
 export interface TokenServiceConfig {
   jwtSecret?: string;
@@ -14,7 +36,7 @@ export class TokenService {
   private refreshTtl: number;
 
   constructor(config?: TokenServiceConfig) {
-    this.secret = config?.jwtSecret || process.env.JWT_SECRET || "sdui-platform-super-secret-key-2026";
+    this.secret = resolveSecret(config?.jwtSecret);
     this.accessTtl = config?.accessTtlSeconds ?? 300; // 5 minutos
     this.refreshTtl = config?.refreshTtlSeconds ?? 7 * 24 * 3600; // 7 dias
   }
