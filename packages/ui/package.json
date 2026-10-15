@@ -8,8 +8,10 @@
     "./lib/*": "./src/lib/*.ts",
     "./hooks/*": "./src/hooks/*.ts",
     "./contracts/*": "./src/contracts/*.ts",
-    "./imperative/*": "./src/imperative/*.ts",
-    "./imperative/*.tsx": "./src/imperative/*.tsx",
+    "./imperative/controller": "./src/imperative/controller.ts",
+    "./imperative/provider": "./src/imperative/provider.tsx",
+    "./imperative/host": "./src/imperative/host.tsx",
+    "./imperative/use-window": "./src/imperative/use-window.tsx",
     "./adapters/*": "./src/adapters/*.ts"
   },
   "scripts": {
