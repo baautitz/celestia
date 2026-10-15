@@ -1,40 +1,34 @@
 import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "@/context/AuthContext";
 import type { Role, PermissionCatalog, PermissionItem } from "@platform/shared";
 import { Card, CardHeader, CardTitle, CardContent } from "@platform/ui/components/card";
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from "@platform/ui/components/table";
 import { Button } from "@platform/ui/components/button";
 import { Input } from "@platform/ui/components/input";
 import { Textarea } from "@platform/ui/components/textarea";
 import { Badge } from "@platform/ui/components/badge";
 import { Switch } from "@platform/ui/components/switch";
-import { Skeleton } from "@platform/ui/components/skeleton";
-import { FieldGroup, Field, FieldLabel } from "@platform/ui/components/field";
-import { MobileCard } from "@platform/ui/components/mobile-card";
-import { useIsMobile } from "@platform/ui/hooks/use-mobile";
+import { FieldGroup } from "@platform/ui/components/field";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from "@platform/ui/components/sheet";
-import { ScrollArea } from "@platform/ui/components/scroll-area";
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@platform/ui/components/form";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@platform/ui/components/dropdown-menu";
-import { toast } from "@platform/ui/components/toast";
+import { DataTable } from "@platform/ui/data-table/data-table";
+import type { DataTableColumn } from "@platform/ui/data-table/data-table";
+import { useUi } from "@platform/ui/imperative/provider";
+import { useWindow, WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import {
   Shield,
   PlusCircle,
@@ -45,24 +39,192 @@ import {
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 
+const roleSchema = z.object({
+  name: z.string().min(1, "Informe o nome do grupo."),
+  slug: z.string().min(1, "Informe o identificador do grupo."),
+  description: z.string(),
+  permissions: z.array(z.string()),
+});
+type RoleFormValues = z.infer<typeof roleSchema>;
+
+interface RoleSheetProps {
+  role: Role | null;
+  catalog: PermissionCatalog | null;
+}
+
+const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
+  const { resolve, setTitle } = useWindow<true>();
+  const { feedback } = useUi();
+  const isEditMode = role !== null;
+  const [saving, setSaving] = useState(false);
+  const form = useForm<RoleFormValues>({
+    resolver: zodResolver(roleSchema),
+    defaultValues: {
+      name: role?.name ?? "",
+      slug: role?.id ?? "",
+      description: role?.description || "",
+      permissions: role ? [...role.permissions] : [],
+    },
+  });
+
+  const name = form.watch("name");
+  useEffect(() => {
+    if (isEditMode) setTitle(`Editar Grupo: ${name}`);
+  }, [isEditMode, name, setTitle]);
+
+  const onSubmit = async (v: RoleFormValues) => {
+    try {
+      setSaving(true);
+      const cleanSlug = v.slug.trim().toLowerCase().replace(/\s+/g, "_");
+      if (role) {
+        await api.iam.updateRole(role.id, {
+          name: v.name.trim(),
+          description: v.description.trim(),
+          permissions: v.permissions,
+        });
+        feedback.notify({ title: "Perfil de acesso atualizado com sucesso!", type: "success" });
+      } else {
+        await api.iam.createRole({
+          id: cleanSlug,
+          name: v.name.trim(),
+          description: v.description.trim(),
+          permissions: v.permissions,
+        });
+        feedback.notify({ title: "Perfil de acesso criado com sucesso!", type: "success" });
+      }
+      resolve(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha ao salvar perfil";
+      feedback.notify({ title: msg, type: "error" });
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Form {...form}>
+        <form
+          id="role-form"
+          noValidate
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="flex flex-col gap-6"
+        >
+          <FieldGroup>
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem className="w-full">
+                  <FormLabel className="w-fit leading-snug">Nome do Grupo</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Auditor Financeiro" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="slug"
+              render={({ field }) => (
+                <FormItem className="w-full">
+                  <FormLabel className="w-fit leading-snug">Identificador do Grupo (slug)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="auditor_financeiro" disabled={isEditMode} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem className="w-full">
+                  <FormLabel className="w-fit leading-snug">Descrição</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Descreva a finalidade e escopo de acesso deste grupo..."
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </FieldGroup>
+
+          {/* Matriz de Permissões: Módulos de Sistema (system:*) */}
+          <FormField
+            control={form.control}
+            name="permissions"
+            render={({ field }) => (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Shield className="size-3.5 text-primary" />
+                    Módulos de Sistema
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  {catalog &&
+                    Object.entries(catalog.system).map(([moduleName, perms]) => (
+                      <div key={moduleName} className="flex flex-col gap-2">
+                        <div className="bg-muted/60 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground">
+                          Módulo: {moduleName}
+                        </div>
+                        <div className="flex flex-col divide-y divide-border/40">
+                          {perms.map((p: PermissionItem) => (
+                            <div key={p.key} className="flex items-center justify-between gap-4 py-2">
+                              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                <span className="font-mono text-xs font-medium text-foreground break-all">{p.key}</span>
+                                {p.description && (
+                                  <span className="text-[11px] text-muted-foreground">{p.description}</span>
+                                )}
+                              </div>
+                              <Switch
+                                className="shrink-0"
+                                checked={field.value.includes("*") || field.value.includes(p.key)}
+                                onCheckedChange={(checked: boolean) =>
+                                  field.onChange(
+                                    checked
+                                      ? [...field.value.filter((k) => k !== p.key && k !== "*"), p.key]
+                                      : field.value.filter((k) => k !== p.key && k !== "*"),
+                                  )
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                </CardContent>
+              </Card>
+            )}
+          />
+
+          <p className="text-xs text-muted-foreground">
+            Permissões de Dashboards são configuradas diretamente na página de cada Dashboard.
+          </p>
+        </form>
+      </Form>
+
+      <WindowActions>
+        <WindowCancelButton />
+        <Button form="role-form" type="submit" disabled={saving}>
+          {saving ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Criar Grupo"}
+        </Button>
+      </WindowActions>
+    </>
+  );
+};
+
 export const IAMRolesPage: React.FC = () => {
   const { hasPermission } = useAuth();
+  const ui = useUi();
   const [roles, setRoles] = useState<Role[]>([]);
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Drawer / Sheet State
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
-
-  // Form State
-  const [roleName, setRoleName] = useState("");
-  const [roleSlug, setRoleSlug] = useState("");
-  const [roleDescription, setRoleDescription] = useState("");
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const isMobile = useIsMobile();
 
   const fetchData = async () => {
     try {
@@ -75,7 +237,7 @@ export const IAMRolesPage: React.FC = () => {
       setCatalog(catalogRes);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao carregar perfis de acesso";
-      toast.error(msg);
+      ui.feedback.notify({ title: msg, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -85,70 +247,54 @@ export const IAMRolesPage: React.FC = () => {
     fetchData();
   }, []);
 
-  const openCreateSheet = () => {
-    setIsEditMode(false);
-    setEditingRoleId(null);
-    setRoleName("");
-    setRoleSlug("");
-    setRoleDescription("");
-    setSelectedPermissions([]);
-    setIsSheetOpen(true);
+  const openSheet = async (role: Role | null) => {
+    const result = await ui.windows.open<true>({
+      surface: "sheet",
+      title: role ? `Editar Grupo: ${role.name}` : "Novo Grupo de Acesso",
+      description: "Configure os dados básicos do grupo e selecione as permissões atribuídas.",
+      content: () => <RoleSheetContent role={role} catalog={catalog} />,
+    });
+    if (result.status === "confirmed") fetchData();
   };
+  const openCreateSheet = () => openSheet(null);
+  const openEditSheet = (r: Role) => openSheet(r);
 
-  const openEditSheet = (r: Role) => {
-    setIsEditMode(true);
-    setEditingRoleId(r.id);
-    setRoleName(r.name);
-    setRoleSlug(r.id);
-    setRoleDescription(r.description || "");
-    setSelectedPermissions([...r.permissions]);
-    setIsSheetOpen(true);
-  };
-
-  const handleTogglePermission = (key: string, enabled: boolean) => {
-    if (enabled) {
-      setSelectedPermissions((prev) => [...prev.filter((p) => p !== key && p !== "*"), key]);
-    } else {
-      setSelectedPermissions((prev) => prev.filter((p) => p !== key && p !== "*"));
-    }
-  };
-
-  const isPermActive = (key: string): boolean => {
-    return selectedPermissions.includes("*") || selectedPermissions.includes(key);
-  };
-
-  const handleSaveRole = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setSaving(true);
-      const cleanSlug = roleSlug.trim().toLowerCase().replace(/\s+/g, "_");
-
-      if (isEditMode && editingRoleId) {
-        await api.iam.updateRole(editingRoleId, {
-          name: roleName.trim(),
-          description: roleDescription.trim(),
-          permissions: selectedPermissions,
-        });
-        toast.success("Perfil de acesso atualizado com sucesso!");
-      } else {
-        await api.iam.createRole({
-          id: cleanSlug,
-          name: roleName.trim(),
-          description: roleDescription.trim(),
-          permissions: selectedPermissions,
-        });
-        toast.success("Perfil de acesso criado com sucesso!");
-      }
-
-      setIsSheetOpen(false);
-      fetchData();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Falha ao salvar perfil";
-      toast.error(msg);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const columns: DataTableColumn<Role>[] = [
+    {
+      key: "id",
+      label: "Identificador (Slug)",
+      value: (r) => r.id,
+      cellClassName: "font-mono text-xs font-semibold",
+      skeletonClassName: "h-4 w-24",
+      mobileRole: "secondary",
+    },
+    {
+      key: "name",
+      label: "Nome do Grupo",
+      value: (r) => r.name,
+      cellClassName: "font-medium",
+      skeletonClassName: "h-4 w-32",
+      mobileRole: "primary",
+    },
+    {
+      key: "description",
+      label: "Descrição",
+      value: (r) => r.description || "-",
+      cellClassName: "text-xs text-muted-foreground",
+      skeletonClassName: "h-4 w-56",
+    },
+    {
+      key: "permissions",
+      label: "Permissões Ativas",
+      value: (r) => (r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`),
+      render: (r) => (
+        <Badge variant="secondary">
+          {r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`}
+        </Badge>
+      ),
+      skeletonClassName: "h-5 w-20",
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -189,219 +335,22 @@ export const IAMRolesPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Tabela de Grupos */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">
-            Grupos Registrados ({roles.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isMobile ? (
-            <div className="flex flex-col gap-3">
-              {loading ? (
-                Array.from({ length: 3 }).map((_, idx) => (
-                  <MobileCard
-                    key={idx}
-                    primary=""
-                    secondary=""
-                    fields={[
-                      { label: "Descrição", value: <Skeleton className="h-4 w-40" /> },
-                      { label: "Permissões", value: <Skeleton className="h-5 w-20" /> },
-                    ]}
-                  />
-                ))
-              ) : roles.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground text-sm">
-                  Nenhum grupo de acesso cadastrado.
-                </p>
-              ) : (
-                roles.map((r) => (
-                  <MobileCard
-                    key={r.id}
-                    primary={r.name}
-                    secondary={r.id}
-                    fields={[
-                      { label: "Descrição", value: r.description || "-" },
-                      {
-                        label: "Permissões",
-                        value: (
-                          <Badge variant="secondary">
-                            {r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`}
-                          </Badge>
-                        ),
-                      },
-                    ]}
-                    actions={
-                      hasPermission("system:roles:update") && (
-                        <Button variant="ghost" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditSheet(r)}>
-                          <Edit2 className="size-4" />
-                        </Button>
-                      )
-                    }
-                  />
-                ))
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead>Identificador (Slug)</TableHead>
-                  <TableHead>Nome do Grupo</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Permissões Ativas</TableHead>
-                  <TableHead className="text-right w-20">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-56" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : roles.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                      Nenhum grupo de acesso cadastrado.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  roles.map((r) => (
-                    <TableRow key={r.id} className="hover:bg-muted/30">
-                      <TableCell className="font-mono text-xs font-semibold">{r.id}</TableCell>
-                      <TableCell className="font-medium">{r.name}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.description || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {hasPermission("system:roles:update") && (
-                          <Button variant="ghost" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditSheet(r)}>
-                            <Edit2 className="size-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Drawer Lateral */}
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl">
-          <SheetHeader className="p-6 border-b shrink-0">
-            <SheetTitle>{isEditMode ? `Editar Grupo: ${roleName}` : "Novo Grupo de Acesso"}</SheetTitle>
-            <SheetDescription>
-              Configure os dados básicos do grupo e selecione as permissões atribuídas.
-            </SheetDescription>
-          </SheetHeader>
-
-          <ScrollArea className="flex-1 min-h-0">
-            <form
-              id="role-form"
-              onSubmit={handleSaveRole}
-              className="p-6 flex flex-col gap-6"
-            >
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="r-name">Nome do Grupo</FieldLabel>
-                  <Input
-                    id="r-name"
-                    placeholder="Ex: Auditor Financeiro"
-                    value={roleName}
-                    onChange={(e) => setRoleName(e.target.value)}
-                    required
-                  />
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="r-slug">Identificador do Grupo (slug)</FieldLabel>
-                  <Input
-                    id="r-slug"
-                    placeholder="auditor_financeiro"
-                    value={roleSlug}
-                    onChange={(e) => setRoleSlug(e.target.value)}
-                    disabled={isEditMode}
-                    required
-                  />
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="r-desc">Descrição</FieldLabel>
-                  <Textarea
-                    id="r-desc"
-                    placeholder="Descreva a finalidade e escopo de acesso deste grupo..."
-                    value={roleDescription}
-                    onChange={(e) => setRoleDescription(e.target.value)}
-                  />
-                </Field>
-              </FieldGroup>
-
-              {/* Matriz de Permissões: Módulos de Sistema (system:*) */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Shield className="size-3.5 text-primary" />
-                    Módulos de Sistema
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  {catalog &&
-                    Object.entries(catalog.system).map(([moduleName, perms]) => (
-                      <div key={moduleName} className="flex flex-col gap-2">
-                        <div className="bg-muted/60 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground">
-                          Módulo: {moduleName}
-                        </div>
-                        <div className="flex flex-col divide-y divide-border/40">
-                          {perms.map((p: PermissionItem) => (
-                            <div key={p.key} className="flex items-center justify-between gap-4 py-2">
-                              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                                <span className="font-mono text-xs font-medium text-foreground break-all">{p.key}</span>
-                                {p.description && (
-                                  <span className="text-[11px] text-muted-foreground">{p.description}</span>
-                                )}
-                              </div>
-                              <Switch
-                                className="shrink-0"
-                                checked={isPermActive(p.key)}
-                                onCheckedChange={(checked: boolean) => handleTogglePermission(p.key, checked)}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                </CardContent>
-              </Card>
-
-              <p className="text-xs text-muted-foreground">
-                Permissões de Dashboards são configuradas diretamente na página de cada Dashboard.
-              </p>
-            </form>
-          </ScrollArea>
-
-          <SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover">
-            <Button type="button" variant="outline" onClick={() => setIsSheetOpen(false)}>
-              Cancelar
+      <DataTable
+        columns={columns}
+        rows={roles}
+        getRowId={(r) => r.id}
+        loading={loading}
+        skeletonRows={3}
+        title={`Grupos Registrados (${roles.length})`}
+        emptyMessage="Nenhum grupo de acesso cadastrado."
+        rowActions={(r) =>
+          hasPermission("system:roles:update") ? (
+            <Button variant="ghost" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditSheet(r)}>
+              <Edit2 className="size-4" />
             </Button>
-            <Button form="role-form" type="submit" disabled={saving}>
-              {saving ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Criar Grupo"}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          ) : null
+        }
+      />
     </div>
   );
 };
