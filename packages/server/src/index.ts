@@ -1,4 +1,4 @@
-import { Hono, type Context, type MiddlewareHandler, type Next } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { serve } from "@hono/node-server";
@@ -119,20 +119,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       : payload;
 
   const auth = createAuthMiddleware(tokenService, withAdminBypass);
-
-  // Helper opcional para extrair usuário sem forçar 401
-  const optionalAuthMiddleware = async (c: Context, next: Next) => {
-    const authHeader = c.req.header("Authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      try {
-        const payload = await tokenService.verifyAccessToken(authHeader.substring(7));
-        c.set("user", withAdminBypass(payload));
-      } catch {
-        // Ignora erro em auth opcional
-      }
-    }
-    await next();
-  };
 
   // Exige ao menos uma das permissões; ausência de usuário/permissões nega (fail closed).
   const guard =

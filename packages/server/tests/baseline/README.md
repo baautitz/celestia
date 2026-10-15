@@ -9,11 +9,12 @@ com stores em memória, relógio falso (`Date` fixo em 2026-03-10T12:00:00Z) e v
 
 ## Observações de comportamento congelado
 
-- `/api/workspaces*`, `/api/recipes`, `/api/lookups`, `/api/dashboards/:id/schema`, dados e `actions/exec` usam auth opcional:
-  sem token respondem 200 (não há 401); o 403 só ocorre com token sem a permissão.
-- `/api/workspaces/:id/persistence/*` não têm nenhuma autenticação.
-- `/api/dashboards/:id/schema` de Modelo inexistente responde 500 (exceção não tratada).
-- `GET /api/workspaces/:id` desconhecido devolve um workspace padrão; `conclude`/`reopen` de id desconhecido criam o workspace.
+- Todas as rotas, exceto `/api/health` e `/api/auth/*`, exigem token: sem ele respondem 401.
+- Workspaces: listar/detalhar exigem `system:workspaces:read`; gravar persistência exige `system:workspaces:update`;
+  conclude/reopen aceitam também o legado `system:workspaces:create`. Workspace/Modelo/componente/ação desconhecidos: 404.
+- Schema, dados e `actions/exec` exigem `recipe:<id>:view`; `actions/exec` também a permissão da ação (403 antes de executar).
+- Dados sem Área de Trabalho existente (prévia) continuam válidos.
+- As mensagens de 403 vêm de `deniedMessage` em `SYSTEM_PERMISSIONS` via `denyMessage(key)`.
 - Não existe rota DELETE para roles.
 
 ## Não exercitado
