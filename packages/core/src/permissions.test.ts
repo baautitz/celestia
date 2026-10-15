@@ -101,6 +101,27 @@ describe("deniedMessage", () => {
   });
 });
 
+describe("fail-closed", () => {
+  const noop = () => 1;
+  it("declaração inválida lança", () => {
+    const p = definePermissions("m", { "a:b": "x" });
+    // @ts-expect-error chave inexistente
+    expect(() => p.ref("x:y")).toThrow('Permissão "x:y" não declarada no módulo "m".');
+    expect(() => guarded(undefined as never, noop)).toThrow(/não informada/);
+    expect(() => guarded("  ", noop)).toThrow(/não informada/);
+    expect(() => guarded("", noop)).toThrow(/não informada/);
+    expect(() => byPermission([])).toThrow(/Nenhuma variante/);
+    expect(() => byPermission([{ when: "", run: noop }])).toThrow(/não informada/);
+    expect(() => pickVariant([{ when: "" }], ["*"])).toThrow(/não informada/);
+  });
+  it("usuário sem permissions nega", () => {
+    const bad = { user: {} } as never;
+    expect(() => guarded("a", noop)(bad)).toThrow(ForbiddenError);
+    expect(() => byPermission([{ when: "a", run: noop }])(bad)).toThrow(ForbiddenError);
+    expect(new PermissionRegistry().has(["*"], "")).toBe(false);
+  });
+});
+
 describe("pruneOrphans", () => {
   it("mantém * e válidas", () => {
     expect(pruneOrphans(["*", "a", "b"], new Set(["a"]))).toEqual(["*", "a"]);

@@ -71,13 +71,25 @@ export function definePermissions<const D extends Record<string, PermissionDef>>
     moduleId,
     items: Object.freeze(items),
     keys: Object.freeze(keys),
-    ref: (k: string): PermissionRef => refs.get(`${moduleId}:${k}`) as PermissionRef,
+    ref: (k: string): PermissionRef => {
+      const r = refs.get(`${moduleId}:${k}`);
+      if (!r) throw new Error(`Permissão "${k}" não declarada no módulo "${moduleId}".`);
+      return r;
+    },
   });
   return result;
 }
 
-const hasPerm = (perms: readonly string[], key: string): boolean =>
-  perms.includes("*") || perms.includes(key);
+const hasPerm = (perms: readonly string[] | undefined, key: string): boolean =>
+  typeof key === "string" && key.trim() !== "" && Array.isArray(perms) && (perms.includes("*") || perms.includes(key));
+
+function requireKey(p: PermissionSpec | undefined | null): string {
+  const key = p == null ? p : keyOf(p);
+  if (typeof key !== "string" || key.trim() === "") {
+    throw new Error("Permissão não informada: toda ação protegida exige uma permissão válida.");
+  }
+  return key;
+}
 
 export class PermissionRegistry {
   private entries = new Map<string, () => readonly PermissionItem[]>();
@@ -111,7 +123,7 @@ export class PermissionRegistry {
     return undefined;
   }
 
-  has(userPermissions: readonly string[], key: string): boolean {
+  has(userPermissions: readonly string[] | undefined, key: string): boolean {
     return hasPerm(userPermissions, key);
   }
 }
@@ -120,9 +132,9 @@ export function guarded<C extends PermissionContext, A extends unknown[], R>(
   permission: PermissionSpec,
   fn: (ctx: C, ...args: A) => R,
 ): (ctx: C, ...args: A) => R {
-  const key = keyOf(permission);
+  const key = requireKey(permission);
   return (ctx, ...args) => {
-    if (!hasPerm(ctx.user.permissions, key)) throw new ForbiddenError(key, msgOf(permission));
+    if (!hasPerm(ctx?.user?.permissions, key)) throw new ForbiddenError(key, msgOf(permission));
     return fn(ctx, ...args);
   };
 }
@@ -134,16 +146,20 @@ export interface Variant<C extends PermissionContext, A extends unknown[], R> {
 
 export function pickVariant<V extends { when: PermissionSpec }>(
   variants: readonly V[],
-  userPermissions: readonly string[],
+  userPermissions: readonly string[] | undefined,
 ): V | undefined {
+  if (variants.length === 0) throw new Error("Nenhuma variante de permissão informada.");
+  variants.forEach((v) => requireKey(v.when));
   return variants.find((v) => hasPerm(userPermissions, keyOf(v.when)));
 }
 
 export function byPermission<C extends PermissionContext, A extends unknown[], R>(
   variants: readonly Variant<C, A, R>[],
 ): (ctx: C, ...args: A) => R {
+  if (variants.length === 0) throw new Error("Nenhuma variante de permissão informada.");
+  variants.forEach((v) => requireKey(v.when));
   return (ctx, ...args) => {
-    const v = pickVariant(variants, ctx.user.permissions);
+    const v = pickVariant(variants, ctx?.user?.permissions);
     if (!v) throw new ForbiddenError(
         variants.map((x) => keyOf(x.when)).join(" | "),
         variants.map((x) => msgOf(x.when)).find((m) => m !== undefined),
