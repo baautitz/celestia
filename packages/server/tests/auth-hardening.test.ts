@@ -446,4 +446,14 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(res.status).toBe(401);
     });
   });
+
+  describe("erros de JWT genéricos", () => {
+    it("não devolvem a mensagem interna da biblioteca", async () => {
+      const me = await app.request("/api/auth/me", { headers: { Authorization: "Bearer lixo.lixo.lixo" } });
+      expect(((await me.json()) as { error: string }).error).toBe("Falha na autenticação: token expirado ou inválido.");
+      const refresh = await app.request("/api/auth/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: "lixo.lixo.lixo" }) });
+      expect(refresh.status).toBe(401);
+      expect(((await refresh.json()) as { error: string }).error).toBe("Refresh token inválido ou expirado.");
+    });
+  });
 });

@@ -253,13 +253,13 @@
   "auth.refresh.invalid": {
     "status": 401,
     "body": {
-      "error": "invalid JWT token: lixo"
+      "error": "Refresh token inválido ou expirado."
     }
   },
   "auth.refresh.access_token_as_refresh": {
     "status": 401,
     "body": {
-      "error": "Token de renovação inválido."
+      "error": "Refresh token inválido ou expirado."
     }
   },
   "auth.logout": {
@@ -363,7 +363,7 @@
   "auth.me.401_bad_token": {
     "status": 401,
     "body": {
-      "error": "Falha na autenticação: invalid JWT token: lixo"
+      "error": "Falha na autenticação: token expirado ou inválido."
     }
   },
   "iam.catalog.ok": {

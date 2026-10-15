@@ -261,9 +261,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           expires_in: 300,
           user: withAdminBypass(userPayload),
         });
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Refresh token inválido ou expirado.";
-        return c.json({ error: msg }, 401);
+      } catch {
+        return c.json({ error: "Refresh token inválido ou expirado." }, 401);
       }
     }
   );

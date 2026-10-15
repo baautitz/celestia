@@ -26,9 +26,8 @@ export function createAuthMiddleware(
       const payload = await tokenService.verifyAccessToken(token);
       c.set("user", transform(payload));
       await next();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Token expirado ou inválido.";
-      return c.json({ error: `Falha na autenticação: ${msg}` }, 401);
+    } catch {
+      return c.json({ error: "Falha na autenticação: token expirado ou inválido." }, 401);
     }
   };
 }
