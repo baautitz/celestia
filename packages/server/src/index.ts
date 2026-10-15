@@ -661,7 +661,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 3. POST /api/workspaces (Criação de nova Área de Trabalho com datas obrigatórias)
   app.post(
     "/api/workspaces",
-    optionalAuthMiddleware,
+    auth,
+    guard(
+      "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho.",
+      "system:workspaces:create"
+    ),
     zValidator(
       "json",
       z
@@ -686,14 +690,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     ),
     async (c) => {
       const body = c.req.valid("json");
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      if (user && user.permissions && !user.permissions.includes("system:workspaces:create")) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho." },
-          403
-        );
-      }
 
       let recipe: RecipeDef;
       try {
@@ -724,7 +720,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 3.1 PUT /api/workspaces/:id (Edição de título, período e parâmetros)
   app.put(
     "/api/workspaces/:id",
-    optionalAuthMiddleware,
+    auth,
+    guard(
+      "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho.",
+      "system:workspaces:update"
+    ),
     zValidator("param", z.object({ id: z.string() })),
     zValidator(
       "json",
@@ -738,14 +738,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const { id } = c.req.valid("param");
       const body = c.req.valid("json");
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      if (user && user.permissions && !user.permissions.includes("system:workspaces:update")) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho." },
-          403
-        );
-      }
 
       const ws = workspacesMap.get(id);
       if (!ws) {
@@ -773,23 +765,14 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 4. POST /api/workspaces/:id/conclude (Conclui e bloqueia a Área de Trabalho)
   app.post(
     "/api/workspaces/:id/conclude",
-    optionalAuthMiddleware,
+    auth,
+    guard(
+      "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho.",
+      "system:workspaces:close", "system:workspaces:create"
+    ),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      if (
-        user &&
-        user.permissions &&
-        !user.permissions.includes("system:workspaces:close") &&
-        !user.permissions.includes("system:workspaces:create")
-      ) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho." },
-          403
-        );
-      }
 
       const ws = workspacesMap.get(id);
       if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
@@ -804,23 +787,14 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 5. POST /api/workspaces/:id/reopen (Reabre a Área de Trabalho concluída)
   app.post(
     "/api/workspaces/:id/reopen",
-    optionalAuthMiddleware,
+    auth,
+    guard(
+      "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen).",
+      "system:workspaces:reopen", "system:workspaces:create"
+    ),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      if (
-        user &&
-        user.permissions &&
-        !user.permissions.includes("system:workspaces:reopen") &&
-        !user.permissions.includes("system:workspaces:create")
-      ) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen)." },
-          403
-        );
-      }
 
       const ws = workspacesMap.get(id);
       if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
@@ -835,18 +809,14 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 5.1 DELETE /api/workspaces/:id (Exclui Área de Trabalho — permission-first)
   app.delete(
     "/api/workspaces/:id",
-    optionalAuthMiddleware,
+    auth,
+    guard(
+      "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete).",
+      "system:workspaces:delete"
+    ),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      if (user && user.permissions && !user.permissions.includes("system:workspaces:delete")) {
-        return c.json(
-          { error: "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete)." },
-          403
-        );
-      }
 
       const ws = workspacesMap.get(id);
       if (!ws) {
@@ -860,7 +830,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   );
 
   // 5.1 GET /api/recipes (Catálogo de Modelos disponíveis, filtrado por permissão de visualização)
-  app.get("/api/recipes", optionalAuthMiddleware, async (c) => {
+  app.get("/api/recipes", auth, async (c) => {
     const user = c.get("user") as JWTAccessPayload | undefined;
 
     let catalog = Array.from(recipesMap.values()).map((recipe) => ({
@@ -880,7 +850,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 5.2 GET /api/lookups (Opções de um campo com lookup definido no Modelo)
   app.get(
     "/api/lookups",
-    optionalAuthMiddleware,
+    auth,
     zValidator("query", z.object({ recipe_id: z.string(), field: z.string() })),
     async (c) => {
       const { recipe_id, field } = c.req.valid("query");
@@ -928,7 +898,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 6. GET /api/dashboards/:id/schema (Retorna o UI Schema sanitizado sem código SQL)
   app.get(
     "/api/dashboards/:id/schema",
-    optionalAuthMiddleware,
+    auth,
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
@@ -983,7 +953,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 2. GET /api/workspaces/:id/data/:componentId (Retorna dados do componente resolvidos com IAM)
   app.get(
     "/api/workspaces/:id/data/:componentId",
-    optionalAuthMiddleware,
+    auth,
     zValidator("param", z.object({ id: z.string(), componentId: z.string() })),
     zValidator(
       "query",
@@ -1084,7 +1054,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // 3. POST /api/workspaces/:id/actions/exec (Executa RPC de ação operacional com verificação de permissão)
   app.post(
     "/api/workspaces/:id/actions/exec",
-    optionalAuthMiddleware,
+    auth,
     zValidator("param", z.object({ id: z.string() })),
     zValidator(
       "json",

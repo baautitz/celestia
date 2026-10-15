@@ -4,7 +4,7 @@ import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import { WorkspaceValidator } from "../src/engine/workspace-validator.js";
 import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
-import { authHeader, createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { authHeader, createSeededUserStore, seededWorkspaces , withAuth } from "./helpers/fixtures.js";
 
 describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -21,6 +21,7 @@ describe("Validação de Datas da Área de Trabalho (Workspace Dates)", () => {
         fechamento_mes: fechamentoRecipe,
       },
     });
+    withAuth(app);
   });
 
   // ─── 1. TESTES UNITÁRIOS DO WORKSPACE VALIDATOR ────────────────────────────

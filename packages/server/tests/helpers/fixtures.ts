@@ -62,13 +62,18 @@ function user(id: string, fullname: string, username: string, email: string, rol
   };
 }
 
-export function createSeededUserStore(): MemoryUserStore {
+/** `admin: true` acrescenta `test.root` (isAdmin) para testes que só precisam de acesso total. */
+export function createSeededUserStore(opts: { admin?: boolean } = {}): MemoryUserStore {
+  const root: User[] = opts.admin
+    ? [{ ...user("usr_9000", "Test Root", "test.root", "root@farmacia.com.br", "role_vendedor", {}), isAdmin: true }]
+    : [];
   return new MemoryUserStore({
     roles,
     users: [
       user("usr_1001", "Carlos Oliveira", "carlos.admin", "carlos@farmacia.com.br", "role_admin", { inovafarma: 1, sap: 9001 }),
       user("usr_1002", "João da Silva (Vendedor 42)", "joao.silva", "joao.silva@farmacia.com.br", "role_vendedor", { inovafarma: 42, sap: 9042 }),
       user("usr_1003", "Maria Souza (Gerente)", "maria.souza", "maria.souza@farmacia.com.br", "role_operador", { inovafarma: 99, sap: 9099 }),
+      ...root,
     ],
   });
 }
@@ -108,4 +113,23 @@ export async function authHeader(
   });
   const { access_token } = (await res.json()) as { access_token: string };
   return { Authorization: `Bearer ${access_token}` };
+}
+
+interface Requester {
+  request: (input: string, init?: RequestInit) => Response | Promise<Response>;
+}
+
+/** Faz toda requisição de `app.request` sair autenticada (login lazy) quando não traz Authorization. */
+export function withAuth<T extends Requester>(app: T, username = "carlos.admin"): T {
+  const original = app.request.bind(app);
+  let header: Promise<Record<string, string>> | undefined;
+  app.request = (async (input: string, init: RequestInit = {}) => {
+    const headers = new Headers(init.headers);
+    if (!headers.has("Authorization") && !input.startsWith("/api/auth/")) {
+      header ??= authHeader({ request: original }, username);
+      headers.set("Authorization", (await header).Authorization);
+    }
+    return original(input, { ...init, headers });
+  }) as T["request"];
+  return app;
 }

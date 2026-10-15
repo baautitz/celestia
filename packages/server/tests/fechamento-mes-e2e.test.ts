@@ -3,7 +3,7 @@ import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
-import { authHeader, createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { authHeader, createSeededUserStore, seededWorkspaces , withAuth } from "./helpers/fixtures.js";
 
 describe("Bateria E2E Completa: Recipe Fechamento de Mês", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -32,6 +32,7 @@ describe("Bateria E2E Completa: Recipe Fechamento de Mês", () => {
         fechamento_mes: fechamentoRecipe,
       },
     });
+    withAuth(app);
   });
 
   it("1. [Segurança SDUI] Schema sanitizado deve ser entregue ao frontend sem expor SQL interno", async () => {

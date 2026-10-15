@@ -263,7 +263,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     tick();
     await rec("ws.create.admin_bypass", "POST", "/api/workspaces", { token: R, body: { ...wsNew, name: "Via admin" } });
     tick();
-    await rec("ws.create.anon", "POST", "/api/workspaces", { body: wsNew });
+    await rec("ws.create.401", "POST", "/api/workspaces", { body: wsNew });
     await rec("ws.update.403", "PUT", `/api/workspaces/${wsId}`, { token: V, body: { name: "Y Z" } });
     await rec("ws.update.ok", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { name: "Renomeada", endDate: "2026-03-05" } });
     await rec("ws.update.400_dates", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { endDate: "2026-01-01" } });
@@ -284,19 +284,20 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   describe("dashboards-data", () => {
     it("rotas", async () => {
     // ── recipes / lookups / dashboards
-    await rec("recipes.catalog.anon", "GET", "/api/recipes");
+    await rec("recipes.catalog.401", "GET", "/api/recipes");
     await rec("recipes.catalog.vendedor", "GET", "/api/recipes", { token: V });
     await rec("recipes.catalog.admin_bypass", "GET", "/api/recipes", { token: R });
     await rec("lookups.ok", "GET", "/api/lookups?recipe_id=fechamento_mes&field=categories_focus", { token: A });
     await rec("lookups.403", "GET", "/api/lookups?recipe_id=outro&field=x", { token: V });
     await rec("lookups.400_no_lookup", "GET", "/api/lookups?recipe_id=fechamento_mes&field=start_date", { token: A });
-    await rec("lookups.404_unknown_recipe", "GET", "/api/lookups?recipe_id=nada&field=x");
-    await rec("lookups.400_missing_query", "GET", "/api/lookups");
-    await rec("dashboards.schema.anon", "GET", "/api/dashboards/fechamento_mes/schema");
+    await rec("lookups.404_unknown_recipe", "GET", "/api/lookups?recipe_id=nada&field=x", { token: R });
+    await rec("lookups.401", "GET", "/api/lookups?recipe_id=fechamento_mes&field=categories_focus");
+    await rec("lookups.400_missing_query", "GET", "/api/lookups", { token: A });
+    await rec("dashboards.schema.401", "GET", "/api/dashboards/fechamento_mes/schema");
     await rec("dashboards.schema.vendedor", "GET", "/api/dashboards/fechamento_mes/schema", { token: V });
     await rec("dashboards.schema.operador", "GET", "/api/dashboards/fechamento_mes/schema", { token: O });
     await rec("dashboards.schema.admin_bypass", "GET", "/api/dashboards/fechamento_mes/schema", { token: R });
-    await rec("dashboards.schema.unknown_recipe", "GET", "/api/dashboards/nada/schema");
+    await rec("dashboards.schema.unknown_recipe", "GET", "/api/dashboards/nada/schema", { token: A });
 
     // ── dados dos componentes
     const q = "?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31";
@@ -305,7 +306,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("data.table.admin", "GET", `${comp}${q}&profile_id=equipe&sort_by=vendedor&order=desc&page_size=2`, { token: A });
     await rec("data.table.admin_bypass", "GET", `${comp}${q}`, { token: R });
     await rec("data.table.search", "GET", `${comp}${q}&search=a`, { token: O });
-    await rec("data.table.anon", "GET", `${comp}${q}`);
+    await rec("data.table.401", "GET", `${comp}${q}`);
     await rec("data.table.profile_without_permission", "GET", `${comp}${q}&profile_id=proprias`, { token: O });
     await rec("data.kpi.operador", "GET", `/api/workspaces/${WS}/data/kpi_total_vendas${q}`, { token: O });
     await rec("data.chart.operador", "GET", `/api/workspaces/${WS}/data/grafico_ranking_vendas${q}`, { token: O });
@@ -323,7 +324,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await exec("actions.submit.admin_bypass", R, { action_id: "adicionar_penalidade", form_data: { valor: 5, reason: "bypass" } });
     await exec("actions.read.vendedor", V, { action_id: "visualizar_penalidades" });
     await exec("actions.vendedor_mutation", V, { action_id: "adicionar_penalidade", form_data: { valor: 1, reason: "x" } });
-    await exec("actions.anon", undefined, { action_id: "visualizar_penalidades" });
+    await exec("actions.401", undefined, { action_id: "visualizar_penalidades" });
     await exec("actions.400_closed_workspace", O, { action_id: "adicionar_penalidade", form_data: { valor: 1, reason: "x" } }, WS_CLOSED);
     await exec("actions.400_unknown_component", O, { action_id: "adicionar_penalidade", component_id: "kpi_total_vendas" });
     await exec("actions.unknown_action", O, { action_id: "nao_existe" });

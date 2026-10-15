@@ -1763,22 +1763,10 @@
       "updatedAt": "<ts>"
     }
   },
-  "ws.create.anon": {
-    "status": 201,
+  "ws.create.401": {
+    "status": 401,
     "body": {
-      "id": "ws_1773144005000",
-      "recipeId": "fechamento_mes",
-      "name": "Fechamento de Mês (2026-02-01 a 2026-02-28)",
-      "startDate": "2026-02-01",
-      "endDate": "2026-02-28",
-      "status": "open",
-      "params": {
-        "categories_focus": [
-          1
-        ]
-      },
-      "createdAt": "<ts>",
-      "updatedAt": "<ts>"
+      "error": "Não autenticado: token de acesso não fornecido."
     }
   },
   "ws.update.403": {
@@ -1901,15 +1889,11 @@
       "error": "Área de Trabalho não encontrada."
     }
   },
-  "recipes.catalog.anon": {
-    "status": 200,
-    "body": [
-      {
-        "id": "fechamento_mes",
-        "name": "Fechamento de Mês",
-        "description": "Dashboard para conferência de vendas por vendedor, ajustes de salário/comissão, penalidades, gráficos comparativos e cálculo do total a receber."
-      }
-    ]
+  "recipes.catalog.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
   },
   "recipes.catalog.vendedor": {
     "status": 200,
@@ -1957,9 +1941,15 @@
     }
   },
   "lookups.404_unknown_recipe": {
-    "status": 404,
+    "status": 403,
     "body": {
-      "error": "Recipe 'nada' não encontrada."
+      "error": "Acesso negado: o usuário não possui permissão para visualizar este Modelo."
+    }
+  },
+  "lookups.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
     }
   },
   "lookups.400_missing_query": {
@@ -1991,338 +1981,10 @@
       }
     }
   },
-  "dashboards.schema.anon": {
-    "status": 200,
+  "dashboards.schema.401": {
+    "status": 401,
     "body": {
-      "id": "fechamento_mes",
-      "name": "Fechamento de Mês",
-      "description": "Dashboard para conferência de vendas por vendedor, ajustes de salário/comissão, penalidades, gráficos comparativos e cálculo do total a receber.",
-      "workspace": {
-        "params": [
-          {
-            "name": "start_date",
-            "label": "Data Inicial",
-            "type": "date",
-            "required": true
-          },
-          {
-            "name": "end_date",
-            "label": "Data Final",
-            "type": "date",
-            "required": true
-          },
-          {
-            "name": "categories_focus",
-            "label": "Categorias em Foco",
-            "type": "multi_select",
-            "required": false,
-            "lookup": {
-              "source": "inovafarma",
-              "query": "SELECT id AS value, name AS label FROM categories ORDER BY name"
-            }
-          }
-        ]
-      },
-      "actions": [
-        {
-          "id": "adicionar_penalidade",
-          "label": "Adicionar Penalidade",
-          "icon": "AlertTriangle",
-          "nature": "mutation",
-          "permission": "recipe:fechamento_mes:action:adicionar_penalidade"
-        },
-        {
-          "id": "visualizar_penalidades",
-          "label": "Ver Penalidades",
-          "icon": "Eye",
-          "nature": "read",
-          "permission": "recipe:fechamento_mes:action:visualizar_penalidades"
-        },
-        {
-          "id": "remover_penalidade",
-          "label": "Remover",
-          "icon": "Trash2",
-          "variant": "destructive",
-          "nature": "mutation",
-          "permission": "recipe:fechamento_mes:action:remover_penalidade"
-        }
-      ],
-      "ui": {
-        "layout": {
-          "type": "grid",
-          "columns": 12,
-          "gap": 16
-        },
-        "components": [
-          {
-            "id": "kpi_total_vendas",
-            "component": "stat_card",
-            "layoutProps": {
-              "colSpan": 4
-            },
-            "props": {
-              "title": "Total em Vendas",
-              "source": "inovafarma",
-              "query": "vendas",
-              "aggregate": {
-                "function": "sum",
-                "field": "venda_geral"
-              },
-              "format": "currency",
-              "icon": "DollarSign",
-              "availableProfiles": [
-                {
-                  "id": "equipe",
-                  "label": "Equipe",
-                  "bindings": [
-                    {
-                      "id": "main",
-                      "sourceName": "inovafarma",
-                      "queryName": "vendas",
-                      "optionId": "equipe",
-                      "optionLabel": "Equipe"
-                    }
-                  ]
-                }
-              ]
-            }
-          },
-          {
-            "id": "kpi_total_penalidades",
-            "component": "stat_card",
-            "layoutProps": {
-              "colSpan": 4
-            },
-            "props": {
-              "title": "Total em Penalidades",
-              "source": "penalidades_vendedor",
-              "aggregate": {
-                "function": "sum",
-                "field": "total_penalidades"
-              },
-              "format": "currency",
-              "icon": "AlertCircle",
-              "availableProfiles": []
-            }
-          },
-          {
-            "id": "kpi_total_folha",
-            "component": "stat_card",
-            "layoutProps": {
-              "colSpan": 4
-            },
-            "props": {
-              "title": "Total Líquido a Pagar",
-              "source": "inovafarma",
-              "query": "vendas",
-              "format": "currency",
-              "icon": "Wallet",
-              "availableProfiles": [
-                {
-                  "id": "equipe",
-                  "label": "Equipe",
-                  "bindings": [
-                    {
-                      "id": "main",
-                      "sourceName": "inovafarma",
-                      "queryName": "vendas",
-                      "optionId": "equipe",
-                      "optionLabel": "Equipe"
-                    }
-                  ]
-                }
-              ]
-            }
-          },
-          {
-            "id": "grafico_ranking_vendas",
-            "component": "bar_chart",
-            "layoutProps": {
-              "colSpan": 6,
-              "rowSpan": 2
-            },
-            "props": {
-              "title": "Ranking de Vendas por Vendedor",
-              "source": "inovafarma",
-              "query": "vendas",
-              "nameKey": "vendedor",
-              "valueKey": "venda_geral",
-              "limit": 5,
-              "availableProfiles": [
-                {
-                  "id": "equipe",
-                  "label": "Equipe",
-                  "bindings": [
-                    {
-                      "id": "main",
-                      "sourceName": "inovafarma",
-                      "queryName": "vendas",
-                      "optionId": "equipe",
-                      "optionLabel": "Equipe"
-                    }
-                  ]
-                }
-              ]
-            }
-          },
-          {
-            "id": "grafico_pizza_vendas",
-            "component": "pie_chart",
-            "layoutProps": {
-              "colSpan": 6,
-              "rowSpan": 2
-            },
-            "props": {
-              "title": "Distribuição das Vendas na Equipe",
-              "source": "inovafarma",
-              "query": "vendas",
-              "nameKey": "vendedor",
-              "valueKey": "venda_geral",
-              "availableProfiles": [
-                {
-                  "id": "equipe",
-                  "label": "Equipe",
-                  "bindings": [
-                    {
-                      "id": "main",
-                      "sourceName": "inovafarma",
-                      "queryName": "vendas",
-                      "optionId": "equipe",
-                      "optionLabel": "Equipe"
-                    }
-                  ]
-                }
-              ]
-            }
-          },
-          {
-            "id": "tabela_vendedores",
-            "component": "data_table",
-            "layoutProps": {
-              "colSpan": 12
-            },
-            "props": {
-              "title": "Fechamento da Folha por Vendedor",
-              "source": "inovafarma",
-              "query": "vendas",
-              "bindings": [
-                {
-                  "id": "vendas",
-                  "source": "inovafarma",
-                  "query": "vendas",
-                  "joinKey": "vendedor_id",
-                  "primary": true
-                },
-                {
-                  "id": "remuneracao",
-                  "persistence": "remuneracao_vendedor",
-                  "joinKey": "vendedor_id"
-                },
-                {
-                  "id": "penalidades",
-                  "persistence": "penalidades_vendedor",
-                  "joinKey": "vendedor_id"
-                }
-              ],
-              "profiles": [
-                {
-                  "id": "equipe",
-                  "label": "Equipe",
-                  "options": {
-                    "vendas": "equipe"
-                  }
-                },
-                {
-                  "id": "proprias",
-                  "label": "Próprias",
-                  "options": {
-                    "vendas": "proprias"
-                  }
-                }
-              ],
-              "columns": [
-                {
-                  "key": "vendedor_id",
-                  "label": "ID",
-                  "sortable": true
-                },
-                {
-                  "key": "vendedor",
-                  "label": "Vendedor",
-                  "sortable": true,
-                  "searchable": true
-                },
-                {
-                  "key": "venda_geral",
-                  "label": "Venda Geral",
-                  "format": "currency",
-                  "sortable": true
-                },
-                {
-                  "key": "remuneracao_vendedor.salario_base",
-                  "label": "Salário Base",
-                  "format": "currency",
-                  "sortable": true,
-                  "editable": true,
-                  "editType": "money",
-                  "permission": "recipe:fechamento_mes:edit"
-                },
-                {
-                  "key": "remuneracao_vendedor.comissao_ajustada",
-                  "label": "Comissão (R$)",
-                  "format": "currency",
-                  "sortable": true,
-                  "editable": true,
-                  "editType": "money",
-                  "permission": "recipe:fechamento_mes:edit"
-                },
-                {
-                  "key": "penalidades_vendedor.total_penalidades",
-                  "label": "Penalidades (-)",
-                  "format": "currency",
-                  "sortable": true
-                },
-                {
-                  "key": "total_a_receber",
-                  "label": "Total a Receber (=)",
-                  "format": "currency",
-                  "sortable": true
-                }
-              ],
-              "rowActions": [
-                "visualizar_penalidades",
-                "adicionar_penalidade"
-              ],
-              "pagination": {
-                "pageSize": 10
-              },
-              "availableProfiles": [
-                {
-                  "id": "equipe",
-                  "label": "Equipe",
-                  "bindings": [
-                    {
-                      "id": "vendas",
-                      "sourceName": "inovafarma",
-                      "queryName": "vendas",
-                      "optionId": "equipe",
-                      "optionLabel": "Equipe"
-                    },
-                    {
-                      "id": "remuneracao",
-                      "persistenceName": "remuneracao_vendedor"
-                    },
-                    {
-                      "id": "penalidades",
-                      "persistenceName": "penalidades_vendedor"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        ]
-      }
+      "error": "Não autenticado: token de acesso não fornecido."
     }
   },
   "dashboards.schema.vendedor": {
@@ -3671,70 +3333,10 @@
       }
     }
   },
-  "data.table.anon": {
-    "status": 200,
+  "data.table.401": {
+    "status": 401,
     "body": {
-      "type": "table",
-      "data": [
-        {
-          "vendedor_id": 1,
-          "vendedor": "Carlos Vendedor",
-          "venda_geral": 10000,
-          "remuneracao_vendedor.salario_base": 1500,
-          "remuneracao_vendedor.comissao_ajustada": 0,
-          "remuneracao_vendedor": {
-            "salario_base": 1500,
-            "comissao_ajustada": 0
-          },
-          "penalidades_vendedor.total_penalidades": 0,
-          "penalidades_vendedor": {
-            "items": [],
-            "total_penalidades": 0
-          },
-          "total_a_receber": 1500
-        },
-        {
-          "vendedor_id": 2,
-          "vendedor": "Ana Gerente",
-          "venda_geral": 25000,
-          "remuneracao_vendedor.salario_base": 1500,
-          "remuneracao_vendedor.comissao_ajustada": 0,
-          "remuneracao_vendedor": {
-            "salario_base": 1500,
-            "comissao_ajustada": 0
-          },
-          "penalidades_vendedor.total_penalidades": 0,
-          "penalidades_vendedor": {
-            "items": [],
-            "total_penalidades": 0
-          },
-          "total_a_receber": 1500
-        },
-        {
-          "vendedor_id": 42,
-          "vendedor": "João da Silva",
-          "venda_geral": 15000,
-          "remuneracao_vendedor.salario_base": 1500,
-          "remuneracao_vendedor.comissao_ajustada": 0,
-          "remuneracao_vendedor": {
-            "salario_base": 1500,
-            "comissao_ajustada": 0
-          },
-          "penalidades_vendedor.total_penalidades": 0,
-          "penalidades_vendedor": {
-            "items": [],
-            "total_penalidades": 0
-          },
-          "total_a_receber": 1500
-        }
-      ],
-      "meta": {
-        "page": 1,
-        "pageSize": 10,
-        "totalRecords": 3,
-        "totalPages": 1,
-        "order": "asc"
-      }
+      "error": "Não autenticado: token de acesso não fornecido."
     }
   },
   "data.table.profile_without_permission": {
@@ -4029,45 +3631,10 @@
       "error": "Acesso negado: o usuário não possui permissão para executar a ação 'Adicionar Penalidade'."
     }
   },
-  "actions.anon": {
-    "status": 200,
+  "actions.401": {
+    "status": 401,
     "body": {
-      "success": true,
-      "effects": [
-        {
-          "type": "show_table",
-          "actionId": "visualizar_penalidades",
-          "options": {
-            "title": "Penalidades de João da Silva",
-            "size": "lg",
-            "source": "penalidades_vendedor",
-            "columns": [
-              {
-                "key": "value",
-                "label": "Valor (R$)",
-                "format": "currency"
-              },
-              {
-                "key": "reason",
-                "label": "Motivo"
-              },
-              {
-                "key": "created_at",
-                "label": "Data/Hora",
-                "format": "datetime"
-              }
-            ],
-            "rowActions": [
-              "remover_penalidade"
-            ]
-          },
-          "row": {
-            "vendedor_id": 42,
-            "vendedor": "João da Silva"
-          }
-        }
-      ],
-      "newWorkspaceVersion": 2
+      "error": "Não autenticado: token de acesso não fornecido."
     }
   },
   "actions.400_closed_workspace": {

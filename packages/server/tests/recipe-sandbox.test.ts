@@ -7,7 +7,7 @@ import { ActionExecutor } from "../src/engine/action-executor.js";
 import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
-import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { createSeededUserStore, seededWorkspaces , withAuth } from "./helpers/fixtures.js";
 
 const recipeSource = (id: string, columns: string, actions = "") => `
 import { defineRecipe } from "@platform/shared";
@@ -176,6 +176,7 @@ describe("fechamento_mes carregado no isolate (fluxo completo pela API)", () => 
       }),
       recipes: { fechamento_mes: recipe },
     });
+    withAuth(app);
     const get = async (component: string) =>
       (await (await app.request(`/api/workspaces/ws_fechamento_jan_2026/data/${component}?recipe_id=fechamento_mes`)).json()) as {
         value?: number;

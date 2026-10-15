@@ -3,7 +3,7 @@ import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import type { RecipeDef } from "@platform/shared";
-import { authHeader, createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { authHeader, createSeededUserStore, seededWorkspaces , withAuth } from "./helpers/fixtures.js";
 
 describe("Hono API Integration Test (End-to-End)", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -86,7 +86,7 @@ describe("Hono API Integration Test (End-to-End)", () => {
     });
     persistenceStore = new MemoryPersistenceStore();
     app = createPlatformApp({
-      userStore: createSeededUserStore(),
+      userStore: createSeededUserStore({ admin: true }),
       workspaces: seededWorkspaces,
       sourceConnector,
       persistenceStore,
@@ -94,6 +94,7 @@ describe("Hono API Integration Test (End-to-End)", () => {
         fechamento_mes: fechamentoRecipe,
       },
     });
+    withAuth(app, "test.root");
   });
 
   it("GET /api/health deve responder status ok", async () => {
