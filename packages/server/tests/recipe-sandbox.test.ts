@@ -147,6 +147,7 @@ export default defineRecipe({
       workspaceVersion: 1,
       persistenceStore: new MemoryPersistenceStore(),
       timeoutMs,
+      userPermissions: ["*"],
     });
 
   it("estoura o tempo, encerra o isolate e o Modelo continua utilizável", async () => {

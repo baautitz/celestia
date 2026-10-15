@@ -3,6 +3,8 @@ import { createPlatformApp } from "../src/index.js";
 import { MockSourceConnector } from "../src/data/source-connector.js";
 import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
+import { hasPermission } from "../src/iam/has-permission.js";
+import { PermissionResolver } from "../src/iam/permission-resolver.js";
 import { authHeader, createSeededUserStore, seededWorkspaces, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 const WS = "ws_fechamento_jan_2026";
@@ -58,5 +60,26 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
 
   it("curinga '*' passa pela checagem de visualização do Modelo", async () => {
     expect((await app.request("/api/dashboards/fechamento_mes/schema", { headers: curinga })).status).toBe(200);
+  });
+
+  it("curinga '*' não-admin acessa rotas system:* e workspaces", async () => {
+    expect((await app.request("/api/iam/users", { headers: curinga })).status).toBe(200);
+    expect((await app.request("/api/workspaces", { headers: curinga })).status).toBe(200);
+    expect((await app.request(`/api/workspaces/${WS}/persistence/collection/c/1`, { headers: curinga })).status).toBe(200);
+  });
+
+  it("role com '*' mantém o curinga após o sync de órfãs", async () => {
+    const store = createSeededUserStore();
+    await store.createRole({ id: "role_c", name: "Curinga", description: "d", permissions: ["*", "recipe:morto:view"] });
+    await store.syncOrphanPermissions({ fechamento_mes: fechamentoRecipe });
+    expect((await store.getRole("role_c"))?.permissions).toEqual(["*"]);
+  });
+
+  it("PermissionResolver e hasPermission falham fechado sem permissões", () => {
+    expect(hasPermission(undefined, "x")).toBe(false);
+    expect(hasPermission([], "x")).toBe(false);
+    expect(hasPermission(["*"], "x")).toBe(true);
+    expect(PermissionResolver.canViewRecipe("fechamento_mes", [])).toBe(false);
+    expect(PermissionResolver.canUsePermission("x", undefined)).toBe(false);
   });
 });

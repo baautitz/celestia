@@ -64,17 +64,15 @@ export class ActionExecutor {
     }
 
     // Valida permissão do usuário para executar esta action (se fornecida lista de permissões)
-    if (userPermissions && userPermissions.length > 0) {
-      const allowed = PermissionResolver.canExecuteAction({
-        recipeId: recipe.id,
-        actionDef,
-        userPermissions,
-      });
-      if (!allowed) {
-        throw new Error(
-          `Acesso negado: o usuário não possui permissão para executar a ação '${actionDef.label || actionId}'.`
-        );
-      }
+    const allowed = PermissionResolver.canExecuteAction({
+      recipeId: recipe.id,
+      actionDef,
+      userPermissions: userPermissions ?? [],
+    });
+    if (!allowed) {
+      throw new Error(
+        `Acesso negado: o usuário não possui permissão para executar a ação '${actionDef.label || actionId}'.`
+      );
     }
 
     const effects: UIEffect[] = [];

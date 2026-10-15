@@ -1,4 +1,5 @@
 import type { Context, MiddlewareHandler } from "hono";
+import { hasPermission } from "./has-permission.js";
 import type { TokenService } from "./token-service.js";
 import type { JWTAccessPayload } from "@platform/shared";
 
@@ -49,11 +50,8 @@ export function requirePermission(...requiredPermissions: string[]): MiddlewareH
       return c.json({ error: "Acesso negado: usuário não autenticado." }, 401);
     }
 
-    const userPerms = new Set(user.permissions || []);
-    // Usuário precisa ter ao menos uma das permissões exigidas
-    const hasPermission = requiredPermissions.some((perm) => userPerms.has(perm));
-
-    if (!hasPermission) {
+    // Usuário precisa ter ao menos uma das permissões exigidas ("*" honrado, falha fechado)
+    if (!requiredPermissions.some((perm) => hasPermission(user.permissions, perm))) {
       return c.json(
         {
           error: "Acesso negado: permissões insuficientes.",
