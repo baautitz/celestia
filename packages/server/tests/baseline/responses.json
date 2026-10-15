@@ -67,7 +67,7 @@
   "auth.login.unknown_user": {
     "status": 401,
     "body": {
-      "error": "Credenciais inválidas ou usuário inativo."
+      "error": "Credenciais inválidas."
     }
   },
   "auth.login.invalid_body": {

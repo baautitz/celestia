@@ -7,6 +7,7 @@ import { MemoryPersistenceStore } from "../src/data/persistence-store.js";
 import fechamentoRecipe from "./fixtures/fechamento-mes.recipe.js";
 import { canGrant, missingGrants } from "../src/iam/can-grant.js";
 import { hasPermission } from "../src/iam/has-permission.js";
+import { PasswordService } from "../src/iam/password-service.js";
 import { PermissionResolver } from "../src/iam/permission-resolver.js";
 import { authHeader, createSeededUserStore, seededWorkspaces, TEST_PASSWORD } from "./helpers/fixtures.js";
 
@@ -390,6 +391,32 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       });
       expect(res.status).toBe(403);
       expect(((await res.json()) as { error: string }).error).toContain("visualizar este Modelo");
+    });
+  });
+
+  describe("login sem enumeração de usuários", () => {
+    it("mensagem única e hash verificado mesmo para usuário inexistente", async () => {
+      const store = createSeededUserStore();
+      const inativo = await store.createUser({ fullname: "Usuario Inativo", username: "usuario.inativo", password: TEST_PASSWORD, roleId: "role_vendedor", externals: {} });
+      await store.updateUser(inativo.id, { status: "inactive" });
+      const local = createPlatformApp({ userStore: store, recipes: { fechamento_mes: fechamentoRecipe } });
+      const spy = vi.spyOn(PasswordService, "verify");
+      const login = async (username: string, password: string) => {
+        const res = await local.request("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
+        return { status: res.status, body: (await res.json()) as { error: string } };
+      };
+      const results = [
+        await login("ninguem.existe", TEST_PASSWORD),
+        await login("carlos.admin", "SenhaErrada@1"),
+        await login("usuario.inativo", TEST_PASSWORD),
+      ];
+      for (const r of results) {
+        expect(r.status).toBe(401);
+        expect(r.body.error).toBe("Credenciais inválidas.");
+      }
+      expect(spy).toHaveBeenCalledTimes(3);
+      expect(spy.mock.calls[0][1]).not.toBe("");
+      spy.mockRestore();
     });
   });
 });

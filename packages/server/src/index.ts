@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
@@ -54,6 +55,13 @@ const IsoDateSchema = z
     const parsed = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
   }, "Data inexistente.");
+
+let dummyHash: string | undefined;
+/** Hash descartável para igualar o tempo do login quando o usuário não existe. */
+function getDummyHash(): string {
+  dummyHash ??= PasswordService.hash(`${randomUUID()}Aa1!`);
+  return dummyHash;
+}
 
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const app = new Hono();
@@ -170,12 +178,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const { username, password } = c.req.valid("json");
       const user = await userStore.findByUsername(username);
 
-      if (!user || user.status === "inactive") {
-        return c.json({ error: "Credenciais inválidas ou usuário inativo." }, 401);
-      }
-
-      const isPasswordValid = PasswordService.verify(password, user.passwordHash || "");
-      if (!isPasswordValid) {
+      // Mesma mensagem e mesmo custo (hash dummy) para inexistente, senha errada e inativo.
+      const isPasswordValid = PasswordService.verify(password, user?.passwordHash || getDummyHash());
+      if (!user || user.status === "inactive" || !isPasswordValid) {
         return c.json({ error: "Credenciais inválidas." }, 401);
       }
 
