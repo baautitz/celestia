@@ -1941,9 +1941,9 @@
     }
   },
   "lookups.404_unknown_recipe": {
-    "status": 403,
+    "status": 404,
     "body": {
-      "error": "Acesso negado: o usuário não possui permissão para visualizar este Modelo."
+      "error": "Recipe 'nada' não encontrada."
     }
   },
   "lookups.401": {

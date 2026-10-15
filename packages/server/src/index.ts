@@ -21,7 +21,7 @@ import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js
 import { PermissionCatalogEngine } from "./iam/permission-catalog.js";
 import { PermissionResolver } from "./iam/permission-resolver.js";
 import { NotFoundError } from "./engine/errors.js";
-import { createAuthMiddleware, requirePermission } from "./iam/middleware.js";
+import { createAuthMiddleware, getAuthenticatedUser, requirePermission } from "./iam/middleware.js";
 import type { WorkspaceStore } from "./data/workspace-store.js";
 import type { RecipeDef, ActionDef, JWTAccessPayload, WorkspaceRecord } from "@platform/shared";
 
@@ -142,6 +142,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (!keys.some((key) => perms.includes(key))) return c.json({ error: message }, 403);
       await next();
     };
+  const VIEW_RECIPE_DENIED = "Acesso negado: o usuário não possui permissão para visualizar este Modelo.";
   const READ_WS_DENIED = "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho.";
 
   // Helper para obter recipe registrada
@@ -831,7 +832,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 
   // 5.1 GET /api/recipes (Catálogo de Modelos disponíveis, filtrado por permissão de visualização)
   app.get("/api/recipes", auth, async (c) => {
-    const user = c.get("user") as JWTAccessPayload | undefined;
+    const user = getAuthenticatedUser(c);
 
     let catalog = Array.from(recipesMap.values()).map((recipe) => ({
       id: recipe.id,
@@ -840,8 +841,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     }));
 
     // Quem gerencia permissões precisa enxergar todos os Modelos para configurar o acesso a eles.
-    if (user && !user.permissions?.includes("system:roles:update")) {
-      catalog = catalog.filter((item) => user.permissions?.includes(`recipe:${item.id}:view`));
+    if (!user.permissions.includes("system:roles:update")) {
+      catalog = catalog.filter((item) => PermissionResolver.canViewRecipe(item.id, user.permissions));
     }
 
     return c.json(catalog);
@@ -854,9 +855,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     zValidator("query", z.object({ recipe_id: z.string(), field: z.string() })),
     async (c) => {
       const { recipe_id, field } = c.req.valid("query");
-      const user = c.get("user") as JWTAccessPayload | undefined;
+      const user = getAuthenticatedUser(c);
 
-      if (user && user.permissions && !user.permissions.includes(`recipe:${recipe_id}:view`)) {
+      if (!PermissionResolver.canViewRecipe(recipe_id, user.permissions)) {
         return c.json({ error: "Acesso negado: o usuário não possui permissão para visualizar este Modelo." }, 403);
       }
 
@@ -904,19 +905,18 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const { id } = c.req.valid("param");
       const recipe = recipesMap.get(id);
       if (!recipe) return c.json({ error: `Modelo '${id}' não encontrado.` }, 404);
-      const user = c.get("user") as JWTAccessPayload | undefined;
-
-      // Filtra actions pelas permissões do usuário se logado
-      let filteredActions = recipe.actions;
-      if (user && user.permissions) {
-        filteredActions = recipe.actions.filter((a: ActionDef) =>
-          PermissionResolver.canExecuteAction({
-            recipeId: recipe.id,
-            actionDef: a,
-            userPermissions: user.permissions,
-          })
-        );
+      const user = getAuthenticatedUser(c);
+      if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
+        return c.json({ error: VIEW_RECIPE_DENIED }, 403);
       }
+
+      const filteredActions = recipe.actions.filter((a: ActionDef) =>
+        PermissionResolver.canExecuteAction({
+          recipeId: recipe.id,
+          actionDef: a,
+          userPermissions: user.permissions,
+        })
+      );
 
       const schemaComponents = recipe.ui.components.map((component) => ({
         ...component,
@@ -925,7 +925,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           availableProfiles: DataResolver.getComponentProfileMetadata(
             recipe,
             component,
-            user?.permissions
+            user.permissions
           ),
         },
       }));
@@ -988,7 +988,10 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const query = c.req.valid("query");
       const recipe = recipesMap.get(query.recipe_id);
       if (!recipe) return c.json({ error: `Modelo '${query.recipe_id}' não encontrado.` }, 404);
-      const user = c.get("user") as JWTAccessPayload | undefined;
+      const user = getAuthenticatedUser(c);
+      if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
+        return c.json({ error: VIEW_RECIPE_DENIED }, 403);
+      }
 
       // Só aceita parâmetros declarados no Modelo; chegam à consulta sempre como bind parameters.
       let requestParams: Record<string, unknown> | undefined;
@@ -1018,14 +1021,12 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
               endDate: query.end_date,
               params: workspacesMap.get(workspaceId)?.params ?? requestParams,
             },
-            user: user
-              ? {
-                  id: user.sub,
-                  role: user.role,
-                  permissions: user.permissions,
-                  externals: user.externals,
-                }
-              : undefined,
+            user: {
+              id: user.sub,
+              role: user.role,
+              permissions: user.permissions,
+              externals: user.externals,
+            },
           },
           pagination: {
             page: query.page,
@@ -1072,7 +1073,10 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const body = c.req.valid("json");
       const recipe = recipesMap.get(body.recipe_id);
       if (!recipe) return c.json({ error: `Modelo '${body.recipe_id}' não encontrado.` }, 404);
-      const user = c.get("user") as JWTAccessPayload | undefined;
+      const user = getAuthenticatedUser(c);
+      if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
+        return c.json({ error: VIEW_RECIPE_DENIED }, 403);
+      }
 
       const component = recipe.ui.components.find((item) => item.id === body.component_id);
       if (!component || component.component !== "data_table") {
@@ -1095,6 +1099,12 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       if (!actionDef) {
         return c.json({ error: `Ação '${body.action_id}' não encontrada no Modelo '${recipe.id}'.` }, 404);
       }
+      if (!PermissionResolver.canExecuteAction({ recipeId: recipe.id, actionDef, userPermissions: user.permissions })) {
+        return c.json(
+          { error: `Acesso negado: o usuário não possui permissão para executar a ação '${actionDef.label || actionDef.id}'.` },
+          403
+        );
+      }
       const isMutation = actionDef.nature !== "read";
 
       if (ws && ws.status === "closed" && isMutation) {
@@ -1115,7 +1125,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           workspaceId,
           workspaceVersion: body.workspace_version,
           persistenceStore,
-          userPermissions: user?.permissions,
+          userPermissions: user.permissions,
         });
 
         return c.json(result);
