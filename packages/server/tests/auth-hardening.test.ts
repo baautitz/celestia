@@ -203,7 +203,9 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(((await denied.json()) as { error: string }).error).toBe("Somente administradores podem excluir ou inativar outro administrador.");
       expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, { status: "inactive" })).status).toBe(403);
       for (const patch of [{ fullname: "Outro Nome" }, { email: "x@y.com" }, { externals: { sap: 1 } }, { roleId: "role_pequeno" }]) {
-        expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, patch)).status).toBe(403);
+        const res = await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, patch);
+        expect(res.status).toBe(403);
+        expect(((await res.json()) as { error: string }).error).toBe("Somente administradores podem alterar outro administrador.");
       }
       expect((await send("PUT", `/api/iam/users/${alvoComumId}`, gestor, { status: "inactive" })).status).toBe(200);
       expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, admin, { status: "inactive" })).status).toBe(200);
@@ -340,6 +342,15 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(((await other.json()) as { error: string }).error).toBe("A Área de Trabalho não pertence a este Modelo.");
       expect((await app.request(dataUrl(WS), { headers: op })).status).toBe(200);
       expect((await app.request(dataUrl("preview"), { headers: op })).status).toBe(200);
+    });
+
+    it("exec com id preview e ação que grava: 404 (preview vale só em data)", async () => {
+      const res = await app.request("/api/workspaces/preview/actions/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...op },
+        body: JSON.stringify({ recipe_id: "fechamento_mes", component_id: "tabela_vendedores", action_id: "adicionar_penalidade", row: { vendedor_id: 1 }, form_data: { valor: 1, reason: "x" } }),
+      });
+      expect(res.status).toBe(404);
     });
 
     it("exec: workspace inexistente 404; de outro Modelo 400", async () => {

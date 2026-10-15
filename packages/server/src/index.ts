@@ -367,7 +367,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       }
       // Só admin age sobre admin: nenhum campo de um administrador é alterável por não-admin.
       if (!caller.isAdmin && (await userStore.findById(id))?.isAdmin) {
-        return c.json({ error: ADMIN_TARGET_ONLY }, 403);
+        const message = body.status === "inactive" ? ADMIN_TARGET_ONLY : "Somente administradores podem alterar outro administrador.";
+        return c.json({ error: message }, 403);
       }
       if (body.status === "inactive" && (await isLastActiveAdmin(id))) {
         return c.json({ error: LAST_ADMIN }, 409);
@@ -469,13 +470,14 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     return admins.length === 1 && admins[0].id === id;
   };
 
-  // Modo prévia: o id literal "preview" dispensa Área de Trabalho; qualquer outro id precisa existir e ser do Modelo.
+  // Modo prévia (só leitura, `allowPreview`): o id literal "preview" dispensa Área de Trabalho; fora dele o id precisa existir e ser do Modelo.
   const PREVIEW_WORKSPACE_ID = "preview";
   const workspaceScopeError = (
     workspaceId: string,
-    recipeId: string
+    recipeId: string,
+    allowPreview: boolean
   ): { error: string; status: 400 | 404 } | undefined => {
-    if (workspaceId === PREVIEW_WORKSPACE_ID) return undefined;
+    if (allowPreview && workspaceId === PREVIEW_WORKSPACE_ID) return undefined;
     const ws = workspacesMap.get(workspaceId);
     if (!ws) return { error: "Área de Trabalho não encontrada.", status: 404 };
     if (ws.recipeId !== recipeId) return { error: "A Área de Trabalho não pertence a este Modelo.", status: 400 };
@@ -1064,7 +1066,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       }
       const recipe = recipesMap.get(query.recipe_id);
       if (!recipe) return c.json({ error: `Modelo '${query.recipe_id}' não encontrado.` }, 404);
-      const scopeError = workspaceScopeError(workspaceId, recipe.id);
+      const scopeError = workspaceScopeError(workspaceId, recipe.id, true);
       if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
 
       // Só aceita parâmetros declarados no Modelo; chegam à consulta sempre como bind parameters.
@@ -1153,7 +1155,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       const recipe = recipesMap.get(body.recipe_id);
       if (!recipe) return c.json({ error: `Modelo '${body.recipe_id}' não encontrado.` }, 404);
 
-      const scopeError = workspaceScopeError(workspaceId, recipe.id);
+      const scopeError = workspaceScopeError(workspaceId, recipe.id, false);
       if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
 
       const component = recipe.ui.components.find((item) => item.id === body.component_id);

@@ -12,7 +12,7 @@ com stores em memória, relógio falso (`Date` fixo em 2026-03-10T12:00:00Z) e v
 - Todas as rotas, exceto `/api/health` e `/api/auth/*`, exigem token: sem ele respondem 401.
 - Workspaces: listar/detalhar exigem `system:workspaces:read`; conclude/reopen exigem só `close`/`reopen`; criar exige também
   `recipe:<id>:view`. Workspace/Modelo/componente/ação desconhecidos: 404. As rotas HTTP de persistência foram removidas.
-- Dados e `actions/exec` exigem que a Área de Trabalho exista e seja do Modelo (id literal `preview` dispensa); 400 se for de outro Modelo.
+- Dados e `actions/exec` exigem que a Área de Trabalho exista e seja do Modelo (o id literal `preview` dispensa só em `data`, nunca em `actions/exec`); 400 se for de outro Modelo. Em produção `NODE_ENV` deve ser exatamente `production`.
 - A permissão `recipe:<id>:view` é checada antes de resolver o Modelo (403 mesmo para inexistente).
 - Schema, dados e `actions/exec` exigem `recipe:<id>:view`; `actions/exec` também a permissão da ação (403 antes de executar).
 - Dados sem Área de Trabalho existente (prévia) continuam válidos.
