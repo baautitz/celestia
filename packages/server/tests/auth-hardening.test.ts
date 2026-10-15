@@ -352,6 +352,13 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect((await exec("ws_outro")).status).toBe(400);
     });
 
+    it("sem recipe:<id>:view: 403 também para Modelo inexistente; '*' recebe 404", async () => {
+      expect((await app.request("/api/dashboards/nada/schema", { headers: semView })).status).toBe(403);
+      expect((await app.request("/api/dashboards/fechamento_mes/schema", { headers: semView })).status).toBe(403);
+      expect((await app.request(`/api/workspaces/${WS}/data/tabela_vendedores?recipe_id=nada&start_date=2026-01-01&end_date=2026-01-31`, { headers: semView })).status).toBe(403);
+      expect((await app.request("/api/dashboards/nada/schema", { headers: op })).status).toBe(403);
+    });
+
     it("conclude e reopen exigem close/reopen; só create não basta", async () => {
       for (const action of ["conclude", "reopen"]) {
         const res = await app.request(`/api/workspaces/${WS}/${action}`, { method: "POST", headers: semView });

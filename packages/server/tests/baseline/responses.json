@@ -3090,6 +3090,12 @@
       "error": "Modelo 'nada' não encontrado."
     }
   },
+  "dashboards.schema.403_unknown_recipe_without_view": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para visualizar este Modelo."
+    }
+  },
   "data.table.operador": {
     "status": 200,
     "body": {

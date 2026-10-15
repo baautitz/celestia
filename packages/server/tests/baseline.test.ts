@@ -301,7 +301,8 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("dashboards.schema.vendedor", "GET", "/api/dashboards/fechamento_mes/schema", { token: V });
     await rec("dashboards.schema.operador", "GET", "/api/dashboards/fechamento_mes/schema", { token: O });
     await rec("dashboards.schema.admin_bypass", "GET", "/api/dashboards/fechamento_mes/schema", { token: R });
-    await rec("dashboards.schema.unknown_recipe", "GET", "/api/dashboards/nada/schema", { token: A });
+    await rec("dashboards.schema.unknown_recipe", "GET", "/api/dashboards/nada/schema", { token: R });
+    await rec("dashboards.schema.403_unknown_recipe_without_view", "GET", "/api/dashboards/nada/schema", { token: A });
 
     // ── dados dos componentes
     const q = "?recipe_id=fechamento_mes&start_date=2026-01-01&end_date=2026-01-31";

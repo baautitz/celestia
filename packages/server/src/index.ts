@@ -955,12 +955,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
+      // Permissão antes de resolver o Modelo: sem ela, existente ou não, a resposta é 403.
+      const user = getAuthenticatedUser(c);
+      if (!PermissionResolver.canViewRecipe(id, user.permissions)) {
+        return c.json({ error: denyMessage(`recipe:${id}:view`) }, 403);
+      }
       const recipe = recipesMap.get(id);
       if (!recipe) return c.json({ error: `Modelo '${id}' não encontrado.` }, 404);
-      const user = getAuthenticatedUser(c);
-      if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
-        return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
-      }
 
       const filteredActions = recipe.actions.filter((a: ActionDef) =>
         PermissionResolver.canExecuteAction({
@@ -1038,12 +1039,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const { id: workspaceId, componentId } = c.req.valid("param");
       const query = c.req.valid("query");
+      // Permissão antes de resolver o Modelo: sem ela, existente ou não, a resposta é 403.
+      const user = getAuthenticatedUser(c);
+      if (!PermissionResolver.canViewRecipe(query.recipe_id, user.permissions)) {
+        return c.json({ error: denyMessage(`recipe:${query.recipe_id}:view`) }, 403);
+      }
       const recipe = recipesMap.get(query.recipe_id);
       if (!recipe) return c.json({ error: `Modelo '${query.recipe_id}' não encontrado.` }, 404);
-      const user = getAuthenticatedUser(c);
-      if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
-        return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
-      }
       const scopeError = workspaceScopeError(workspaceId, recipe.id);
       if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
 
@@ -1125,12 +1127,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const { id: workspaceId } = c.req.valid("param");
       const body = c.req.valid("json");
+      // Permissão antes de resolver o Modelo: sem ela, existente ou não, a resposta é 403.
+      const user = getAuthenticatedUser(c);
+      if (!PermissionResolver.canViewRecipe(body.recipe_id, user.permissions)) {
+        return c.json({ error: denyMessage(`recipe:${body.recipe_id}:view`) }, 403);
+      }
       const recipe = recipesMap.get(body.recipe_id);
       if (!recipe) return c.json({ error: `Modelo '${body.recipe_id}' não encontrado.` }, 404);
-      const user = getAuthenticatedUser(c);
-      if (!PermissionResolver.canViewRecipe(recipe.id, user.permissions)) {
-        return c.json({ error: denyMessage(`recipe:${recipe.id}:view`) }, 403);
-      }
 
       const scopeError = workspaceScopeError(workspaceId, recipe.id);
       if (scopeError) return c.json({ error: scopeError.error }, scopeError.status);
