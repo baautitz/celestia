@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { parseLocalDate, toLocalISODate } from "@/lib/utils";
-import type { FormFieldDef } from "@platform/shared";
+import { parseLocalDate, toLocalISODate } from "../lib/utils";
+import type { FormFieldDef } from "../contracts/fields";
 import type { UseFormReturn } from "react-hook-form";
 import {
   FormField as FormFieldControl,
@@ -8,19 +8,19 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-} from "@platform/ui/components/form";
-import { Input } from "@platform/ui/components/input";
-import { MoneyInput } from "@platform/ui/components/money-input";
-import { Textarea } from "@platform/ui/components/textarea";
-import { Switch } from "@platform/ui/components/switch";
-import { DatePicker } from "@platform/ui/components/date-picker";
+} from "../components/form";
+import { Input } from "../components/input";
+import { MoneyInput } from "../components/money-input";
+import { Textarea } from "../components/textarea";
+import { Switch } from "../components/switch";
+import { DatePicker } from "../components/date-picker";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@platform/ui/components/select";
+} from "../components/select";
 import {
   Combobox,
   ComboboxChip,
@@ -32,20 +32,20 @@ import {
   ComboboxList,
   ComboboxValue,
   useComboboxAnchor,
-} from "@platform/ui/components/combobox";
-import { Skeleton } from "@platform/ui/components/skeleton";
-import { api } from "@/lib/api-client";
-import type { DynamicFormValues } from "@/lib/dynamic-form";
+} from "../components/combobox";
+import { Skeleton } from "../components/skeleton";
+import type { DynamicFormValues } from "./dynamic-form";
 
 interface DynamicFormFieldsProps {
   fields: FormFieldDef[];
   form: UseFormReturn<DynamicFormValues>;
-  recipeId?: string;
+  /** Resolve as opções de um campo com lookup (injetado pelo consumidor). */
+  fetchLookupOptions?: (field: FormFieldDef) => Promise<Option[]>;
 }
 
-type Option = { value: string | number; label: string };
+export type Option = { value: string | number; label: string };
 
-function useFieldOptions(field: FormFieldDef, recipeId: string) {
+function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormFieldDef) => Promise<Option[]>) {
   const hasLookup =
     ("lookup" in field && field.lookup !== undefined) ||
     (field.type === "multi_select" && "lookup" in field && (field as FormFieldDef & { lookup?: unknown }).lookup);
@@ -71,8 +71,8 @@ function useFieldOptions(field: FormFieldDef, recipeId: string) {
 
     let cancelled = false;
     setLoading(true);
-    api.lookups
-      .fetch(recipeId, field.name)
+    if (!fetchLookupOptions) return;
+    fetchLookupOptions(field)
       .then((res) => {
         if (!cancelled) setOptions(res.filter((opt) => opt.label !== ""));
       })
@@ -86,7 +86,7 @@ function useFieldOptions(field: FormFieldDef, recipeId: string) {
     return () => {
       cancelled = true;
     };
-  }, [field.name, recipeId, isLookup]);
+  }, [field.name, fetchLookupOptions, isLookup]);
 
   return { options, loading };
 }
@@ -94,7 +94,7 @@ function useFieldOptions(field: FormFieldDef, recipeId: string) {
 export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
   fields,
   form,
-  recipeId = "",
+  fetchLookupOptions,
 }) => {
   return (
     <>
@@ -277,7 +277,7 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
           }
 
           case "lookup_select": {
-            const { options, loading } = useFieldOptions(field, recipeId);
+            const { options, loading } = useFieldOptions(field, fetchLookupOptions);
 
             return (
               <FormFieldControl
@@ -318,7 +318,7 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
           }
 
           case "multi_select": {
-            const { options: rawOptions, loading } = useFieldOptions(field, recipeId);
+            const { options: rawOptions, loading } = useFieldOptions(field, fetchLookupOptions);
             const anchor = useComboboxAnchor();
             const normalized = rawOptions
               .filter((opt) => opt.label !== "")
