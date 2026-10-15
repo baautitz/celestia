@@ -129,15 +129,16 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, types }) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de ERP</FormLabel>
-                  <FormControl>
                     <Select
                       value={String(field.value ?? "")}
                       disabled={isEditMode}
                       onValueChange={(val: string | null) => handleTypeChange(val ?? "")}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
                         {types.map((t) => (
                           <SelectItem key={t.id} value={t.id}>
@@ -146,7 +147,6 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, types }) => {
                         ))}
                       </SelectContent>
                     </Select>
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
