@@ -2,7 +2,7 @@ import { hasPermission } from "./has-permission.js";
 
 const MAX_LISTED = 10;
 
-/** Chaves de `targets` que o chamador não possui ("*" cobre tudo; admin é isento; falha fechado). */
+/** Chaves de `targets` que o chamador não possui ("*" cobre tudo; admin é isento; falha fechado). Usa as permissões do token vigente (até 5 min defasado), sem revalidar no store. */
 export function missingGrants(
   callerPermissions: readonly string[] | undefined,
   targets: readonly string[],

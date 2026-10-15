@@ -347,6 +347,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
           return c.json({ error: "Você não pode remover o seu próprio acesso de administrador." }, 400);
         }
       }
+      if (body.status === "inactive" && !caller.isAdmin && (await userStore.findById(id))?.isAdmin) {
+        return c.json({ error: ADMIN_TARGET_ONLY }, 403);
+      }
       if (body.roleId) {
         const targetRole = await userStore.getRole(body.roleId);
         if (targetRole) {
@@ -402,6 +405,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // DELETE /api/iam/users/:id
   app.delete("/api/iam/users/:id", auth, requirePermission("system:users:delete"), async (c) => {
     const id = c.req.param("id");
+    if (!getAuthenticatedUser(c).isAdmin && (await userStore.findById(id))?.isAdmin) {
+      return c.json({ error: ADMIN_TARGET_ONLY }, 403);
+    }
     try {
       await userStore.deleteUser(id);
       return c.json({ success: true });
@@ -430,6 +436,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     const missing = missingGrants(caller.permissions, targets, caller.isAdmin === true);
     return missing.length > 0 ? c.json({ error: grantDeniedMessage(missing) }, 403) : undefined;
   };
+
+  const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
 
   const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
 
