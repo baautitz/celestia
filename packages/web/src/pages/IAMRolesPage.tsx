@@ -286,6 +286,7 @@ export const IAMRolesPage: React.FC = () => {
     {
       key: "permissions",
       label: "Permissões Ativas",
+      mobileLabel: "Permissões",
       value: (r) => (r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`),
       render: (r) => (
         <Badge variant="secondary">
