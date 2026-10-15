@@ -9,6 +9,8 @@ export interface WindowHandle<TResult = unknown> {
   dismiss: (reason?: CloseReason) => void
   /** Consultado só ao tentar fechar; `null` remove. */
   setDirtyCheck: (check: (() => boolean) | null) => void
+  /** Substitui o título da janela enquanto ela estiver aberta. */
+  setTitle: (title: ReactNode) => void
 }
 
 export const WindowContext = createContext<WindowHandle | null>(null)
