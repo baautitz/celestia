@@ -245,16 +245,17 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                   return (
                     <FormItem>
                       <FormLabel>{field.label}</FormLabel>
-                      <FormControl>
                         <Select
                           items={normalized.map((opt) => ({ value: String(opt.value), label: opt.label }))}
                           value={String(rhf.value ?? "")}
                           disabled={field.readOnly}
                           onValueChange={(val: string | null) => rhf.onChange(val ?? "")}
                         >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Selecione uma opção" />
-                          </SelectTrigger>
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Selecione uma opção" />
+                            </SelectTrigger>
+                          </FormControl>
                           <SelectContent alignItemWithTrigger={false} className="w-max min-w-(--anchor-width)">
                             {normalized.map((opt) => (
                               <SelectItem key={String(opt.value)} value={String(opt.value)}>
@@ -263,7 +264,6 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                             ))}
                           </SelectContent>
                         </Select>
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   );
@@ -283,29 +283,29 @@ export const DynamicFormFields: React.FC<DynamicFormFieldsProps> = ({
                 render={({ field: rhf }) => (
                   <FormItem>
                     <FormLabel>{field.label}</FormLabel>
-                    <FormControl>
-                      {loading ? (
-                        <Skeleton className="h-10 w-full" />
-                      ) : (
-                        <Select
-                          items={options.map((opt) => ({ value: String(opt.value), label: opt.label }))}
-                          value={String(rhf.value ?? "")}
-                          disabled={field.readOnly}
-                          onValueChange={(val: string | null) => rhf.onChange(val ?? "")}
-                        >
+                    {loading ? (
+                      <Skeleton className="h-10 w-full" />
+                    ) : (
+                      <Select
+                        items={options.map((opt) => ({ value: String(opt.value), label: opt.label }))}
+                        value={String(rhf.value ?? "")}
+                        disabled={field.readOnly}
+                        onValueChange={(val: string | null) => rhf.onChange(val ?? "")}
+                      >
+                        <FormControl>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Selecione uma opção" />
                           </SelectTrigger>
-                          <SelectContent alignItemWithTrigger={false} className="w-max min-w-(--anchor-width)">
-                            {options.map((opt) => (
-                              <SelectItem key={String(opt.value)} value={String(opt.value)}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </FormControl>
+                        </FormControl>
+                        <SelectContent alignItemWithTrigger={false} className="w-max min-w-(--anchor-width)">
+                          {options.map((opt) => (
+                            <SelectItem key={String(opt.value)} value={String(opt.value)}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
