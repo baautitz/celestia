@@ -166,13 +166,9 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 - Reference: `buttonVariants` sizes are `default` (`h-8`), `xs` (`h-6`), `sm` (`h-7`), `lg` (`h-9`), `icon`/`icon-xs`/`icon-sm`/`icon-lg`. Project convention uses exclusively `default` and `icon`.
 
 ### 16. Sheet Layout Convention
-- Side: always `side="right"`.
-- Content: `SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl"`.
-- Header: `SheetHeader className="p-6 border-b shrink-0"` with `SheetTitle` + `SheetDescription`.
-- Body: `ScrollArea className="flex-1 min-h-0"` wrapping a `<div className="p-6 flex flex-col gap-6">` (or `gap-4`).
-- Footer: `SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover"` with `variant="outline"` Cancel + primary submit.
-- Submit pattern: `form="role-form"` on the submit button, `<form id="role-form">` inside the scroll area.
-- Reference: `IAMRolesPage.tsx`. (Windows are being moved to `useUi()`; Sheet layout details under review: a definir.)
+- Sheets are opened via the `"sheet"` surface of `useUi().windows.open`; the window host in `@platform/ui` implements the layout, so the window component renders ONLY the body and publishes its actions with `<WindowActions>`.
+- Host layout: `SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl"`; `SheetHeader className="p-6 border-b shrink-0"` (`SheetTitle` + `SheetDescription`); `ScrollArea className="flex-1 min-h-0"` > `<div className="p-6 flex flex-col gap-6">`; `SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover"`.
+- Submit pattern: the action button uses `form="<id>"` and the body renders `<form id="<id>">`.
 
 ### 17. Permission Management Separation (System vs Recipe)
 - **System permissions** (`system:*`) are configured in the Roles page (`/iam/roles`) via the edit Sheet.
