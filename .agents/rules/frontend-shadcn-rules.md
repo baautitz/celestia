@@ -50,4 +50,4 @@ Every component rendered in the application MUST be built exclusively with offic
 
 - Authentication status is managed in `AuthContext.tsx`.
 - Page navigations after login/mutations must use `navigate("/target", { replace: true })`.
-- Imperative dialogs triggered from SDUI actions (`ui.dialog.open`, `ui.confirm`) must use the Promise-based `ImperativeUIContext.tsx`.
+- Imperative dialogs must use the Promise-based `useUi()` from `@platform/ui` (`ui.windows.open`, `ui.windows.confirm`, `ui.feedback`).
