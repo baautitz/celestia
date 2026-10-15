@@ -371,6 +371,9 @@ export default defineRecipe({
 ```bash
 # Build all packages in monorepo
 pnpm -r run build
+# Note: server depends on shared and core via dist; `pnpm -r` orders them topologically.
+# Building one package alone: run `pnpm --filter @platform/shared build` and
+# `pnpm --filter @platform/core build` before the server (build/test/dev).
 
 # Run entire Vitest test suite
 pnpm test
