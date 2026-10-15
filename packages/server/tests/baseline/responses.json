@@ -1,0 +1,4933 @@
+{
+  "health.get": {
+    "status": 200,
+    "body": {
+      "status": "ok",
+      "timestamp": "<ts>"
+    }
+  },
+  "auth.login.ok": {
+    "status": 200,
+    "body": {
+      "accessToken": "<token>",
+      "refreshToken": "<token>",
+      "expiresIn": 300,
+      "access_token": "<token>",
+      "refresh_token": "<token>",
+      "expires_in": 300,
+      "user": {
+        "sub": "usr_1001",
+        "username": "carlos.admin",
+        "fullname": "Carlos Oliveira",
+        "email": "carlos@farmacia.com.br",
+        "role": "role_admin",
+        "permissions": [
+          "system:users:create",
+          "system:users:read",
+          "system:users:update",
+          "system:users:reset_password",
+          "system:users:delete",
+          "system:roles:create",
+          "system:roles:read",
+          "system:roles:update",
+          "system:roles:delete",
+          "system:workspaces:create",
+          "system:workspaces:update",
+          "system:workspaces:delete",
+          "system:workspaces:close",
+          "system:workspaces:reopen",
+          "system:sources:manage",
+          "system:recipes:read",
+          "system:recipes:manage",
+          "system:audit:read",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ],
+        "externals": {
+          "inovafarma": 1,
+          "sap": 9001
+        },
+        "iat": 1773144000,
+        "exp": 1773144300
+      }
+    },
+    "cookie": "refresh_token=<token>; Max-Age=604800; Path=/api/auth; HttpOnly; SameSite=Lax"
+  },
+  "auth.login.bad_password": {
+    "status": 401,
+    "body": {
+      "error": "Credenciais inválidas."
+    }
+  },
+  "auth.login.unknown_user": {
+    "status": 401,
+    "body": {
+      "error": "Credenciais inválidas ou usuário inativo."
+    }
+  },
+  "auth.login.invalid_body": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "undefined",
+            "path": [
+              "password"
+            ],
+            "message": "Required"
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "auth.login.admin_bypass": {
+    "status": 200,
+    "body": {
+      "accessToken": "<token>",
+      "refreshToken": "<token>",
+      "expiresIn": 300,
+      "access_token": "<token>",
+      "refresh_token": "<token>",
+      "expires_in": 300,
+      "user": {
+        "sub": "usr_1773144000000",
+        "username": "root.admin",
+        "fullname": "Root Admin",
+        "role": "role_vendedor",
+        "permissions": [
+          "*",
+          "system:users:create",
+          "system:users:read",
+          "system:users:update",
+          "system:users:reset_password",
+          "system:users:delete",
+          "system:roles:create",
+          "system:roles:read",
+          "system:roles:update",
+          "system:roles:delete",
+          "system:workspaces:create",
+          "system:workspaces:update",
+          "system:workspaces:delete",
+          "system:workspaces:close",
+          "system:workspaces:reopen",
+          "system:sources:manage",
+          "system:recipes:read",
+          "system:recipes:manage",
+          "system:audit:read",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ],
+        "isAdmin": true,
+        "externals": {},
+        "iat": 1773144000,
+        "exp": 1773144300
+      }
+    },
+    "cookie": "refresh_token=<token>; Max-Age=604800; Path=/api/auth; HttpOnly; SameSite=Lax"
+  },
+  "auth.refresh.body": {
+    "status": 200,
+    "body": {
+      "accessToken": "<token>",
+      "refreshToken": "<token>",
+      "expiresIn": 300,
+      "access_token": "<token>",
+      "refresh_token": "<token>",
+      "expires_in": 300,
+      "user": {
+        "sub": "usr_1001",
+        "username": "carlos.admin",
+        "fullname": "Carlos Oliveira",
+        "email": "carlos@farmacia.com.br",
+        "role": "role_admin",
+        "permissions": [
+          "system:users:create",
+          "system:users:read",
+          "system:users:update",
+          "system:users:reset_password",
+          "system:users:delete",
+          "system:roles:create",
+          "system:roles:read",
+          "system:roles:update",
+          "system:roles:delete",
+          "system:workspaces:create",
+          "system:workspaces:update",
+          "system:workspaces:delete",
+          "system:workspaces:close",
+          "system:workspaces:reopen",
+          "system:sources:manage",
+          "system:recipes:read",
+          "system:recipes:manage",
+          "system:audit:read",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ],
+        "externals": {
+          "inovafarma": 1,
+          "sap": 9001
+        },
+        "iat": 1773144000,
+        "exp": 1773144300
+      }
+    },
+    "cookie": "refresh_token=<token>; Max-Age=604800; Path=/api/auth; HttpOnly; SameSite=Lax"
+  },
+  "auth.refresh.cookie": {
+    "status": 200,
+    "body": {
+      "accessToken": "<token>",
+      "refreshToken": "<token>",
+      "expiresIn": 300,
+      "access_token": "<token>",
+      "refresh_token": "<token>",
+      "expires_in": 300,
+      "user": {
+        "sub": "usr_1001",
+        "username": "carlos.admin",
+        "fullname": "Carlos Oliveira",
+        "email": "carlos@farmacia.com.br",
+        "role": "role_admin",
+        "permissions": [
+          "system:users:create",
+          "system:users:read",
+          "system:users:update",
+          "system:users:reset_password",
+          "system:users:delete",
+          "system:roles:create",
+          "system:roles:read",
+          "system:roles:update",
+          "system:roles:delete",
+          "system:workspaces:create",
+          "system:workspaces:update",
+          "system:workspaces:delete",
+          "system:workspaces:close",
+          "system:workspaces:reopen",
+          "system:sources:manage",
+          "system:recipes:read",
+          "system:recipes:manage",
+          "system:audit:read",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ],
+        "externals": {
+          "inovafarma": 1,
+          "sap": 9001
+        },
+        "iat": 1773144000,
+        "exp": 1773144300
+      }
+    },
+    "cookie": "refresh_token=<token>; Max-Age=604800; Path=/api/auth; HttpOnly; SameSite=Lax"
+  },
+  "auth.refresh.missing": {
+    "status": 401,
+    "body": {
+      "error": "Refresh token não fornecido."
+    }
+  },
+  "auth.refresh.invalid": {
+    "status": 401,
+    "body": {
+      "error": "invalid JWT token: lixo"
+    }
+  },
+  "auth.refresh.access_token_as_refresh": {
+    "status": 401,
+    "body": {
+      "error": "Token de renovação inválido."
+    }
+  },
+  "auth.logout": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Sessão encerrada com sucesso."
+    },
+    "cookie": "refresh_token=; Max-Age=0; Path=/api/auth"
+  },
+  "auth.me.ok": {
+    "status": 200,
+    "body": {
+      "sub": "usr_1001",
+      "username": "carlos.admin",
+      "fullname": "Carlos Oliveira",
+      "email": "carlos@farmacia.com.br",
+      "role": "role_admin",
+      "permissions": [
+        "system:users:create",
+        "system:users:read",
+        "system:users:update",
+        "system:users:reset_password",
+        "system:users:delete",
+        "system:roles:create",
+        "system:roles:read",
+        "system:roles:update",
+        "system:roles:delete",
+        "system:workspaces:create",
+        "system:workspaces:update",
+        "system:workspaces:delete",
+        "system:workspaces:close",
+        "system:workspaces:reopen",
+        "system:sources:manage",
+        "system:recipes:read",
+        "system:recipes:manage",
+        "system:audit:read",
+        "recipe:fechamento_mes:view",
+        "recipe:fechamento_mes:query:vendas_equipe",
+        "recipe:fechamento_mes:query:vendas_proprias",
+        "recipe:fechamento_mes:action:adicionar_penalidade",
+        "recipe:fechamento_mes:action:visualizar_penalidades",
+        "recipe:fechamento_mes:action:remover_penalidade"
+      ],
+      "externals": {
+        "inovafarma": 1,
+        "sap": 9001
+      },
+      "iat": 1773144000,
+      "exp": 1773144300
+    }
+  },
+  "auth.me.admin_bypass": {
+    "status": 200,
+    "body": {
+      "sub": "usr_1773144000000",
+      "username": "root.admin",
+      "fullname": "Root Admin",
+      "role": "role_vendedor",
+      "permissions": [
+        "*",
+        "system:users:create",
+        "system:users:read",
+        "system:users:update",
+        "system:users:reset_password",
+        "system:users:delete",
+        "system:roles:create",
+        "system:roles:read",
+        "system:roles:update",
+        "system:roles:delete",
+        "system:workspaces:create",
+        "system:workspaces:update",
+        "system:workspaces:delete",
+        "system:workspaces:close",
+        "system:workspaces:reopen",
+        "system:sources:manage",
+        "system:recipes:read",
+        "system:recipes:manage",
+        "system:audit:read",
+        "recipe:fechamento_mes:view",
+        "recipe:fechamento_mes:query:vendas_equipe",
+        "recipe:fechamento_mes:query:vendas_proprias",
+        "recipe:fechamento_mes:action:adicionar_penalidade",
+        "recipe:fechamento_mes:action:visualizar_penalidades",
+        "recipe:fechamento_mes:action:remover_penalidade"
+      ],
+      "isAdmin": true,
+      "externals": {},
+      "iat": 1773144000,
+      "exp": 1773144300
+    }
+  },
+  "auth.me.401_no_token": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "auth.me.401_bad_token": {
+    "status": 401,
+    "body": {
+      "error": "Falha na autenticação: invalid JWT token: lixo"
+    }
+  },
+  "iam.catalog.ok": {
+    "status": 200,
+    "body": {
+      "system": {
+        "users": [
+          {
+            "key": "system:users:create",
+            "label": "Criar Usuários",
+            "description": "Permite cadastrar novos operadores e administradores no sistema.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:read",
+            "label": "Visualizar Usuários",
+            "description": "Permite listar e visualizar o perfil e dados cadastrais dos usuários.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:update",
+            "label": "Editar Usuários",
+            "description": "Permite alterar nome, cargo e mapeamento de IDs de ERP (externals) de usuários.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:reset_password",
+            "label": "Redefinir Senha de Usuários",
+            "description": "Permite ao administrador definir uma nova senha para qualquer usuário.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:delete",
+            "label": "Inativar/Excluir Usuários",
+            "description": "Permite desativar ou excluir contas de usuários.",
+            "module": "users"
+          }
+        ],
+        "roles": [
+          {
+            "key": "system:roles:create",
+            "label": "Criar Grupos de Acesso",
+            "description": "Permite criar novos perfis/cargos de permissão.",
+            "module": "roles"
+          },
+          {
+            "key": "system:roles:read",
+            "label": "Visualizar Grupos e Catálogo",
+            "description": "Permite listar perfis de acesso e inspecionar o catálogo de permissões.",
+            "module": "roles"
+          },
+          {
+            "key": "system:roles:update",
+            "label": "Editar Permissões do Grupo",
+            "description": "Permite alterar quais permissões do sistema e recipes pertencem a cada grupo.",
+            "module": "roles"
+          },
+          {
+            "key": "system:roles:delete",
+            "label": "Excluir Grupos de Acesso",
+            "description": "Permite remover perfis que não estejam em uso.",
+            "module": "roles"
+          }
+        ],
+        "workspaces": [
+          {
+            "key": "system:workspaces:create",
+            "label": "Criar Áreas de Trabalho",
+            "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:update",
+            "label": "Editar Áreas de Trabalho",
+            "description": "Permite alterar o título, o período e os parâmetros de áreas de trabalho existentes.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:delete",
+            "label": "Excluir Áreas de Trabalho",
+            "description": "Permite excluir instâncias de áreas de trabalho.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:close",
+            "label": "Concluir/Travar Áreas de Trabalho",
+            "description": "Permite finalizar e travar áreas de trabalho contra novas edições.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:reopen",
+            "label": "Reabrir Áreas de Trabalho",
+            "description": "Permite reabrir áreas de trabalho concluídas para novas edições e ações.",
+            "module": "workspaces"
+          }
+        ],
+        "sources": [
+          {
+            "key": "system:sources:manage",
+            "label": "Gerenciar Fontes de Dados",
+            "description": "Permite configurar e testar conexões com ERPs externos (SQL Server, Postgres).",
+            "module": "sources"
+          }
+        ],
+        "recipes": [
+          {
+            "key": "system:recipes:read",
+            "label": "Visualizar Código dos Modelos",
+            "description": "Permite listar os Modelos cadastrados e ler o código-fonte de cada um.",
+            "module": "recipes"
+          },
+          {
+            "key": "system:recipes:manage",
+            "label": "Gerenciar Modelos",
+            "description": "Permite criar, editar e excluir Modelos (o código é compilado e validado ao salvar).",
+            "module": "recipes"
+          }
+        ],
+        "audit": [
+          {
+            "key": "system:audit:read",
+            "label": "Consultar Logs de Auditoria",
+            "description": "Permite visualizar o histórico de mutações e ações disparadas na plataforma.",
+            "module": "audit"
+          }
+        ]
+      },
+      "recipes": [
+        {
+          "recipeId": "fechamento_mes",
+          "recipeName": "Fechamento de Mês",
+          "viewPermission": {
+            "key": "recipe:fechamento_mes:view",
+            "label": "Acessar Modelo (Fechamento de Mês)",
+            "description": "Permite visualizar e abrir áreas de trabalho do modelo 'Fechamento de Mês'."
+          },
+          "queryPermissions": [
+            {
+              "key": "recipe:fechamento_mes:query:vendas_equipe",
+              "label": "Consulta INOVAFARMA: vendas — Equipe",
+              "description": "Permite usar a option 'equipe' da query 'vendas' na fonte 'inovafarma'."
+            },
+            {
+              "key": "recipe:fechamento_mes:query:vendas_proprias",
+              "label": "Consulta INOVAFARMA: vendas — Próprias",
+              "description": "Permite usar a option 'proprias' da query 'vendas' na fonte 'inovafarma'."
+            }
+          ],
+          "actionPermissions": [
+            {
+              "key": "recipe:fechamento_mes:action:adicionar_penalidade",
+              "label": "Ação: Adicionar Penalidade",
+              "description": "Permite executar o botão/ação operacional 'Adicionar Penalidade'."
+            },
+            {
+              "key": "recipe:fechamento_mes:action:visualizar_penalidades",
+              "label": "Ação: Ver Penalidades",
+              "description": "Permite executar o botão/ação operacional 'Ver Penalidades'."
+            },
+            {
+              "key": "recipe:fechamento_mes:action:remover_penalidade",
+              "label": "Ação: Remover",
+              "description": "Permite executar o botão/ação operacional 'Remover'."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "iam.catalog.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.catalog.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:roles:read"
+      ]
+    }
+  },
+  "iam.catalog.admin_bypass": {
+    "status": 200,
+    "body": {
+      "system": {
+        "users": [
+          {
+            "key": "system:users:create",
+            "label": "Criar Usuários",
+            "description": "Permite cadastrar novos operadores e administradores no sistema.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:read",
+            "label": "Visualizar Usuários",
+            "description": "Permite listar e visualizar o perfil e dados cadastrais dos usuários.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:update",
+            "label": "Editar Usuários",
+            "description": "Permite alterar nome, cargo e mapeamento de IDs de ERP (externals) de usuários.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:reset_password",
+            "label": "Redefinir Senha de Usuários",
+            "description": "Permite ao administrador definir uma nova senha para qualquer usuário.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:delete",
+            "label": "Inativar/Excluir Usuários",
+            "description": "Permite desativar ou excluir contas de usuários.",
+            "module": "users"
+          }
+        ],
+        "roles": [
+          {
+            "key": "system:roles:create",
+            "label": "Criar Grupos de Acesso",
+            "description": "Permite criar novos perfis/cargos de permissão.",
+            "module": "roles"
+          },
+          {
+            "key": "system:roles:read",
+            "label": "Visualizar Grupos e Catálogo",
+            "description": "Permite listar perfis de acesso e inspecionar o catálogo de permissões.",
+            "module": "roles"
+          },
+          {
+            "key": "system:roles:update",
+            "label": "Editar Permissões do Grupo",
+            "description": "Permite alterar quais permissões do sistema e recipes pertencem a cada grupo.",
+            "module": "roles"
+          },
+          {
+            "key": "system:roles:delete",
+            "label": "Excluir Grupos de Acesso",
+            "description": "Permite remover perfis que não estejam em uso.",
+            "module": "roles"
+          }
+        ],
+        "workspaces": [
+          {
+            "key": "system:workspaces:create",
+            "label": "Criar Áreas de Trabalho",
+            "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:update",
+            "label": "Editar Áreas de Trabalho",
+            "description": "Permite alterar o título, o período e os parâmetros de áreas de trabalho existentes.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:delete",
+            "label": "Excluir Áreas de Trabalho",
+            "description": "Permite excluir instâncias de áreas de trabalho.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:close",
+            "label": "Concluir/Travar Áreas de Trabalho",
+            "description": "Permite finalizar e travar áreas de trabalho contra novas edições.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:reopen",
+            "label": "Reabrir Áreas de Trabalho",
+            "description": "Permite reabrir áreas de trabalho concluídas para novas edições e ações.",
+            "module": "workspaces"
+          }
+        ],
+        "sources": [
+          {
+            "key": "system:sources:manage",
+            "label": "Gerenciar Fontes de Dados",
+            "description": "Permite configurar e testar conexões com ERPs externos (SQL Server, Postgres).",
+            "module": "sources"
+          }
+        ],
+        "recipes": [
+          {
+            "key": "system:recipes:read",
+            "label": "Visualizar Código dos Modelos",
+            "description": "Permite listar os Modelos cadastrados e ler o código-fonte de cada um.",
+            "module": "recipes"
+          },
+          {
+            "key": "system:recipes:manage",
+            "label": "Gerenciar Modelos",
+            "description": "Permite criar, editar e excluir Modelos (o código é compilado e validado ao salvar).",
+            "module": "recipes"
+          }
+        ],
+        "audit": [
+          {
+            "key": "system:audit:read",
+            "label": "Consultar Logs de Auditoria",
+            "description": "Permite visualizar o histórico de mutações e ações disparadas na plataforma.",
+            "module": "audit"
+          }
+        ]
+      },
+      "recipes": [
+        {
+          "recipeId": "fechamento_mes",
+          "recipeName": "Fechamento de Mês",
+          "viewPermission": {
+            "key": "recipe:fechamento_mes:view",
+            "label": "Acessar Modelo (Fechamento de Mês)",
+            "description": "Permite visualizar e abrir áreas de trabalho do modelo 'Fechamento de Mês'."
+          },
+          "queryPermissions": [
+            {
+              "key": "recipe:fechamento_mes:query:vendas_equipe",
+              "label": "Consulta INOVAFARMA: vendas — Equipe",
+              "description": "Permite usar a option 'equipe' da query 'vendas' na fonte 'inovafarma'."
+            },
+            {
+              "key": "recipe:fechamento_mes:query:vendas_proprias",
+              "label": "Consulta INOVAFARMA: vendas — Próprias",
+              "description": "Permite usar a option 'proprias' da query 'vendas' na fonte 'inovafarma'."
+            }
+          ],
+          "actionPermissions": [
+            {
+              "key": "recipe:fechamento_mes:action:adicionar_penalidade",
+              "label": "Ação: Adicionar Penalidade",
+              "description": "Permite executar o botão/ação operacional 'Adicionar Penalidade'."
+            },
+            {
+              "key": "recipe:fechamento_mes:action:visualizar_penalidades",
+              "label": "Ação: Ver Penalidades",
+              "description": "Permite executar o botão/ação operacional 'Ver Penalidades'."
+            },
+            {
+              "key": "recipe:fechamento_mes:action:remover_penalidade",
+              "label": "Ação: Remover",
+              "description": "Permite executar o botão/ação operacional 'Remover'."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "iam.sources.ok": {
+    "status": 200,
+    "body": []
+  },
+  "iam.sources.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.sources.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:users:read"
+      ]
+    }
+  },
+  "iam.sources.admin_bypass": {
+    "status": 200,
+    "body": []
+  },
+  "iam.users.ok": {
+    "status": 200,
+    "body": [
+      {
+        "id": "usr_1001",
+        "fullname": "Carlos Oliveira",
+        "username": "carlos.admin",
+        "email": "carlos@farmacia.com.br",
+        "roleId": "role_admin",
+        "externals": {
+          "inovafarma": 1,
+          "sap": 9001
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      },
+      {
+        "id": "usr_1002",
+        "fullname": "João da Silva (Vendedor 42)",
+        "username": "joao.silva",
+        "email": "joao.silva@farmacia.com.br",
+        "roleId": "role_vendedor",
+        "externals": {
+          "inovafarma": 42,
+          "sap": 9042
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      },
+      {
+        "id": "usr_1003",
+        "fullname": "Maria Souza (Gerente)",
+        "username": "maria.souza",
+        "email": "maria.souza@farmacia.com.br",
+        "roleId": "role_operador",
+        "externals": {
+          "inovafarma": 99,
+          "sap": 9099
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      },
+      {
+        "id": "usr_1773144000000",
+        "fullname": "Root Admin",
+        "username": "root.admin",
+        "roleId": "role_vendedor",
+        "externals": {},
+        "status": "active",
+        "createdAt": "<ts>",
+        "isAdmin": true
+      }
+    ]
+  },
+  "iam.users.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.users.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:users:read"
+      ]
+    }
+  },
+  "iam.users.admin_bypass": {
+    "status": 200,
+    "body": [
+      {
+        "id": "usr_1001",
+        "fullname": "Carlos Oliveira",
+        "username": "carlos.admin",
+        "email": "carlos@farmacia.com.br",
+        "roleId": "role_admin",
+        "externals": {
+          "inovafarma": 1,
+          "sap": 9001
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      },
+      {
+        "id": "usr_1002",
+        "fullname": "João da Silva (Vendedor 42)",
+        "username": "joao.silva",
+        "email": "joao.silva@farmacia.com.br",
+        "roleId": "role_vendedor",
+        "externals": {
+          "inovafarma": 42,
+          "sap": 9042
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      },
+      {
+        "id": "usr_1003",
+        "fullname": "Maria Souza (Gerente)",
+        "username": "maria.souza",
+        "email": "maria.souza@farmacia.com.br",
+        "roleId": "role_operador",
+        "externals": {
+          "inovafarma": 99,
+          "sap": 9099
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      },
+      {
+        "id": "usr_1773144000000",
+        "fullname": "Root Admin",
+        "username": "root.admin",
+        "roleId": "role_vendedor",
+        "externals": {},
+        "status": "active",
+        "createdAt": "<ts>",
+        "isAdmin": true
+      }
+    ]
+  },
+  "iam.roles.ok": {
+    "status": 200,
+    "body": [
+      {
+        "id": "role_admin",
+        "name": "Administrador",
+        "description": "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
+        "permissions": [
+          "system:users:create",
+          "system:users:read",
+          "system:users:update",
+          "system:users:reset_password",
+          "system:users:delete",
+          "system:roles:create",
+          "system:roles:read",
+          "system:roles:update",
+          "system:roles:delete",
+          "system:workspaces:create",
+          "system:workspaces:update",
+          "system:workspaces:delete",
+          "system:workspaces:close",
+          "system:workspaces:reopen",
+          "system:sources:manage",
+          "system:recipes:read",
+          "system:recipes:manage",
+          "system:audit:read",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ]
+      },
+      {
+        "id": "role_operador",
+        "name": "Operador de Fechamento",
+        "description": "Acesso ao fechamento geral de vendas e aplicação de penalidades.",
+        "permissions": [
+          "system:workspaces:create",
+          "system:workspaces:close",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ]
+      },
+      {
+        "id": "role_vendedor",
+        "name": "Vendedor",
+        "description": "Acesso exclusivo ao relatório individual de suas próprias vendas.",
+        "permissions": [
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:visualizar_penalidades"
+        ]
+      }
+    ]
+  },
+  "iam.roles.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.roles.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:roles:read"
+      ]
+    }
+  },
+  "iam.roles.admin_bypass": {
+    "status": 200,
+    "body": [
+      {
+        "id": "role_admin",
+        "name": "Administrador",
+        "description": "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
+        "permissions": [
+          "system:users:create",
+          "system:users:read",
+          "system:users:update",
+          "system:users:reset_password",
+          "system:users:delete",
+          "system:roles:create",
+          "system:roles:read",
+          "system:roles:update",
+          "system:roles:delete",
+          "system:workspaces:create",
+          "system:workspaces:update",
+          "system:workspaces:delete",
+          "system:workspaces:close",
+          "system:workspaces:reopen",
+          "system:sources:manage",
+          "system:recipes:read",
+          "system:recipes:manage",
+          "system:audit:read",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ]
+      },
+      {
+        "id": "role_operador",
+        "name": "Operador de Fechamento",
+        "description": "Acesso ao fechamento geral de vendas e aplicação de penalidades.",
+        "permissions": [
+          "system:workspaces:create",
+          "system:workspaces:close",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ]
+      },
+      {
+        "id": "role_vendedor",
+        "name": "Vendedor",
+        "description": "Acesso exclusivo ao relatório individual de suas próprias vendas.",
+        "permissions": [
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:visualizar_penalidades"
+        ]
+      }
+    ]
+  },
+  "iam.users.create.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.users.create.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:users:create"
+      ]
+    }
+  },
+  "iam.users.create.400_weak_password": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "too_small",
+            "minimum": 8,
+            "type": "string",
+            "inclusive": true,
+            "exact": false,
+            "message": "A senha deve conter no mínimo 8 caracteres.",
+            "path": [
+              "password"
+            ]
+          },
+          {
+            "validation": "regex",
+            "code": "invalid_string",
+            "message": "A senha deve conter ao menos uma letra maiúscula.",
+            "path": [
+              "password"
+            ]
+          },
+          {
+            "validation": "regex",
+            "code": "invalid_string",
+            "message": "A senha deve conter ao menos um número.",
+            "path": [
+              "password"
+            ]
+          },
+          {
+            "validation": "regex",
+            "code": "invalid_string",
+            "message": "A senha deve conter ao menos um caractere especial (!@#$%^&*...).",
+            "path": [
+              "password"
+            ]
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "iam.users.create.400_short_username": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "too_small",
+            "minimum": 3,
+            "type": "string",
+            "inclusive": true,
+            "exact": false,
+            "message": "String must contain at least 3 character(s)",
+            "path": [
+              "username"
+            ]
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "iam.users.create.ok": {
+    "status": 201,
+    "body": {
+      "id": "usr_1773144001000",
+      "fullname": "Novo Usuario",
+      "username": "novo.user",
+      "roleId": "role_vendedor",
+      "externals": {
+        "inovafarma": 7
+      },
+      "status": "active",
+      "createdAt": "<ts>"
+    }
+  },
+  "iam.users.create.400_duplicate": {
+    "status": 400,
+    "body": {
+      "error": "Usuário 'novo.user' já existe."
+    }
+  },
+  "iam.users.create.unknown_role": {
+    "status": 400,
+    "body": {
+      "error": "Role 'inexistente' não encontrada."
+    }
+  },
+  "iam.users.create.admin_bypass": {
+    "status": 201,
+    "body": {
+      "id": "usr_1773144002000",
+      "fullname": "Novo Usuario",
+      "username": "novo.root",
+      "roleId": "role_vendedor",
+      "externals": {
+        "inovafarma": 7
+      },
+      "status": "active",
+      "createdAt": "<ts>"
+    }
+  },
+  "iam.users.update.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.users.update.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:users:update"
+      ]
+    }
+  },
+  "iam.users.update.ok": {
+    "status": 200,
+    "body": {
+      "id": "usr_1773144001000",
+      "fullname": "Nome Editado",
+      "username": "novo.user",
+      "email": "a@b.com",
+      "roleId": "role_vendedor",
+      "externals": {
+        "inovafarma": 7
+      },
+      "status": "inactive",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "iam.users.update.400_invalid_status": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "received": "foo",
+            "code": "invalid_enum_value",
+            "options": [
+              "active",
+              "inactive"
+            ],
+            "path": [
+              "status"
+            ],
+            "message": "Invalid enum value. Expected 'active' | 'inactive', received 'foo'"
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "iam.users.update.400_unknown_user": {
+    "status": 400,
+    "body": {
+      "error": "Usuário 'nao_existe' não encontrado."
+    }
+  },
+  "iam.users.update.403_isadmin_by_non_admin": {
+    "status": 403,
+    "body": {
+      "error": "Somente administradores podem alterar o acesso de administrador."
+    }
+  },
+  "iam.users.update.ok_isadmin_by_admin": {
+    "status": 200,
+    "body": {
+      "id": "usr_1773144001000",
+      "fullname": "Nome Editado",
+      "username": "novo.user",
+      "email": "a@b.com",
+      "roleId": "role_vendedor",
+      "externals": {
+        "inovafarma": 7
+      },
+      "status": "inactive",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "isAdmin": true
+    }
+  },
+  "iam.users.update.400_self_demote": {
+    "status": 400,
+    "body": {
+      "error": "Você não pode remover o seu próprio acesso de administrador."
+    }
+  },
+  "iam.users.reset.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.users.reset.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:users:reset_password"
+      ]
+    }
+  },
+  "iam.users.reset.400_weak": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "too_small",
+            "minimum": 8,
+            "type": "string",
+            "inclusive": true,
+            "exact": false,
+            "message": "A senha deve conter no mínimo 8 caracteres.",
+            "path": [
+              "newPassword"
+            ]
+          },
+          {
+            "validation": "regex",
+            "code": "invalid_string",
+            "message": "A senha deve conter ao menos uma letra maiúscula.",
+            "path": [
+              "newPassword"
+            ]
+          },
+          {
+            "validation": "regex",
+            "code": "invalid_string",
+            "message": "A senha deve conter ao menos um número.",
+            "path": [
+              "newPassword"
+            ]
+          },
+          {
+            "validation": "regex",
+            "code": "invalid_string",
+            "message": "A senha deve conter ao menos um caractere especial (!@#$%^&*...).",
+            "path": [
+              "newPassword"
+            ]
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "iam.users.reset.ok": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Senha redefinida com sucesso."
+    }
+  },
+  "iam.users.reset.unknown_user": {
+    "status": 400,
+    "body": {
+      "error": "Usuário 'nao_existe' não encontrado."
+    }
+  },
+  "iam.users.reset.admin_bypass": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Senha redefinida com sucesso."
+    }
+  },
+  "iam.users.delete.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.users.delete.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:users:delete"
+      ]
+    }
+  },
+  "iam.users.delete.ok": {
+    "status": 200,
+    "body": {
+      "success": true
+    }
+  },
+  "iam.users.delete.again": {
+    "status": 400,
+    "body": {
+      "error": "Usuário 'usr_1773144001000' não encontrado."
+    }
+  },
+  "iam.users.list.after": {
+    "status": 200,
+    "body": [
+      {
+        "id": "usr_1001",
+        "fullname": "Carlos Oliveira",
+        "username": "carlos.admin",
+        "email": "carlos@farmacia.com.br",
+        "roleId": "role_admin",
+        "externals": {
+          "inovafarma": 1,
+          "sap": 9001
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      },
+      {
+        "id": "usr_1002",
+        "fullname": "João da Silva (Vendedor 42)",
+        "username": "joao.silva",
+        "email": "joao.silva@farmacia.com.br",
+        "roleId": "role_vendedor",
+        "externals": {
+          "inovafarma": 42,
+          "sap": 9042
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      },
+      {
+        "id": "usr_1003",
+        "fullname": "Maria Souza (Gerente)",
+        "username": "maria.souza",
+        "email": "maria.souza@farmacia.com.br",
+        "roleId": "role_operador",
+        "externals": {
+          "inovafarma": 99,
+          "sap": 9099
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      },
+      {
+        "id": "usr_1773144000000",
+        "fullname": "Root Admin",
+        "username": "root.admin",
+        "roleId": "role_vendedor",
+        "externals": {},
+        "status": "active",
+        "createdAt": "<ts>",
+        "isAdmin": true
+      },
+      {
+        "id": "usr_1773144002000",
+        "fullname": "Novo Usuario",
+        "username": "novo.root",
+        "roleId": "role_vendedor",
+        "externals": {
+          "inovafarma": 7
+        },
+        "status": "active",
+        "createdAt": "<ts>"
+      }
+    ]
+  },
+  "iam.roles.create.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.roles.create.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:roles:create"
+      ]
+    }
+  },
+  "iam.roles.create.400_invalid_keys": {
+    "status": 400,
+    "body": {
+      "error": "Permissões inválidas: system:foo:bar, recipe:nada:view"
+    }
+  },
+  "iam.roles.create.400_short_id": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "too_small",
+            "minimum": 2,
+            "type": "string",
+            "inclusive": true,
+            "exact": false,
+            "message": "String must contain at least 2 character(s)",
+            "path": [
+              "id"
+            ]
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "iam.roles.create.ok": {
+    "status": 201,
+    "body": {
+      "id": "role_teste",
+      "name": "Grupo Teste",
+      "description": "d",
+      "permissions": [
+        "system:users:read",
+        "recipe:fechamento_mes:view"
+      ]
+    }
+  },
+  "iam.roles.create.duplicate": {
+    "status": 400,
+    "body": {
+      "error": "Role 'role_teste' já existe."
+    }
+  },
+  "iam.roles.create.ok_wildcard": {
+    "status": 201,
+    "body": {
+      "id": "role_curinga",
+      "name": "Grupo Teste",
+      "description": "d",
+      "permissions": [
+        "*"
+      ]
+    }
+  },
+  "iam.roles.update.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "iam.roles.update.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:roles:update"
+      ]
+    }
+  },
+  "iam.roles.update.ok": {
+    "status": 200,
+    "body": {
+      "id": "role_teste",
+      "name": "Grupo Editado",
+      "description": "d",
+      "permissions": [
+        "system:roles:read"
+      ]
+    }
+  },
+  "iam.roles.update.400_invalid_keys": {
+    "status": 400,
+    "body": {
+      "error": "Permissões inválidas: system:foo:bar"
+    }
+  },
+  "iam.roles.update.unknown_role": {
+    "status": 400,
+    "body": {
+      "error": "Role 'nao_existe' não encontrada."
+    }
+  },
+  "iam.roles.update.admin_bypass": {
+    "status": 200,
+    "body": {
+      "id": "role_teste",
+      "name": "Grupo Editado",
+      "description": "via admin",
+      "permissions": [
+        "system:roles:read"
+      ]
+    }
+  },
+  "iam.roles.list.after": {
+    "status": 200,
+    "body": [
+      {
+        "id": "role_admin",
+        "name": "Administrador",
+        "description": "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
+        "permissions": [
+          "system:users:create",
+          "system:users:read",
+          "system:users:update",
+          "system:users:reset_password",
+          "system:users:delete",
+          "system:roles:create",
+          "system:roles:read",
+          "system:roles:update",
+          "system:roles:delete",
+          "system:workspaces:create",
+          "system:workspaces:update",
+          "system:workspaces:delete",
+          "system:workspaces:close",
+          "system:workspaces:reopen",
+          "system:sources:manage",
+          "system:recipes:read",
+          "system:recipes:manage",
+          "system:audit:read",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ]
+      },
+      {
+        "id": "role_operador",
+        "name": "Operador de Fechamento",
+        "description": "Acesso ao fechamento geral de vendas e aplicação de penalidades.",
+        "permissions": [
+          "system:workspaces:create",
+          "system:workspaces:close",
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_equipe",
+          "recipe:fechamento_mes:action:adicionar_penalidade",
+          "recipe:fechamento_mes:action:visualizar_penalidades",
+          "recipe:fechamento_mes:action:remover_penalidade"
+        ]
+      },
+      {
+        "id": "role_vendedor",
+        "name": "Vendedor",
+        "description": "Acesso exclusivo ao relatório individual de suas próprias vendas.",
+        "permissions": [
+          "recipe:fechamento_mes:view",
+          "recipe:fechamento_mes:query:vendas_proprias",
+          "recipe:fechamento_mes:action:visualizar_penalidades"
+        ]
+      },
+      {
+        "id": "role_teste",
+        "name": "Grupo Editado",
+        "description": "via admin",
+        "permissions": [
+          "system:roles:read"
+        ]
+      },
+      {
+        "id": "role_curinga",
+        "name": "Grupo Teste",
+        "description": "d",
+        "permissions": [
+          "*"
+        ]
+      }
+    ]
+  },
+  "ws.list.anon": {
+    "status": 200,
+    "body": [
+      {
+        "id": "ws_fechamento_dez_2025",
+        "recipeId": "fechamento_mes",
+        "name": "Fechamento Mensal — Dezembro / 2025",
+        "startDate": "2025-12-01",
+        "endDate": "2025-12-31",
+        "status": "closed",
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      },
+      {
+        "id": "ws_fechamento_jan_2026",
+        "recipeId": "fechamento_mes",
+        "name": "Fechamento Mensal — Janeiro / 2026",
+        "startDate": "2026-01-01",
+        "endDate": "2026-01-31",
+        "status": "open",
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      }
+    ]
+  },
+  "ws.list.filter": {
+    "status": 200,
+    "body": []
+  },
+  "ws.detail.ok": {
+    "status": 200,
+    "body": {
+      "id": "ws_fechamento_jan_2026",
+      "recipeId": "fechamento_mes",
+      "name": "Fechamento Mensal — Janeiro / 2026",
+      "startDate": "2026-01-01",
+      "endDate": "2026-01-31",
+      "status": "open",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "ws.detail.unknown_returns_default": {
+    "status": 200,
+    "body": {
+      "id": "ws_inexistente",
+      "recipeId": "fechamento_mes",
+      "name": "Área de Trabalho ws_inexistente",
+      "startDate": "2026-01-01",
+      "endDate": "2026-01-31",
+      "status": "open",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "ws.create.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho."
+    }
+  },
+  "ws.create.400_dates": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "custom",
+            "message": "A Data Final não pode ser anterior à Data Inicial.",
+            "path": [
+              "endDate"
+            ]
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "ws.create.400_missing_fields": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "undefined",
+            "path": [
+              "startDate"
+            ],
+            "message": "Required"
+          },
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "undefined",
+            "path": [
+              "endDate"
+            ],
+            "message": "Required"
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "ws.create.400_unknown_recipe": {
+    "status": 400,
+    "body": {
+      "error": "Modelo 'nada' não encontrado."
+    }
+  },
+  "ws.create.ok": {
+    "status": 201,
+    "body": {
+      "id": "ws_1773144003000",
+      "recipeId": "fechamento_mes",
+      "name": "Fechamento de Mês (2026-02-01 a 2026-02-28)",
+      "startDate": "2026-02-01",
+      "endDate": "2026-02-28",
+      "status": "open",
+      "params": {
+        "categories_focus": [
+          1
+        ]
+      },
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "ws.create.admin_bypass": {
+    "status": 201,
+    "body": {
+      "id": "ws_1773144004000",
+      "recipeId": "fechamento_mes",
+      "name": "Via admin",
+      "startDate": "2026-02-01",
+      "endDate": "2026-02-28",
+      "status": "open",
+      "params": {
+        "categories_focus": [
+          1
+        ]
+      },
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "ws.create.anon": {
+    "status": 201,
+    "body": {
+      "id": "ws_1773144005000",
+      "recipeId": "fechamento_mes",
+      "name": "Fechamento de Mês (2026-02-01 a 2026-02-28)",
+      "startDate": "2026-02-01",
+      "endDate": "2026-02-28",
+      "status": "open",
+      "params": {
+        "categories_focus": [
+          1
+        ]
+      },
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "ws.update.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho."
+    }
+  },
+  "ws.update.ok": {
+    "status": 200,
+    "body": {
+      "id": "ws_1773144003000",
+      "recipeId": "fechamento_mes",
+      "name": "Renomeada",
+      "startDate": "2026-02-01",
+      "endDate": "2026-03-05",
+      "status": "open",
+      "params": {
+        "categories_focus": [
+          1
+        ]
+      },
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "ws.update.400_dates": {
+    "status": 400,
+    "body": {
+      "error": "A Data Final não pode ser anterior à Data Inicial."
+    }
+  },
+  "ws.update.404": {
+    "status": 404,
+    "body": {
+      "error": "Área de Trabalho não encontrada."
+    }
+  },
+  "ws.conclude.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho."
+    }
+  },
+  "ws.conclude.ok": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "workspace": {
+        "id": "ws_1773144003000",
+        "recipeId": "fechamento_mes",
+        "name": "Renomeada",
+        "startDate": "2026-02-01",
+        "endDate": "2026-03-05",
+        "status": "closed",
+        "params": {
+          "categories_focus": [
+            1
+          ]
+        },
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      }
+    }
+  },
+  "ws.conclude.unknown_creates": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "workspace": {
+        "id": "ws_fantasma",
+        "recipeId": "fechamento_mes",
+        "name": "Área de Trabalho ws_fantasma",
+        "startDate": "2026-01-01",
+        "endDate": "2026-01-31",
+        "status": "closed",
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      }
+    }
+  },
+  "ws.reopen.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen)."
+    }
+  },
+  "ws.reopen.ok": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "workspace": {
+        "id": "ws_1773144003000",
+        "recipeId": "fechamento_mes",
+        "name": "Renomeada",
+        "startDate": "2026-02-01",
+        "endDate": "2026-03-05",
+        "status": "open",
+        "params": {
+          "categories_focus": [
+            1
+          ]
+        },
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      }
+    }
+  },
+  "ws.reopen.unknown_creates": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "workspace": {
+        "id": "ws_fantasma2",
+        "recipeId": "fechamento_mes",
+        "name": "Área de Trabalho ws_fantasma2",
+        "startDate": "2026-01-01",
+        "endDate": "2026-01-31",
+        "status": "open",
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      }
+    }
+  },
+  "ws.delete.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete)."
+    }
+  },
+  "ws.delete.ok": {
+    "status": 200,
+    "body": {
+      "success": true
+    }
+  },
+  "ws.delete.404": {
+    "status": 404,
+    "body": {
+      "error": "Área de Trabalho não encontrada."
+    }
+  },
+  "recipes.catalog.anon": {
+    "status": 200,
+    "body": [
+      {
+        "id": "fechamento_mes",
+        "name": "Fechamento de Mês",
+        "description": "Dashboard para conferência de vendas por vendedor, ajustes de salário/comissão, penalidades, gráficos comparativos e cálculo do total a receber."
+      }
+    ]
+  },
+  "recipes.catalog.vendedor": {
+    "status": 200,
+    "body": [
+      {
+        "id": "fechamento_mes",
+        "name": "Fechamento de Mês",
+        "description": "Dashboard para conferência de vendas por vendedor, ajustes de salário/comissão, penalidades, gráficos comparativos e cálculo do total a receber."
+      }
+    ]
+  },
+  "recipes.catalog.admin_bypass": {
+    "status": 200,
+    "body": [
+      {
+        "id": "fechamento_mes",
+        "name": "Fechamento de Mês",
+        "description": "Dashboard para conferência de vendas por vendedor, ajustes de salário/comissão, penalidades, gráficos comparativos e cálculo do total a receber."
+      }
+    ]
+  },
+  "lookups.ok": {
+    "status": 200,
+    "body": [
+      {
+        "value": 1,
+        "label": "Medicamentos"
+      },
+      {
+        "value": 2,
+        "label": "Perfumaria"
+      }
+    ]
+  },
+  "lookups.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para visualizar este Modelo."
+    }
+  },
+  "lookups.400_no_lookup": {
+    "status": 400,
+    "body": {
+      "error": "Campo 'start_date' não possui configuração de lookup no Modelo 'fechamento_mes'."
+    }
+  },
+  "lookups.404_unknown_recipe": {
+    "status": 404,
+    "body": {
+      "error": "Recipe 'nada' não encontrada."
+    }
+  },
+  "lookups.400_missing_query": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "undefined",
+            "path": [
+              "recipe_id"
+            ],
+            "message": "Required"
+          },
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "undefined",
+            "path": [
+              "field"
+            ],
+            "message": "Required"
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "dashboards.schema.anon": {
+    "status": 200,
+    "body": {
+      "id": "fechamento_mes",
+      "name": "Fechamento de Mês",
+      "description": "Dashboard para conferência de vendas por vendedor, ajustes de salário/comissão, penalidades, gráficos comparativos e cálculo do total a receber.",
+      "workspace": {
+        "params": [
+          {
+            "name": "start_date",
+            "label": "Data Inicial",
+            "type": "date",
+            "required": true
+          },
+          {
+            "name": "end_date",
+            "label": "Data Final",
+            "type": "date",
+            "required": true
+          },
+          {
+            "name": "categories_focus",
+            "label": "Categorias em Foco",
+            "type": "multi_select",
+            "required": false,
+            "lookup": {
+              "source": "inovafarma",
+              "query": "SELECT id AS value, name AS label FROM categories ORDER BY name"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "adicionar_penalidade",
+          "label": "Adicionar Penalidade",
+          "icon": "AlertTriangle",
+          "nature": "mutation",
+          "permission": "recipe:fechamento_mes:action:adicionar_penalidade"
+        },
+        {
+          "id": "visualizar_penalidades",
+          "label": "Ver Penalidades",
+          "icon": "Eye",
+          "nature": "read",
+          "permission": "recipe:fechamento_mes:action:visualizar_penalidades"
+        },
+        {
+          "id": "remover_penalidade",
+          "label": "Remover",
+          "icon": "Trash2",
+          "variant": "destructive",
+          "nature": "mutation",
+          "permission": "recipe:fechamento_mes:action:remover_penalidade"
+        }
+      ],
+      "ui": {
+        "layout": {
+          "type": "grid",
+          "columns": 12,
+          "gap": 16
+        },
+        "components": [
+          {
+            "id": "kpi_total_vendas",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total em Vendas",
+              "source": "inovafarma",
+              "query": "vendas",
+              "aggregate": {
+                "function": "sum",
+                "field": "venda_geral"
+              },
+              "format": "currency",
+              "icon": "DollarSign",
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "kpi_total_penalidades",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total em Penalidades",
+              "source": "penalidades_vendedor",
+              "aggregate": {
+                "function": "sum",
+                "field": "total_penalidades"
+              },
+              "format": "currency",
+              "icon": "AlertCircle",
+              "availableProfiles": []
+            }
+          },
+          {
+            "id": "kpi_total_folha",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total Líquido a Pagar",
+              "source": "inovafarma",
+              "query": "vendas",
+              "format": "currency",
+              "icon": "Wallet",
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "grafico_ranking_vendas",
+            "component": "bar_chart",
+            "layoutProps": {
+              "colSpan": 6,
+              "rowSpan": 2
+            },
+            "props": {
+              "title": "Ranking de Vendas por Vendedor",
+              "source": "inovafarma",
+              "query": "vendas",
+              "nameKey": "vendedor",
+              "valueKey": "venda_geral",
+              "limit": 5,
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "grafico_pizza_vendas",
+            "component": "pie_chart",
+            "layoutProps": {
+              "colSpan": 6,
+              "rowSpan": 2
+            },
+            "props": {
+              "title": "Distribuição das Vendas na Equipe",
+              "source": "inovafarma",
+              "query": "vendas",
+              "nameKey": "vendedor",
+              "valueKey": "venda_geral",
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "tabela_vendedores",
+            "component": "data_table",
+            "layoutProps": {
+              "colSpan": 12
+            },
+            "props": {
+              "title": "Fechamento da Folha por Vendedor",
+              "source": "inovafarma",
+              "query": "vendas",
+              "bindings": [
+                {
+                  "id": "vendas",
+                  "source": "inovafarma",
+                  "query": "vendas",
+                  "joinKey": "vendedor_id",
+                  "primary": true
+                },
+                {
+                  "id": "remuneracao",
+                  "persistence": "remuneracao_vendedor",
+                  "joinKey": "vendedor_id"
+                },
+                {
+                  "id": "penalidades",
+                  "persistence": "penalidades_vendedor",
+                  "joinKey": "vendedor_id"
+                }
+              ],
+              "profiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "options": {
+                    "vendas": "equipe"
+                  }
+                },
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "options": {
+                    "vendas": "proprias"
+                  }
+                }
+              ],
+              "columns": [
+                {
+                  "key": "vendedor_id",
+                  "label": "ID",
+                  "sortable": true
+                },
+                {
+                  "key": "vendedor",
+                  "label": "Vendedor",
+                  "sortable": true,
+                  "searchable": true
+                },
+                {
+                  "key": "venda_geral",
+                  "label": "Venda Geral",
+                  "format": "currency",
+                  "sortable": true
+                },
+                {
+                  "key": "remuneracao_vendedor.salario_base",
+                  "label": "Salário Base",
+                  "format": "currency",
+                  "sortable": true,
+                  "editable": true,
+                  "editType": "money",
+                  "permission": "recipe:fechamento_mes:edit"
+                },
+                {
+                  "key": "remuneracao_vendedor.comissao_ajustada",
+                  "label": "Comissão (R$)",
+                  "format": "currency",
+                  "sortable": true,
+                  "editable": true,
+                  "editType": "money",
+                  "permission": "recipe:fechamento_mes:edit"
+                },
+                {
+                  "key": "penalidades_vendedor.total_penalidades",
+                  "label": "Penalidades (-)",
+                  "format": "currency",
+                  "sortable": true
+                },
+                {
+                  "key": "total_a_receber",
+                  "label": "Total a Receber (=)",
+                  "format": "currency",
+                  "sortable": true
+                }
+              ],
+              "rowActions": [
+                "visualizar_penalidades",
+                "adicionar_penalidade"
+              ],
+              "pagination": {
+                "pageSize": 10
+              },
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "vendas",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    },
+                    {
+                      "id": "remuneracao",
+                      "persistenceName": "remuneracao_vendedor"
+                    },
+                    {
+                      "id": "penalidades",
+                      "persistenceName": "penalidades_vendedor"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "dashboards.schema.vendedor": {
+    "status": 200,
+    "body": {
+      "id": "fechamento_mes",
+      "name": "Fechamento de Mês",
+      "description": "Dashboard para conferência de vendas por vendedor, ajustes de salário/comissão, penalidades, gráficos comparativos e cálculo do total a receber.",
+      "workspace": {
+        "params": [
+          {
+            "name": "start_date",
+            "label": "Data Inicial",
+            "type": "date",
+            "required": true
+          },
+          {
+            "name": "end_date",
+            "label": "Data Final",
+            "type": "date",
+            "required": true
+          },
+          {
+            "name": "categories_focus",
+            "label": "Categorias em Foco",
+            "type": "multi_select",
+            "required": false,
+            "lookup": {
+              "source": "inovafarma",
+              "query": "SELECT id AS value, name AS label FROM categories ORDER BY name"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "visualizar_penalidades",
+          "label": "Ver Penalidades",
+          "icon": "Eye",
+          "nature": "read",
+          "permission": "recipe:fechamento_mes:action:visualizar_penalidades"
+        }
+      ],
+      "ui": {
+        "layout": {
+          "type": "grid",
+          "columns": 12,
+          "gap": 16
+        },
+        "components": [
+          {
+            "id": "kpi_total_vendas",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total em Vendas",
+              "source": "inovafarma",
+              "query": "vendas",
+              "aggregate": {
+                "function": "sum",
+                "field": "venda_geral"
+              },
+              "format": "currency",
+              "icon": "DollarSign",
+              "availableProfiles": [
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "kpi_total_penalidades",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total em Penalidades",
+              "source": "penalidades_vendedor",
+              "aggregate": {
+                "function": "sum",
+                "field": "total_penalidades"
+              },
+              "format": "currency",
+              "icon": "AlertCircle",
+              "availableProfiles": []
+            }
+          },
+          {
+            "id": "kpi_total_folha",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total Líquido a Pagar",
+              "source": "inovafarma",
+              "query": "vendas",
+              "format": "currency",
+              "icon": "Wallet",
+              "availableProfiles": [
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "grafico_ranking_vendas",
+            "component": "bar_chart",
+            "layoutProps": {
+              "colSpan": 6,
+              "rowSpan": 2
+            },
+            "props": {
+              "title": "Ranking de Vendas por Vendedor",
+              "source": "inovafarma",
+              "query": "vendas",
+              "nameKey": "vendedor",
+              "valueKey": "venda_geral",
+              "limit": 5,
+              "availableProfiles": [
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "grafico_pizza_vendas",
+            "component": "pie_chart",
+            "layoutProps": {
+              "colSpan": 6,
+              "rowSpan": 2
+            },
+            "props": {
+              "title": "Distribuição das Vendas na Equipe",
+              "source": "inovafarma",
+              "query": "vendas",
+              "nameKey": "vendedor",
+              "valueKey": "venda_geral",
+              "availableProfiles": [
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "tabela_vendedores",
+            "component": "data_table",
+            "layoutProps": {
+              "colSpan": 12
+            },
+            "props": {
+              "title": "Fechamento da Folha por Vendedor",
+              "source": "inovafarma",
+              "query": "vendas",
+              "bindings": [
+                {
+                  "id": "vendas",
+                  "source": "inovafarma",
+                  "query": "vendas",
+                  "joinKey": "vendedor_id",
+                  "primary": true
+                },
+                {
+                  "id": "remuneracao",
+                  "persistence": "remuneracao_vendedor",
+                  "joinKey": "vendedor_id"
+                },
+                {
+                  "id": "penalidades",
+                  "persistence": "penalidades_vendedor",
+                  "joinKey": "vendedor_id"
+                }
+              ],
+              "profiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "options": {
+                    "vendas": "equipe"
+                  }
+                },
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "options": {
+                    "vendas": "proprias"
+                  }
+                }
+              ],
+              "columns": [
+                {
+                  "key": "vendedor_id",
+                  "label": "ID",
+                  "sortable": true
+                },
+                {
+                  "key": "vendedor",
+                  "label": "Vendedor",
+                  "sortable": true,
+                  "searchable": true
+                },
+                {
+                  "key": "venda_geral",
+                  "label": "Venda Geral",
+                  "format": "currency",
+                  "sortable": true
+                },
+                {
+                  "key": "remuneracao_vendedor.salario_base",
+                  "label": "Salário Base",
+                  "format": "currency",
+                  "sortable": true,
+                  "editable": true,
+                  "editType": "money",
+                  "permission": "recipe:fechamento_mes:edit"
+                },
+                {
+                  "key": "remuneracao_vendedor.comissao_ajustada",
+                  "label": "Comissão (R$)",
+                  "format": "currency",
+                  "sortable": true,
+                  "editable": true,
+                  "editType": "money",
+                  "permission": "recipe:fechamento_mes:edit"
+                },
+                {
+                  "key": "penalidades_vendedor.total_penalidades",
+                  "label": "Penalidades (-)",
+                  "format": "currency",
+                  "sortable": true
+                },
+                {
+                  "key": "total_a_receber",
+                  "label": "Total a Receber (=)",
+                  "format": "currency",
+                  "sortable": true
+                }
+              ],
+              "rowActions": [
+                "visualizar_penalidades",
+                "adicionar_penalidade"
+              ],
+              "pagination": {
+                "pageSize": 10
+              },
+              "availableProfiles": [
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "vendas",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    },
+                    {
+                      "id": "remuneracao",
+                      "persistenceName": "remuneracao_vendedor"
+                    },
+                    {
+                      "id": "penalidades",
+                      "persistenceName": "penalidades_vendedor"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "dashboards.schema.operador": {
+    "status": 200,
+    "body": {
+      "id": "fechamento_mes",
+      "name": "Fechamento de Mês",
+      "description": "Dashboard para conferência de vendas por vendedor, ajustes de salário/comissão, penalidades, gráficos comparativos e cálculo do total a receber.",
+      "workspace": {
+        "params": [
+          {
+            "name": "start_date",
+            "label": "Data Inicial",
+            "type": "date",
+            "required": true
+          },
+          {
+            "name": "end_date",
+            "label": "Data Final",
+            "type": "date",
+            "required": true
+          },
+          {
+            "name": "categories_focus",
+            "label": "Categorias em Foco",
+            "type": "multi_select",
+            "required": false,
+            "lookup": {
+              "source": "inovafarma",
+              "query": "SELECT id AS value, name AS label FROM categories ORDER BY name"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "adicionar_penalidade",
+          "label": "Adicionar Penalidade",
+          "icon": "AlertTriangle",
+          "nature": "mutation",
+          "permission": "recipe:fechamento_mes:action:adicionar_penalidade"
+        },
+        {
+          "id": "visualizar_penalidades",
+          "label": "Ver Penalidades",
+          "icon": "Eye",
+          "nature": "read",
+          "permission": "recipe:fechamento_mes:action:visualizar_penalidades"
+        },
+        {
+          "id": "remover_penalidade",
+          "label": "Remover",
+          "icon": "Trash2",
+          "variant": "destructive",
+          "nature": "mutation",
+          "permission": "recipe:fechamento_mes:action:remover_penalidade"
+        }
+      ],
+      "ui": {
+        "layout": {
+          "type": "grid",
+          "columns": 12,
+          "gap": 16
+        },
+        "components": [
+          {
+            "id": "kpi_total_vendas",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total em Vendas",
+              "source": "inovafarma",
+              "query": "vendas",
+              "aggregate": {
+                "function": "sum",
+                "field": "venda_geral"
+              },
+              "format": "currency",
+              "icon": "DollarSign",
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "kpi_total_penalidades",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total em Penalidades",
+              "source": "penalidades_vendedor",
+              "aggregate": {
+                "function": "sum",
+                "field": "total_penalidades"
+              },
+              "format": "currency",
+              "icon": "AlertCircle",
+              "availableProfiles": []
+            }
+          },
+          {
+            "id": "kpi_total_folha",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total Líquido a Pagar",
+              "source": "inovafarma",
+              "query": "vendas",
+              "format": "currency",
+              "icon": "Wallet",
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "grafico_ranking_vendas",
+            "component": "bar_chart",
+            "layoutProps": {
+              "colSpan": 6,
+              "rowSpan": 2
+            },
+            "props": {
+              "title": "Ranking de Vendas por Vendedor",
+              "source": "inovafarma",
+              "query": "vendas",
+              "nameKey": "vendedor",
+              "valueKey": "venda_geral",
+              "limit": 5,
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "grafico_pizza_vendas",
+            "component": "pie_chart",
+            "layoutProps": {
+              "colSpan": 6,
+              "rowSpan": 2
+            },
+            "props": {
+              "title": "Distribuição das Vendas na Equipe",
+              "source": "inovafarma",
+              "query": "vendas",
+              "nameKey": "vendedor",
+              "valueKey": "venda_geral",
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "tabela_vendedores",
+            "component": "data_table",
+            "layoutProps": {
+              "colSpan": 12
+            },
+            "props": {
+              "title": "Fechamento da Folha por Vendedor",
+              "source": "inovafarma",
+              "query": "vendas",
+              "bindings": [
+                {
+                  "id": "vendas",
+                  "source": "inovafarma",
+                  "query": "vendas",
+                  "joinKey": "vendedor_id",
+                  "primary": true
+                },
+                {
+                  "id": "remuneracao",
+                  "persistence": "remuneracao_vendedor",
+                  "joinKey": "vendedor_id"
+                },
+                {
+                  "id": "penalidades",
+                  "persistence": "penalidades_vendedor",
+                  "joinKey": "vendedor_id"
+                }
+              ],
+              "profiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "options": {
+                    "vendas": "equipe"
+                  }
+                },
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "options": {
+                    "vendas": "proprias"
+                  }
+                }
+              ],
+              "columns": [
+                {
+                  "key": "vendedor_id",
+                  "label": "ID",
+                  "sortable": true
+                },
+                {
+                  "key": "vendedor",
+                  "label": "Vendedor",
+                  "sortable": true,
+                  "searchable": true
+                },
+                {
+                  "key": "venda_geral",
+                  "label": "Venda Geral",
+                  "format": "currency",
+                  "sortable": true
+                },
+                {
+                  "key": "remuneracao_vendedor.salario_base",
+                  "label": "Salário Base",
+                  "format": "currency",
+                  "sortable": true,
+                  "editable": true,
+                  "editType": "money",
+                  "permission": "recipe:fechamento_mes:edit"
+                },
+                {
+                  "key": "remuneracao_vendedor.comissao_ajustada",
+                  "label": "Comissão (R$)",
+                  "format": "currency",
+                  "sortable": true,
+                  "editable": true,
+                  "editType": "money",
+                  "permission": "recipe:fechamento_mes:edit"
+                },
+                {
+                  "key": "penalidades_vendedor.total_penalidades",
+                  "label": "Penalidades (-)",
+                  "format": "currency",
+                  "sortable": true
+                },
+                {
+                  "key": "total_a_receber",
+                  "label": "Total a Receber (=)",
+                  "format": "currency",
+                  "sortable": true
+                }
+              ],
+              "rowActions": [
+                "visualizar_penalidades",
+                "adicionar_penalidade"
+              ],
+              "pagination": {
+                "pageSize": 10
+              },
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "vendas",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    },
+                    {
+                      "id": "remuneracao",
+                      "persistenceName": "remuneracao_vendedor"
+                    },
+                    {
+                      "id": "penalidades",
+                      "persistenceName": "penalidades_vendedor"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "dashboards.schema.admin_bypass": {
+    "status": 200,
+    "body": {
+      "id": "fechamento_mes",
+      "name": "Fechamento de Mês",
+      "description": "Dashboard para conferência de vendas por vendedor, ajustes de salário/comissão, penalidades, gráficos comparativos e cálculo do total a receber.",
+      "workspace": {
+        "params": [
+          {
+            "name": "start_date",
+            "label": "Data Inicial",
+            "type": "date",
+            "required": true
+          },
+          {
+            "name": "end_date",
+            "label": "Data Final",
+            "type": "date",
+            "required": true
+          },
+          {
+            "name": "categories_focus",
+            "label": "Categorias em Foco",
+            "type": "multi_select",
+            "required": false,
+            "lookup": {
+              "source": "inovafarma",
+              "query": "SELECT id AS value, name AS label FROM categories ORDER BY name"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "adicionar_penalidade",
+          "label": "Adicionar Penalidade",
+          "icon": "AlertTriangle",
+          "nature": "mutation",
+          "permission": "recipe:fechamento_mes:action:adicionar_penalidade"
+        },
+        {
+          "id": "visualizar_penalidades",
+          "label": "Ver Penalidades",
+          "icon": "Eye",
+          "nature": "read",
+          "permission": "recipe:fechamento_mes:action:visualizar_penalidades"
+        },
+        {
+          "id": "remover_penalidade",
+          "label": "Remover",
+          "icon": "Trash2",
+          "variant": "destructive",
+          "nature": "mutation",
+          "permission": "recipe:fechamento_mes:action:remover_penalidade"
+        }
+      ],
+      "ui": {
+        "layout": {
+          "type": "grid",
+          "columns": 12,
+          "gap": 16
+        },
+        "components": [
+          {
+            "id": "kpi_total_vendas",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total em Vendas",
+              "source": "inovafarma",
+              "query": "vendas",
+              "aggregate": {
+                "function": "sum",
+                "field": "venda_geral"
+              },
+              "format": "currency",
+              "icon": "DollarSign",
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                },
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "kpi_total_penalidades",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total em Penalidades",
+              "source": "penalidades_vendedor",
+              "aggregate": {
+                "function": "sum",
+                "field": "total_penalidades"
+              },
+              "format": "currency",
+              "icon": "AlertCircle",
+              "availableProfiles": []
+            }
+          },
+          {
+            "id": "kpi_total_folha",
+            "component": "stat_card",
+            "layoutProps": {
+              "colSpan": 4
+            },
+            "props": {
+              "title": "Total Líquido a Pagar",
+              "source": "inovafarma",
+              "query": "vendas",
+              "format": "currency",
+              "icon": "Wallet",
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                },
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "grafico_ranking_vendas",
+            "component": "bar_chart",
+            "layoutProps": {
+              "colSpan": 6,
+              "rowSpan": 2
+            },
+            "props": {
+              "title": "Ranking de Vendas por Vendedor",
+              "source": "inovafarma",
+              "query": "vendas",
+              "nameKey": "vendedor",
+              "valueKey": "venda_geral",
+              "limit": 5,
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                },
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "grafico_pizza_vendas",
+            "component": "pie_chart",
+            "layoutProps": {
+              "colSpan": 6,
+              "rowSpan": 2
+            },
+            "props": {
+              "title": "Distribuição das Vendas na Equipe",
+              "source": "inovafarma",
+              "query": "vendas",
+              "nameKey": "vendedor",
+              "valueKey": "venda_geral",
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    }
+                  ]
+                },
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "main",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "tabela_vendedores",
+            "component": "data_table",
+            "layoutProps": {
+              "colSpan": 12
+            },
+            "props": {
+              "title": "Fechamento da Folha por Vendedor",
+              "source": "inovafarma",
+              "query": "vendas",
+              "bindings": [
+                {
+                  "id": "vendas",
+                  "source": "inovafarma",
+                  "query": "vendas",
+                  "joinKey": "vendedor_id",
+                  "primary": true
+                },
+                {
+                  "id": "remuneracao",
+                  "persistence": "remuneracao_vendedor",
+                  "joinKey": "vendedor_id"
+                },
+                {
+                  "id": "penalidades",
+                  "persistence": "penalidades_vendedor",
+                  "joinKey": "vendedor_id"
+                }
+              ],
+              "profiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "options": {
+                    "vendas": "equipe"
+                  }
+                },
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "options": {
+                    "vendas": "proprias"
+                  }
+                }
+              ],
+              "columns": [
+                {
+                  "key": "vendedor_id",
+                  "label": "ID",
+                  "sortable": true
+                },
+                {
+                  "key": "vendedor",
+                  "label": "Vendedor",
+                  "sortable": true,
+                  "searchable": true
+                },
+                {
+                  "key": "venda_geral",
+                  "label": "Venda Geral",
+                  "format": "currency",
+                  "sortable": true
+                },
+                {
+                  "key": "remuneracao_vendedor.salario_base",
+                  "label": "Salário Base",
+                  "format": "currency",
+                  "sortable": true,
+                  "editable": true,
+                  "editType": "money",
+                  "permission": "recipe:fechamento_mes:edit"
+                },
+                {
+                  "key": "remuneracao_vendedor.comissao_ajustada",
+                  "label": "Comissão (R$)",
+                  "format": "currency",
+                  "sortable": true,
+                  "editable": true,
+                  "editType": "money",
+                  "permission": "recipe:fechamento_mes:edit"
+                },
+                {
+                  "key": "penalidades_vendedor.total_penalidades",
+                  "label": "Penalidades (-)",
+                  "format": "currency",
+                  "sortable": true
+                },
+                {
+                  "key": "total_a_receber",
+                  "label": "Total a Receber (=)",
+                  "format": "currency",
+                  "sortable": true
+                }
+              ],
+              "rowActions": [
+                "visualizar_penalidades",
+                "adicionar_penalidade"
+              ],
+              "pagination": {
+                "pageSize": 10
+              },
+              "availableProfiles": [
+                {
+                  "id": "equipe",
+                  "label": "Equipe",
+                  "bindings": [
+                    {
+                      "id": "vendas",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "equipe",
+                      "optionLabel": "Equipe"
+                    },
+                    {
+                      "id": "remuneracao",
+                      "persistenceName": "remuneracao_vendedor"
+                    },
+                    {
+                      "id": "penalidades",
+                      "persistenceName": "penalidades_vendedor"
+                    }
+                  ]
+                },
+                {
+                  "id": "proprias",
+                  "label": "Próprias",
+                  "bindings": [
+                    {
+                      "id": "vendas",
+                      "sourceName": "inovafarma",
+                      "queryName": "vendas",
+                      "optionId": "proprias",
+                      "optionLabel": "Próprias"
+                    },
+                    {
+                      "id": "remuneracao",
+                      "persistenceName": "remuneracao_vendedor"
+                    },
+                    {
+                      "id": "penalidades",
+                      "persistenceName": "penalidades_vendedor"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "dashboards.schema.unknown_recipe": {
+    "status": 500,
+    "body": "Internal Server Error"
+  },
+  "data.table.operador": {
+    "status": 200,
+    "body": {
+      "type": "table",
+      "data": [
+        {
+          "vendedor_id": 1,
+          "vendedor": "Carlos Vendedor",
+          "venda_geral": 10000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 2,
+          "vendedor": "Ana Gerente",
+          "venda_geral": 25000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 42,
+          "vendedor": "João da Silva",
+          "venda_geral": 15000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "pageSize": 10,
+        "totalRecords": 3,
+        "totalPages": 1,
+        "order": "asc"
+      }
+    }
+  },
+  "data.table.vendedor": {
+    "status": 200,
+    "body": {
+      "type": "table",
+      "data": [
+        {
+          "vendedor_id": 42,
+          "vendedor": "João da Silva",
+          "venda_geral": 15000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "pageSize": 10,
+        "totalRecords": 1,
+        "totalPages": 1,
+        "order": "asc"
+      }
+    }
+  },
+  "data.table.admin": {
+    "status": 200,
+    "body": {
+      "type": "table",
+      "data": [
+        {
+          "vendedor_id": 42,
+          "vendedor": "João da Silva",
+          "venda_geral": 15000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 1,
+          "vendedor": "Carlos Vendedor",
+          "venda_geral": 10000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "pageSize": 2,
+        "totalRecords": 3,
+        "totalPages": 2,
+        "sortBy": "vendedor",
+        "order": "desc"
+      }
+    }
+  },
+  "data.table.admin_bypass": {
+    "status": 200,
+    "body": {
+      "type": "table",
+      "data": [
+        {
+          "vendedor_id": 1,
+          "vendedor": "Carlos Vendedor",
+          "venda_geral": 10000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 2,
+          "vendedor": "Ana Gerente",
+          "venda_geral": 25000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 42,
+          "vendedor": "João da Silva",
+          "venda_geral": 15000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "pageSize": 10,
+        "totalRecords": 3,
+        "totalPages": 1,
+        "order": "asc"
+      }
+    }
+  },
+  "data.table.search": {
+    "status": 200,
+    "body": {
+      "type": "table",
+      "data": [
+        {
+          "vendedor_id": 1,
+          "vendedor": "Carlos Vendedor",
+          "venda_geral": 10000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 2,
+          "vendedor": "Ana Gerente",
+          "venda_geral": 25000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 42,
+          "vendedor": "João da Silva",
+          "venda_geral": 15000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "pageSize": 10,
+        "totalRecords": 3,
+        "totalPages": 1,
+        "order": "asc"
+      }
+    }
+  },
+  "data.table.anon": {
+    "status": 200,
+    "body": {
+      "type": "table",
+      "data": [
+        {
+          "vendedor_id": 1,
+          "vendedor": "Carlos Vendedor",
+          "venda_geral": 10000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 2,
+          "vendedor": "Ana Gerente",
+          "venda_geral": 25000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 42,
+          "vendedor": "João da Silva",
+          "venda_geral": 15000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "pageSize": 10,
+        "totalRecords": 3,
+        "totalPages": 1,
+        "order": "asc"
+      }
+    }
+  },
+  "data.table.profile_without_permission": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o profile solicitado não está autorizado para o componente 'tabela_vendedores'."
+    }
+  },
+  "data.kpi.operador": {
+    "status": 200,
+    "body": {
+      "type": "stat",
+      "value": 50000,
+      "title": "Total em Vendas"
+    }
+  },
+  "data.chart.operador": {
+    "status": 200,
+    "body": {
+      "type": "chart",
+      "data": [
+        {
+          "name": "Ana Gerente",
+          "value": 25000,
+          "vendedor_id": 2,
+          "vendedor": "Ana Gerente",
+          "venda_geral": 25000,
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          }
+        },
+        {
+          "name": "João da Silva",
+          "value": 15000,
+          "vendedor_id": 42,
+          "vendedor": "João da Silva",
+          "venda_geral": 15000,
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          }
+        },
+        {
+          "name": "Carlos Vendedor",
+          "value": 10000,
+          "vendedor_id": 1,
+          "vendedor": "Carlos Vendedor",
+          "venda_geral": 10000,
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          }
+        }
+      ]
+    }
+  },
+  "data.400_dates": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "custom",
+            "message": "A Data Final não pode ser anterior à Data Inicial.",
+            "path": [
+              "end_date"
+            ]
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "data.400_params_not_object": {
+    "status": 400,
+    "body": {
+      "error": "O parâmetro 'params' deve ser um objeto JSON."
+    }
+  },
+  "data.ok_params": {
+    "status": 200,
+    "body": {
+      "type": "table",
+      "data": [
+        {
+          "vendedor_id": 1,
+          "vendedor": "Carlos Vendedor",
+          "venda_geral": 10000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 2,
+          "vendedor": "Ana Gerente",
+          "venda_geral": 25000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        },
+        {
+          "vendedor_id": 42,
+          "vendedor": "João da Silva",
+          "venda_geral": 15000,
+          "remuneracao_vendedor.salario_base": 1500,
+          "remuneracao_vendedor.comissao_ajustada": 0,
+          "remuneracao_vendedor": {
+            "salario_base": 1500,
+            "comissao_ajustada": 0
+          },
+          "penalidades_vendedor.total_penalidades": 0,
+          "penalidades_vendedor": {
+            "items": [],
+            "total_penalidades": 0
+          },
+          "total_a_receber": 1500
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "pageSize": 10,
+        "totalRecords": 3,
+        "totalPages": 1,
+        "order": "asc"
+      }
+    }
+  },
+  "data.unknown_component": {
+    "status": 500,
+    "body": {
+      "error": "Componente 'nao_existe' não encontrado na recipe 'fechamento_mes'."
+    }
+  },
+  "actions.dialog.operador": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "effects": [
+        {
+          "type": "open_dialog",
+          "actionId": "adicionar_penalidade",
+          "options": {
+            "title": "Adicionar Penalidade",
+            "description": "Informe o valor da penalidade a ser registrada para o vendedor.",
+            "fields": [
+              {
+                "name": "vendedor",
+                "label": "Vendedor",
+                "type": "text",
+                "readOnly": true,
+                "defaultValue": "João da Silva"
+              },
+              {
+                "name": "valor",
+                "label": "Valor da Penalidade (R$)",
+                "type": "money",
+                "required": true,
+                "defaultValue": 5
+              },
+              {
+                "name": "reason",
+                "label": "Motivo / Observação",
+                "type": "textarea",
+                "required": true
+              }
+            ]
+          }
+        }
+      ],
+      "newWorkspaceVersion": 2
+    }
+  },
+  "actions.submit.operador": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "effects": [
+        {
+          "type": "toast",
+          "variant": "success",
+          "message": "Penalidade inserida com sucesso!"
+        },
+        {
+          "type": "refresh_data"
+        }
+      ],
+      "newWorkspaceVersion": 2
+    }
+  },
+  "actions.submit.admin_bypass": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "effects": [
+        {
+          "type": "toast",
+          "variant": "success",
+          "message": "Penalidade inserida com sucesso!"
+        },
+        {
+          "type": "refresh_data"
+        }
+      ],
+      "newWorkspaceVersion": 2
+    }
+  },
+  "actions.read.vendedor": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "effects": [
+        {
+          "type": "show_table",
+          "actionId": "visualizar_penalidades",
+          "options": {
+            "title": "Penalidades de João da Silva",
+            "size": "lg",
+            "source": "penalidades_vendedor",
+            "columns": [
+              {
+                "key": "value",
+                "label": "Valor (R$)",
+                "format": "currency"
+              },
+              {
+                "key": "reason",
+                "label": "Motivo"
+              },
+              {
+                "key": "created_at",
+                "label": "Data/Hora",
+                "format": "datetime"
+              }
+            ],
+            "rowActions": [
+              "remover_penalidade"
+            ]
+          },
+          "row": {
+            "vendedor_id": 42,
+            "vendedor": "João da Silva"
+          }
+        }
+      ],
+      "newWorkspaceVersion": 2
+    }
+  },
+  "actions.vendedor_mutation": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: o usuário não possui permissão para executar a ação 'Adicionar Penalidade'."
+    }
+  },
+  "actions.anon": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "effects": [
+        {
+          "type": "show_table",
+          "actionId": "visualizar_penalidades",
+          "options": {
+            "title": "Penalidades de João da Silva",
+            "size": "lg",
+            "source": "penalidades_vendedor",
+            "columns": [
+              {
+                "key": "value",
+                "label": "Valor (R$)",
+                "format": "currency"
+              },
+              {
+                "key": "reason",
+                "label": "Motivo"
+              },
+              {
+                "key": "created_at",
+                "label": "Data/Hora",
+                "format": "datetime"
+              }
+            ],
+            "rowActions": [
+              "remover_penalidade"
+            ]
+          },
+          "row": {
+            "vendedor_id": 42,
+            "vendedor": "João da Silva"
+          }
+        }
+      ],
+      "newWorkspaceVersion": 2
+    }
+  },
+  "actions.400_closed_workspace": {
+    "status": 400,
+    "body": {
+      "error": "Esta Área de Trabalho está concluída e bloqueada para ações de modificação."
+    }
+  },
+  "actions.400_unknown_component": {
+    "status": 400,
+    "body": {
+      "error": "Componente de origem 'kpi_total_vendas' não encontrado ou não suporta actions de linha."
+    }
+  },
+  "actions.unknown_action": {
+    "status": 500,
+    "body": {
+      "error": "Ação 'nao_existe' não encontrada na recipe 'fechamento_mes'."
+    }
+  },
+  "actions.400_invalid_body": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "undefined",
+            "path": [
+              "component_id"
+            ],
+            "message": "Required"
+          },
+          {
+            "code": "invalid_type",
+            "expected": "object",
+            "received": "undefined",
+            "path": [
+              "row"
+            ],
+            "message": "Required"
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "persistence.set.ok": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "new_version": 4
+    }
+  },
+  "persistence.set.400_closed": {
+    "status": 400,
+    "body": {
+      "error": "Esta Área de Trabalho está concluída e bloqueada para edições."
+    }
+  },
+  "persistence.set.400_invalid_body": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "undefined",
+            "path": [
+              "field"
+            ],
+            "message": "Required"
+          },
+          {
+            "code": "invalid_union",
+            "unionErrors": [
+              {
+                "issues": [
+                  {
+                    "code": "invalid_type",
+                    "expected": "string",
+                    "received": "undefined",
+                    "path": [
+                      "target_foreign_key_value"
+                    ],
+                    "message": "Required"
+                  }
+                ],
+                "name": "ZodError"
+              },
+              {
+                "issues": [
+                  {
+                    "code": "invalid_type",
+                    "expected": "number",
+                    "received": "undefined",
+                    "path": [
+                      "target_foreign_key_value"
+                    ],
+                    "message": "Required"
+                  }
+                ],
+                "name": "ZodError"
+              }
+            ],
+            "path": [
+              "target_foreign_key_value"
+            ],
+            "message": "Invalid input"
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "persistence.collection.ok": {
+    "status": 200,
+    "body": [
+      {
+        "id": "item_1",
+        "created_at": "<ts>",
+        "value": 10,
+        "reason": "atraso"
+      },
+      {
+        "id": "item_2",
+        "created_at": "<ts>",
+        "value": 5,
+        "reason": "bypass"
+      }
+    ]
+  },
+  "persistence.collection.empty": {
+    "status": 200,
+    "body": []
+  },
+  "admin.recipes.list.initial": {
+    "status": 200,
+    "body": []
+  },
+  "admin.recipes.list.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "admin.recipes.list.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:recipes:read"
+      ]
+    }
+  },
+  "admin.recipes.put.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "admin.recipes.put.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:recipes:manage"
+      ]
+    }
+  },
+  "admin.recipes.put.400_compile": {
+    "status": 400,
+    "body": {
+      "error": "Transform failed with 1 error:\n<stdin>:1:29: ERROR: Expected identifier but found end of file"
+    }
+  },
+  "admin.recipes.put.400_empty": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "too_small",
+            "minimum": 1,
+            "type": "string",
+            "inclusive": true,
+            "exact": false,
+            "message": "String must contain at least 1 character(s)",
+            "path": [
+              "source"
+            ]
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "admin.recipes.put.ok": {
+    "status": 200,
+    "body": {
+      "id": "novo",
+      "source": "\nimport { defineRecipe } from \"@platform/shared\";\nexport default defineRecipe({\n  id: \"novo\", name: \"Modelo Baseline\", workspace: { params: [] }, sources: {},\n  actions: [{ id: \"acao_a\", label: \"A\", permission: \"recipe:novo:action:acao_a\", action: async () => {} }],\n  ui: { layout: { type: \"grid\", columns: 12, gap: 16 }, components: [] },\n});\n",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "admin.recipes.put.admin_bypass": {
+    "status": 200,
+    "body": {
+      "id": "outro",
+      "source": "\nimport { defineRecipe } from \"@platform/shared\";\nexport default defineRecipe({\n  id: \"outro\", name: \"Modelo Baseline\", workspace: { params: [] }, sources: {},\n  actions: [{ id: \"acao_a\", label: \"A\", permission: \"recipe:outro:action:acao_a\", action: async () => {} }],\n  ui: { layout: { type: \"grid\", columns: 12, gap: 16 }, components: [] },\n});\n",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "admin.recipes.get.ok": {
+    "status": 200,
+    "body": {
+      "id": "novo",
+      "source": "\nimport { defineRecipe } from \"@platform/shared\";\nexport default defineRecipe({\n  id: \"novo\", name: \"Modelo Baseline\", workspace: { params: [] }, sources: {},\n  actions: [{ id: \"acao_a\", label: \"A\", permission: \"recipe:novo:action:acao_a\", action: async () => {} }],\n  ui: { layout: { type: \"grid\", columns: 12, gap: 16 }, components: [] },\n});\n",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "admin.recipes.get.404": {
+    "status": 404,
+    "body": {
+      "error": "Modelo não encontrado."
+    }
+  },
+  "admin.recipes.get.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:recipes:read"
+      ]
+    }
+  },
+  "admin.recipes.list.after": {
+    "status": 200,
+    "body": [
+      {
+        "id": "novo",
+        "name": "Modelo Baseline",
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      },
+      {
+        "id": "outro",
+        "name": "Modelo Baseline",
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      }
+    ]
+  },
+  "admin.recipes.catalog_includes_new": {
+    "status": 200,
+    "body": {
+      "system": {
+        "users": [
+          {
+            "key": "system:users:create",
+            "label": "Criar Usuários",
+            "description": "Permite cadastrar novos operadores e administradores no sistema.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:read",
+            "label": "Visualizar Usuários",
+            "description": "Permite listar e visualizar o perfil e dados cadastrais dos usuários.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:update",
+            "label": "Editar Usuários",
+            "description": "Permite alterar nome, cargo e mapeamento de IDs de ERP (externals) de usuários.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:reset_password",
+            "label": "Redefinir Senha de Usuários",
+            "description": "Permite ao administrador definir uma nova senha para qualquer usuário.",
+            "module": "users"
+          },
+          {
+            "key": "system:users:delete",
+            "label": "Inativar/Excluir Usuários",
+            "description": "Permite desativar ou excluir contas de usuários.",
+            "module": "users"
+          }
+        ],
+        "roles": [
+          {
+            "key": "system:roles:create",
+            "label": "Criar Grupos de Acesso",
+            "description": "Permite criar novos perfis/cargos de permissão.",
+            "module": "roles"
+          },
+          {
+            "key": "system:roles:read",
+            "label": "Visualizar Grupos e Catálogo",
+            "description": "Permite listar perfis de acesso e inspecionar o catálogo de permissões.",
+            "module": "roles"
+          },
+          {
+            "key": "system:roles:update",
+            "label": "Editar Permissões do Grupo",
+            "description": "Permite alterar quais permissões do sistema e recipes pertencem a cada grupo.",
+            "module": "roles"
+          },
+          {
+            "key": "system:roles:delete",
+            "label": "Excluir Grupos de Acesso",
+            "description": "Permite remover perfis que não estejam em uso.",
+            "module": "roles"
+          }
+        ],
+        "workspaces": [
+          {
+            "key": "system:workspaces:create",
+            "label": "Criar Áreas de Trabalho",
+            "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:update",
+            "label": "Editar Áreas de Trabalho",
+            "description": "Permite alterar o título, o período e os parâmetros de áreas de trabalho existentes.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:delete",
+            "label": "Excluir Áreas de Trabalho",
+            "description": "Permite excluir instâncias de áreas de trabalho.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:close",
+            "label": "Concluir/Travar Áreas de Trabalho",
+            "description": "Permite finalizar e travar áreas de trabalho contra novas edições.",
+            "module": "workspaces"
+          },
+          {
+            "key": "system:workspaces:reopen",
+            "label": "Reabrir Áreas de Trabalho",
+            "description": "Permite reabrir áreas de trabalho concluídas para novas edições e ações.",
+            "module": "workspaces"
+          }
+        ],
+        "sources": [
+          {
+            "key": "system:sources:manage",
+            "label": "Gerenciar Fontes de Dados",
+            "description": "Permite configurar e testar conexões com ERPs externos (SQL Server, Postgres).",
+            "module": "sources"
+          }
+        ],
+        "recipes": [
+          {
+            "key": "system:recipes:read",
+            "label": "Visualizar Código dos Modelos",
+            "description": "Permite listar os Modelos cadastrados e ler o código-fonte de cada um.",
+            "module": "recipes"
+          },
+          {
+            "key": "system:recipes:manage",
+            "label": "Gerenciar Modelos",
+            "description": "Permite criar, editar e excluir Modelos (o código é compilado e validado ao salvar).",
+            "module": "recipes"
+          }
+        ],
+        "audit": [
+          {
+            "key": "system:audit:read",
+            "label": "Consultar Logs de Auditoria",
+            "description": "Permite visualizar o histórico de mutações e ações disparadas na plataforma.",
+            "module": "audit"
+          }
+        ]
+      },
+      "recipes": [
+        {
+          "recipeId": "fechamento_mes",
+          "recipeName": "Fechamento de Mês",
+          "viewPermission": {
+            "key": "recipe:fechamento_mes:view",
+            "label": "Acessar Modelo (Fechamento de Mês)",
+            "description": "Permite visualizar e abrir áreas de trabalho do modelo 'Fechamento de Mês'."
+          },
+          "queryPermissions": [
+            {
+              "key": "recipe:fechamento_mes:query:vendas_equipe",
+              "label": "Consulta INOVAFARMA: vendas — Equipe",
+              "description": "Permite usar a option 'equipe' da query 'vendas' na fonte 'inovafarma'."
+            },
+            {
+              "key": "recipe:fechamento_mes:query:vendas_proprias",
+              "label": "Consulta INOVAFARMA: vendas — Próprias",
+              "description": "Permite usar a option 'proprias' da query 'vendas' na fonte 'inovafarma'."
+            }
+          ],
+          "actionPermissions": [
+            {
+              "key": "recipe:fechamento_mes:action:adicionar_penalidade",
+              "label": "Ação: Adicionar Penalidade",
+              "description": "Permite executar o botão/ação operacional 'Adicionar Penalidade'."
+            },
+            {
+              "key": "recipe:fechamento_mes:action:visualizar_penalidades",
+              "label": "Ação: Ver Penalidades",
+              "description": "Permite executar o botão/ação operacional 'Ver Penalidades'."
+            },
+            {
+              "key": "recipe:fechamento_mes:action:remover_penalidade",
+              "label": "Ação: Remover",
+              "description": "Permite executar o botão/ação operacional 'Remover'."
+            }
+          ]
+        },
+        {
+          "recipeId": "novo",
+          "recipeName": "Modelo Baseline",
+          "viewPermission": {
+            "key": "recipe:novo:view",
+            "label": "Acessar Modelo (Modelo Baseline)",
+            "description": "Permite visualizar e abrir áreas de trabalho do modelo 'Modelo Baseline'."
+          },
+          "queryPermissions": [],
+          "actionPermissions": [
+            {
+              "key": "recipe:novo:action:acao_a",
+              "label": "Ação: A",
+              "description": "Permite executar o botão/ação operacional 'A'."
+            }
+          ]
+        },
+        {
+          "recipeId": "outro",
+          "recipeName": "Modelo Baseline",
+          "viewPermission": {
+            "key": "recipe:outro:view",
+            "label": "Acessar Modelo (Modelo Baseline)",
+            "description": "Permite visualizar e abrir áreas de trabalho do modelo 'Modelo Baseline'."
+          },
+          "queryPermissions": [],
+          "actionPermissions": [
+            {
+              "key": "recipe:outro:action:acao_a",
+              "label": "Ação: A",
+              "description": "Permite executar o botão/ação operacional 'A'."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "admin.recipes.reload.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "admin.recipes.reload.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:recipes:manage"
+      ]
+    }
+  },
+  "admin.recipes.reload.ok": {
+    "status": 200,
+    "body": {
+      "loaded": 2,
+      "errors": []
+    }
+  },
+  "admin.recipes.delete.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "admin.recipes.delete.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:recipes:manage"
+      ]
+    }
+  },
+  "admin.recipes.delete.ok": {
+    "status": 200,
+    "body": {
+      "success": true
+    }
+  },
+  "admin.recipes.delete.404": {
+    "status": 404,
+    "body": {
+      "error": "Modelo não encontrado."
+    }
+  },
+  "admin.erp_types.ok": {
+    "status": 200,
+    "body": [
+      {
+        "id": "mssql",
+        "label": "SQL Server",
+        "fields": [
+          {
+            "name": "host",
+            "label": "Servidor",
+            "type": "text",
+            "required": true,
+            "placeholder": "erp.empresa.com.br"
+          },
+          {
+            "name": "port",
+            "label": "Porta",
+            "type": "number",
+            "required": true,
+            "defaultValue": 1433,
+            "min": 1,
+            "max": 65535
+          },
+          {
+            "name": "database",
+            "label": "Banco de dados",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "username",
+            "label": "Usuário",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "password",
+            "label": "Senha",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "trustServerCertificate",
+            "label": "Confiar no certificado do servidor",
+            "type": "switch",
+            "defaultValue": false,
+            "description": "Ative para servidores com certificado autoassinado."
+          }
+        ]
+      }
+    ]
+  },
+  "admin.erp_types.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "admin.erp_types.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:sources:manage"
+      ]
+    }
+  },
+  "admin.erp_types.admin_bypass": {
+    "status": 200,
+    "body": [
+      {
+        "id": "mssql",
+        "label": "SQL Server",
+        "fields": [
+          {
+            "name": "host",
+            "label": "Servidor",
+            "type": "text",
+            "required": true,
+            "placeholder": "erp.empresa.com.br"
+          },
+          {
+            "name": "port",
+            "label": "Porta",
+            "type": "number",
+            "required": true,
+            "defaultValue": 1433,
+            "min": 1,
+            "max": 65535
+          },
+          {
+            "name": "database",
+            "label": "Banco de dados",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "username",
+            "label": "Usuário",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "password",
+            "label": "Senha",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "trustServerCertificate",
+            "label": "Confiar no certificado do servidor",
+            "type": "switch",
+            "defaultValue": false,
+            "description": "Ative para servidores com certificado autoassinado."
+          }
+        ]
+      }
+    ]
+  },
+  "admin.connections.list.empty": {
+    "status": 200,
+    "body": []
+  },
+  "admin.connections.list.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "admin.connections.list.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:sources:manage"
+      ]
+    }
+  },
+  "admin.connections.put.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "admin.connections.put.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:sources:manage"
+      ]
+    }
+  },
+  "admin.connections.put.400_id": {
+    "status": 400,
+    "body": {
+      "error": "O id da conexão deve usar letras minúsculas, números e _ (ex.: inovafarma)."
+    }
+  },
+  "admin.connections.put.400_type": {
+    "status": 400,
+    "body": {
+      "error": "Tipo de ERP 'oracle' não suportado."
+    }
+  },
+  "admin.connections.put.400_missing_secret": {
+    "status": 400,
+    "body": {
+      "error": "Senha é obrigatório."
+    }
+  },
+  "admin.connections.put.400_port": {
+    "status": 400,
+    "body": {
+      "error": "Porta fora do intervalo permitido."
+    }
+  },
+  "admin.connections.put.400_invalid_body": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "error": {
+        "issues": [
+          {
+            "code": "too_small",
+            "minimum": 1,
+            "type": "string",
+            "inclusive": true,
+            "exact": false,
+            "message": "String must contain at least 1 character(s)",
+            "path": [
+              "name"
+            ]
+          },
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "undefined",
+            "path": [
+              "type"
+            ],
+            "message": "Required"
+          },
+          {
+            "code": "invalid_type",
+            "expected": "object",
+            "received": "undefined",
+            "path": [
+              "values"
+            ],
+            "message": "Required"
+          }
+        ],
+        "name": "ZodError"
+      }
+    }
+  },
+  "admin.connections.put.ok": {
+    "status": 200,
+    "body": {
+      "id": "inovafarma",
+      "name": "InovaFarma",
+      "type": "mssql",
+      "config": {
+        "host": "db",
+        "port": 1433,
+        "database": "erp",
+        "username": "ro",
+        "trustServerCertificate": false
+      },
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "admin.connections.put.ok_keep_secret": {
+    "status": 200,
+    "body": {
+      "id": "inovafarma",
+      "name": "InovaFarma",
+      "type": "mssql",
+      "config": {
+        "host": "novo",
+        "port": 1433,
+        "database": "erp",
+        "username": "ro",
+        "trustServerCertificate": false
+      },
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "admin.connections.put.admin_bypass": {
+    "status": 200,
+    "body": {
+      "id": "ruim",
+      "name": "InovaFarma",
+      "type": "mssql",
+      "config": {
+        "host": "bad",
+        "port": 1433,
+        "database": "erp",
+        "username": "ro",
+        "trustServerCertificate": false
+      },
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "admin.connections.list.after": {
+    "status": 200,
+    "body": [
+      {
+        "id": "inovafarma",
+        "name": "InovaFarma",
+        "type": "mssql",
+        "config": {
+          "host": "novo",
+          "port": 1433,
+          "database": "erp",
+          "username": "ro",
+          "trustServerCertificate": false
+        },
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      },
+      {
+        "id": "ruim",
+        "name": "InovaFarma",
+        "type": "mssql",
+        "config": {
+          "host": "bad",
+          "port": 1433,
+          "database": "erp",
+          "username": "ro",
+          "trustServerCertificate": false
+        },
+        "createdAt": "<ts>",
+        "updatedAt": "<ts>"
+      }
+    ]
+  },
+  "iam.sources.after": {
+    "status": 200,
+    "body": [
+      {
+        "id": "inovafarma",
+        "name": "InovaFarma"
+      },
+      {
+        "id": "ruim",
+        "name": "InovaFarma"
+      }
+    ]
+  },
+  "admin.connections.test.ok": {
+    "status": 200,
+    "body": {
+      "ok": true
+    }
+  },
+  "admin.connections.test.502": {
+    "status": 502,
+    "body": {
+      "ok": false
+    }
+  },
+  "admin.connections.test.404": {
+    "status": 404,
+    "body": {
+      "error": "Conexão não encontrada."
+    }
+  },
+  "admin.connections.test.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "admin.connections.test.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:sources:manage"
+      ]
+    }
+  },
+  "admin.connections.delete.401": {
+    "status": 401,
+    "body": {
+      "error": "Não autenticado: token de acesso não fornecido."
+    }
+  },
+  "admin.connections.delete.403": {
+    "status": 403,
+    "body": {
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "system:sources:manage"
+      ]
+    }
+  },
+  "admin.connections.delete.ok": {
+    "status": 200,
+    "body": {
+      "success": true
+    }
+  },
+  "admin.connections.delete.404": {
+    "status": 404,
+    "body": {
+      "error": "Conexão não encontrada."
+    }
+  }
+}
