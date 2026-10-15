@@ -177,7 +177,7 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, types }) => {
               name="id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Identificador (usado nos Dashboards)</FormLabel>
+                  <FormLabel>Identificador (usado nos módulos)</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="inovafarma"
@@ -254,7 +254,7 @@ export const ERPsPage: React.FC = () => {
   const handleDelete = async (erp: ErpConnection) => {
     const confirmed = await ui.windows.confirm({
       title: "Excluir ERP",
-      description: `Excluir "${erp.name}" (${erp.id}) remove a conexão. Os Dashboards que usam essa fonte deixarão de carregar dados.`,
+      description: `Excluir "${erp.name}" (${erp.id}) remove a conexão. Os módulos que usam essa fonte deixarão de carregar dados.`,
       confirmLabel: "Excluir",
     });
     if (!confirmed) return;
@@ -352,7 +352,7 @@ export const ERPsPage: React.FC = () => {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">ERPs</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Cadastre os ERPs de onde os Dashboards leem dados. As conexões são somente leitura.
+          Cadastre os ERPs de onde os módulos leem dados. As conexões são somente leitura.
         </p>
       </div>
 
