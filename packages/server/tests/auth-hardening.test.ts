@@ -350,6 +350,13 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect((await exec("ws_outro")).status).toBe(400);
     });
 
+    it("conclude e reopen exigem close/reopen; só create não basta", async () => {
+      for (const action of ["conclude", "reopen"]) {
+        const res = await app.request(`/api/workspaces/${WS}/${action}`, { method: "POST", headers: semView });
+        expect(res.status).toBe(403);
+      }
+    });
+
     it("criar workspace exige também recipe:<id>:view", async () => {
       const res = await app.request("/api/workspaces", {
         method: "POST",

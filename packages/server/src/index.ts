@@ -827,7 +827,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.post(
     "/api/workspaces/:id/conclude",
     auth,
-    guard("system:workspaces:close", "system:workspaces:create"),
+    guard("system:workspaces:close"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
@@ -846,7 +846,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.post(
     "/api/workspaces/:id/reopen",
     auth,
-    guard("system:workspaces:reopen", "system:workspaces:create"),
+    guard("system:workspaces:reopen"),
     zValidator("param", z.object({ id: z.string() })),
     async (c) => {
       const { id } = c.req.valid("param");
