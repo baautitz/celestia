@@ -1,8 +1,8 @@
 // owner: T1 permissions
 export class ForbiddenError extends Error {
   readonly status = 403 as const;
-  constructor(readonly permission: string) {
-    super(`Acesso negado: permissão "${permission}" é obrigatória.`);
+  constructor(readonly permission: string, deniedMessage?: string) {
+    super(deniedMessage ?? `Acesso negado: permissão "${permission}" é obrigatória.`);
     this.name = "ForbiddenError";
   }
 }
@@ -11,15 +11,27 @@ export interface PermissionItem {
   key: string;
   label: string;
   description?: string;
+  deniedMessage?: string;
   module: string;
 }
 
-export type PermissionDef = string | { label: string; description?: string };
+export interface PermissionRef {
+  readonly key: string;
+  readonly deniedMessage?: string;
+}
+
+export type PermissionSpec = string | PermissionRef;
+
+export type PermissionDef = string | { label: string; description?: string; deniedMessage?: string };
+
+const keyOf = (p: PermissionSpec): string => (typeof p === "string" ? p : p.key);
+const msgOf = (p: PermissionSpec): string | undefined => (typeof p === "string" ? undefined : p.deniedMessage);
 
 export interface ModulePermissions<K extends string = string> {
   readonly moduleId: string;
   readonly items: readonly PermissionItem[];
   readonly keys: { readonly [P in K]: string };
+  ref(key: K): PermissionRef;
 }
 
 export interface PermissionContext {
@@ -49,14 +61,19 @@ export function definePermissions<const D extends Record<string, PermissionDef>>
     if (seen.has(full)) throw new Error(`Permissão duplicada "${full}".`);
     seen.add(full);
     const d = typeof def === "string" ? { label: def } : def;
-    items.push(Object.freeze({ key: full, label: d.label, description: d.description, module: moduleId }));
+    items.push(Object.freeze({ key: full, label: d.label, description: d.description, deniedMessage: d.deniedMessage, module: moduleId }));
     keys[k] = full;
   }
-  return Object.freeze({
+  const refs = new Map<string, PermissionRef>(
+    items.map((i) => [i.key, Object.freeze({ key: i.key, deniedMessage: i.deniedMessage })]),
+  );
+  const result: ModulePermissions = Object.freeze({
     moduleId,
     items: Object.freeze(items),
     keys: Object.freeze(keys),
-  }) as ModulePermissions<Extract<keyof D, string>>;
+    ref: (k: string): PermissionRef => refs.get(`${moduleId}:${k}`) as PermissionRef,
+  });
+  return result;
 }
 
 const hasPerm = (perms: readonly string[], key: string): boolean =>
@@ -86,31 +103,40 @@ export class PermissionRegistry {
     return new Set(this.catalog().flatMap((c) => c.items.map((i) => i.key)));
   }
 
+  deniedMessage(key: string): string | undefined {
+    for (const c of this.catalog()) {
+      const item = c.items.find((i) => i.key === key);
+      if (item) return item.deniedMessage;
+    }
+    return undefined;
+  }
+
   has(userPermissions: readonly string[], key: string): boolean {
     return hasPerm(userPermissions, key);
   }
 }
 
 export function guarded<C extends PermissionContext, A extends unknown[], R>(
-  permission: string,
+  permission: PermissionSpec,
   fn: (ctx: C, ...args: A) => R,
 ): (ctx: C, ...args: A) => R {
+  const key = keyOf(permission);
   return (ctx, ...args) => {
-    if (!hasPerm(ctx.user.permissions, permission)) throw new ForbiddenError(permission);
+    if (!hasPerm(ctx.user.permissions, key)) throw new ForbiddenError(key, msgOf(permission));
     return fn(ctx, ...args);
   };
 }
 
 export interface Variant<C extends PermissionContext, A extends unknown[], R> {
-  when: string;
+  when: PermissionSpec;
   run: (ctx: C, ...args: A) => R;
 }
 
-export function pickVariant<V extends { when: string }>(
+export function pickVariant<V extends { when: PermissionSpec }>(
   variants: readonly V[],
   userPermissions: readonly string[],
 ): V | undefined {
-  return variants.find((v) => hasPerm(userPermissions, v.when));
+  return variants.find((v) => hasPerm(userPermissions, keyOf(v.when)));
 }
 
 export function byPermission<C extends PermissionContext, A extends unknown[], R>(
@@ -118,7 +144,10 @@ export function byPermission<C extends PermissionContext, A extends unknown[], R
 ): (ctx: C, ...args: A) => R {
   return (ctx, ...args) => {
     const v = pickVariant(variants, ctx.user.permissions);
-    if (!v) throw new ForbiddenError(variants.map((x) => x.when).join(" | "));
+    if (!v) throw new ForbiddenError(
+        variants.map((x) => keyOf(x.when)).join(" | "),
+        variants.map((x) => msgOf(x.when)).find((m) => m !== undefined),
+      );
     return v.run(ctx, ...args);
   };
 }

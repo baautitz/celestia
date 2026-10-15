@@ -76,6 +76,31 @@ describe("byPermission", () => {
   it("pickVariant", () => expect(pickVariant([{ when: "x" }], ["*"])).toEqual({ when: "x" }));
 });
 
+describe("deniedMessage", () => {
+  const p = definePermissions("fin", {
+    "fechar:mes": { label: "Fechar", deniedMessage: "Só o financeiro fecha o mês." },
+    "ver:mes": "Ver",
+  });
+  it("guarded usa mensagem custom e fallback", () => {
+    const g = guarded(p.ref("fechar:mes"), () => 1);
+    expect(() => g(ctx())).toThrow("Só o financeiro fecha o mês.");
+    expect(() => guarded(p.ref("ver:mes"), () => 1)(ctx())).toThrow('permissão "fin:ver:mes"');
+    expect(p.keys["fechar:mes"]).toBe("fin:fechar:mes");
+  });
+  it("byPermission usa mensagem custom", () => {
+    const f = byPermission([{ when: p.ref("fechar:mes"), run: () => 1 }]);
+    expect(() => f(ctx())).toThrow("Só o financeiro fecha o mês.");
+  });
+  it("registry.deniedMessage inclui providers", () => {
+    const r = new PermissionRegistry();
+    r.register(p);
+    r.registerProvider("recipe", () => [{ key: "recipe:x:view", label: "v", module: "recipe", deniedMessage: "Sem acesso." }]);
+    expect(r.deniedMessage("fin:fechar:mes")).toBe("Só o financeiro fecha o mês.");
+    expect(r.deniedMessage("recipe:x:view")).toBe("Sem acesso.");
+    expect(r.deniedMessage("nada")).toBeUndefined();
+  });
+});
+
 describe("pruneOrphans", () => {
   it("mantém * e válidas", () => {
     expect(pruneOrphans(["*", "a", "b"], new Set(["a"]))).toEqual(["*", "a"]);
