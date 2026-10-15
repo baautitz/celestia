@@ -18,7 +18,7 @@
 | Ciclo de vida | `close`, `reopen`, `approve`, `reject`, `publish` | |
 | Dados em massa | `export`, `import` | |
 | Sensíveis | verbo próprio e específico (`reset_password`) | nunca escondido dentro de `update` |
-| Tela | `view` | só telas e variantes (`recipe:<id>:view`); distinto de `read` |
+| Tela | `view` | só telas e variantes (`<modulo>:<recurso>:view`); distinto de `read` |
 
 Evite `manage`: agrega tudo e vira privilégio genérico. Prefira um verbo por capacidade.
 
@@ -70,10 +70,6 @@ foge da convenção.
 | roles | `create`, `read`, `update`, `delete` | |
 | workspaces | `create`, `update`, `delete`, `close`, `reopen` | |
 | sources | `manage` | `system:sources:manage` |
-| recipes | `read`, `manage` | `system:recipes:manage` |
 | audit | `read` | |
 
-Legado a desmembrar (sem mudança agora): `system:sources:manage` e `system:recipes:manage`
-(este cobre criar, editar e excluir Modelos; candidatos: `create`, `update`, `delete`).
-Também fora: `recipe:<id>:query:<nome>` e `recipe:<id>:action:<id>` (AGENTS.md §3) usam
-`query`/`action` no lugar de verbos.
+Legado a desmembrar (sem mudança agora): `system:sources:manage`.
