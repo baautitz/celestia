@@ -1,27 +1,22 @@
 import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "@/context/AuthContext";
-import type { User, Role } from "@platform/shared";
+import type { User, Role, JWTAccessPayload } from "@platform/shared";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@platform/ui/components/card";
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from "@platform/ui/components/table";
 import { Button } from "@platform/ui/components/button";
 import { Input } from "@platform/ui/components/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@platform/ui/components/input-group";
 import { Badge } from "@platform/ui/components/badge";
-import { Skeleton } from "@platform/ui/components/skeleton";
 import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription } from "@platform/ui/components/field";
-import { MobileCard } from "@platform/ui/components/mobile-card";
-import { useIsMobile } from "@platform/ui/hooks/use-mobile";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@platform/ui/components/form";
 import {
   Select,
   SelectContent,
@@ -30,24 +25,17 @@ import {
   SelectValue,
 } from "@platform/ui/components/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@platform/ui/components/dialog";
-import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@platform/ui/components/dropdown-menu";
-import { toast } from "@platform/ui/components/toast";
+import { DataTable } from "@platform/ui/data-table/data-table";
+import { useUi } from "@platform/ui/imperative/provider";
+import { useWindow, WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import {
   UserPlus,
   KeyRound,
-  Search,
   RefreshCw,
   MoreHorizontal,
   Edit2,
@@ -60,36 +48,319 @@ import { Switch } from "@platform/ui/components/switch";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 
+const userSchema = z.object({
+  fullname: z.string().min(1, "Informe o nome completo."),
+  username: z.string().min(1, "Informe o nome de usuário."),
+  email: z.string().min(1, "Informe o e-mail.").email("E-mail inválido."),
+  roleId: z.string().min(1),
+  isAdmin: z.boolean(),
+  password: z.string(),
+  externals: z.record(z.union([z.string(), z.number()])),
+});
+type UserFormValues = z.infer<typeof userSchema>;
+
+const resetSchema = z.object({
+  newPassword: z.string().min(1, "Informe a nova senha."),
+});
+type ResetFormValues = z.infer<typeof resetSchema>;
+
+interface UserFormWindowProps {
+  user: User | null;
+  roles: Role[];
+  sources: string[];
+  currentUser: JWTAccessPayload | null;
+}
+
+const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, currentUser }) => {
+  const { resolve } = useWindow<boolean>();
+  const ui = useUi();
+  const isEditMode = user !== null;
+  const form = useForm<UserFormValues>({
+    resolver: zodResolver(userSchema),
+    defaultValues: {
+      fullname: user?.fullname ?? "",
+      username: user?.username ?? "",
+      email: user?.email ?? "",
+      roleId: user?.roleId ?? (roles[0]?.id || "role_operador"),
+      isAdmin: user?.isAdmin === true,
+      password: "",
+      externals: user?.externals ?? {},
+    },
+  });
+  const roleId = form.watch("roleId");
+  const getRoleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
+
+  const onSubmit = async (v: UserFormValues) => {
+    try {
+      if (user) {
+        await api.iam.updateUser(user.id, {
+          fullname: v.fullname.trim(),
+          email: v.email.trim(),
+          roleId: v.roleId,
+          externals: v.externals,
+          ...(currentUser?.isAdmin ? { isAdmin: v.isAdmin } : {}),
+        });
+        ui.feedback.notify({ type: "success", title: "Usuário atualizado com sucesso!" });
+      } else {
+        await api.iam.createUser({
+          fullname: v.fullname.trim(),
+          username: v.username.trim(),
+          email: v.email.trim(),
+          password: v.password,
+          roleId: v.roleId,
+          externals: v.externals,
+        });
+        ui.feedback.notify({ type: "success", title: "Usuário cadastrado com sucesso!" });
+      }
+      resolve(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha ao salvar usuário";
+      ui.feedback.notify({ type: "error", title: msg });
+    }
+  };
+
+  const submitting = form.formState.isSubmitting;
+
+  return (
+    <>
+      <Form {...form}>
+        <form id="user-form" noValidate onSubmit={form.handleSubmit(onSubmit)}>
+          <FieldGroup className="py-4">
+            <FormField
+              control={form.control}
+              name="fullname"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome Completo</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Carlos Silva" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome de Usuário</FormLabel>
+                    <FormControl>
+                      <Input placeholder="carlos.silva" disabled={isEditMode} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>E-mail</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="carlos@empresa.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="roleId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Perfil de Acesso</FormLabel>
+                  <Select value={field.value} onValueChange={(val: string | null) => val && field.onChange(val)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione o perfil">
+                        {roleId ? getRoleName(roleId) : undefined}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {isEditMode && currentUser?.isAdmin && (
+              <FormField
+                control={form.control}
+                name="isAdmin"
+                render={({ field }) => (
+                  <Field orientation="horizontal">
+                    <FieldContent>
+                      <FieldLabel htmlFor="u-admin">Administrador</FieldLabel>
+                      <FieldDescription>Ignora a matriz de permissões e tem acesso total.</FieldDescription>
+                    </FieldContent>
+                    <Switch
+                      id="u-admin"
+                      checked={field.value}
+                      disabled={user?.id === currentUser.sub}
+                      onCheckedChange={(checked: boolean) => field.onChange(checked)}
+                    />
+                  </Field>
+                )}
+              />
+            )}
+
+            {/* Seção 100% shadcn para Identificadores ERP (Fontes Oficiais) */}
+            <FormField
+              control={form.control}
+              name="externals"
+              render={({ field }) => (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Database className="size-3.5 text-primary" />
+                      Identificadores nos ERPs (Fontes de Dados)
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Mapeamento das chaves de identificação do usuário em cada fonte oficial.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2">
+                    {sources.length === 0 && (
+                      <CardDescription className="text-xs">
+                        Nenhum ERP cadastrado. Cadastre uma fonte de dados para vincular identificadores.
+                      </CardDescription>
+                    )}
+                    {sources.map((src) => (
+                      <div
+                        key={src}
+                        className="flex items-center justify-between gap-4 p-2.5 border bg-muted/20 hover:bg-muted/40 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Database className="size-3.5 text-muted-foreground shrink-0" />
+                          <span className="font-mono text-xs font-semibold text-foreground">{src}</span>
+                        </div>
+                        <div className="flex items-center gap-2 w-44">
+                          <Input
+                            placeholder="Não vinculado"
+                            className="h-8 font-mono text-xs text-right"
+                            value={field.value[src] !== undefined ? String(field.value[src]) : ""}
+                            onChange={(e) => {
+                              const next = { ...field.value };
+                              const val = e.target.value.trim();
+                              if (!val) {
+                                delete next[src];
+                              } else {
+                                const num = Number(val);
+                                next[src] = isNaN(num) ? val : num;
+                              }
+                              field.onChange(next);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            />
+
+            {!isEditMode && (
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Senha Inicial</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
+                    </FormControl>
+                    <span className="text-[11px] text-muted-foreground mt-1">
+                      Requer: 1 maiúscula, 1 minúscula, 1 número e 1 especial.
+                    </span>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+          </FieldGroup>
+        </form>
+      </Form>
+      <WindowActions>
+        <WindowCancelButton />
+        <Button type="submit" form="user-form" disabled={submitting}>
+          {submitting ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Cadastrar Usuário"}
+        </Button>
+      </WindowActions>
+    </>
+  );
+};
+
+const ResetPasswordWindow: React.FC<{ user: User }> = ({ user }) => {
+  const { resolve } = useWindow<boolean>();
+  const ui = useUi();
+  const form = useForm<ResetFormValues>({
+    resolver: zodResolver(resetSchema),
+    defaultValues: { newPassword: "" },
+  });
+
+  const onSubmit = async (v: ResetFormValues) => {
+    try {
+      await api.iam.resetPassword(user.id, v.newPassword);
+      ui.feedback.notify({ type: "success", title: `Senha de ${user.username} redefinida com sucesso!` });
+      resolve(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha ao redefinir senha";
+      ui.feedback.notify({ type: "error", title: msg });
+    }
+  };
+
+  return (
+    <>
+      <Form {...form}>
+        <form id="reset-form" noValidate onSubmit={form.handleSubmit(onSubmit)}>
+          <FieldGroup className="py-4">
+            <FormField
+              control={form.control}
+              name="newPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nova Senha</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
+                  </FormControl>
+                  <span className="text-[11px] text-muted-foreground mt-1">
+                    Requer 1 maiúscula, 1 minúscula, 1 número e 1 especial.
+                  </span>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </FieldGroup>
+        </form>
+      </Form>
+      <WindowActions>
+        <WindowCancelButton />
+        <Button type="submit" form="reset-form" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? "Salvando..." : "Salvar Senha"}
+        </Button>
+      </WindowActions>
+    </>
+  );
+};
+
 export const IAMUsersPage: React.FC = () => {
   const { user: currentUser, hasPermission } = useAuth();
+  const ui = useUi();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-
-  // Modais de Criação / Edição e Reset
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
-
-  const [isResetOpen, setIsResetOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-
-  // Form State Criação / Edição
-  const [fullname, setFullname] = useState("");
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [roleId, setRoleId] = useState("role_operador");
-  const [isAdmin, setIsAdmin] = useState(false);
   const [sources, setSources] = useState<{ id: string; name: string }[]>([]);
-  const [externals, setExternals] = useState<Record<string, string | number>>({});
-  const [submitting, setSubmitting] = useState(false);
-
-  // Form State Reset Senha
-  const [newPassword, setNewPassword] = useState("");
-  const [resetting, setResetting] = useState(false);
-  const isMobile = useIsMobile();
 
   const fetchData = async () => {
     try {
@@ -104,7 +375,7 @@ export const IAMUsersPage: React.FC = () => {
       setSources(sourcesRes);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao carregar usuários";
-      toast.error(msg);
+      ui.feedback.notify({ type: "error", title: msg });
     } finally {
       setLoading(false);
     }
@@ -114,110 +385,46 @@ export const IAMUsersPage: React.FC = () => {
     fetchData();
   }, []);
 
-  const availableSources = sources.map((source) => source.id);
-
-  const openCreateModal = () => {
-    setIsEditMode(false);
-    setEditingUserId(null);
-    setFullname("");
-    setUsername("");
-    setEmail("");
-    setPassword("");
-    setRoleId(roles[0]?.id || "role_operador");
-    setExternals({});
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (u: User) => {
-    setIsEditMode(true);
-    setEditingUserId(u.id);
-    setFullname(u.fullname);
-    setUsername(u.username);
-    setEmail(u.email || "");
-    setPassword("");
-    setRoleId(u.roleId);
-    setIsAdmin(u.isAdmin === true);
-    setExternals(u.externals || {});
-    setIsModalOpen(true);
-  };
-
-  const handleExternalChange = (source: string, val: string) => {
-    setExternals((prev) => {
-      const next = { ...prev };
-      if (!val || val.trim() === "") {
-        delete next[source];
-      } else {
-        const num = Number(val.trim());
-        next[source] = isNaN(num) ? val.trim() : num;
-      }
-      return next;
+  const openUserWindow = async (u: User | null) => {
+    const sourceIds = sources.map((s) => s.id);
+    const result = await ui.windows.open<boolean>({
+      surface: "dialog",
+      size: "small",
+      title: u ? "Editar Usuário" : "Cadastrar Novo Usuário",
+      description: u
+        ? "Atualize os dados, perfil e identificadores ERP do usuário."
+        : "Crie uma nova identidade no sistema com perfil e senha inicial.",
+      content: () => <UserFormWindow user={u} roles={roles} sources={sourceIds} currentUser={currentUser} />,
     });
+    if (result.status === "confirmed") fetchData();
   };
 
-  const handleSaveUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setSubmitting(true);
-
-      if (isEditMode && editingUserId) {
-        await api.iam.updateUser(editingUserId, {
-          fullname: fullname.trim(),
-          email: email.trim(),
-          roleId,
-          externals,
-          ...(currentUser?.isAdmin ? { isAdmin } : {}),
-        });
-        toast.success("Usuário atualizado com sucesso!");
-      } else {
-        await api.iam.createUser({
-          fullname: fullname.trim(),
-          username: username.trim(),
-          email: email.trim(),
-          password,
-          roleId,
-          externals,
-        });
-        toast.success("Usuário cadastrado com sucesso!");
-      }
-
-      setIsModalOpen(false);
-      fetchData();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Falha ao salvar usuário";
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedUser) return;
-
-    try {
-      setResetting(true);
-      await api.iam.resetPassword(selectedUser.id, newPassword);
-      toast.success(`Senha de ${selectedUser.username} redefinida com sucesso!`);
-      setIsResetOpen(false);
-      setNewPassword("");
-      setSelectedUser(null);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Falha ao redefinir senha";
-      toast.error(msg);
-    } finally {
-      setResetting(false);
-    }
+  const openResetWindow = (u: User) => {
+    void ui.windows.open<boolean>({
+      surface: "dialog",
+      size: "small",
+      title: "Redefinir Senha",
+      description: (
+        <>
+          Defina uma nova senha para <strong>{u.fullname}</strong> ({u.username}).
+        </>
+      ),
+      content: () => <ResetPasswordWindow user={u} />,
+    });
   };
 
   const handleToggleStatus = async (user: User) => {
     try {
       const nextStatus = user.status === "active" ? "inactive" : "active";
       await api.iam.updateUser(user.id, { status: nextStatus });
-      toast.success(`Usuário ${user.username} ${nextStatus === "active" ? "ativado" : "desativado"}.`);
+      ui.feedback.notify({
+        type: "success",
+        title: `Usuário ${user.username} ${nextStatus === "active" ? "ativado" : "desativado"}.`,
+      });
       fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao alterar status";
-      toast.error(msg);
+      ui.feedback.notify({ type: "error", title: msg });
     }
   };
 
@@ -225,15 +432,6 @@ export const IAMUsersPage: React.FC = () => {
     const r = roles.find((role) => role.id === roleId);
     return r ? r.name : roleId;
   };
-
-  const filteredUsers = users.filter((u) => {
-    const q = search.toLowerCase();
-    return (
-      u.fullname.toLowerCase().includes(q) ||
-      u.username.toLowerCase().includes(q) ||
-      (u.email && u.email.toLowerCase().includes(q))
-    );
-  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -243,7 +441,7 @@ export const IAMUsersPage: React.FC = () => {
         </Button>
 
         {hasPermission("system:users:create") && (
-          <Button onClick={openCreateModal} className="hidden lg:inline-flex shrink-0">
+          <Button onClick={() => openUserWindow(null)} className="hidden lg:inline-flex shrink-0">
             <UserPlus className="size-3.5 mr-1.5" />
             Novo Usuário
           </Button>
@@ -257,7 +455,7 @@ export const IAMUsersPage: React.FC = () => {
               <MoreHorizontal className="size-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={openCreateModal} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => openUserWindow(null)} className="cursor-pointer">
                 <UserPlus className="size-4 mr-2" />
                 Novo Usuário
               </DropdownMenuItem>
@@ -274,397 +472,99 @@ export const IAMUsersPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Tabela de Usuários */}
-      <Card>
-        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="text-base font-semibold">
-            Usuários Cadastrados ({filteredUsers.length})
-          </CardTitle>
-          <InputGroup className="w-72">
-            <InputGroupInput
-              type="search"
-              placeholder="Buscar por nome, usuário ou e-mail..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <InputGroupAddon>
-              <Search />
-            </InputGroupAddon>
-          </InputGroup>
-        </CardHeader>
-        <CardContent>
-          {isMobile ? (
-            <div className="flex flex-col gap-3">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <MobileCard
-                    key={idx}
-                    primary=""
-                    secondary=""
-                    fields={[
-                      { label: "E-mail", value: <Skeleton className="h-4 w-32" /> },
-                      { label: "Perfil", value: <Skeleton className="h-5 w-24" /> },
-                      { label: "Status", value: <Skeleton className="h-5 w-16" /> },
-                    ]}
-                  />
-                ))
-              ) : filteredUsers.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground text-sm">
-                  Nenhum usuário encontrado.
-                </p>
+      <DataTable<User>
+        rows={users}
+        getRowId={(u) => u.id}
+        loading={loading}
+        title={(count) => `Usuários Cadastrados (${count})`}
+        emptyMessage="Nenhum usuário encontrado."
+        search={{ placeholder: "Buscar por nome, usuário ou e-mail..." }}
+        columns={[
+          {
+            key: "fullname",
+            label: "Nome Completo",
+            value: (u) => u.fullname,
+            searchable: true,
+            cellClassName: "font-medium",
+            skeletonClassName: "h-4 w-40",
+            mobileRole: "primary",
+          },
+          {
+            key: "username",
+            label: "Usuário",
+            value: (u) => u.username,
+            searchable: true,
+            cellClassName: "font-mono text-xs text-muted-foreground",
+            skeletonClassName: "h-4 w-24",
+            mobileRole: "secondary",
+          },
+          {
+            key: "email",
+            label: "E-mail",
+            value: (u) => u.email || "-",
+            searchable: true,
+            cellClassName: "text-xs text-muted-foreground",
+            skeletonClassName: "h-4 w-36",
+          },
+          {
+            key: "role",
+            label: "Perfil",
+            value: (u) => getRoleName(u.roleId),
+            render: (u) => <Badge variant="secondary">{getRoleName(u.roleId)}</Badge>,
+            skeletonClassName: "h-5 w-24",
+          },
+          {
+            key: "status",
+            label: "Status",
+            value: (u) => u.status,
+            render: (u) =>
+              u.status === "active" ? (
+                <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                  <CheckCircle2 className="size-3 text-emerald-500" />
+                  Ativo
+                </Badge>
               ) : (
-                filteredUsers.map((u) => (
-                  <MobileCard
-                    key={u.id}
-                    primary={u.fullname}
-                    secondary={u.username}
-                    fields={[
-                      { label: "E-mail", value: u.email || "-" },
-                      { label: "Perfil", value: <Badge variant="secondary">{getRoleName(u.roleId)}</Badge> },
-                      {
-                        label: "Status",
-                        value: u.status === "active" ? (
-                          <Badge variant="secondary" className="flex items-center gap-1 w-fit">
-                            <CheckCircle2 className="size-3 text-emerald-500" />
-                            Ativo
-                          </Badge>
-                        ) : (
-                          <Badge variant="default" className="flex items-center gap-1 w-fit">
-                            <Clock className="size-3" />
-                            Inativo
-                          </Badge>
-                        ),
-                      },
-                    ]}
-                    actions={
-                      <div className="flex justify-end gap-1">
-                        {hasPermission("system:users:update") && (
-                          <Button variant="ghost" size="icon" aria-label="Editar Usuário" title="Editar Usuário" onClick={() => openEditModal(u)}>
-                            <Edit2 className="size-4" />
-                          </Button>
-                        )}
-                        {hasPermission("system:users:reset_password") && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Redefinir Senha"
-                            title="Redefinir Senha"
-                            onClick={() => {
-                              setSelectedUser(u);
-                              setNewPassword("");
-                              setIsResetOpen(true);
-                            }}
-                          >
-                            <KeyRound className="size-4" />
-                          </Button>
-                        )}
-                        {hasPermission("system:users:update") && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={u.status === "active" ? "text-destructive" : "text-emerald-600"}
-                            aria-label={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
-                            title={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
-                            onClick={() => handleToggleStatus(u)}
-                          >
-                            <Power className="size-4" />
-                          </Button>
-                        )}
-                      </div>
-                    }
-                  />
-                ))
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead>Nome Completo</TableHead>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>E-mail</TableHead>
-                  <TableHead>Perfil</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right w-20">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 4 }).map((_, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-36" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : filteredUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                      Nenhum usuário encontrado.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredUsers.map((u) => (
-                    <TableRow key={u.id} className="hover:bg-muted/30">
-                      <TableCell className="font-medium">{u.fullname}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{u.username}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{u.email || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{getRoleName(u.roleId)}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {u.status === "active" ? (
-                          <Badge variant="secondary" className="flex items-center gap-1 w-fit">
-                            <CheckCircle2 className="size-3 text-emerald-500" />
-                            Ativo
-                          </Badge>
-                        ) : (
-                          <Badge variant="default" className="flex items-center gap-1 w-fit">
-                            <Clock className="size-3" />
-                            Inativo
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {hasPermission("system:users:update") && (
-                            <Button variant="ghost" size="icon" aria-label="Editar Usuário" title="Editar Usuário" onClick={() => openEditModal(u)}>
-                              <Edit2 className="size-4" />
-                            </Button>
-                          )}
-                          {hasPermission("system:users:reset_password") && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Redefinir Senha"
-                              title="Redefinir Senha"
-                              onClick={() => {
-                                setSelectedUser(u);
-                                setNewPassword("");
-                                setIsResetOpen(true);
-                              }}
-                            >
-                              <KeyRound className="size-4" />
-                            </Button>
-                          )}
-                          {hasPermission("system:users:update") && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={u.status === "active" ? "text-destructive" : "text-emerald-600"}
-                              aria-label={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
-                              title={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
-                              onClick={() => handleToggleStatus(u)}
-                            >
-                              <Power className="size-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Modal de Criação / Edição */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <form onSubmit={handleSaveUser}>
-            <DialogHeader>
-              <DialogTitle>{isEditMode ? "Editar Usuário" : "Cadastrar Novo Usuário"}</DialogTitle>
-              <DialogDescription>
-                {isEditMode
-                  ? "Atualize os dados, perfil e identificadores ERP do usuário."
-                  : "Crie uma nova identidade no sistema com perfil e senha inicial."}
-              </DialogDescription>
-            </DialogHeader>
-
-            <FieldGroup className="py-4">
-              <Field>
-                <FieldLabel htmlFor="u-fullname">Nome Completo</FieldLabel>
-                <Input
-                  id="u-fullname"
-                  placeholder="Ex: Carlos Silva"
-                  value={fullname}
-                  onChange={(e) => setFullname(e.target.value)}
-                  required
-                />
-              </Field>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
-                  <FieldLabel htmlFor="u-username">Nome de Usuário</FieldLabel>
-                  <Input
-                    id="u-username"
-                    placeholder="carlos.silva"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    disabled={isEditMode}
-                    required
-                  />
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="u-email">E-mail</FieldLabel>
-                  <Input
-                    id="u-email"
-                    type="email"
-                    placeholder="carlos@empresa.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </Field>
-              </div>
-
-              <Field>
-                <FieldLabel htmlFor="u-role">Perfil de Acesso</FieldLabel>
-                <Select value={roleId} onValueChange={(val: string | null) => val && setRoleId(val)}>
-                  <SelectTrigger id="u-role" className="w-full">
-                    <SelectValue placeholder="Selecione o perfil">
-                      {roleId ? getRoleName(roleId) : undefined}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              {isEditMode && currentUser?.isAdmin && (
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldLabel htmlFor="u-admin">Administrador</FieldLabel>
-                    <FieldDescription>Ignora a matriz de permissões e tem acesso total.</FieldDescription>
-                  </FieldContent>
-                  <Switch
-                    id="u-admin"
-                    checked={isAdmin}
-                    disabled={editingUserId === currentUser.sub}
-                    onCheckedChange={(checked: boolean) => setIsAdmin(checked)}
-                  />
-                </Field>
-              )}
-
-              {/* Seção 100% shadcn para Identificadores ERP (Fontes Oficiais) */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Database className="size-3.5 text-primary" />
-                    Identificadores nos ERPs (Fontes de Dados)
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Mapeamento das chaves de identificação do usuário em cada fonte oficial.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-2">
-                  {availableSources.length === 0 && (
-                    <CardDescription className="text-xs">
-                      Nenhum ERP cadastrado. Cadastre uma fonte de dados para vincular identificadores.
-                    </CardDescription>
-                  )}
-                  {availableSources.map((src) => (
-                    <div
-                      key={src}
-                      className="flex items-center justify-between gap-4 p-2.5 border bg-muted/20 hover:bg-muted/40 transition-colors"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Database className="size-3.5 text-muted-foreground shrink-0" />
-                        <span className="font-mono text-xs font-semibold text-foreground">{src}</span>
-                      </div>
-                      <div className="flex items-center gap-2 w-44">
-                        <Input
-                          placeholder="Não vinculado"
-                          className="h-8 font-mono text-xs text-right"
-                          value={externals[src] !== undefined ? String(externals[src]) : ""}
-                          onChange={(e) => handleExternalChange(src, e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {!isEditMode && (
-                <Field>
-                  <FieldLabel htmlFor="u-password">Senha Inicial</FieldLabel>
-                  <Input
-                    id="u-password"
-                    type="password"
-                    placeholder="Mínimo 8 caracteres (Aa1@)"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <span className="text-[11px] text-muted-foreground mt-1">
-                    Requer: 1 maiúscula, 1 minúscula, 1 número e 1 especial.
-                  </span>
-                </Field>
-              )}
-            </FieldGroup>
-
-            <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                Cancelar
+                <Badge variant="default" className="flex items-center gap-1 w-fit">
+                  <Clock className="size-3" />
+                  Inativo
+                </Badge>
+              ),
+            skeletonClassName: "h-5 w-16",
+          },
+        ]}
+        rowActions={(u) => (
+          <div className="flex justify-end gap-1">
+            {hasPermission("system:users:update") && (
+              <Button variant="ghost" size="icon" aria-label="Editar Usuário" title="Editar Usuário" onClick={() => openUserWindow(u)}>
+                <Edit2 className="size-4" />
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Cadastrar Usuário"}
+            )}
+            {hasPermission("system:users:reset_password") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Redefinir Senha"
+                title="Redefinir Senha"
+                onClick={() => openResetWindow(u)}
+              >
+                <KeyRound className="size-4" />
               </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal de Redefinição de Senha */}
-      <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
-        <DialogContent className="sm:max-w-md">
-          <form onSubmit={handleResetPassword}>
-            <DialogHeader>
-              <DialogTitle>Redefinir Senha</DialogTitle>
-              <DialogDescription>
-                Defina uma nova senha para <strong>{selectedUser?.fullname}</strong> ({selectedUser?.username}).
-              </DialogDescription>
-            </DialogHeader>
-
-            <FieldGroup className="py-4">
-              <Field>
-                <FieldLabel htmlFor="r-pass">Nova Senha</FieldLabel>
-                <Input
-                  id="r-pass"
-                  type="password"
-                  placeholder="Mínimo 8 caracteres (Aa1@)"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                />
-                <span className="text-[11px] text-muted-foreground mt-1">
-                  Requer 1 maiúscula, 1 minúscula, 1 número e 1 especial.
-                </span>
-              </Field>
-            </FieldGroup>
-
-            <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsResetOpen(false)}>
-                Cancelar
+            )}
+            {hasPermission("system:users:update") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className={u.status === "active" ? "text-destructive" : "text-emerald-600"}
+                aria-label={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
+                title={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
+                onClick={() => handleToggleStatus(u)}
+              >
+                <Power className="size-4" />
               </Button>
-              <Button type="submit" disabled={resetting}>
-                {resetting ? "Salvando..." : "Salvar Senha"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            )}
+          </div>
+        )}
+      />
     </div>
   );
 };
