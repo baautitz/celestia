@@ -49,9 +49,9 @@ import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 
 const userSchema = z.object({
-  fullname: z.string().trim().min(1, "Informe o nome completo."),
-  username: z.string().trim().min(1, "Informe o nome de usuário."),
-  email: z.string().trim().min(1, "Informe o e-mail.").email("E-mail inválido."),
+  fullname: z.string().min(1, "Informe o nome completo."),
+  username: z.string().min(1, "Informe o nome de usuário."),
+  email: z.string().min(1, "Informe o e-mail.").email("E-mail inválido."),
   roleId: z.string().min(1),
   isAdmin: z.boolean(),
   password: z.string(),
@@ -389,6 +389,7 @@ export const IAMUsersPage: React.FC = () => {
     const sourceIds = sources.map((s) => s.id);
     const result = await ui.windows.open<boolean>({
       surface: "dialog",
+      size: "small",
       title: u ? "Editar Usuário" : "Cadastrar Novo Usuário",
       description: u
         ? "Atualize os dados, perfil e identificadores ERP do usuário."
@@ -401,6 +402,7 @@ export const IAMUsersPage: React.FC = () => {
   const openResetWindow = (u: User) => {
     void ui.windows.open<boolean>({
       surface: "dialog",
+      size: "small",
       title: "Redefinir Senha",
       description: (
         <>
