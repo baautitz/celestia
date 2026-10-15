@@ -123,4 +123,33 @@ describe("loadModules", () => {
     expect((await app.request("/api/m/a/x")).status).toBe(401);
     expect(r.registry.catalog()[0]?.items[0]?.key).toBe("a:r:read");
   });
+
+  it("módulo falho não deixa handlers nem serviços", async () => {
+    let afterRan = false;
+    let got: unknown = "unset";
+    const r = await loadModules(
+      new Hono(),
+      [
+        mod("bad", [], (c) => {
+          c.events.before("x", (ctx) => ctx.cancel("veto"));
+          c.events.after("x", () => void (afterRan = true));
+          c.services.expose("s", 1);
+          throw new Error("boom");
+        }),
+        mod("dep", ["bad"], (c) => {
+          got = c.services.use("bad", "s");
+        }),
+        mod("ok", [], (c) => {
+          c.events.before("x", () => {});
+        }),
+      ],
+      { logger: quiet },
+    );
+    const res = await r.events.run("x", {}, () => 7);
+    expect(res).toEqual({ cancelled: false, result: 7 });
+    expect(afterRan).toBe(false);
+    expect(got).toBe("unset");
+    expect(r.failed.map((f) => f.moduleId)).toEqual(["bad", "dep"]);
+    expect(r.loaded).toEqual(["ok"]);
+  });
 });
