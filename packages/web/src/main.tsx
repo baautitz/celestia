@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
-import { ImperativeUIProvider } from "./context/ImperativeUIContext";
 import { HeaderActionsProvider } from "./context/HeaderActionsContext";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { useRouterNavigation } from "@platform/ui/adapters/navigation-router";
@@ -18,11 +17,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <RouterUiProvider>
-          <ImperativeUIProvider>
-            <HeaderActionsProvider>
-              <App />
-            </HeaderActionsProvider>
-          </ImperativeUIProvider>
+          <HeaderActionsProvider>
+            <App />
+          </HeaderActionsProvider>
         </RouterUiProvider>
       </AuthProvider>
     </BrowserRouter>
