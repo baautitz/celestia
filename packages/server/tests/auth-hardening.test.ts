@@ -82,4 +82,41 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     expect(PermissionResolver.canViewRecipe("fechamento_mes", [])).toBe(false);
     expect(PermissionResolver.canUsePermission("x", undefined)).toBe(false);
   });
+
+  describe("curinga '*' em roles é ato de administrador", () => {
+    let gestor: Record<string, string>;
+    let admin: Record<string, string>;
+    const send = (method: string, path: string, headers: Record<string, string>, body: object) =>
+      app.request(path, { method, headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
+
+    beforeAll(async () => {
+      const store = createSeededUserStore({ admin: true });
+      await store.createRole({ id: "role_gestor", name: "Gestor", description: "d", permissions: ["system:roles:create", "system:roles:update", "system:roles:read"] });
+      await store.createUser({ fullname: "Gestor Roles", username: "gestor.roles", password: TEST_PASSWORD, roleId: "role_gestor", externals: {} });
+      app = createPlatformApp({ userStore: store, recipes: { fechamento_mes: fechamentoRecipe } });
+      gestor = await authHeader(app, "gestor.roles");
+      admin = await authHeader(app, "test.root");
+      await store.createRole({ id: "role_total", name: "Total", description: "d", permissions: ["*"] });
+    });
+
+    it("não-admin criando role com '*' recebe 403; admin recebe 201", async () => {
+      const body = { id: "role_x", name: "Role X", permissions: ["*"] };
+      const denied = await send("POST", "/api/iam/roles", gestor, body);
+      expect(denied.status).toBe(403);
+      expect(((await denied.json()) as { error: string }).error).toContain("Somente administradores");
+      expect((await send("POST", "/api/iam/roles", admin, body)).status).toBe(201);
+    });
+
+    it("não-admin edita role comum sem '*': ok; tentar conceder '*': 403", async () => {
+      await send("POST", "/api/iam/roles", gestor, { id: "role_y", name: "Role Y", permissions: [] });
+      expect((await send("PUT", "/api/iam/roles/role_y", gestor, { permissions: ["system:users:read"] })).status).toBe(200);
+      expect((await send("PUT", "/api/iam/roles/role_y", gestor, { permissions: ["*"] })).status).toBe(403);
+    });
+
+    it("não-admin não mantém nem remove '*' de role que o tem; renomear continua permitido", async () => {
+      expect((await send("PUT", "/api/iam/roles/role_total", gestor, { permissions: ["system:users:read"] })).status).toBe(403);
+      expect((await send("PUT", "/api/iam/roles/role_total", gestor, { name: "Total 2" })).status).toBe(200);
+      expect((await send("PUT", "/api/iam/roles/role_total", admin, { permissions: ["*", "system:users:read"] })).status).toBe(200);
+    });
+  });
 });

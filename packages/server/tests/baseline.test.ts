@@ -230,6 +230,8 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.roles.create.ok", "POST", "/api/iam/roles", { token: A, body: role });
     await rec("iam.roles.create.duplicate", "POST", "/api/iam/roles", { token: A, body: role });
     await rec("iam.roles.create.ok_wildcard", "POST", "/api/iam/roles", { token: R, body: { ...role, id: "role_curinga", permissions: ["*"] } });
+    await rec("iam.roles.create.403_wildcard_non_admin", "POST", "/api/iam/roles", { token: A, body: { ...role, id: "role_curinga_a", permissions: ["*"] } });
+    await rec("iam.roles.update.403_wildcard_non_admin", "PUT", "/api/iam/roles/role_curinga", { token: A, body: { permissions: ["system:roles:read"] } });
     await rec("iam.roles.update.401", "PUT", "/api/iam/roles/role_teste", { body: { name: "X Y" } });
     await rec("iam.roles.update.403", "PUT", "/api/iam/roles/role_teste", { token: V, body: { name: "X Y" } });
     await rec("iam.roles.update.ok", "PUT", "/api/iam/roles/role_teste", { token: A, body: { name: "Grupo Editado", permissions: ["system:roles:read"] } });

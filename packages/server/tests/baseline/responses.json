@@ -1481,6 +1481,18 @@
       ]
     }
   },
+  "iam.roles.create.403_wildcard_non_admin": {
+    "status": 403,
+    "body": {
+      "error": "Somente administradores podem conceder acesso total (*) a um grupo de acesso."
+    }
+  },
+  "iam.roles.update.403_wildcard_non_admin": {
+    "status": 403,
+    "body": {
+      "error": "Somente administradores podem conceder acesso total (*) a um grupo de acesso."
+    }
+  },
   "iam.roles.update.401": {
     "status": 401,
     "body": {

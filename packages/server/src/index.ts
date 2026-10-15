@@ -406,6 +406,8 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     return invalid;
   }
 
+  const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
+
   // POST /api/iam/roles
   app.post(
     "/api/iam/roles",
@@ -422,6 +424,9 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     ),
     async (c) => {
       const body = c.req.valid("json");
+      if (body.permissions.includes("*") && !getAuthenticatedUser(c).isAdmin) {
+        return c.json({ error: WILDCARD_ADMIN_ONLY }, 403);
+      }
 
       const invalid = validatePermissionKeys(body.permissions);
       if (invalid.length > 0) {
@@ -454,6 +459,14 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     async (c) => {
       const id = c.req.param("id");
       const body = c.req.valid("json");
+
+      // Alterar a posse do curinga "*" (conceder ou retirar) é ato de administrador.
+      if (body.permissions && !getAuthenticatedUser(c).isAdmin) {
+        const hadWildcard = (await userStore.getRole(id))?.permissions.includes("*") ?? false;
+        if (body.permissions.includes("*") !== hadWildcard) {
+          return c.json({ error: WILDCARD_ADMIN_ONLY }, 403);
+        }
+      }
 
       if (body.permissions) {
         const invalid = validatePermissionKeys(body.permissions);
