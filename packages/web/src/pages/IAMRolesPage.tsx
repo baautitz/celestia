@@ -115,7 +115,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
               name="name"
               render={({ field }) => (
                 <FormItem className="w-full">
-                  <FormLabel className="w-fit leading-snug">Nome do Grupo</FormLabel>
+                  <FormLabel className="w-full leading-snug">Nome do Grupo</FormLabel>
                   <FormControl>
                     <Input placeholder="Ex: Auditor Financeiro" {...field} />
                   </FormControl>
@@ -128,7 +128,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
               name="slug"
               render={({ field }) => (
                 <FormItem className="w-full">
-                  <FormLabel className="w-fit leading-snug">Identificador do Grupo (slug)</FormLabel>
+                  <FormLabel className="w-full leading-snug">Identificador do Grupo (slug)</FormLabel>
                   <FormControl>
                     <Input placeholder="auditor_financeiro" disabled={isEditMode} {...field} />
                   </FormControl>
@@ -141,7 +141,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
               name="description"
               render={({ field }) => (
                 <FormItem className="w-full">
-                  <FormLabel className="w-fit leading-snug">Descrição</FormLabel>
+                  <FormLabel className="w-full leading-snug">Descrição</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Descreva a finalidade e escopo de acesso deste grupo..."
