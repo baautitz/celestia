@@ -8,7 +8,8 @@
     "./lib/*": "./src/lib/*.ts",
     "./hooks/*": "./src/hooks/*.ts",
     "./contracts/*": "./src/contracts/*.ts",
-    "./imperative/*": "./src/imperative/*.ts"
+    "./imperative/*": "./src/imperative/*.ts",
+    "./data-table/*": "./src/data-table/*.tsx"
   },
   "scripts": {
     "test": "vitest run"
