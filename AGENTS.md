@@ -102,6 +102,7 @@ When generating or modifying code in this repository, agents MUST adhere to thes
 - **No self-service "forgot password"**: password resets are performed exclusively by admins via `POST /api/iam/users/:id/reset-password` (`system:users:reset_password`).
 
 ### 3. Permission-First & Naming Format
+- Convenção de verbos e nomes (orientação, não obrigatória): [docs/conventions/permissions.md](docs/conventions/permissions.md).
 - Every action, source query, and route requires explicit permission strings.
 - **Format**:
   - System modules: `system:<modulo>:<acao>` (e.g. `system:users:create`, `system:workspaces:create`).
