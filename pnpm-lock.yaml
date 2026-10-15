@@ -140,6 +140,9 @@ importers:
       react-hook-form:
         specifier: ^7.53.2
         version: 7.85.0(react@19.2.8)
+      react-router-dom:
+        specifier: ^6.28.0
+        version: 6.30.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       recharts:
         specifier: ^3.8.0
         version: 3.8.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@18.3.1)(react@19.2.8)(redux@5.0.1)

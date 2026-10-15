@@ -8,7 +8,9 @@
     "./lib/*": "./src/lib/*.ts",
     "./hooks/*": "./src/hooks/*.ts",
     "./contracts/*": "./src/contracts/*.ts",
-    "./imperative/*": "./src/imperative/*.ts"
+    "./imperative/*": "./src/imperative/*.ts",
+    "./imperative/*.tsx": "./src/imperative/*.tsx",
+    "./adapters/*": "./src/adapters/*.ts"
   },
   "scripts": {
     "test": "vitest run"
@@ -20,7 +22,8 @@
   "peerDependencies": {
     "@base-ui/react": "^1.7.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^6.28.0"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
