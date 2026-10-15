@@ -215,4 +215,66 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(canGrant(undefined, ["a"], true)).toBe(true);
     });
   });
+
+  describe("auto-exclusão e último administrador ativo", () => {
+    let ger: Record<string, string>;
+    let gerId = "";
+    let root: Record<string, string>;
+    const del = (id: string, h: Record<string, string>) => app.request(`/api/iam/users/${id}`, { method: "DELETE", headers: h });
+
+    beforeAll(async () => {
+      const store = createSeededUserStore({ admin: true });
+      await store.createRole({ id: "role_del", name: "Del", description: "d", permissions: ["system:users:delete", "system:users:update"] });
+      const g = await store.createUser({ fullname: "Gestor Del", username: "gestor.del", password: TEST_PASSWORD, roleId: "role_del", externals: {} });
+      gerId = g.id;
+      app = createPlatformApp({ userStore: store, recipes: { fechamento_mes: fechamentoRecipe } });
+      ger = await authHeader(app, "gestor.del");
+      root = await authHeader(app, "test.root");
+    });
+
+    it("não-admin não exclui a si mesmo (409)", async () => {
+      const res = await del(gerId, ger);
+      expect(res.status).toBe(409);
+      expect(((await res.json()) as { error: string }).error).toBe("Não é possível excluir a si mesmo.");
+    });
+
+    it("o único admin ativo não pode inativar a si mesmo nem ser excluído (409)", async () => {
+      const users = (await (await app.request("/api/iam/users", { headers: root })).json()) as { id: string; username: string }[];
+      const rootId = users.find((u) => u.username === "test.root")?.id ?? "";
+      const inact = await app.request(`/api/iam/users/${rootId}`, { method: "PUT", headers: { ...root, "Content-Type": "application/json" }, body: JSON.stringify({ status: "inactive" }) });
+      expect(inact.status).toBe(409);
+      expect(((await inact.json()) as { error: string }).error).toBe("O sistema precisa de ao menos um administrador ativo.");
+      expect((await del(rootId, root)).status).toBe(409);
+    });
+  });
+
+  describe("refresh relê o usuário do store", () => {
+    it("inativado ou excluído não renova; mudança de role vale após o refresh", async () => {
+      const store = createSeededUserStore();
+      await store.createRole({ id: "role_r1", name: "R Um", description: "d", permissions: ["system:users:read"] });
+      await store.createRole({ id: "role_r2", name: "R Dois", description: "d", permissions: ["system:roles:read"] });
+      const a = await store.createUser({ fullname: "Usuario Um", username: "refresh.um", password: TEST_PASSWORD, roleId: "role_r1", externals: {} });
+      const b = await store.createUser({ fullname: "Usuario Dois", username: "refresh.dois", password: TEST_PASSWORD, roleId: "role_r1", externals: {} });
+      const c = await store.createUser({ fullname: "Usuario Tres", username: "refresh.tres", password: TEST_PASSWORD, roleId: "role_r1", externals: {} });
+      const local = createPlatformApp({ userStore: store, recipes: { fechamento_mes: fechamentoRecipe } });
+      const login = async (username: string) => {
+        const res = await local.request("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password: TEST_PASSWORD }) });
+        return ((await res.json()) as { refresh_token: string }).refresh_token;
+      };
+      const refresh = (token: string) =>
+        local.request("/api/auth/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: token }) });
+      const ra = await login("refresh.um");
+      const rb = await login("refresh.dois");
+      const rc = await login("refresh.tres");
+      await store.updateUser(a.id, { status: "inactive" });
+      await store.deleteUser(b.id);
+      await store.updateUser(c.id, { roleId: "role_r2" });
+      expect((await refresh(ra)).status).toBe(401);
+      expect((await refresh(rb)).status).toBe(401);
+      const ok = await refresh(rc);
+      expect(ok.status).toBe(200);
+      const body = (await ok.json()) as { user: { permissions: string[] } };
+      expect(body.user.permissions).toEqual(["system:roles:read"]);
+    });
+  });
 });

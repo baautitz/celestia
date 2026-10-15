@@ -4780,5 +4780,17 @@
     "body": {
       "success": true
     }
+  },
+  "iam.users.delete.409_self": {
+    "status": 409,
+    "body": {
+      "error": "Não é possível excluir a si mesmo."
+    }
+  },
+  "iam.users.update.409_last_admin_inactivate": {
+    "status": 409,
+    "body": {
+      "error": "O sistema precisa de ao menos um administrador ativo."
+    }
   }
 }

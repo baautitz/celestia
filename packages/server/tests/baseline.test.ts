@@ -463,6 +463,14 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.grants.users.update.ok_inactivate_common", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { status: "inactive" } });
     await rec("iam.grants.users.delete.ok_common", "DELETE", `/api/iam/users/${comumId}`, { token: G });
     await rec("iam.grants.users.delete.ok_admin_by_admin", "DELETE", `/api/iam/users/${admId}`, { token: R });
+    const rl = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "root.admin", password: TEST_PASSWORD }),
+    });
+    const R2 = ((await rl.json()) as { access_token: string }).access_token;
+    await rec("iam.users.delete.409_self", "DELETE", `/api/iam/users/${rootId}`, { token: R2 });
+    await rec("iam.users.update.409_last_admin_inactivate", "PUT", `/api/iam/users/${rootId}`, { token: R2, body: { status: "inactive" } });
 
     });
   });
