@@ -213,7 +213,8 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
 
     await rec("iam.users.delete.401", "DELETE", `/api/iam/users/${newId}`);
     await rec("iam.users.delete.403", "DELETE", `/api/iam/users/${newId}`, { token: V });
-    await rec("iam.users.delete.ok", "DELETE", `/api/iam/users/${newId}`, { token: A });
+    await rec("iam.users.delete.403_target_admin", "DELETE", `/api/iam/users/${newId}`, { token: A });
+    await rec("iam.users.delete.ok", "DELETE", `/api/iam/users/${newId}`, { token: R });
     await rec("iam.users.delete.again", "DELETE", `/api/iam/users/${newId}`, { token: A });
     await rec("iam.users.list.after", "GET", "/api/iam/users", { token: A });
 
@@ -420,6 +421,48 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("admin.connections.delete.403", "DELETE", "/api/admin/connections/inovafarma", { token: V });
     await rec("admin.connections.delete.ok", "DELETE", "/api/admin/connections/inovafarma", { token: A });
     await rec("admin.connections.delete.404", "DELETE", "/api/admin/connections/inovafarma", { token: A });
+
+    });
+  });
+
+  describe("iam-grants", () => {
+    it("rotas", async () => {
+    // ── gestor não-admin limitado: a regra "só concede o que possui" fica congelada
+    const gPerms = ["system:users:create", "system:users:update", "system:users:reset_password", "system:users:delete", "system:roles:create", "system:roles:update", "system:roles:read"];
+    await rec("iam.grants.setup_role", "POST", "/api/iam/roles", { token: A, body: { id: "role_gestor", name: "Gestor Limitado", permissions: gPerms } });
+    const mk = (username: string, roleId: string) => ({ fullname: "Usuario Grants", username, password: "Senha@456", roleId, externals: {} });
+    tick();
+    await rec("iam.grants.setup_gestor", "POST", "/api/iam/users", { token: A, body: mk("gestor.limitado", "role_gestor") });
+    tick();
+    const comum = await rec("iam.grants.setup_comum", "POST", "/api/iam/users", { token: A, body: mk("alvo.comum", "role_vendedor") });
+    tick();
+    const adm = await rec("iam.grants.setup_admin_alvo", "POST", "/api/iam/users", { token: A, body: mk("alvo.admin", "role_vendedor") });
+    const comumId = (comum.raw as { id: string }).id;
+    const admId = (adm.raw as { id: string }).id;
+    await rec("iam.grants.setup_admin_flag", "PUT", `/api/iam/users/${admId}`, { token: R, body: { isAdmin: true } });
+    const gl = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "gestor.limitado", password: "Senha@456" }),
+    });
+    const G = ((await gl.json()) as { access_token: string }).access_token;
+
+    await rec("iam.grants.users.update.403_stronger_role", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { roleId: "role_admin" } });
+    await rec("iam.grants.users.update.ok_subset_role", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { roleId: "role_vendedor" } });
+    tick();
+    await rec("iam.grants.users.create.403_stronger_role", "POST", "/api/iam/users", { token: G, body: mk("cumplice.um", "role_admin") });
+    tick();
+    await rec("iam.grants.users.create.ok_subset_role", "POST", "/api/iam/users", { token: G, body: mk("legitimo.um", "role_vendedor") });
+    await rec("iam.grants.roles.create.403_missing_keys", "POST", "/api/iam/roles", { token: G, body: { id: "role_g_x", name: "Grupo GX", permissions: ["system:sources:manage"] } });
+    await rec("iam.grants.roles.create.ok_owned_keys", "POST", "/api/iam/roles", { token: G, body: { id: "role_g_y", name: "Grupo GY", permissions: ["system:roles:read"] } });
+    await rec("iam.grants.roles.update.403_add_missing_key", "PUT", "/api/iam/roles/role_gestor", { token: G, body: { permissions: [...gPerms, "system:sources:manage"] } });
+    await rec("iam.grants.roles.update.ok_remove_key", "PUT", "/api/iam/roles/role_g_y", { token: G, body: { permissions: [] } });
+    await rec("iam.grants.users.reset.403_target_admin", "POST", `/api/iam/users/${admId}/reset-password`, { token: G, body: { newPassword: "Nova@1234" } });
+    await rec("iam.grants.users.update.403_inactivate_admin", "PUT", `/api/iam/users/${admId}`, { token: G, body: { status: "inactive" } });
+    await rec("iam.grants.users.delete.403_target_admin", "DELETE", `/api/iam/users/${admId}`, { token: G });
+    await rec("iam.grants.users.update.ok_inactivate_common", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { status: "inactive" } });
+    await rec("iam.grants.users.delete.ok_common", "DELETE", `/api/iam/users/${comumId}`, { token: G });
+    await rec("iam.grants.users.delete.ok_admin_by_admin", "DELETE", `/api/iam/users/${admId}`, { token: R });
 
     });
   });

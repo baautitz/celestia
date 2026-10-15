@@ -137,7 +137,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
         id: "role_gestor",
         name: "Gestor",
         description: "d",
-        permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read"],
+        permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:users:delete", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read"],
       });
       await store.createRole({ id: "role_pequeno", name: "Pequeno", description: "d", permissions: ["system:users:read"] });
       await store.createUser({ fullname: "Gestor Grants", username: "gestor.grants", password: TEST_PASSWORD, roleId: "role_gestor", externals: {} });
@@ -169,9 +169,9 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     });
 
     it("POST role: só com chaves que possui; PUT role: só adicionar o que possui, remover é livre", async () => {
-      expect((await send("POST", "/api/iam/roles", gestor, { id: "role_g1", name: "G Um", permissions: ["system:users:delete"] })).status).toBe(403);
+      expect((await send("POST", "/api/iam/roles", gestor, { id: "role_g1", name: "G Um", permissions: ["system:sources:manage"] })).status).toBe(403);
       expect((await send("POST", "/api/iam/roles", gestor, { id: "role_g2", name: "G Dois", permissions: ["system:users:read"] })).status).toBe(201);
-      expect((await send("PUT", "/api/iam/roles/role_gestor", gestor, { permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read", "system:users:delete"] })).status).toBe(403);
+      expect((await send("PUT", "/api/iam/roles/role_gestor", gestor, { permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read", "system:sources:manage"] })).status).toBe(403);
       expect((await send("PUT", "/api/iam/roles/role_g2", gestor, { permissions: [] })).status).toBe(200);
       expect((await send("PUT", "/api/iam/roles/role_g2", gestor, { name: "Renomeado" })).status).toBe(200);
     });
@@ -193,6 +193,17 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(denied.status).toBe(403);
       expect(((await denied.json()) as { error: string }).error).toBe("Somente administradores podem redefinir a senha de outro administrador.");
       expect((await send("POST", `/api/iam/users/${alvoAdminId}/reset-password`, admin, body)).status).toBe(200);
+    });
+
+    it("não-admin não exclui nem inativa admin; admin e usuário comum permitidos", async () => {
+      const denied = await app.request(`/api/iam/users/${alvoAdminId}`, { method: "DELETE", headers: gestor });
+      expect(denied.status).toBe(403);
+      expect(((await denied.json()) as { error: string }).error).toBe("Somente administradores podem excluir ou inativar outro administrador.");
+      expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, { status: "inactive" })).status).toBe(403);
+      expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, { fullname: "Outro Nome" })).status).toBe(200);
+      expect((await send("PUT", `/api/iam/users/${alvoComumId}`, gestor, { status: "inactive" })).status).toBe(200);
+      expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, admin, { status: "inactive" })).status).toBe(200);
+      expect((await app.request(`/api/iam/users/${alvoAdminId}`, { method: "DELETE", headers: admin })).status).toBe(200);
     });
 
     it("'*' do chamador cobre tudo (exceto conceder '*', que é só admin); fail-closed sem permissões", async () => {

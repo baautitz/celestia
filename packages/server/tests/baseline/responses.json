@@ -1338,6 +1338,12 @@
       ]
     }
   },
+  "iam.users.delete.403_target_admin": {
+    "status": 403,
+    "body": {
+      "error": "Somente administradores podem excluir ou inativar outro administrador."
+    }
+  },
   "iam.users.delete.ok": {
     "status": 200,
     "body": {
@@ -4597,6 +4603,182 @@
     "status": 404,
     "body": {
       "error": "Conexão não encontrada."
+    }
+  },
+  "iam.grants.setup_role": {
+    "status": 201,
+    "body": {
+      "id": "role_gestor",
+      "name": "Gestor Limitado",
+      "permissions": [
+        "system:users:create",
+        "system:users:update",
+        "system:users:reset_password",
+        "system:users:delete",
+        "system:roles:create",
+        "system:roles:update",
+        "system:roles:read"
+      ]
+    }
+  },
+  "iam.grants.setup_gestor": {
+    "status": 201,
+    "body": {
+      "id": "usr_1773144006000",
+      "fullname": "Usuario Grants",
+      "username": "gestor.limitado",
+      "roleId": "role_gestor",
+      "externals": {},
+      "status": "active",
+      "createdAt": "<ts>"
+    }
+  },
+  "iam.grants.setup_comum": {
+    "status": 201,
+    "body": {
+      "id": "usr_1773144007000",
+      "fullname": "Usuario Grants",
+      "username": "alvo.comum",
+      "roleId": "role_vendedor",
+      "externals": {},
+      "status": "active",
+      "createdAt": "<ts>"
+    }
+  },
+  "iam.grants.setup_admin_alvo": {
+    "status": 201,
+    "body": {
+      "id": "usr_1773144008000",
+      "fullname": "Usuario Grants",
+      "username": "alvo.admin",
+      "roleId": "role_vendedor",
+      "externals": {},
+      "status": "active",
+      "createdAt": "<ts>"
+    }
+  },
+  "iam.grants.setup_admin_flag": {
+    "status": 200,
+    "body": {
+      "id": "usr_1773144008000",
+      "fullname": "Usuario Grants",
+      "username": "alvo.admin",
+      "roleId": "role_vendedor",
+      "externals": {},
+      "status": "active",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>",
+      "isAdmin": true
+    }
+  },
+  "iam.grants.users.update.403_stronger_role": {
+    "status": 403,
+    "body": {
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:workspaces:create, system:workspaces:read, system:workspaces:update, system:workspaces:delete, system:workspaces:close, system:workspaces:reopen, system:sources:manage, system:recipes:read e mais 2."
+    }
+  },
+  "iam.grants.users.update.ok_subset_role": {
+    "status": 200,
+    "body": {
+      "id": "usr_1773144007000",
+      "fullname": "Usuario Grants",
+      "username": "alvo.comum",
+      "roleId": "role_vendedor",
+      "externals": {},
+      "status": "active",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "iam.grants.users.create.403_stronger_role": {
+    "status": 403,
+    "body": {
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:workspaces:create, system:workspaces:read, system:workspaces:update, system:workspaces:delete, system:workspaces:close, system:workspaces:reopen, system:sources:manage, system:recipes:read e mais 2."
+    }
+  },
+  "iam.grants.users.create.ok_subset_role": {
+    "status": 201,
+    "body": {
+      "id": "usr_1773144010000",
+      "fullname": "Usuario Grants",
+      "username": "legitimo.um",
+      "roleId": "role_vendedor",
+      "externals": {},
+      "status": "active",
+      "createdAt": "<ts>"
+    }
+  },
+  "iam.grants.roles.create.403_missing_keys": {
+    "status": 403,
+    "body": {
+      "error": "Você não pode conceder permissões que não possui: system:sources:manage."
+    }
+  },
+  "iam.grants.roles.create.ok_owned_keys": {
+    "status": 201,
+    "body": {
+      "id": "role_g_y",
+      "name": "Grupo GY",
+      "permissions": [
+        "system:roles:read"
+      ]
+    }
+  },
+  "iam.grants.roles.update.403_add_missing_key": {
+    "status": 403,
+    "body": {
+      "error": "Você não pode conceder permissões que não possui: system:sources:manage."
+    }
+  },
+  "iam.grants.roles.update.ok_remove_key": {
+    "status": 200,
+    "body": {
+      "id": "role_g_y",
+      "name": "Grupo GY",
+      "permissions": []
+    }
+  },
+  "iam.grants.users.reset.403_target_admin": {
+    "status": 403,
+    "body": {
+      "error": "Somente administradores podem redefinir a senha de outro administrador."
+    }
+  },
+  "iam.grants.users.update.403_inactivate_admin": {
+    "status": 403,
+    "body": {
+      "error": "Somente administradores podem excluir ou inativar outro administrador."
+    }
+  },
+  "iam.grants.users.delete.403_target_admin": {
+    "status": 403,
+    "body": {
+      "error": "Somente administradores podem excluir ou inativar outro administrador."
+    }
+  },
+  "iam.grants.users.update.ok_inactivate_common": {
+    "status": 200,
+    "body": {
+      "id": "usr_1773144007000",
+      "fullname": "Usuario Grants",
+      "username": "alvo.comum",
+      "roleId": "role_vendedor",
+      "externals": {},
+      "status": "inactive",
+      "createdAt": "<ts>",
+      "updatedAt": "<ts>"
+    }
+  },
+  "iam.grants.users.delete.ok_common": {
+    "status": 200,
+    "body": {
+      "success": true
+    }
+  },
+  "iam.grants.users.delete.ok_admin_by_admin": {
+    "status": 200,
+    "body": {
+      "success": true
     }
   }
 }

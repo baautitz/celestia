@@ -15,6 +15,9 @@ com stores em memória, relógio falso (`Date` fixo em 2026-03-10T12:00:00Z) e v
 - Schema, dados e `actions/exec` exigem `recipe:<id>:view`; `actions/exec` também a permissão da ação (403 antes de executar).
 - Dados sem Área de Trabalho existente (prévia) continuam válidos.
 - As mensagens de 403 vêm de `deniedMessage` em `SYSTEM_PERMISSIONS` via `denyMessage(key)`.
+- Concessão de acesso (roles/usuários) só do que o chamador possui, medido pelas permissões do token vigente (até 5 min defasado; não revalida no store).
+- Não-admin não redefine senha, exclui nem inativa um administrador.
+- Pendência documentada: `DELETE /api/iam/users/:id` permite auto-exclusão e exclusão do último administrador.
 - Não existe rota DELETE para roles.
 
 ## Não exercitado
