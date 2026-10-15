@@ -118,6 +118,11 @@ export class WindowController<TContent = unknown> {
     closing.forEach((w) => w.resolve({ status: "cancelled", reason: "unmounted" }))
   }
 
+  /** Rearma após dispose(): o StrictMode do React executa mount, cleanup e mount de novo. */
+  revive(): void {
+    this.disposed = false
+  }
+
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
