@@ -40,8 +40,8 @@ import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 
 const roleSchema = z.object({
-  name: z.string().min(1, "Informe o nome do grupo"),
-  slug: z.string().min(1, "Informe o identificador do grupo"),
+  name: z.string().min(1, "Informe o nome do grupo."),
+  slug: z.string().min(1, "Informe o identificador do grupo."),
   description: z.string(),
   permissions: z.array(z.string()),
 });
@@ -105,6 +105,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
       <Form {...form}>
         <form
           id="role-form"
+          noValidate
           onSubmit={form.handleSubmit(onSubmit)}
           className="flex flex-col gap-6"
         >
@@ -116,7 +117,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                 <FormItem className="w-full">
                   <FormLabel className="w-fit leading-snug">Nome do Grupo</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: Auditor Financeiro" required {...field} />
+                    <Input placeholder="Ex: Auditor Financeiro" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -129,7 +130,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                 <FormItem className="w-full">
                   <FormLabel className="w-fit leading-snug">Identificador do Grupo (slug)</FormLabel>
                   <FormControl>
-                    <Input placeholder="auditor_financeiro" disabled={isEditMode} required {...field} />
+                    <Input placeholder="auditor_financeiro" disabled={isEditMode} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
