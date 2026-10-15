@@ -50,7 +50,7 @@ function ManagedWindow({ entry, controller }: {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>{options.title}</AlertDialogTitle>
-                <AlertDialogDescription>{options.description}</AlertDialogDescription>
+                {options.description && <AlertDialogDescription>{options.description}</AlertDialogDescription>}
               </AlertDialogHeader>
               {body}
               <AlertDialogFooter ref={setFooter} />
@@ -61,7 +61,7 @@ function ManagedWindow({ entry, controller }: {
             <SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl">
               <SheetHeader className="p-6 border-b shrink-0">
                 <SheetTitle>{options.title}</SheetTitle>
-                <SheetDescription>{options.description}</SheetDescription>
+                {options.description && <SheetDescription>{options.description}</SheetDescription>}
               </SheetHeader>
               <ScrollArea className="flex-1 min-h-0">
                 <div className="p-6 flex flex-col gap-6">{body}</div>
@@ -74,7 +74,7 @@ function ManagedWindow({ entry, controller }: {
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>{options.title}</DialogTitle>
-                <DialogDescription>{options.description}</DialogDescription>
+                {options.description && <DialogDescription>{options.description}</DialogDescription>}
               </DialogHeader>
               {body}
               <DialogFooter ref={setFooter} className="gap-2" />
