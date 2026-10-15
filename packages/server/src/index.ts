@@ -19,6 +19,7 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
 import { PermissionCatalogEngine } from "./iam/permission-catalog.js";
+import { hasPermission } from "./iam/has-permission.js";
 import { denyMessage } from "./iam/system-permissions.js";
 import { PermissionResolver } from "./iam/permission-resolver.js";
 import { NotFoundError } from "./engine/errors.js";
@@ -125,8 +126,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     (...keys: string[]): MiddlewareHandler =>
     async (c, next) => {
       const user = c.get("user") as JWTAccessPayload | undefined;
-      const perms = user?.permissions ?? [];
-      if (!keys.some((key) => perms.includes(key))) return c.json({ error: denyMessage(keys[0]) }, 403);
+      if (!keys.some((key) => hasPermission(user?.permissions, key))) return c.json({ error: denyMessage(keys[0]) }, 403);
       await next();
     };
 
@@ -811,7 +811,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     }));
 
     // Quem gerencia permissões precisa enxergar todos os Modelos para configurar o acesso a eles.
-    if (!user.permissions.includes("system:roles:update")) {
+    if (!hasPermission(user.permissions, "system:roles:update")) {
       catalog = catalog.filter((item) => PermissionResolver.canViewRecipe(item.id, user.permissions));
     }
 
@@ -1162,6 +1162,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     zValidator("param", z.object({ id: z.string(), collection: z.string(), foreignKeyValue: z.string() })),
     async (c) => {
       const { id: workspaceId, collection, foreignKeyValue } = c.req.valid("param");
+      if (!workspacesMap.has(workspaceId)) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
       const items = await persistenceStore.getItems(workspaceId, collection, foreignKeyValue);
       const formatted = items.map((item) => ({
         id: item.id,

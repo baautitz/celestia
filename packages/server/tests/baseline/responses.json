@@ -3805,6 +3805,12 @@
     "status": 200,
     "body": []
   },
+  "persistence.collection.404_unknown_workspace": {
+    "status": 404,
+    "body": {
+      "error": "Área de Trabalho não encontrada."
+    }
+  },
   "persistence.collection.401": {
     "status": 401,
     "body": {

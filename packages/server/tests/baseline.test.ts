@@ -347,6 +347,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     const col = `/api/workspaces/${WS}/persistence/collection/penalidades_vendedor`;
     await rec("persistence.collection.ok", "GET", `${col}/42`, { token: O });
     await rec("persistence.collection.empty", "GET", `${col}/9999`, { token: O });
+    await rec("persistence.collection.404_unknown_workspace", "GET", "/api/workspaces/ws_inexistente/persistence/collection/penalidades_vendedor/42", { token: O });
     await rec("persistence.collection.401", "GET", `${col}/42`);
     await rec("persistence.collection.403", "GET", `${col}/42`, { token: V });
 
