@@ -131,7 +131,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
               name="fullname"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nome Completo</FormLabel>
+                  <FormLabel className="w-full leading-snug">Nome Completo</FormLabel>
                   <FormControl>
                     <Input placeholder="Ex: Carlos Silva" {...field} />
                   </FormControl>
@@ -146,7 +146,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome de Usuário</FormLabel>
+                    <FormLabel className="w-full leading-snug">Nome de Usuário</FormLabel>
                     <FormControl>
                       <Input placeholder="carlos.silva" disabled={isEditMode} {...field} />
                     </FormControl>
@@ -159,7 +159,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>E-mail</FormLabel>
+                    <FormLabel className="w-full leading-snug">E-mail</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="carlos@empresa.com" {...field} />
                     </FormControl>
@@ -174,7 +174,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
               name="roleId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Perfil de Acesso</FormLabel>
+                  <FormLabel className="w-full leading-snug">Perfil de Acesso</FormLabel>
                   <Select value={field.value} onValueChange={(val: string | null) => val && field.onChange(val)}>
                     <FormControl>
                       <SelectTrigger className="w-full">
@@ -278,7 +278,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Senha Inicial</FormLabel>
+                    <FormLabel className="w-full leading-snug">Senha Inicial</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
                     </FormControl>
@@ -332,7 +332,7 @@ const ResetPasswordWindow: React.FC<{ user: User }> = ({ user }) => {
               name="newPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nova Senha</FormLabel>
+                  <FormLabel className="w-full leading-snug">Nova Senha</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
                   </FormControl>
