@@ -12,7 +12,7 @@
 
 - **Backend**: [Hono](https://hono.dev/) on Node.js. **Security**: Argon2id, stateless JWT (5 min) + Refresh Token (7 days).
 - **Frontend**: Vite + React 19 + shadcn/ui + Tailwind CSS v4.
-- **Recipes / SDUI were removed.** Customer-specific features will be modules under `/integrations` (a definir). Workspaces ("Área de Trabalho", the active closing period) will become a module; today they live in the server.
+- **Recipes / SDUI were removed.** Customer-specific features will be modules under `/integrations` (a definir). The Closing Period ("Período de Fechamento", formerly Workspace/Área de Trabalho) is already a Plugin Module (`closing_period`).
 - **Target architecture** (modules as bounded contexts, `before`/`after` events, per-module migrations): see the GitHub issues, the ADRs in [docs/adr/](docs/adr/) and the glossaries ([GLOSSARY-MAP.md](GLOSSARY-MAP.md)). Not implemented yet.
 
 ---
@@ -25,8 +25,8 @@ celestia/
 │   ├── core/     (@platform/core)   module framework: contract, loader/graph, events, migrations, permissions (pruneOrphans, ...)
 │   ├── shared/   (@platform/shared) contracts & types: iam.ts, workspace.ts, erp.ts, fields.ts
 │   ├── server/   (@platform/server) Hono API
-│   │   └── src/  index.ts (app: health, auth, iam, /api/admin/connections*, /api/admin/erp-types, /api/workspaces*),
-│   │             iam/, engine/ (template-engine, workspace-validator), data/ (connectors, stores, secret-box, read-only-guard),
+│   │   └── src/  index.ts (app: health, auth, iam, /api/admin/connections*, /api/admin/erp-types, /api/closing-periods*),
+│   │             iam/, closing-period/ (Plugin: module, permissions, stores, schema, own drizzle/ migrations), engine/ (template-engine), data/ (connectors, stores, secret-box, read-only-guard),
 │   │             db/ (drizzle schema, client, migrate), cli/ (create-admin, erp-query)
 │   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi), DataTable, forms, defineWebModule
 │   └── web/      (@platform/web)    SPA: modules.ts registry, pages IAMUsers/IAMRoles/ERPs/Login
@@ -70,7 +70,7 @@ Building one package alone: build `@platform/shared` and `@platform/core` first.
 - **Administrator bypass (`isAdmin`)**: `users.is_admin = true` ignores the permission matrix; the auth middleware swaps the token's permissions for every key in `SYSTEM_PERMISSIONS` at request time, so `requirePermission` keeps working unchanged. Settable only via `UserStore.setAdmin`: by the `create-admin` CLI, or `PUT /api/iam/users/:id` with `isAdmin`, accepted only from a caller who is already admin (403 otherwise) and never lets an admin demote themselves (400). `POST /api/iam/users` ignores it. This is the single deliberate exception to least-privilege; grant sparingly.
 
 ### Domain
-- Every Workspace has `startDate` and `endDate` (`YYYY-MM-DD`); `POST /api/workspaces` takes `{ name, startDate, endDate }`. `end_date < start_date` → HTTP 400 `"A Data Final não pode ser anterior à Data Inicial."`.
+- A Closing Period is a contiguous range of dates (`startDate`/`endDate`, `YYYY-MM-DD`, any length); `POST /api/closing-periods` takes `{ name, startDate, endDate }` and needs `closing_period:period:create` (`GET` needs `closing_period:period:read`). `endDate < startDate` → HTTP 400 `"A Data Final não pode ser anterior à Data Inicial."`. A date belongs to at most one Closing Period (open or closed): a period sharing any date with another → HTTP 400. Unknown id → 404. Its migrations live in `packages/server/src/closing-period/drizzle` (generate with `drizzle-kit generate --config=drizzle.closing-period.config.ts --name=<descricao>`).
 
 ### UI
 Details in [docs/conventions/ui.md](docs/conventions/ui.md).

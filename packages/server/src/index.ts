@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { zValidator } from "@hono/zod-validator";
@@ -17,11 +16,12 @@ import { MemoryAuditStore } from "./audit/audit-store.js";
 import { createAuditModule } from "./audit/audit-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
-import { hasPermission } from "./iam/has-permission.js";
-import { denyMessage, NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
+import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware, requirePermission } from "./iam/middleware.js";
-import type { WorkspaceStore } from "./data/workspace-store.js";
-import type { JWTAccessPayload, WorkspaceRecord } from "@platform/shared";
+import { createClosingPeriodModule } from "./closing-period/closing-period-module.js";
+import { CLOSING_PERIOD_PERMISSIONS } from "./closing-period/closing-period-permissions.js";
+import { MemoryClosingPeriodStore, type ClosingPeriodStore } from "./closing-period/closing-period-store.js";
+import type { JWTAccessPayload } from "@platform/shared";
 
 export interface CreatePlatformAppOptions {
   sourceConnectors?: SourceConnectorRegistry;
@@ -29,21 +29,10 @@ export interface CreatePlatformAppOptions {
   connectorFactory?: ConnectorFactory;
   userStore?: UserStore;
   tokenService?: TokenService;
-  workspaces?: WorkspaceRecord[];
-  /** Quando informado, as Áreas de Trabalho são gravadas nele a cada mudança (o Map em memória é só cache). */
-  workspaceStore?: WorkspaceStore;
+  closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
   auditLog?: AuditLog;
 }
-
-/** Data civil estrita YYYY-MM-DD (e existente no calendário). */
-const IsoDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD.")
-  .refine((value) => {
-    const parsed = new Date(`${value}T00:00:00Z`);
-    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
-  }, "Data inexistente.");
 
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const app = new Hono();
@@ -68,29 +57,20 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const connectorFactory = options?.connectorFactory || createConnector;
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
-  const workspaceStore = options?.workspaceStore;
-  const workspacesMap = new Map<string, WorkspaceRecord>((options?.workspaces || []).map((w) => [w.id, w]));
+  const closingPeriodStore = options?.closingPeriodStore || new MemoryClosingPeriodStore();
 
   // Remove das roles as permissões que não existem mais no catálogo do sistema (preserva "*").
-  void userStore.syncOrphanPermissions(SYSTEM_PERMISSION_KEYS);
+  const validKeys: ReadonlySet<string> = new Set([...SYSTEM_PERMISSION_KEYS, ...CLOSING_PERIOD_PERMISSIONS.items.map((p) => p.key)]);
+  void userStore.syncOrphanPermissions(validKeys);
 
   // Middleware de Autenticação
   // Administrador (isAdmin) ignora a matriz de permissões: recebe todas as permissões válidas no momento da requisição.
   const withAdminBypass = (payload: JWTAccessPayload): JWTAccessPayload =>
     payload.isAdmin
-      ? { ...payload, permissions: ["*", ...SYSTEM_PERMISSION_KEYS] }
+      ? { ...payload, permissions: ["*", ...validKeys] }
       : payload;
 
   const auth = createAuthMiddleware(tokenService, withAdminBypass);
-
-  // Exige ao menos uma das permissões; ausência de usuário/permissões nega (fail closed).
-  const guard =
-    (...keys: string[]): MiddlewareHandler =>
-    async (c, next) => {
-      const user = c.get("user") as JWTAccessPayload | undefined;
-      if (!keys.some((key) => hasPermission(user?.permissions, key))) return c.json({ error: denyMessage(keys[0]) }, 403);
-      await next();
-    };
 
   // Health check
   app.get("/api/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
@@ -98,8 +78,12 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // Autenticação (/api/auth) é servida pelo Module `iam`, carregado pelo Core num sub-app.
   // O carregamento é assíncrono; a rota aguarda o módulo montar (mount síncrono evita matcher já construído).
   const iamApp = new Hono();
-  const iamReady = loadModules(iamApp, [createIamModule({ userStore, connectionStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass })]);
-  for (const path of ["/api/auth/*", "/api/iam/*"]) {
+  // O Plugin `closing_period` é carregado junto, para o catálogo de Permissions agregar as chaves de ambos.
+  const iamReady = loadModules(iamApp, [
+    createIamModule({ userStore, connectionStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass }),
+    createClosingPeriodModule({ store: closingPeriodStore, auth }),
+  ]);
+  for (const path of ["/api/auth/*", "/api/iam/*", "/api/closing-periods", "/api/closing-periods/*"]) {
     app.all(path, async (c) => {
       await iamReady;
       return iamApp.fetch(c.req.raw);
@@ -197,175 +181,6 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     return c.json({ success: true });
   });
 
-  // ─────────────────────────────────────────────────────────────
-  // 3. WORKSPACES (Permission-First)
-  // ─────────────────────────────────────────────────────────────
-
-  // 1. GET /api/workspaces (Lista todas as Áreas de Trabalho, com filtro opcional por Modelo)
-  app.get(
-    "/api/workspaces",
-    auth,
-    guard("system:workspaces:read"),
-    (c) => c.json(Array.from(workspacesMap.values()).reverse())
-  );
-
-  // 2. GET /api/workspaces/:id (Detalhes e status da Área de Trabalho)
-  app.get(
-    "/api/workspaces/:id",
-    auth,
-    guard("system:workspaces:read"),
-    zValidator("param", z.object({ id: z.string() })),
-    async (c) => {
-      const { id } = c.req.valid("param");
-      const ws = workspacesMap.get(id);
-      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
-      return c.json(ws);
-    }
-  );
-
-  // 3. POST /api/workspaces (Criação de nova Área de Trabalho com datas obrigatórias)
-  app.post(
-    "/api/workspaces",
-    auth,
-    guard("system:workspaces:create"),
-    zValidator(
-      "json",
-      z
-        .object({
-          name: z.string().min(1),
-          startDate: IsoDateSchema,
-          endDate: IsoDateSchema,
-        })
-        .refine(
-          (data) => {
-            const start = new Date(data.startDate);
-            const end = new Date(data.endDate);
-            return end.getTime() >= start.getTime();
-          },
-          {
-            message: "A Data Final não pode ser anterior à Data Inicial.",
-            path: ["endDate"],
-          }
-        )
-    ),
-    async (c) => {
-      const body = c.req.valid("json");
-
-      const id = `ws_${randomUUID()}`;
-      const newWs: WorkspaceRecord = {
-        id,
-        name: body.name,
-        startDate: body.startDate,
-        endDate: body.endDate,
-        status: "open",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      workspacesMap.set(id, newWs);
-      await workspaceStore?.save(newWs);
-      return c.json(newWs, 201);
-    }
-  );
-
-  // 3.1 PUT /api/workspaces/:id (Edição de título e período)
-  app.put(
-    "/api/workspaces/:id",
-    auth,
-    guard("system:workspaces:update"),
-    zValidator("param", z.object({ id: z.string() })),
-    zValidator(
-      "json",
-      z.object({
-        name: z.string().optional(),
-        startDate: IsoDateSchema.optional(),
-        endDate: IsoDateSchema.optional(),
-      })
-    ),
-    async (c) => {
-      const { id } = c.req.valid("param");
-      const body = c.req.valid("json");
-
-      const ws = workspacesMap.get(id);
-      if (!ws) {
-        return c.json({ error: "Área de Trabalho não encontrada." }, 404);
-      }
-
-      // Proteção temporal estrita considerando o período resultante (mesclado)
-      const startDate = body.startDate ?? ws.startDate;
-      const endDate = body.endDate ?? ws.endDate;
-      if (new Date(endDate).getTime() < new Date(startDate).getTime()) {
-        return c.json({ error: "A Data Final não pode ser anterior à Data Inicial." }, 400);
-      }
-
-      if (body.name !== undefined) ws.name = body.name;
-      ws.startDate = startDate;
-      ws.endDate = endDate;
-      ws.updatedAt = new Date().toISOString();
-      await workspaceStore?.save(ws);
-
-      return c.json(ws);
-    }
-  );
-
-  // 4. POST /api/workspaces/:id/conclude (Conclui e bloqueia a Área de Trabalho)
-  app.post(
-    "/api/workspaces/:id/conclude",
-    auth,
-    guard("system:workspaces:close"),
-    zValidator("param", z.object({ id: z.string() })),
-    async (c) => {
-      const { id } = c.req.valid("param");
-
-      const ws = workspacesMap.get(id);
-      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
-      ws.status = "closed";
-      ws.updatedAt = new Date().toISOString();
-      await workspaceStore?.save(ws);
-
-      return c.json({ success: true, workspace: ws });
-    }
-  );
-
-  // 5. POST /api/workspaces/:id/reopen (Reabre a Área de Trabalho concluída)
-  app.post(
-    "/api/workspaces/:id/reopen",
-    auth,
-    guard("system:workspaces:reopen"),
-    zValidator("param", z.object({ id: z.string() })),
-    async (c) => {
-      const { id } = c.req.valid("param");
-
-      const ws = workspacesMap.get(id);
-      if (!ws) return c.json({ error: "Área de Trabalho não encontrada." }, 404);
-      ws.status = "open";
-      ws.updatedAt = new Date().toISOString();
-      await workspaceStore?.save(ws);
-
-      return c.json({ success: true, workspace: ws });
-    }
-  );
-
-  // 5.1 DELETE /api/workspaces/:id (Exclui Área de Trabalho — permission-first)
-  app.delete(
-    "/api/workspaces/:id",
-    auth,
-    guard("system:workspaces:delete"),
-    zValidator("param", z.object({ id: z.string() })),
-    async (c) => {
-      const { id } = c.req.valid("param");
-
-      const ws = workspacesMap.get(id);
-      if (!ws) {
-        return c.json({ error: "Área de Trabalho não encontrada." }, 404);
-      }
-
-      workspacesMap.delete(id);
-      await workspaceStore?.remove(id);
-      return c.json({ success: true });
-    }
-  );
-
   return app;
 }
 
@@ -377,22 +192,20 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     let userStore: UserStore | undefined;
     const sourceConnectors: SourceConnectorRegistry = {};
     let connectionStore: ConnectionStore | undefined;
-    let workspaceStore: WorkspaceStore | undefined;
-    let workspaces: WorkspaceRecord[] = [];
+    let closingPeriodStore: ClosingPeriodStore | undefined;
     let auditLog: AuditLog | undefined;
     if (process.env.POSTGRES_HOST) {
-      const [{ db }, { PostgresUserStore }, { PostgresConnectionStore }, { PostgresWorkspaceStore }] = await Promise.all([
+      const [{ db }, { PostgresUserStore }, { PostgresConnectionStore }, { PostgresClosingPeriodStore }] = await Promise.all([
         import("./db/client.js"),
         import("./iam/postgres-user-store.js"),
         import("./data/postgres-connection-store.js"),
-        import("./data/postgres-workspace-store.js"),
+        import("./closing-period/postgres-closing-period-store.js"),
       ]);
       userStore = new PostgresUserStore(db);
       connectionStore = new PostgresConnectionStore(db);
-      workspaceStore = new PostgresWorkspaceStore(db);
+      closingPeriodStore = new PostgresClosingPeriodStore(db);
       const { PostgresAuditStore } = await import("./audit/postgres-audit-store.js");
       auditLog = new AuditLog(new PostgresAuditStore(db));
-      workspaces = await workspaceStore.list();
 
       for (const record of await connectionStore.list()) {
         try {
@@ -403,7 +216,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       }
     }
 
-    const app = createPlatformApp({ userStore, connectionStore, workspaceStore, workspaces, sourceConnectors, auditLog });
+    const app = createPlatformApp({ userStore, connectionStore, closingPeriodStore, sourceConnectors, auditLog });
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
     serve({ fetch: app.fetch, port });

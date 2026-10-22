@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { createPlatformApp } from "../src/index.js";
-import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { createSeededUserStore } from "./helpers/fixtures.js";
 
 describe("Hono API Integration Test", () => {
-  const app = createPlatformApp({ userStore: createSeededUserStore({ admin: true }), workspaces: seededWorkspaces });
+  const app = createPlatformApp({ userStore: createSeededUserStore({ admin: true }) });
 
   it("GET /api/health deve responder status ok", async () => {
     const res = await app.request("/api/health");

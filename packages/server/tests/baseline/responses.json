@@ -31,14 +31,10 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
           "system:sources:manage",
-          "system:audit:read"
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:create"
         ],
         "externals": {
           "inovafarma": 1,
@@ -107,14 +103,10 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
           "system:sources:manage",
-          "system:audit:read"
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:create"
         ],
         "isAdmin": true,
         "externals": {},
@@ -149,14 +141,10 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
           "system:sources:manage",
-          "system:audit:read"
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:create"
         ],
         "externals": {
           "inovafarma": 1,
@@ -193,14 +181,10 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
           "system:sources:manage",
-          "system:audit:read"
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:create"
         ],
         "externals": {
           "inovafarma": 1,
@@ -256,14 +240,10 @@
         "system:roles:read",
         "system:roles:update",
         "system:roles:delete",
-        "system:workspaces:create",
-        "system:workspaces:read",
-        "system:workspaces:update",
-        "system:workspaces:delete",
-        "system:workspaces:close",
-        "system:workspaces:reopen",
         "system:sources:manage",
-        "system:audit:read"
+        "system:audit:read",
+        "closing_period:period:read",
+        "closing_period:period:create"
       ],
       "externals": {
         "inovafarma": 1,
@@ -291,14 +271,10 @@
         "system:roles:read",
         "system:roles:update",
         "system:roles:delete",
-        "system:workspaces:create",
-        "system:workspaces:read",
-        "system:workspaces:update",
-        "system:workspaces:delete",
-        "system:workspaces:close",
-        "system:workspaces:reopen",
         "system:sources:manage",
-        "system:audit:read"
+        "system:audit:read",
+        "closing_period:period:read",
+        "closing_period:period:create"
       ],
       "isAdmin": true,
       "externals": {},
@@ -380,50 +356,6 @@
             "module": "roles"
           }
         ],
-        "workspaces": [
-          {
-            "key": "system:workspaces:create",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho.",
-            "label": "Criar Áreas de Trabalho",
-            "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:read",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho.",
-            "label": "Visualizar Áreas de Trabalho",
-            "description": "Permite listar e abrir áreas de trabalho e consultar seus dados persistidos.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:update",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho.",
-            "label": "Editar Áreas de Trabalho",
-            "description": "Permite alterar o título, o período e os parâmetros de áreas de trabalho existentes.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:delete",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete).",
-            "label": "Excluir Áreas de Trabalho",
-            "description": "Permite excluir instâncias de áreas de trabalho.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:close",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho.",
-            "label": "Concluir/Travar Áreas de Trabalho",
-            "description": "Permite finalizar e travar áreas de trabalho contra novas edições.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:reopen",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen).",
-            "label": "Reabrir Áreas de Trabalho",
-            "description": "Permite reabrir áreas de trabalho concluídas para novas edições e ações.",
-            "module": "workspaces"
-          }
-        ],
         "sources": [
           {
             "key": "system:sources:manage",
@@ -438,6 +370,22 @@
             "label": "Consultar Logs de Auditoria",
             "description": "Permite visualizar o histórico de mutações e ações disparadas na plataforma.",
             "module": "audit"
+          }
+        ],
+        "period": [
+          {
+            "key": "closing_period:period:read",
+            "label": "Visualizar Períodos de Fechamento",
+            "description": "Permite listar e abrir Períodos de Fechamento.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Períodos de Fechamento.",
+            "module": "period"
+          },
+          {
+            "key": "closing_period:period:create",
+            "label": "Criar Períodos de Fechamento",
+            "description": "Permite criar um Período de Fechamento com data inicial e final.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
+            "module": "period"
           }
         ]
       }
@@ -520,50 +468,6 @@
             "module": "roles"
           }
         ],
-        "workspaces": [
-          {
-            "key": "system:workspaces:create",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho.",
-            "label": "Criar Áreas de Trabalho",
-            "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:read",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho.",
-            "label": "Visualizar Áreas de Trabalho",
-            "description": "Permite listar e abrir áreas de trabalho e consultar seus dados persistidos.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:update",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho.",
-            "label": "Editar Áreas de Trabalho",
-            "description": "Permite alterar o título, o período e os parâmetros de áreas de trabalho existentes.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:delete",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete).",
-            "label": "Excluir Áreas de Trabalho",
-            "description": "Permite excluir instâncias de áreas de trabalho.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:close",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho.",
-            "label": "Concluir/Travar Áreas de Trabalho",
-            "description": "Permite finalizar e travar áreas de trabalho contra novas edições.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:reopen",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen).",
-            "label": "Reabrir Áreas de Trabalho",
-            "description": "Permite reabrir áreas de trabalho concluídas para novas edições e ações.",
-            "module": "workspaces"
-          }
-        ],
         "sources": [
           {
             "key": "system:sources:manage",
@@ -578,6 +482,22 @@
             "label": "Consultar Logs de Auditoria",
             "description": "Permite visualizar o histórico de mutações e ações disparadas na plataforma.",
             "module": "audit"
+          }
+        ],
+        "period": [
+          {
+            "key": "closing_period:period:read",
+            "label": "Visualizar Períodos de Fechamento",
+            "description": "Permite listar e abrir Períodos de Fechamento.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Períodos de Fechamento.",
+            "module": "period"
+          },
+          {
+            "key": "closing_period:period:create",
+            "label": "Criar Períodos de Fechamento",
+            "description": "Permite criar um Período de Fechamento com data inicial e final.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
+            "module": "period"
           }
         ]
       }
@@ -735,7 +655,7 @@
       {
         "id": "role_admin",
         "name": "Administrador",
-        "description": "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
+        "description": "Acesso total à plataforma, gestão de usuários e gestão de Períodos de Fechamento.",
         "permissions": [
           "system:users:create",
           "system:users:read",
@@ -746,24 +666,19 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
           "system:sources:manage",
-          "system:audit:read"
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:create"
         ]
       },
       {
         "id": "role_operador",
         "name": "Operador de Fechamento",
-        "description": "Cria e conclui áreas de trabalho.",
+        "description": "Visualiza e cria Períodos de Fechamento.",
         "permissions": [
-          "system:workspaces:read",
-          "system:workspaces:create",
-          "system:workspaces:close"
+          "closing_period:period:read",
+          "closing_period:period:create"
         ]
       },
       {
@@ -795,7 +710,7 @@
       {
         "id": "role_admin",
         "name": "Administrador",
-        "description": "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
+        "description": "Acesso total à plataforma, gestão de usuários e gestão de Períodos de Fechamento.",
         "permissions": [
           "system:users:create",
           "system:users:read",
@@ -806,24 +721,19 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
           "system:sources:manage",
-          "system:audit:read"
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:create"
         ]
       },
       {
         "id": "role_operador",
         "name": "Operador de Fechamento",
-        "description": "Cria e conclui áreas de trabalho.",
+        "description": "Visualiza e cria Períodos de Fechamento.",
         "permissions": [
-          "system:workspaces:read",
-          "system:workspaces:create",
-          "system:workspaces:close"
+          "closing_period:period:read",
+          "closing_period:period:create"
         ]
       },
       {
@@ -1283,7 +1193,7 @@
       "description": "d",
       "permissions": [
         "system:users:read",
-        "system:workspaces:read"
+        "closing_period:period:read"
       ]
     }
   },
@@ -1371,7 +1281,7 @@
       {
         "id": "role_admin",
         "name": "Administrador",
-        "description": "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
+        "description": "Acesso total à plataforma, gestão de usuários e gestão de Períodos de Fechamento.",
         "permissions": [
           "system:users:create",
           "system:users:read",
@@ -1382,24 +1292,19 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
           "system:sources:manage",
-          "system:audit:read"
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:create"
         ]
       },
       {
         "id": "role_operador",
         "name": "Operador de Fechamento",
-        "description": "Cria e conclui áreas de trabalho.",
+        "description": "Visualiza e cria Períodos de Fechamento.",
         "permissions": [
-          "system:workspaces:read",
-          "system:workspaces:create",
-          "system:workspaces:close"
+          "closing_period:period:read",
+          "closing_period:period:create"
         ]
       },
       {
@@ -1426,78 +1331,41 @@
       }
     ]
   },
-  "ws.list.401": {
+  "cp.list.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "ws.list.ok": {
+  "cp.list.ok": {
     "status": 200,
-    "body": [
-      {
-        "id": "ws_fechamento_dez_2025",
-        "name": "Fechamento Mensal — Dezembro / 2025",
-        "startDate": "2025-12-01",
-        "endDate": "2025-12-31",
-        "status": "closed",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      },
-      {
-        "id": "ws_fechamento_jan_2026",
-        "name": "Fechamento Mensal — Janeiro / 2026",
-        "startDate": "2026-01-01",
-        "endDate": "2026-01-31",
-        "status": "open",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      }
-    ]
+    "body": []
   },
-  "ws.list.403": {
+  "cp.list.403": {
     "status": 403,
     "body": {
-      "error": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho."
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "closing_period:period:read"
+      ]
     }
   },
-  "ws.detail.ok": {
-    "status": 200,
-    "body": {
-      "id": "ws_fechamento_jan_2026",
-      "name": "Fechamento Mensal — Janeiro / 2026",
-      "startDate": "2026-01-01",
-      "endDate": "2026-01-31",
-      "status": "open",
-      "createdAt": "<ts>",
-      "updatedAt": "<ts>"
-    }
-  },
-  "ws.detail.401": {
-    "status": 401,
-    "body": {
-      "error": "Não autenticado: token de acesso não fornecido."
-    }
-  },
-  "ws.detail.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho."
-    }
-  },
-  "ws.detail.unknown_404": {
+  "cp.detail.unknown_404": {
     "status": 404,
     "body": {
-      "error": "Área de Trabalho não encontrada."
+      "error": "Período de Fechamento não encontrado."
     }
   },
-  "ws.create.403": {
+  "cp.create.403": {
     "status": 403,
     "body": {
-      "error": "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho."
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "closing_period:period:create"
+      ]
     }
   },
-  "ws.create.400_dates": {
+  "cp.create.400_dates": {
     "status": 400,
     "body": {
       "success": false,
@@ -1515,7 +1383,7 @@
       }
     }
   },
-  "ws.create.400_missing_fields": {
+  "cp.create.400_missing_fields": {
     "status": 400,
     "body": {
       "success": false,
@@ -1544,10 +1412,10 @@
       }
     }
   },
-  "ws.create.ok": {
+  "cp.create.ok": {
     "status": 201,
     "body": {
-      "id": "ws_<uuid>",
+      "id": "cp_<uuid>",
       "name": "Fevereiro",
       "startDate": "2026-02-01",
       "endDate": "2026-02-28",
@@ -1556,150 +1424,16 @@
       "updatedAt": "<ts>"
     }
   },
-  "ws.create.admin_bypass": {
-    "status": 201,
+  "cp.create.400_overlap": {
+    "status": 400,
     "body": {
-      "id": "ws_<uuid>",
-      "name": "Via admin",
-      "startDate": "2026-02-01",
-      "endDate": "2026-02-28",
-      "status": "open",
-      "createdAt": "<ts>",
-      "updatedAt": "<ts>"
+      "error": "O período informado coincide com \"Fevereiro\" (2026-02-01 a 2026-02-28). Uma data pertence a no máximo um Período de Fechamento."
     }
   },
-  "ws.create.401": {
+  "cp.create.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
-    }
-  },
-  "ws.update.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho."
-    }
-  },
-  "ws.update.ok": {
-    "status": 200,
-    "body": {
-      "id": "ws_<uuid>",
-      "name": "Renomeada",
-      "startDate": "2026-02-01",
-      "endDate": "2026-03-05",
-      "status": "open",
-      "createdAt": "<ts>",
-      "updatedAt": "<ts>"
-    }
-  },
-  "ws.update.400_dates": {
-    "status": 400,
-    "body": {
-      "error": "A Data Final não pode ser anterior à Data Inicial."
-    }
-  },
-  "ws.update.400_invalid_date": {
-    "status": 400,
-    "body": {
-      "success": false,
-      "error": {
-        "issues": [
-          {
-            "validation": "regex",
-            "code": "invalid_string",
-            "message": "Use o formato YYYY-MM-DD.",
-            "path": [
-              "startDate"
-            ]
-          },
-          {
-            "code": "custom",
-            "message": "Data inexistente.",
-            "path": [
-              "startDate"
-            ]
-          }
-        ],
-        "name": "ZodError"
-      }
-    }
-  },
-  "ws.update.404": {
-    "status": 404,
-    "body": {
-      "error": "Área de Trabalho não encontrada."
-    }
-  },
-  "ws.conclude.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho."
-    }
-  },
-  "ws.conclude.ok": {
-    "status": 200,
-    "body": {
-      "success": true,
-      "workspace": {
-        "id": "ws_<uuid>",
-        "name": "Renomeada",
-        "startDate": "2026-02-01",
-        "endDate": "2026-03-05",
-        "status": "closed",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      }
-    }
-  },
-  "ws.conclude.unknown_404": {
-    "status": 404,
-    "body": {
-      "error": "Área de Trabalho não encontrada."
-    }
-  },
-  "ws.reopen.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen)."
-    }
-  },
-  "ws.reopen.ok": {
-    "status": 200,
-    "body": {
-      "success": true,
-      "workspace": {
-        "id": "ws_<uuid>",
-        "name": "Renomeada",
-        "startDate": "2026-02-01",
-        "endDate": "2026-03-05",
-        "status": "open",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      }
-    }
-  },
-  "ws.reopen.unknown_404": {
-    "status": 404,
-    "body": {
-      "error": "Área de Trabalho não encontrada."
-    }
-  },
-  "ws.delete.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete)."
-    }
-  },
-  "ws.delete.ok": {
-    "status": 200,
-    "body": {
-      "success": true
-    }
-  },
-  "ws.delete.404": {
-    "status": 404,
-    "body": {
-      "error": "Área de Trabalho não encontrada."
     }
   },
   "admin.erp_types.ok": {
@@ -2145,7 +1879,7 @@
   "iam.grants.users.update.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:workspaces:create, system:workspaces:read, system:workspaces:update, system:workspaces:delete, system:workspaces:close, system:workspaces:reopen, system:sources:manage, system:audit:read."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
     }
   },
   "iam.grants.users.update.ok_subset_role": {
@@ -2164,7 +1898,7 @@
   "iam.grants.users.create.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:workspaces:create, system:workspaces:read, system:workspaces:update, system:workspaces:delete, system:workspaces:close, system:workspaces:reopen, system:sources:manage, system:audit:read."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
     }
   },
   "iam.grants.users.create.ok_subset_role": {

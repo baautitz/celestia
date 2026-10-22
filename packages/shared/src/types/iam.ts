@@ -125,7 +125,7 @@ export interface UpdateRoleInput {
  * Item individual no catálogo de permissões.
  */
 export interface PermissionItem {
-  key: string;         // Ex: "system:users:create", "system:workspaces:close"
+  key: string;         // Ex: "system:users:create", "closing_period:period:create"
   label: string;       // Nome amigável para exibição
   description?: string;
   module?: string;     // Módulo no caso de system (ex: "users", "roles")

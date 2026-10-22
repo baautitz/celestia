@@ -8,10 +8,13 @@ import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
 import { LastAdminError } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresConnectionStore } from "../src/data/postgres-connection-store.js";
-import { PostgresWorkspaceStore } from "../src/data/postgres-workspace-store.js";
+import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
 
-const plan = [{ moduleId: "server", folder: resolve(import.meta.dirname, "../drizzle") }];
+const plan = [
+  { moduleId: "server", folder: resolve(import.meta.dirname, "../drizzle") },
+  { moduleId: "closing_period", folder: resolve(import.meta.dirname, "../src/closing-period/drizzle") },
+];
 
 describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
   // Criados no beforeAll: o corpo do describe roda mesmo quando a suíte é ignorada.
@@ -25,7 +28,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
     await assertMigrationsUpToDate(db, plan);
   });
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE users, roles, connections, workspaces CASCADE`);
+    await db.execute(sql`TRUNCATE users, roles, connections, closing_period.periods CASCADE`);
   });
   afterAll(async () => {
     await pool?.end();
@@ -142,9 +145,9 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
     });
   });
 
-  describe("Closing Periods (workspaces)", () => {
-    it("salva (upsert), lista e remove", async () => {
-      const store = new PostgresWorkspaceStore(db);
+  describe("Closing Periods", () => {
+    it("salva (upsert), lista e lê", async () => {
+      const store = new PostgresClosingPeriodStore(db);
       const ws = {
         id: "w1",
         name: "Out/2026",
@@ -157,8 +160,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       await store.save(ws);
       await store.save({ ...ws, status: "closed" });
       expect(await store.list()).toEqual([{ ...ws, status: "closed" }]);
-      await store.remove("w1");
-      expect(await store.list()).toEqual([]);
+      expect(await store.get("w1")).toEqual({ ...ws, status: "closed" });
+      expect(await store.get("nada")).toBeNull();
     });
   });
 });
