@@ -7,6 +7,7 @@ import type {
   ErpTypeMeta,
   ErpConnection,
   ErpConnectionInput,
+  ClosingPeriodRecord,
 } from "@platform/shared";
 
 class ApiClient {
@@ -191,6 +192,12 @@ class ApiClient {
   };
 
   // ─── ERPs (FONTES DE DADOS) ──────────────────────────────────────────────
+  closingPeriods = {
+    list: async (): Promise<ClosingPeriodRecord[]> => {
+      return this.request<ClosingPeriodRecord[]>("/api/closing-periods");
+    },
+  };
+
   erps = {
     listTypes: async (): Promise<ErpTypeMeta[]> => {
       return this.request<ErpTypeMeta[]>("/api/admin/erp-types");
