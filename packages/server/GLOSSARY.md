@@ -11,8 +11,20 @@ One contiguous range of dates of any length, from a start date to an end date in
 _Avoid_: Workspace, Área de Trabalho, session, period
 
 **Cancel** (a Closing Period):
-Remove a Closing Period so its dates become free for another one. It is the only way to release dates; an open or concluded Closing Period always holds them.
+Remove a Closing Period so its dates become free for another one. It is the only way to release dates; an open or closed Closing Period always holds them.
 _Avoid_: Delete, reopen
+
+**Close** (a Closing Period):
+Mark a Closing Period as finished. A closed Closing Period still holds its dates and its range cannot be edited.
+_Avoid_: Conclude, finish
+
+**Reopen** (a Closing Period):
+Return a closed Closing Period to open, so its range can be edited or it can be cancelled.
+_Avoid_: Unclose, undo
+
+**Open** / **Closed**:
+The two states of a Closing Period. An open Closing Period can have its range edited and be cancelled.
+_Avoid_: Concluded, concluído, active
 
 ### ERPs
 
@@ -27,3 +39,17 @@ _Avoid_: ERP type, connector type
 **Externals**:
 The values that map a user to an ERP's own concepts, such as the user's ID, company or region in that ERP. A user has a set of Externals per ERP. The fields are declared by the module that integrates that ERP, not fixed by the platform.
 _Avoid_: External IDs, mapping, identifiers
+
+### Access
+
+**Role** (pt-BR: **Perfil**):
+A named group of Permissions assigned to users. A user has exactly one Role.
+_Avoid_: Perfil de Acesso, group, profile
+
+**Permission**:
+A key that authorizes one action, written `<module>:<resource>:<verb>`.
+_Avoid_: Privilege, right, scope
+
+**Administrator**:
+A user with full access who bypasses the Permission matrix and is granted every valid Permission. It is a flag on the user, not a Role.
+_Avoid_: Super user, root, admin role
