@@ -6,9 +6,7 @@ import { canGrant, grantDeniedMessage, missingGrants } from "../src/iam/can-gran
 import { SYSTEM_PERMISSION_KEYS } from "../src/iam/system-permissions.js";
 import { hasPermission } from "../src/iam/has-permission.js";
 import { PasswordService } from "../src/iam/password-service.js";
-import { authHeader, createSeededUserStore, seededWorkspaces, TEST_PASSWORD } from "./helpers/fixtures.js";
-
-const WS = "ws_fechamento_jan_2026";
+import { authHeader, createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 describe("hardening de auth: permissão ausente falha fechado", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -17,12 +15,9 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
 
   beforeAll(async () => {
     const userStore = createSeededUserStore();
-    await userStore.createRole({ id: "role_so_leitura", name: "Só leitura", description: "d", permissions: ["system:workspaces:read"] });
+    await userStore.createRole({ id: "role_so_leitura", name: "Só leitura", description: "d", permissions: ["closing_period:period:read"] });
     await userStore.createUser({ fullname: "Teste Usuario", username: "sem.view", password: TEST_PASSWORD, roleId: "role_so_leitura", externals: {} });
-    app = createPlatformApp({
-      userStore,
-      workspaces: seededWorkspaces.map((w) => ({ ...w })),
-    });
+    app = createPlatformApp({ userStore });
     // Criado após o boot: o sync de órfãs remove "*" de roles existentes na inicialização.
     await userStore.createRole({ id: "role_curinga", name: "Curinga", description: "d", permissions: ["*"] });
     await userStore.createUser({ fullname: "Teste Usuario", username: "cur.inga", password: TEST_PASSWORD, roleId: "role_curinga", externals: {} });
@@ -30,20 +25,18 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     curinga = await authHeader(app, "cur.inga");
   });
 
-  it("sem permissão: mutações de workspace respondem 403; sem token, 401", async () => {
+  it("sem permissão: criar Closing Period responde 403; sem token, 401", async () => {
     const send = (method: string, path: string, headers: Record<string, string> = {}, body?: object) =>
       app.request(path, { method, headers: { "Content-Type": "application/json", ...headers }, body: body ? JSON.stringify(body) : undefined });
     const novo = { name: "Nova", startDate: "2026-02-01", endDate: "2026-02-28" };
-    expect((await send("POST", "/api/workspaces", semView, novo)).status).toBe(403);
-    expect((await send("POST", `/api/workspaces/${WS}/conclude`, semView)).status).toBe(403);
-    expect((await send("DELETE", `/api/workspaces/${WS}`, semView)).status).toBe(403);
-    expect((await send("GET", "/api/workspaces")).status).toBe(401);
-    expect((await send("POST", "/api/workspaces", {}, novo)).status).toBe(401);
+    expect((await send("POST", "/api/closing-periods", semView, novo)).status).toBe(403);
+    expect((await send("GET", "/api/closing-periods")).status).toBe(401);
+    expect((await send("POST", "/api/closing-periods", {}, novo)).status).toBe(401);
   });
 
-  it("curinga '*' não-admin acessa rotas system:* e workspaces", async () => {
+  it("curinga '*' não-admin acessa rotas system:* e Closing Periods", async () => {
     expect((await app.request("/api/iam/users", { headers: curinga })).status).toBe(200);
-    expect((await app.request("/api/workspaces", { headers: curinga })).status).toBe(200);
+    expect((await app.request("/api/closing-periods", { headers: curinga })).status).toBe(200);
   });
 
   it("role com '*' mantém o curinga após o sync de órfãs", async () => {
@@ -285,51 +278,6 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       );
       const res = await app.request("/api/auth/me", { headers: { Authorization: `Bearer ${forged}` } });
       expect(res.status).toBe(401);
-    });
-  });
-
-  describe("Áreas de Trabalho: datas e permissões", () => {
-    let semView: Record<string, string>;
-
-    beforeAll(async () => {
-      const store = createSeededUserStore();
-      await store.createRole({ id: "role_cria", name: "Cria", description: "d", permissions: ["system:workspaces:create"] });
-      await store.createUser({ fullname: "Cria Sem Close", username: "cria.semclose", password: TEST_PASSWORD, roleId: "role_cria", externals: {} });
-      app = createPlatformApp({ userStore: store, workspaces: seededWorkspaces.map((w) => ({ ...w })) });
-      semView = await authHeader(app, "cria.semclose");
-    });
-
-    it("datas de workspace: YYYY-MM-DD estrito no POST e no PUT", async () => {
-      const gerente = await authHeader(app, "carlos.admin");
-      const put = (body: object) =>
-        app.request(`/api/workspaces/${WS}`, { method: "PUT", headers: { "Content-Type": "application/json", ...gerente }, body: JSON.stringify(body) });
-      expect((await put({ startDate: "abc" })).status).toBe(400);
-      expect((await put({ endDate: "2026-02-30" })).status).toBe(400);
-      expect((await put({ endDate: "2025-01-01" })).status).toBe(400);
-      const post = await app.request("/api/workspaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...gerente },
-        body: JSON.stringify({ name: "Fev", startDate: "01/02/2026", endDate: "2026-02-28" }),
-      });
-      expect(post.status).toBe(400);
-      expect((await put({ endDate: "2026-02-10" })).status).toBe(200);
-    });
-
-    it("conclude e reopen exigem close/reopen; só create não basta", async () => {
-      for (const action of ["conclude", "reopen"]) {
-        const res = await app.request(`/api/workspaces/${WS}/${action}`, { method: "POST", headers: semView });
-        expect(res.status).toBe(403);
-      }
-    });
-
-    it("criar exige só system:workspaces:create e o corpo não tem recipeId", async () => {
-      const res = await app.request("/api/workspaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...semView },
-        body: JSON.stringify({ name: "Fev", startDate: "2026-02-01", endDate: "2026-02-28" }),
-      });
-      expect(res.status).toBe(201);
-      expect(((await res.json()) as { recipeId?: string }).recipeId).toBeUndefined();
     });
   });
 

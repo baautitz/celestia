@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createPlatformApp } from "../src/index.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
 import type { SourceConnector } from "../src/data/source-connector.js";
-import { createSeededUserStore, seededWorkspaces, TEST_PASSWORD } from "./helpers/fixtures.js";
+import { createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 // Baseline executável: congela status+body de todas as rotas HTTP antes da refatoração em módulos.
 // Regenerar: UPDATE_BASELINE=1 pnpm --filter @platform/server test baseline
@@ -50,7 +50,6 @@ async function fresh(): Promise<void> {
   rootId = root.id;
   app = createPlatformApp({
     userStore,
-    workspaces: seededWorkspaces.map((w) => ({ ...w })),
     connectorFactory: (record) => (record.config.host === "bad" ? failingConnector : okConnector),
   });
 }
@@ -85,7 +84,6 @@ async function rec(key: string, method: string, path: string, opts: Opts = {}): 
 
 const tick = () => vi.setSystemTime(new Date(Date.now() + 1000));
 
-const WS = "ws_fechamento_jan_2026";
 describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   beforeAll(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -196,7 +194,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   describe("iam-roles", () => {
     it("rotas", async () => {
     // ── IAM roles
-    const role = { id: "role_teste", name: "Grupo Teste", description: "d", permissions: ["system:users:read", "system:workspaces:read"] };
+    const role = { id: "role_teste", name: "Grupo Teste", description: "d", permissions: ["system:users:read", "closing_period:period:read"] };
     await rec("iam.roles.create.401", "POST", "/api/iam/roles", { body: role });
     await rec("iam.roles.create.403", "POST", "/api/iam/roles", { token: V, body: role });
     await rec("iam.roles.create.400_invalid_keys", "POST", "/api/iam/roles", { token: A, body: { ...role, permissions: ["system:foo:bar", "recipe:nada:view"] } });
@@ -217,41 +215,20 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     });
   });
 
-  describe("workspaces", () => {
+  describe("closing-periods", () => {
     it("rotas", async () => {
-    // ── workspaces (auth opcional: sem token passa; 403 só com token sem permissão)
-    await rec("ws.list.401", "GET", "/api/workspaces");
-    await rec("ws.list.ok", "GET", "/api/workspaces", { token: O });
-    await rec("ws.list.403", "GET", "/api/workspaces", { token: V });
-    await rec("ws.detail.ok", "GET", `/api/workspaces/${WS}`, { token: O });
-    await rec("ws.detail.401", "GET", `/api/workspaces/${WS}`);
-    await rec("ws.detail.403", "GET", `/api/workspaces/${WS}`, { token: V });
-    await rec("ws.detail.unknown_404", "GET", "/api/workspaces/ws_inexistente", { token: O });
-    const wsNew = { name: "Fevereiro", startDate: "2026-02-01", endDate: "2026-02-28" };
-    await rec("ws.create.403", "POST", "/api/workspaces", { token: V, body: wsNew });
-    await rec("ws.create.400_dates", "POST", "/api/workspaces", { token: A, body: { ...wsNew, startDate: "2026-03-01", endDate: "2026-02-01" } });
-    await rec("ws.create.400_missing_fields", "POST", "/api/workspaces", { token: A, body: { name: "Sem datas" } });
+    await rec("cp.list.401", "GET", "/api/closing-periods");
+    await rec("cp.list.ok", "GET", "/api/closing-periods", { token: O });
+    await rec("cp.list.403", "GET", "/api/closing-periods", { token: V });
+    await rec("cp.detail.unknown_404", "GET", "/api/closing-periods/cp_inexistente", { token: O });
+    const cpNew = { name: "Fevereiro", startDate: "2026-02-01", endDate: "2026-02-28" };
+    await rec("cp.create.403", "POST", "/api/closing-periods", { token: V, body: cpNew });
+    await rec("cp.create.400_dates", "POST", "/api/closing-periods", { token: A, body: { ...cpNew, startDate: "2026-03-01", endDate: "2026-02-01" } });
+    await rec("cp.create.400_missing_fields", "POST", "/api/closing-periods", { token: A, body: { name: "Sem datas" } });
     tick();
-    const wsCreated = await rec("ws.create.ok", "POST", "/api/workspaces", { token: A, body: wsNew });
-    const wsId = (wsCreated.raw as { id: string }).id;
-    tick();
-    await rec("ws.create.admin_bypass", "POST", "/api/workspaces", { token: R, body: { ...wsNew, name: "Via admin" } });
-    tick();
-    await rec("ws.create.401", "POST", "/api/workspaces", { body: wsNew });
-    await rec("ws.update.403", "PUT", `/api/workspaces/${wsId}`, { token: V, body: { name: "Y Z" } });
-    await rec("ws.update.ok", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { name: "Renomeada", endDate: "2026-03-05" } });
-    await rec("ws.update.400_dates", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { endDate: "2026-01-01" } });
-    await rec("ws.update.400_invalid_date", "PUT", `/api/workspaces/${wsId}`, { token: A, body: { startDate: "abc" } });
-    await rec("ws.update.404", "PUT", "/api/workspaces/nao_existe", { token: A, body: { name: "Y Z" } });
-    await rec("ws.conclude.403", "POST", `/api/workspaces/${wsId}/conclude`, { token: V });
-    await rec("ws.conclude.ok", "POST", `/api/workspaces/${wsId}/conclude`, { token: O });
-    await rec("ws.conclude.unknown_404", "POST", "/api/workspaces/ws_fantasma/conclude", { token: A });
-    await rec("ws.reopen.403", "POST", `/api/workspaces/${wsId}/reopen`, { token: V });
-    await rec("ws.reopen.ok", "POST", `/api/workspaces/${wsId}/reopen`, { token: A });
-    await rec("ws.reopen.unknown_404", "POST", "/api/workspaces/ws_fantasma2/reopen", { token: A });
-    await rec("ws.delete.403", "DELETE", `/api/workspaces/${wsId}`, { token: V });
-    await rec("ws.delete.ok", "DELETE", `/api/workspaces/${wsId}`, { token: A });
-    await rec("ws.delete.404", "DELETE", `/api/workspaces/${wsId}`, { token: A });
+    await rec("cp.create.ok", "POST", "/api/closing-periods", { token: A, body: cpNew });
+    await rec("cp.create.400_overlap", "POST", "/api/closing-periods", { token: A, body: { ...cpNew, name: "Toca", startDate: "2026-02-28", endDate: "2026-03-10" } });
+    await rec("cp.create.401", "POST", "/api/closing-periods", { body: cpNew });
 
     });
   });

@@ -1,4 +1,5 @@
-import type { Role, User, WorkspaceRecord } from "@platform/shared";
+import type { Role, User } from "@platform/shared";
+import { CLOSING_PERIOD_PERMISSIONS } from "../../src/closing-period/closing-period-permissions.js";
 import { PasswordService } from "../../src/iam/password-service.js";
 import { SYSTEM_PERMISSIONS } from "../../src/iam/system-permissions.js";
 import { MemoryUserStore } from "../../src/iam/user-store.js";
@@ -9,17 +10,16 @@ const roles: Role[] = [
   {
     id: "role_admin",
     name: "Administrador",
-    description: "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
-    permissions: SYSTEM_PERMISSIONS.map((p) => p.key),
+    description: "Acesso total à plataforma, gestão de usuários e gestão de Períodos de Fechamento.",
+    permissions: [...SYSTEM_PERMISSIONS, ...CLOSING_PERIOD_PERMISSIONS.items].map((p) => p.key),
   },
   {
     id: "role_operador",
     name: "Operador de Fechamento",
-    description: "Cria e conclui áreas de trabalho.",
+    description: "Visualiza e cria Períodos de Fechamento.",
     permissions: [
-      "system:workspaces:read",
-      "system:workspaces:create",
-      "system:workspaces:close",
+      CLOSING_PERIOD_PERMISSIONS.keys["period:read"],
+      CLOSING_PERIOD_PERMISSIONS.keys["period:create"],
     ],
   },
   {
@@ -59,27 +59,6 @@ export function createSeededUserStore(opts: { admin?: boolean } = {}): MemoryUse
     ],
   });
 }
-
-export const seededWorkspaces: WorkspaceRecord[] = [
-  {
-    id: "ws_fechamento_jan_2026",
-    name: "Fechamento Mensal — Janeiro / 2026",
-    startDate: "2026-01-01",
-    endDate: "2026-01-31",
-    status: "open",
-    createdAt: "2026-02-01T08:00:00Z",
-    updatedAt: "2026-02-01T08:00:00Z",
-  },
-  {
-    id: "ws_fechamento_dez_2025",
-    name: "Fechamento Mensal — Dezembro / 2025",
-    startDate: "2025-12-01",
-    endDate: "2025-12-31",
-    status: "closed",
-    createdAt: "2026-01-02T09:30:00Z",
-    updatedAt: "2026-01-02T09:30:00Z",
-  },
-];
 
 /** Login de um usuário semeado; devolve o header Authorization pronto para `app.request`. */
 export async function authHeader(

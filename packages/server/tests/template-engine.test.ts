@@ -5,12 +5,12 @@ describe("TemplateEngine (Segurança & Bind Parameters)", () => {
   it("deve converter tokens em parâmetros posicionais seguros (@p1, @p2)", () => {
     const rawSql = `
       SELECT id, name FROM vendas 
-      WHERE created_at BETWEEN {{workspace.start_date}} AND {{workspace.end_date}}
+      WHERE created_at BETWEEN {{closing_period.start_date}} AND {{closing_period.end_date}}
         AND vendedor_id = {{user.externals.inovafarma}}
     `;
 
     const context = {
-      workspace: {
+      closing_period: {
         start_date: "2026-01-01",
         end_date: "2026-01-31",
       },
@@ -34,8 +34,8 @@ describe("TemplateEngine (Segurança & Bind Parameters)", () => {
   });
 
   it("deve tratar tokens não encontrados como null com segurança", () => {
-    const rawSql = "SELECT * FROM produtos WHERE cat_id = {{workspace.categories_focus}}";
-    const context = { workspace: {} };
+    const rawSql = "SELECT * FROM produtos WHERE cat_id = {{closing_period.categories_focus}}";
+    const context = { closing_period: {} };
 
     const result = TemplateEngine.parse(rawSql, context);
 

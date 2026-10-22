@@ -1,10 +1,11 @@
+import { CLOSING_PERIOD_PERMISSIONS } from "../src/closing-period/closing-period-permissions.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { createPlatformApp } from "../src/index.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { TokenService } from "../src/iam/token-service.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
 import { SYSTEM_PERMISSION_KEYS } from "../src/iam/system-permissions.js";
-import { createSeededUserStore, seededWorkspaces } from "./helpers/fixtures.js";
+import { createSeededUserStore } from "./helpers/fixtures.js";
 import type {
   AuthTokens,
   User,
@@ -28,7 +29,6 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
     app = createPlatformApp({
       userStore,
       tokenService,
-      workspaces: seededWorkspaces,
     });
   });
 
@@ -269,7 +269,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
         permissions: ["*", "system:users:read", "system:antiga:removida", "recipe:dashboard_inexistente:view"],
       });
 
-      const removedCount = await userStore.syncOrphanPermissions(SYSTEM_PERMISSION_KEYS);
+      const removedCount = await userStore.syncOrphanPermissions(new Set([...SYSTEM_PERMISSION_KEYS, ...CLOSING_PERIOD_PERMISSIONS.items.map((p) => p.key)]));
 
       expect(removedCount).toBe(2);
       expect((await userStore.getRole("role_teste_orfas"))?.permissions).toEqual(["*", "system:users:read"]);
@@ -282,50 +282,6 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
         body: JSON.stringify({ id: "role_x", name: "Role X", permissions: ["recipe:fechamento_mes:view"] }),
       });
       expect(res.status).toBe(400);
-    });
-  });
-
-  // ─── 5. ENFORCEMENT DE PERMISSÃO NAS ÁREAS DE TRABALHO ─────────────────────
-  describe("5. Áreas de Trabalho: Proteção por Permissão (não-admin, sem '*')", () => {
-    let vendedorToken: string;
-    let operadorToken: string;
-
-    const login = async (username: string) => {
-      const res = await app.request("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password: "Senha@123" }),
-      });
-      return ((await res.json()) as AuthTokens).accessToken;
-    };
-    const call = (path: string, token: string, init: RequestInit = {}) =>
-      app.request(path, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
-
-    beforeEach(async () => {
-      vendedorToken = await login("joao.silva");
-      operadorToken = await login("maria.souza");
-    });
-
-    it("sem permissões, listar/criar/concluir/reabrir/excluir devolve 403", async () => {
-      expect((await call("/api/workspaces", vendedorToken)).status).toBe(403);
-      expect((await call("/api/workspaces", vendedorToken, { method: "POST", body: JSON.stringify({ name: "x", startDate: "2026-01-01", endDate: "2026-01-31" }) })).status).toBe(403);
-      for (const action of ["conclude", "reopen"]) {
-        expect((await call(`/api/workspaces/ws_fechamento_jan_2026/${action}`, vendedorToken, { method: "POST" })).status).toBe(403);
-      }
-      expect((await call("/api/workspaces/ws_fechamento_jan_2026", vendedorToken, { method: "DELETE" })).status).toBe(403);
-    });
-
-    it("operador lista, cria e conclui, mas não reabre nem exclui", async () => {
-      expect((await call("/api/workspaces", operadorToken)).status).toBe(200);
-      const created = await call("/api/workspaces", operadorToken, {
-        method: "POST",
-        body: JSON.stringify({ name: "Abril", startDate: "2026-04-01", endDate: "2026-04-30" }),
-      });
-      expect(created.status).toBe(201);
-      expect(((await created.json()) as { recipeId?: string }).recipeId).toBeUndefined();
-      expect((await call("/api/workspaces/ws_fechamento_jan_2026/conclude", operadorToken, { method: "POST" })).status).toBe(200);
-      expect((await call("/api/workspaces/ws_fechamento_jan_2026/reopen", operadorToken, { method: "POST" })).status).toBe(403);
-      expect((await call("/api/workspaces/ws_fechamento_jan_2026", operadorToken, { method: "DELETE" })).status).toBe(403);
     });
   });
 });
