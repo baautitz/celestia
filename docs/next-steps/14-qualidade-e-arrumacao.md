@@ -29,9 +29,8 @@ para os fluxos de login, usuários, perfis e ERPs.
 
 ## 4. Arrumação
 
-- `docs/component_registry.md` e `docs/session-summary-layout-rules.md` têm nota de "histórico";
-  apagar quando não servirem mais de referência.
-- `todo.txt` (raiz, não rastreado): mover o conteúdo para estes documentos e apagar.
+- Os registros históricos de Recipes/SDUI (`component_registry`, `implementation_plan`, `session-summary-layout-rules`) foram apagados; recuperáveis pelo histórico do git.
+- `todo.txt` migrado para `docs/ideas/wishlist.md`.
 - `engines` do `packages/server` ainda exige Node >= 24 por causa do `isolated-vm`, já removido:
   baixar o piso depois de testar em outra versão (hoje o ambiente roda Node 24).
 - **Permissões declaradas sem uso** (verificado por `grep` em server, web e ui):

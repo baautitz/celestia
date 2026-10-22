@@ -72,7 +72,7 @@ paralelo (dúvida D1 abaixo).
 - [ ] **D8** Perfis iniciais e primeiro admin com o banco reconstruído (05)
 - [ ] **D9** Revalidar o access token de 5 min a cada requisição? (13)
 - [ ] **D10** Restringir quem remove permissões de outros perfis (B2)? (13)
-- [ ] **D11** Nome da pasta: `next-stapes` (como digitado) ou `next-steps`? (este índice)
+- [ ] **D11** Nome da pasta: `next-steps` (como digitado) ou `next-steps`? (este índice)
 - [ ] **D12** `AGENTS.md` §12 (pedir confirmação a cada passo) conflita com agentes autônomos (14)
 - [ ] **D13** Tema escuro: manter light-only ou ativar? (14)
 - [ ] **D14** Impressão, expandir linha, campos customizados por ERP: prioridade e módulo dono (15)
