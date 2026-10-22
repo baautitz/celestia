@@ -4,6 +4,9 @@ Tamanho: M. Depende de: 01. Desbloqueia: 04, 10.
 
 ## Objetivo
 
+O Período de Fechamento é um **Plugin** (não faz parte do sistema base). Um Plugin que dependa dele
+traz o módulo para o build do cliente.
+
 Implementar Área de Trabalho (período de fechamento) como módulo próprio, sem `recipe_id`, com a
 invariante de datas, para os módulos de negócio dependerem dele por `dependsOn`.
 
@@ -29,11 +32,29 @@ invariante de datas, para os módulos de negócio dependerem dele por `dependsOn
 6. Controle de versão otimista (hoje inexistente): coluna `version`, `If-Match`/campo `version`,
    409 em conflito (item 9 da auditoria externa; ver 15).
 
+7. Invariante de não sobreposição (hoje inexistente): uma data pertence a no máximo um período,
+   esteja ele aberto ou concluído; só **cancelar** o período libera as datas (ver glossário); criar ou editar um período que toque outro é rejeitado (400).
+   Os períodos podem ter qualquer duração (não só mensal).
+   Um período **aberto** pode ter a faixa ampliada ou reduzida (ex.: 01/08 a 30/08 corrigido para
+   01/08 a 31/08), desde que os dias adicionados não estejam em outro período não cancelado. Período
+   concluído não tem a faixa editada: é preciso reabri-lo antes.
+8. Renomear Workspace / Área de Trabalho para **Período de Fechamento** (`ClosingPeriod`), conforme
+   `packages/server/GLOSSARY.md`: tabela, rotas, permissões `system:*`, tipos em `shared`, `AGENTS.md`.
+
+9. Cancelar = remover a linha (`DELETE /api/workspaces/:id` vira o cancelamento; não existe status
+   "cancelado"). O evento `before` de cancelamento deixa módulos de negócio vetarem quando há dados
+   que dependem do período. Só se cancela um período **aberto**; o concluído é reaberto antes (padrão
+   adotado, ainda não confirmado).
+10. Auditoria por período: um **log global**, com um registro por evento do período (criar, editar
+   faixa, concluir, reabrir, cancelar). Os atributos serão especificados depois; o log ainda não
+   existe e a tarefa 15 (auditoria) é o lugar natural dele.
+
 ## Critério de aceite
 
 - Chaves `ws.*` do baseline sem mudança de status.
 - Datas inválidas continuam 400 com a mensagem `"A Data Final não pode ser anterior à Data Inicial."`.
 - Trava de workspace concluído coberta por teste de não-admin.
+- Períodos com datas em comum (abertos ou concluídos) são rejeitados, coberto por teste.
 
 ## Dúvidas para responder
 

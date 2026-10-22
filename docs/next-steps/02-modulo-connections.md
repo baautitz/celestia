@@ -20,6 +20,12 @@ depender dele por `dependsOn` e consumir um serviço, sem importar arquivos do s
 - CLI `src/cli/erp-query.ts` (ERP-specific).
 - Tabela `connections` (`config` jsonb, `secrets_encrypted`).
 
+## Vocabulário
+
+Conforme `packages/server/GLOSSARY.md`: o cadastro é **ERP** (não "connection"/"source") e o
+`ERP_TYPES` é o **ERP Driver**. `externals` passa a guardar vários campos por ERP (usuário, empresa,
+região...), e quem declara os campos é o módulo que integra o ERP ("o módulo se descreve"; ver 09). Isto é um **Plugin** (não faz parte do sistema base: só entra no build de quem compra), e o InovaFarma depende dele. Renomear módulo, tabela, rotas e permissões (`system:sources:manage`) junto com a extração.
+
 ## Passos
 
 1. `defineModule({ id: "connections", ... })` em `modules/connections`, `mount: "/api"` (URLs iguais).

@@ -14,6 +14,9 @@ Registro das decisões do usuário durante a refatoração, para não serem reab
   `workspaces`, sem `recipe_id`, com a invariante de datas (`end_date >= start_date`).
 - **`persistence_items` saiu**: cada módulo guarda os próprios dados no próprio schema.
 - Sem loja e sem ativar/desativar módulos por enquanto; módulos entram no build.
+- **Implantação**: não é SaaS. Cada cliente roda a própria instância, numa VPS própria (uma instalação
+  por cliente). "Comprar um plugin" significa incluí-lo no build daquele cliente, por isso não há
+  ativação em tempo de execução nem multi-tenancy.
 - **Sem clientes e sem compatibilidade**: o banco será reconstruído; regenerar migrations do zero.
 
 ## Comunicação entre módulos
