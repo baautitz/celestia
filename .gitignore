@@ -26,3 +26,7 @@ Thumbs.db
 *.tsbuildinfo
 coverage/
 .pnpm-store/
+
+# Playwright
+test-results/
+playwright-report/
