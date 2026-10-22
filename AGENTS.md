@@ -43,6 +43,7 @@ Migrations live in `packages/server/drizzle/`. The database is rebuilt module by
 ```bash
 pnpm -r run build      # build all (server depends on shared and core via dist; pnpm -r orders them)
 pnpm test              # full Vitest suite
+pnpm test:db           # suite + integration tests (runner, stores) against a throwaway Docker Postgres (127.0.0.1, random port, removed at the end)
 pnpm check:ui          # UI boundary check
 pnpm --filter @platform/server test:watch
 ```
