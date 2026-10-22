@@ -4,7 +4,14 @@ import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
-import { RefreshCw } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@platform/ui/components/dropdown-menu";
+import { Lock, LockOpen, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 
@@ -46,6 +53,7 @@ const columns: DataTableColumn<ClosingPeriodRecord>[] = [
 
 export const ClosingPeriodsPage: React.FC = () => {
   const ui = useUi();
+  const { hasPermission } = useAuth();
   const [periods, setPeriods] = useState<ClosingPeriodRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -63,6 +71,77 @@ export const ClosingPeriodsPage: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const run = async (action: () => Promise<unknown>, success: string, failure: string) => {
+    try {
+      await action();
+      ui.feedback.notify({ type: "success", title: success });
+      fetchData();
+    } catch (err: unknown) {
+      ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : failure });
+    }
+  };
+
+  const handleClose = async (p: ClosingPeriodRecord) => {
+    const confirmed = await ui.windows.confirm({
+      title: "Fechar período",
+      description: `Fechar "${p.name}" (${formatDay(p.startDate)} a ${formatDay(p.endDate)})?`,
+      confirmLabel: "Fechar",
+    });
+    if (confirmed) await run(() => api.closingPeriods.close(p.id), "Período fechado.", "Falha ao fechar período");
+  };
+
+  const handleReopen = async (p: ClosingPeriodRecord) => {
+    const confirmed = await ui.windows.confirm({
+      title: "Reabrir período",
+      description: `Reabrir "${p.name}"?`,
+      confirmLabel: "Reabrir",
+    });
+    if (confirmed) await run(() => api.closingPeriods.reopen(p.id), "Período reaberto.", "Falha ao reabrir período");
+  };
+
+  const handleCancel = async (p: ClosingPeriodRecord) => {
+    const confirmed = await ui.windows.confirm({
+      title: "Cancelar período",
+      description: `Cancelar "${p.name}" remove o período e libera suas datas.`,
+      confirmLabel: "Cancelar período",
+    });
+    if (confirmed) await run(() => api.closingPeriods.cancel(p.id), "Período cancelado.", "Falha ao cancelar período");
+  };
+
+  const rowMenu = (p: ClosingPeriodRecord) => {
+    const canClose = p.status === "open" && hasPermission("closing_period:period:close");
+    const canReopen = p.status === "closed" && hasPermission("closing_period:period:reopen");
+    const canCancel = p.status === "open" && hasPermission("closing_period:period:cancel");
+    if (!canClose && !canReopen && !canCancel) return null;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
+          <MoreHorizontal className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {canClose && (
+            <DropdownMenuItem onClick={() => handleClose(p)} className="cursor-pointer">
+              <Lock className="size-4 mr-2" />
+              Fechar período
+            </DropdownMenuItem>
+          )}
+          {canReopen && (
+            <DropdownMenuItem onClick={() => handleReopen(p)} className="cursor-pointer">
+              <LockOpen className="size-4 mr-2" />
+              Reabrir período
+            </DropdownMenuItem>
+          )}
+          {canCancel && (
+            <DropdownMenuItem onClick={() => handleCancel(p)} className="cursor-pointer text-destructive">
+              <Trash2 className="size-4 mr-2" />
+              Cancelar período
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,6 +166,7 @@ export const ClosingPeriodsPage: React.FC = () => {
         skeletonRows={3}
         title={`Períodos (${periods.length})`}
         emptyMessage="Nenhum Período de Fechamento criado."
+        rowActions={rowMenu}
       />
     </div>
   );
