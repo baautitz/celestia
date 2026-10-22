@@ -18,6 +18,8 @@ export interface User {
   status: "active" | "inactive";
   /** Administrador: ignora a matriz de permissões (acesso total). Alterado pelo CLI create-admin ou por outro administrador. */
   isAdmin?: boolean;
+  /** Interno (como passwordHash): só em findById; nunca em respostas da API. Invalida refresh tokens antigos. */
+  sessionVersion?: number;
   createdAt: string;
   updatedAt?: string;
 }
@@ -56,6 +58,8 @@ export interface JWTRefreshPayload {
   sub: string;
   tokenId: string;
   type: "refresh";
+  /** Versão de sessão do usuário na emissão; o refresh só vale enquanto for igual à atual. */
+  ver: number;
   iat?: number;
   exp?: number;
 }
@@ -96,6 +100,8 @@ export interface UpdateUserInput {
   externals?: ExternalsMap;
   status?: "active" | "inactive";
   email?: string;
+  /** Promove ou rebaixa Administrator; aplicado na mesma transação da checagem do último admin ativo. */
+  isAdmin?: boolean;
 }
 
 export interface ResetPasswordInput {

@@ -60,6 +60,7 @@ Building one package alone: build `@platform/shared` and `@platform/core` first.
 - **No credential leakage**: never return `passwordHash`; omit it from every `User` response.
 - **Zero SQL injection**: never concatenate user strings into SQL. All `{{...}}` tokens become bind parameters (`@p1`, `@p2`) via `TemplateEngine.parse()` (`engine/template-engine.ts`).
 - **Session (zero `localStorage`)**: the access token lives only in JS memory; the refresh token only in an `HttpOnly; SameSite=Lax; Path=/api/auth` cookie, handled with `getCookie`/`setCookie`/`deleteCookie` from `hono/cookie`. Never store tokens or credentials in `localStorage`/`sessionStorage`.
+- **Revocable sessions**: refresh tokens carry `ver`, the user's `session_version`; logout, password reset, deactivation, deletion and Role change bump it, so older refresh tokens are refused. Access tokens are stateless and stay valid up to 5 minutes after any of these (documented window, see `TokenService`). Administrator changes and the "last active Administrator" check run in one transaction with row locks (`PostgresUserStore`).
 
 ### Permissions
 - Every action and route requires an explicit permission string. Naming guidance: [docs/conventions/permissions.md](docs/conventions/permissions.md).

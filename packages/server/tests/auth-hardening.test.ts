@@ -231,7 +231,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
   });
 
   describe("refresh relê o usuário do store", () => {
-    it("inativado ou excluído não renova; mudança de role vale após o refresh", async () => {
+    it("inativado ou excluído não renova; troca de role revoga o refresh e vale após novo login", async () => {
       const store = createSeededUserStore();
       await store.createRole({ id: "role_r1", name: "R Um", description: "d", permissions: ["system:users:read"] });
       await store.createRole({ id: "role_r2", name: "R Dois", description: "d", permissions: ["system:roles:read"] });
@@ -253,7 +253,8 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       await store.updateUser(c.id, { roleId: "role_r2" });
       expect((await refresh(ra)).status).toBe(401);
       expect((await refresh(rb)).status).toBe(401);
-      const ok = await refresh(rc);
+      expect((await refresh(rc)).status).toBe(401);
+      const ok = await refresh(await login("refresh.tres"));
       expect(ok.status).toBe(200);
       const body = (await ok.json()) as { user: { permissions: string[] } };
       expect(body.user.permissions).toEqual(["system:roles:read"]);

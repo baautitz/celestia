@@ -5,6 +5,8 @@ import type { Pool } from "pg";
 import { sql } from "drizzle-orm";
 import { assertMigrationsUpToDate, runModuleMigrations } from "@platform/core/migrations";
 import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
+import { LastAdminError } from "../src/iam/user-store.js";
+import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresConnectionStore } from "../src/data/postgres-connection-store.js";
 import { PostgresWorkspaceStore } from "../src/data/postgres-workspace-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
@@ -72,6 +74,71 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       expect(await store.list()).toHaveLength(1);
       await store.delete("c1");
       expect(await store.get("c1")).toBeNull();
+    });
+  });
+
+  describe("sessões e Administrator atômico", () => {
+    async function seed(store: PostgresUserStore, admins: number) {
+      await store.createRole({ id: "r1", name: "Op", permissions: [] });
+      const ids: string[] = [];
+      for (let i = 0; i < admins; i++) {
+        const u = await store.createUser({ fullname: `Admin ${i}`, username: `admin${i}`, password: "Abcdef1!", roleId: "r1" });
+        await store.setAdmin(u.id, true);
+        ids.push(u.id);
+      }
+      return ids;
+    }
+
+    it("rebaixamentos concorrentes: exatamente um passa, sempre sobra um admin ativo", async () => {
+      const store = new PostgresUserStore(db);
+      const [a, b] = await seed(store, 2);
+      const results = await Promise.allSettled([store.updateUser(a!, { isAdmin: false }), store.updateUser(b!, { isAdmin: false })]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+      expect(rejected.reason).toBeInstanceOf(LastAdminError);
+      const admins = (await store.listUsers()).filter((u) => u.isAdmin && u.status === "active");
+      expect(admins).toHaveLength(1);
+    });
+
+    it("rebaixar e inativar/excluir concorrentes também não zeram os admins", async () => {
+      const store = new PostgresUserStore(db);
+      const [a, b, c] = await seed(store, 3);
+      await Promise.allSettled([
+        store.updateUser(a!, { isAdmin: false }),
+        store.updateUser(b!, { status: "inactive" }),
+        store.deleteUser(c!),
+      ]);
+      const admins = (await store.listUsers()).filter((u) => u.isAdmin && u.status === "active");
+      expect(admins).toHaveLength(1);
+    });
+
+    it("promoção concorrente com rebaixamento do único admin não se perde", async () => {
+      const store = new PostgresUserStore(db);
+      const [a] = await seed(store, 1);
+      const p = await store.createUser({ fullname: "Promovido", username: "promovido", password: "Abcdef1!", roleId: "r1" });
+      const results = await Promise.allSettled([store.updateUser(p.id, { isAdmin: true }), store.updateUser(a!, { isAdmin: false })]);
+      const admins = (await store.listUsers()).filter((u) => u.isAdmin && u.status === "active");
+      expect(admins.length).toBeGreaterThanOrEqual(1);
+      expect(results.some((r) => r.status === "fulfilled")).toBe(true);
+    });
+
+    it("bump de sessionVersion em reset, logout, troca de role e inativação; não em edição simples", async () => {
+      const store = new PostgresUserStore(db);
+      await store.createRole({ id: "r1", name: "Op", permissions: [] });
+      await store.createRole({ id: "r2", name: "Op2", permissions: [] });
+      const u = await store.createUser({ fullname: "Ana", username: "ana", password: "Abcdef1!", roleId: "r1" });
+      const version = async () => (await store.findById(u.id))?.sessionVersion;
+      expect(await version()).toBe(0);
+      await store.updateUser(u.id, { fullname: "Ana B" });
+      expect(await version()).toBe(0);
+      await store.updateUser(u.id, { roleId: "r2" });
+      expect(await version()).toBe(1);
+      await store.updateUser(u.id, { status: "inactive" });
+      expect(await version()).toBe(2);
+      await store.resetPassword(u.id, PasswordService.hash("Abcdef1!"));
+      expect(await version()).toBe(3);
+      await store.revokeSessions(u.id);
+      expect(await version()).toBe(4);
     });
   });
 
