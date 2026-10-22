@@ -8,14 +8,32 @@ import type {
 import { PasswordService } from "./password-service.js";
 import { pruneOrphans } from "@platform/core/permissions";
 
+export const LAST_ADMIN_MESSAGE = "O sistema precisa de ao menos um administrador ativo.";
+
+/** A operação deixaria o sistema sem Administrator ativo. */
+export class LastAdminError extends Error {
+  constructor() {
+    super(LAST_ADMIN_MESSAGE);
+    this.name = "LastAdminError";
+  }
+}
+
 export interface UserStore {
   findByUsername(username: string): Promise<User | null>;
   findById(id: string): Promise<User | null>;
   listUsers(): Promise<User[]>;
   createUser(input: CreateUserInput): Promise<User>;
+  /**
+   * Atualiza o usuário. Trocar Role ou inativar revoga os refresh tokens. `isAdmin` é aplicado na mesma
+   * transação da checagem do último Administrator ativo (lança `LastAdminError`).
+   */
   updateUser(id: string, input: UpdateUserInput): Promise<User>;
+  /** Troca a senha e revoga os refresh tokens. */
   resetPassword(id: string, newPasswordHash: string): Promise<void>;
+  /** Lança `LastAdminError` se for o último Administrator ativo. */
   deleteUser(id: string): Promise<void>;
+  /** Invalida todos os refresh tokens já emitidos para o usuário (logout). */
+  revokeSessions(id: string): Promise<void>;
   /** Define a flag de administrador (acesso total). Não exposta pela API: só CLI e testes. */
   setAdmin(id: string, isAdmin: boolean): Promise<void>;
 
@@ -54,6 +72,7 @@ export class MemoryUserStore implements UserStore {
     return Array.from(this.users.values()).map((u) => {
       const copy = { ...u };
       delete copy.passwordHash; // Não expõe hash na listagem
+      delete copy.sessionVersion;
       return copy;
     });
   }
@@ -79,12 +98,14 @@ export class MemoryUserStore implements UserStore {
       roleId: input.roleId,
       externals: input.externals || {},
       status: "active",
+      sessionVersion: 0,
       createdAt: new Date().toISOString(),
     };
 
     this.users.set(id, user);
     const returnUser = { ...user };
     delete returnUser.passwordHash;
+    delete returnUser.sessionVersion;
     return returnUser;
   }
 
@@ -95,37 +116,63 @@ export class MemoryUserStore implements UserStore {
     if (input.roleId) {
       const role = await this.getRole(input.roleId);
       if (!role) throw new Error(`Role '${input.roleId}' não encontrada.`);
-      user.roleId = input.roleId;
     }
+    this.assertAdminRemains(user, { isAdmin: input.isAdmin ?? user.isAdmin ?? false, status: input.status ?? user.status });
 
+    if (input.roleId && input.roleId !== user.roleId) this.revoke(user);
+    if (input.status === "inactive" && user.status !== "inactive") this.revoke(user);
+    if (input.roleId) user.roleId = input.roleId;
     if (input.fullname) user.fullname = input.fullname;
     if (input.email) user.email = input.email;
     if (input.status) user.status = input.status;
+    if (input.isAdmin !== undefined) user.isAdmin = input.isAdmin;
     if (input.externals) user.externals = { ...user.externals, ...input.externals };
     user.updatedAt = new Date().toISOString();
 
     this.users.set(id, user);
     const returnUser = { ...user };
     delete returnUser.passwordHash;
+    delete returnUser.sessionVersion;
     return returnUser;
+  }
+
+  private revoke(user: User): void {
+    user.sessionVersion = (user.sessionVersion ?? 0) + 1;
+  }
+
+  /** Lança se `user`, ao assumir `after`, deixar de ser Administrator ativo e não houver outro. */
+  private assertAdminRemains(user: User, after: { isAdmin: boolean; status: "active" | "inactive" }): void {
+    const wasActiveAdmin = user.isAdmin === true && user.status === "active";
+    if (!wasActiveAdmin || (after.isAdmin && after.status === "active")) return;
+    const others = Array.from(this.users.values()).filter((u) => u.id !== user.id && u.isAdmin && u.status === "active");
+    if (others.length === 0) throw new LastAdminError();
+  }
+
+  async revokeSessions(id: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) this.revoke(user);
   }
 
   async resetPassword(id: string, newPasswordHash: string): Promise<void> {
     const user = this.users.get(id);
     if (!user) throw new Error(`Usuário '${id}' não encontrado.`);
     user.passwordHash = newPasswordHash;
+    this.revoke(user);
     user.updatedAt = new Date().toISOString();
     this.users.set(id, user);
   }
 
   async deleteUser(id: string): Promise<void> {
-    if (!this.users.has(id)) throw new Error(`Usuário '${id}' não encontrado.`);
+    const user = this.users.get(id);
+    if (!user) throw new Error(`Usuário '${id}' não encontrado.`);
+    this.assertAdminRemains(user, { isAdmin: false, status: "inactive" });
     this.users.delete(id);
   }
 
   async setAdmin(id: string, isAdmin: boolean): Promise<void> {
     const user = this.users.get(id);
     if (!user) throw new Error(`Usuário '${id}' não encontrado.`);
+    this.assertAdminRemains(user, { isAdmin, status: user.status });
     user.isAdmin = isAdmin;
   }
 

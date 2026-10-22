@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   externals: jsonb("externals").$type<User["externals"]>().notNull().default({}),
   status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
   isAdmin: boolean("is_admin").notNull().default(false),
+  sessionVersion: integer("session_version").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at"),
 });

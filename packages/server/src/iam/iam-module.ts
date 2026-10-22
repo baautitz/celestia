@@ -10,7 +10,7 @@ import { grantDeniedMessage, missingGrants } from "./can-grant.js";
 import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
 import type { TokenService } from "./token-service.js";
-import type { UserStore } from "./user-store.js";
+import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./password-service.js";
 
 export interface IamModuleDeps {
@@ -33,7 +33,7 @@ function getDummyHash(): string {
 
 const COOKIE = { path: "/api/auth", httpOnly: true, sameSite: "Lax", maxAge: 7 * 24 * 3600 } as const;
 
-const LAST_ADMIN = "O sistema precisa de ao menos um administrador ativo.";
+const LAST_ADMIN = LAST_ADMIN_MESSAGE;
 const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
 const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
 
@@ -108,7 +108,7 @@ export function createIamModule({ userStore, connectionStore, extraPermissions =
             const refreshPayload = await tokenService.verifyRefreshToken(refreshToken);
             const user = await userStore.findById(refreshPayload.sub);
 
-            if (!user || user.status === "inactive") {
+            if (!user || user.status === "inactive" || (user.sessionVersion ?? 0) !== refreshPayload.ver) {
               return c.json({ error: "Usuário não encontrado ou inativo." }, 401);
             }
 
@@ -137,6 +137,15 @@ export function createIamModule({ userStore, connectionStore, extraPermissions =
       );
 
       routes.post("/auth/logout", async (c) => {
+        const refreshToken = getCookie(c, "refresh_token");
+        if (refreshToken) {
+          try {
+            const { sub } = await tokenService.verifyRefreshToken(refreshToken);
+            await userStore.revokeSessions(sub);
+          } catch {
+            // Token inválido ou expirado: não há sessão a revogar; o logout segue limpando o cookie.
+          }
+        }
         deleteCookie(c, "refresh_token", { path: "/api/auth" });
         return c.json({ success: true, message: "Sessão encerrada com sucesso." });
       });
@@ -153,10 +162,6 @@ export function createIamModule({ userStore, connectionStore, extraPermissions =
         const caller = getAuthenticatedUser(c);
         const missing = missingGrants(caller.permissions, targets, caller.isAdmin === true);
         return missing.length > 0 ? c.json({ error: grantDeniedMessage(missing) }, 403) : undefined;
-      };
-      const isLastActiveAdmin = async (id: string): Promise<boolean> => {
-        const admins = (await userStore.listUsers()).filter((u) => u.isAdmin && u.status === "active");
-        return admins.length === 1 && admins[0].id === id;
       };
       const invalidKeys = (keys: string[]): string[] => {
         const valid = permissions.allKeys();
@@ -251,9 +256,6 @@ export function createIamModule({ userStore, connectionStore, extraPermissions =
             const message = body.status === "inactive" ? ADMIN_TARGET_ONLY : "Somente administradores podem alterar outro administrador.";
             return c.json({ error: message }, 403);
           }
-          if (body.status === "inactive" && (await isLastActiveAdmin(id))) {
-            return c.json({ error: LAST_ADMIN }, 409);
-          }
           if (body.roleId) {
             const targetRole = await userStore.getRole(body.roleId);
             if (targetRole) {
@@ -265,18 +267,12 @@ export function createIamModule({ userStore, connectionStore, extraPermissions =
             const ran = await events.run(
               "iam.user.update",
               { actorId: actorOf(c), userId: id, fullname: body.fullname, roleId: body.roleId, status: body.status, isAdmin },
-              async () => {
-                const updated = await userStore.updateUser(id, body);
-                if (isAdmin !== undefined) {
-                  await userStore.setAdmin(id, isAdmin);
-                  updated.isAdmin = isAdmin;
-                }
-                return updated;
-              },
+              () => userStore.updateUser(id, { ...body, isAdmin }),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
             return c.json(ran.result);
           } catch (err: unknown) {
+            if (err instanceof LastAdminError) return c.json({ error: LAST_ADMIN }, 409);
             return c.json({ error: failure(err, "Erro ao atualizar usuário.") }, 400);
           }
         },
@@ -317,12 +313,12 @@ export function createIamModule({ userStore, connectionStore, extraPermissions =
         if (!getAuthenticatedUser(c).isAdmin && (await userStore.findById(id))?.isAdmin) {
           return c.json({ error: ADMIN_TARGET_ONLY }, 403);
         }
-        if (await isLastActiveAdmin(id)) return c.json({ error: LAST_ADMIN }, 409);
         try {
           const ran = await events.run("iam.user.delete", { actorId: actorOf(c), userId: id }, () => userStore.deleteUser(id));
           if (ran.cancelled) return cancelled(c, ran.reason);
           return c.json({ success: true });
         } catch (err: unknown) {
+          if (err instanceof LastAdminError) return c.json({ error: LAST_ADMIN }, 409);
           return c.json({ error: failure(err, "Erro ao excluir usuário.") }, 400);
         }
       });
