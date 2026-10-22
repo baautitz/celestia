@@ -5,6 +5,7 @@ import { createIamModule } from "../src/iam/iam-module.js";
 import { TokenService } from "../src/iam/token-service.js";
 import { createAuthMiddleware } from "../src/iam/middleware.js";
 import { createSeededUserStore } from "./helpers/fixtures.js";
+import { MemoryConnectionStore } from "../src/data/connection-store.js";
 
 const quiet = { info() {}, warn() {}, error() {} };
 
@@ -13,6 +14,7 @@ async function boot() {
   const tokenService = new TokenService();
   const mod = createIamModule({
     userStore,
+    connectionStore: new MemoryConnectionStore(),
     tokenService,
     auth: createAuthMiddleware(tokenService, (p) => p),
     withAdminBypass: (p) => p,
@@ -26,7 +28,7 @@ describe("módulo iam (autenticação)", () => {
   it("é carregado pelo Core e é dono de /api/auth", async () => {
     const { mod, result } = await boot();
     expect(mod.id).toBe("iam");
-    expect(mod.prefix).toBe("/api/auth");
+    expect(mod.prefix).toBe("/api");
     expect(result.loaded).toEqual(["iam"]);
   });
 
