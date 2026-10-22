@@ -44,7 +44,7 @@ async function fresh(): Promise<void> {
     username: "root.admin",
     password: TEST_PASSWORD,
     roleId: "role_vendedor",
-    externals: {},
+   
   });
   await userStore.setAdmin(root.id, true);
   rootId = root.id;
@@ -139,7 +139,6 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     // ── IAM leitura (sucesso / 401 / 403 / bypass)
     const reads: [string, string][] = [
       ["catalog", "/api/iam/permissions/catalog"],
-      ["erps", "/api/iam/erps"],
       ["users", "/api/iam/users"],
       ["roles", "/api/iam/roles"],
     ];
@@ -151,7 +150,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     }
 
     // ── IAM users
-    const newUser = { fullname: "Novo Usuario", username: "novo.user", password: "Senha@456", roleId: "role_vendedor", externals: { inovafarma: 7 } };
+    const newUser = { fullname: "Novo Usuario", username: "novo.user", password: "Senha@456", roleId: "role_vendedor" };
     await rec("iam.users.create.401", "POST", "/api/iam/users", { body: newUser });
     await rec("iam.users.create.403", "POST", "/api/iam/users", { token: V, body: newUser });
     await rec("iam.users.create.400_weak_password", "POST", "/api/iam/users", { token: A, body: { ...newUser, password: "fraca" } });
@@ -257,7 +256,6 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("admin.erps.put.ok_keep_secret", "PUT", "/api/admin/erps/inovafarma", { token: A, body: { ...erpBody, values: { ...values, host: "novo", password: "" } } });
     await rec("admin.erps.put.admin_bypass", "PUT", "/api/admin/erps/ruim", { token: R, body: { ...erpBody, values: { ...values, host: "bad" } } });
     await rec("admin.erps.list.after", "GET", "/api/admin/erps", { token: A });
-    await rec("iam.erps.after", "GET", "/api/iam/erps", { token: A });
     await rec("admin.erps.test.ok", "POST", "/api/admin/erps/inovafarma/test", { token: A });
     await rec("admin.erps.test.502", "POST", "/api/admin/erps/ruim/test", { token: A });
     await rec("admin.erps.test.404", "POST", "/api/admin/erps/nada/test", { token: A });
@@ -276,7 +274,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     // ── gestor não-admin limitado: a regra "só concede o que possui" fica congelada
     const gPerms = ["system:users:create", "system:users:update", "system:users:reset_password", "system:users:delete", "system:roles:create", "system:roles:update", "system:roles:read"];
     await rec("iam.grants.setup_role", "POST", "/api/iam/roles", { token: A, body: { id: "role_gestor", name: "Gestor Limitado", permissions: gPerms } });
-    const mk = (username: string, roleId: string) => ({ fullname: "Usuario Grants", username, password: "Senha@456", roleId, externals: {} });
+    const mk = (username: string, roleId: string) => ({ fullname: "Usuario Grants", username, password: "Senha@456", roleId });
     tick();
     await rec("iam.grants.setup_gestor", "POST", "/api/iam/users", { token: A, body: mk("gestor.limitado", "role_gestor") });
     tick();

@@ -5,7 +5,6 @@ import { createIamModule } from "../src/iam/iam-module.js";
 import { TokenService } from "../src/iam/token-service.js";
 import { createAuthMiddleware } from "../src/iam/middleware.js";
 import { createSeededUserStore } from "./helpers/fixtures.js";
-import { MemoryErpStore } from "../src/erp/erp-store.js";
 
 const quiet = { info() {}, warn() {}, error() {} };
 
@@ -14,7 +13,6 @@ async function boot() {
   const tokenService = new TokenService();
   const mod = createIamModule({
     userStore,
-    erpStore: new MemoryErpStore(),
     tokenService,
     auth: createAuthMiddleware(tokenService, (p) => p),
     withAdminBypass: (p) => p,
@@ -52,7 +50,6 @@ describe("catálogo agrupado por Module", () => {
     const tokenService = new TokenService();
     const mod = createIamModule({
       userStore,
-      connectionStore: new MemoryErpStore(),
       extraPermissions: [{ key: "pharmacy:audit:run", label: "Auditar", module: "pharmacy" }],
       tokenService,
       auth: createAuthMiddleware(tokenService, (p) => p),

@@ -4,7 +4,6 @@ import { loadModules } from "@platform/core/loader";
 import { createIamModule } from "../src/iam/iam-module.js";
 import { TokenService } from "../src/iam/token-service.js";
 import { createAuthMiddleware } from "../src/iam/middleware.js";
-import { MemoryErpStore } from "../src/erp/erp-store.js";
 import { createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 const quiet = { info() {}, warn() {}, error() {} };
@@ -16,7 +15,6 @@ async function boot() {
   const mod = createIamModule({
     userStore,
     tokenService,
-    erpStore: new MemoryErpStore(),
     auth: createAuthMiddleware(tokenService, (p) => p),
     withAdminBypass: (p) => p,
   });

@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
 import { MemoryErpStore, type ErpStore } from "./erp/erp-store.js";
+import { MemoryErpExternalsStore, type ErpExternalsStore } from "./erp/erp-externals-store.js";
 import { createErpClient, type ErpClientFactory } from "./erp/erp-factory.js";
 import { createErpModule } from "./erp/erp-module.js";
 import { loadModules } from "@platform/core/loader";
@@ -23,6 +24,7 @@ import type { JWTAccessPayload } from "@platform/shared";
 export interface CreatePlatformAppOptions {
   erpClients?: ErpClientRegistry;
   erpStore?: ErpStore;
+  erpExternalsStore?: ErpExternalsStore;
   clientFactory?: ErpClientFactory;
   userStore?: UserStore;
   tokenService?: TokenService;
@@ -51,6 +53,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   );
   const erpClients = options?.erpClients || {};
   const erpStore = options?.erpStore || new MemoryErpStore();
+  const erpExternalsStore = options?.erpExternalsStore || new MemoryErpExternalsStore();
   const clientFactory = options?.clientFactory || createErpClient;
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
@@ -81,12 +84,12 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     await loadModules(
       moduleApp,
       [
-        createIamModule({ userStore, erpStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass }),
+        createIamModule({ userStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass }),
         createClosingPeriodModule({ store: closingPeriodStore, auth }),
       ],
       { registry },
     );
-    await loadModules(moduleApp, [createErpModule({ erpStore, clients: erpClients, clientFactory, auth })], { registry });
+    await loadModules(moduleApp, [createErpModule({ erpStore, externalsStore: erpExternalsStore, clients: erpClients, clientFactory, auth })], { registry });
   })();
   for (const path of ["/api/auth/*", "/api/iam/*", "/api/admin/*", "/api/closing-periods", "/api/closing-periods/*"]) {
     app.all(path, async (c) => {
@@ -119,6 +122,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     let userStore: UserStore | undefined;
     const erpClients: ErpClientRegistry = {};
     let erpStore: ErpStore | undefined;
+    let erpExternalsStore: ErpExternalsStore | undefined;
     let closingPeriodStore: ClosingPeriodStore | undefined;
     let auditLog: AuditLog | undefined;
     if (process.env.POSTGRES_HOST) {
@@ -130,6 +134,8 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       ]);
       userStore = new PostgresUserStore(db);
       erpStore = new PostgresErpStore(db);
+      const { PostgresErpExternalsStore } = await import("./erp/postgres-erp-externals-store.js");
+      erpExternalsStore = new PostgresErpExternalsStore(db);
       closingPeriodStore = new PostgresClosingPeriodStore(db);
       const { PostgresAuditStore } = await import("./audit/postgres-audit-store.js");
       auditLog = new AuditLog(new PostgresAuditStore(db));
@@ -143,7 +149,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       }
     }
 
-    const app = createPlatformApp({ userStore, erpStore, closingPeriodStore, erpClients, auditLog });
+    const app = createPlatformApp({ userStore, erpStore, erpExternalsStore, closingPeriodStore, erpClients, auditLog });
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
     serve({ fetch: app.fetch, port });

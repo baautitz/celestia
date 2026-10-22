@@ -23,7 +23,7 @@ describe("Flag isAdmin (bypass de permissões)", () => {
   beforeEach(async () => {
     // Os dois usuários têm um grupo SEM nenhuma permissão; só um deles é admin.
     const hash = PasswordService.hash(TEST_PASSWORD);
-    const base = { fullname: "x", passwordHash: hash, roleId: "role_vazio", externals: {}, status: "active" as const, createdAt: new Date().toISOString() };
+    const base = { fullname: "x", passwordHash: hash, roleId: "role_vazio", status: "active" as const, createdAt: new Date().toISOString() };
     store = new MemoryUserStore({
       roles: [
         { id: "role_vazio", name: "Vazio", permissions: [] },

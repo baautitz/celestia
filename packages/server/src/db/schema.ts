@@ -1,4 +1,3 @@
-import type { User } from "@platform/shared";
 import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const roles = pgTable("roles", {
@@ -17,7 +16,6 @@ export const users = pgTable("users", {
   roleId: text("role_id")
     .notNull()
     .references(() => roles.id),
-  externals: jsonb("externals").$type<User["externals"]>().notNull().default({}),
   status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
   isAdmin: boolean("is_admin").notNull().default(false),
   sessionVersion: integer("session_version").notNull().default(0),

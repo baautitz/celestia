@@ -5,7 +5,6 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import type { JWTAccessPayload, PermissionItem } from "@platform/shared";
-import type { ErpStore } from "../erp/erp-store.js";
 import { grantDeniedMessage, missingGrants } from "./can-grant.js";
 import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
@@ -15,8 +14,6 @@ import { PasswordService, PasswordPolicySchema } from "./password-service.js";
 
 export interface IamModuleDeps {
   userStore: UserStore;
-  /** ERPs cadastrados (GET /api/iam/erps). */
-  erpStore: ErpStore;
   /** Permissões `system:*` de áreas ainda não modularizadas, registradas no catálogo junto das do iam. */
   extraPermissions?: readonly PermissionItem[];
   tokenService: TokenService;
@@ -44,7 +41,7 @@ const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total
  * iam.login, iam.user.create, iam.user.update, iam.user.delete, iam.user.reset_password,
  * iam.role.create, iam.role.update. Um `before` que cancela responde 409 com o motivo.
  */
-export function createIamModule({ userStore, erpStore, extraPermissions = [], tokenService, auth, withAdminBypass }: IamModuleDeps): ModuleDef {
+export function createIamModule({ userStore, extraPermissions = [], tokenService, auth, withAdminBypass }: IamModuleDeps): ModuleDef {
   return defineModule({
     id: "iam",
     version: "1.0.0",
@@ -179,12 +176,6 @@ export function createIamModule({ userStore, erpStore, extraPermissions = [], to
         return c.json({ system: grouped });
       });
 
-      // ERPs cadastrados, para vincular identificadores do usuário; sem dados de acesso.
-      routes.get("/iam/erps", auth, requirePermission(P["users:read"]), async (c) => {
-        const records = await erpStore.list();
-        return c.json(records.map(({ id, name }) => ({ id, name })));
-      });
-
       routes.get("/iam/users", auth, requirePermission(P["users:read"]), async (c) => c.json(await userStore.listUsers()));
 
       routes.post(
@@ -198,7 +189,6 @@ export function createIamModule({ userStore, erpStore, extraPermissions = [], to
             username: z.string().min(3),
             password: PasswordPolicySchema,
             roleId: z.string(),
-            externals: z.record(z.union([z.string(), z.number()])).optional(),
             email: z.string().email().optional(),
           }),
         ),
@@ -232,7 +222,6 @@ export function createIamModule({ userStore, erpStore, extraPermissions = [], to
           z.object({
             fullname: z.string().optional(),
             roleId: z.string().optional(),
-            externals: z.record(z.union([z.string(), z.number()])).optional(),
             status: z.enum(["active", "inactive"]).optional(),
             email: z.string().email().optional(),
             isAdmin: z.boolean().optional(),

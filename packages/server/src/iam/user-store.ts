@@ -96,7 +96,6 @@ export class MemoryUserStore implements UserStore {
       email: input.email,
       passwordHash: PasswordService.hash(input.password),
       roleId: input.roleId,
-      externals: input.externals || {},
       status: "active",
       sessionVersion: 0,
       createdAt: new Date().toISOString(),
@@ -126,7 +125,6 @@ export class MemoryUserStore implements UserStore {
     if (input.email) user.email = input.email;
     if (input.status) user.status = input.status;
     if (input.isAdmin !== undefined) user.isAdmin = input.isAdmin;
-    if (input.externals) user.externals = { ...user.externals, ...input.externals };
     user.updatedAt = new Date().toISOString();
 
     this.users.set(id, user);

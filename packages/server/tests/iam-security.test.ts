@@ -73,7 +73,6 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       expect(data.user.username).toBe("carlos.admin");
       expect(data.user.role).toBe("role_admin");
       expect(data.user.permissions).toContain("system:users:create");
-      expect(data.user.externals.inovafarma).toBe(1);
     });
 
     it("deve rejeitar credenciais inválidas com 401", async () => {
@@ -114,7 +113,6 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       const refreshData = (await refreshRes.json()) as Record<string, any>;
       expect(refreshData.access_token).toBeDefined();
       expect(refreshData.user.username).toBe("joao.silva");
-      expect(refreshData.user.externals.inovafarma).toBe(42);
     });
 
     it("deve retornar dados do usuário logado em GET /api/auth/me", async () => {
@@ -172,7 +170,6 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
           username: "novo.vendedor",
           password: "NovaSenha@2026",
           roleId: "role_vendedor",
-          externals: { inovafarma: 105 },
         }),
       });
 
