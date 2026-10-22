@@ -68,7 +68,7 @@ foge da convenção.
 |---|---|---|
 | users | `create`, `read`, `update`, `reset_password`, `delete` | |
 | roles | `create`, `read`, `update`, `delete` | |
-| workspaces | `create`, `update`, `delete`, `close`, `reopen` | |
+| closing_period:period | `read`, `create` | |
 | sources | `manage` | `system:sources:manage` |
 | audit | `read` | |
 

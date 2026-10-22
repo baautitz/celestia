@@ -9,7 +9,7 @@ O motor de Recipes/SDUI foi removido. Módulos de cliente ficarão em `/integrat
 | Pacote | Conteúdo |
 |---|---|
 | `packages/core` (`@platform/core`) | Framework de módulos: contrato, loader, eventos, permissões |
-| `packages/server` (`@platform/server`) | API Hono, IAM (Argon2id, JWT), conexões ERP, áreas de trabalho |
+| `packages/server` (`@platform/server`) | API Hono, IAM (Argon2id, JWT), conexões ERP, Closing Periods |
 | `packages/shared` (`@platform/shared`) | Tipos e contratos compartilhados |
 | `packages/ui` (`@platform/ui`) | Primitivos shadcn/ui, UI imperativa, DataTable, formulários |
 | `packages/web` (`@platform/web`) | SPA Vite + React 19 + Tailwind v4 |
