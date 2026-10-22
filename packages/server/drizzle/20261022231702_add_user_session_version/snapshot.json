@@ -1,11 +1,17 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "161a008c-9172-48a2-82d5-16f1a6657d4e",
+  "id": "c53e9f60-c06c-4510-ae78-bb849a30ba17",
   "prevIds": [
-    "fb003afe-acb1-434c-a7dd-ee209b6f017e"
+    "5054cee2-df3b-466d-aeff-ae12606b419b"
   ],
   "ddl": [
+    {
+      "isRlsEnabled": false,
+      "name": "audit_log_entries",
+      "entityType": "tables",
+      "schema": "public"
+    },
     {
       "isRlsEnabled": false,
       "name": "connections",
@@ -29,6 +35,149 @@
       "name": "workspaces",
       "entityType": "tables",
       "schema": "public"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "occurred_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "actor_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "actor_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "plugin",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "action",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "target_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "target_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "attributes",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "schema_version",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "summary",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_log_entries"
     },
     {
       "type": "text",
@@ -421,6 +570,55 @@
       "table": "workspaces"
     },
     {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "target_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "target_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "audit_log_target_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "occurred_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "audit_log_occurred_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "audit_log_entries"
+    },
+    {
       "nameExplicit": false,
       "columns": [
         "role_id"
@@ -436,6 +634,16 @@
       "entityType": "fks",
       "schema": "public",
       "table": "users"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "audit_log_entries_pkey",
+      "schema": "public",
+      "table": "audit_log_entries",
+      "entityType": "pks"
     },
     {
       "columns": [
