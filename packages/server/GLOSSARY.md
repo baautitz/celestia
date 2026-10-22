@@ -53,3 +53,13 @@ _Avoid_: Privilege, right, scope
 **Administrator**:
 A user with full access who bypasses the Permission matrix and is granted every valid Permission. It is a flag on the user, not a Role.
 _Avoid_: Super user, root, admin role
+
+### Audit
+
+**Audit Log**:
+The single record of what happened across the whole system, shared by the Base System and every Plugin.
+_Avoid_: History, event log, trail
+
+**Log Entry**:
+One record in the Audit Log: who did what, when. Each Log Entry has attributes that the Plugin writing it defines, so the Audit Log needs no fixed set of fields. A Log Entry stays readable after its Plugin is removed from the build.
+_Avoid_: Event, row, audit record
