@@ -12,7 +12,7 @@ import type { ErpRecord, ErpStore } from "./erp-store.js";
 import { encryptSecret } from "./secret-box.js";
 
 /** Pasta de migrations do Plugin (schema Postgres "erp"). */
-export const ERP_MIGRATIONS = { folder: resolve(__dirname, "migrations"), schema: "erp" };
+export const ERP_MIGRATIONS = { folder: resolve(import.meta.dirname, "migrations"), schema: "erp" };
 
 export interface ErpModuleDeps {
   erpStore: ErpStore;
@@ -33,21 +33,21 @@ export function createErpModule({ erpStore, clients, clientFactory, auth }: ErpM
   return defineModule({
     id: "erp",
     version: "1.0.0",
-    prefix: "/api",
+    prefix: "/api/admin",
     permissions: ERP_PERMISSIONS,
     migrations: ERP_MIGRATIONS,
     register({ routes }) {
       const manage = requirePermission(ERP_PERMISSIONS.keys["erps:manage"]);
 
-      routes.get("/admin/erp-drivers", auth, manage, (c) =>
+      routes.get("/erp-drivers", auth, manage, (c) =>
         c.json(Object.values(ERP_DRIVERS).map(({ id, label, fields }) => ({ id, label, fields })))
       );
 
-      routes.get("/admin/erps", auth, manage, async (c) => c.json((await erpStore.list()).map(publicErp)));
+      routes.get("/erps", auth, manage, async (c) => c.json((await erpStore.list()).map(publicErp)));
 
       // O id é o identificador do ERP usado pelos módulos.
       routes.put(
-        "/admin/erps/:id",
+        "/erps/:id",
         auth,
         manage,
         zValidator("json", z.object({ name: z.string().min(1), driver: z.string().min(1), values: z.record(z.unknown()) })),
@@ -82,14 +82,14 @@ export function createErpModule({ erpStore, clients, clientFactory, auth }: ErpM
         }
       );
 
-      routes.post("/admin/erps/:id/test", auth, manage, async (c) => {
+      routes.post("/erps/:id/test", auth, manage, async (c) => {
         const client = clients[c.req.param("id")];
         if (!client) return c.json({ error: "ERP não encontrado." }, 404);
         const ok = (await client.healthCheck?.()) ?? false;
         return c.json({ ok }, ok ? 200 : 502);
       });
 
-      routes.delete("/admin/erps/:id", auth, manage, async (c) => {
+      routes.delete("/erps/:id", auth, manage, async (c) => {
         const id = c.req.param("id");
         if (!(await erpStore.get(id))) return c.json({ error: "ERP não encontrado." }, 404);
         await erpStore.delete(id);

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import type { MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -7,6 +8,9 @@ import type { ClosingPeriodRecord } from "@platform/shared";
 import { requirePermission } from "../iam/middleware.js";
 import { CLOSING_PERIOD_PERMISSIONS } from "./closing-period-permissions.js";
 import type { ClosingPeriodStore } from "./closing-period-store.js";
+
+/** Pasta de migrations do Plugin (schema Postgres "closing_period"). */
+export const CLOSING_PERIOD_MIGRATIONS = { folder: resolve(import.meta.dirname, "drizzle"), schema: "closing_period" };
 
 export interface ClosingPeriodModuleDeps {
   store: ClosingPeriodStore;
@@ -40,6 +44,7 @@ export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDe
     version: "1.0.0",
     prefix: "/api/closing-periods",
     permissions: CLOSING_PERIOD_PERMISSIONS,
+    migrations: CLOSING_PERIOD_MIGRATIONS,
     register({ routes }) {
       const P = CLOSING_PERIOD_PERMISSIONS.keys;
 

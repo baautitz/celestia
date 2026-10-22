@@ -5,7 +5,8 @@ import type { ErpClientRegistry } from "./erp/erp-client.js";
 import { MemoryErpStore, type ErpStore } from "./erp/erp-store.js";
 import { createErpClient, type ErpClientFactory } from "./erp/erp-factory.js";
 import { createErpModule } from "./erp/erp-module.js";
-import { loadModules } from "@platform/core/loader";
+import { composeModules, migrationPlan, type ModuleEntry } from "./boot/compose.js";
+import { assertMigrationsUpToDate } from "@platform/core/migrations";
 import { PermissionRegistry } from "@platform/core/permissions";
 import { createIamModule } from "./iam/iam-module.js";
 import { AuditLog } from "./audit/audit-log.js";
@@ -29,9 +30,11 @@ export interface CreatePlatformAppOptions {
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
   auditLog?: AuditLog;
+  /** Modules adicionais compostos junto aos padrão (testes e builds de cliente). */
+  extraModules?: ModuleEntry[];
 }
 
-export function createPlatformApp(options?: CreatePlatformAppOptions) {
+export function createPlatform(options?: CreatePlatformAppOptions) {
   const app = new Hono();
 
   // Middleware CORS para desenvolvimento e produção
@@ -56,9 +59,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const tokenService = options?.tokenService || new TokenService();
   const closingPeriodStore = options?.closingPeriodStore || new MemoryClosingPeriodStore();
 
-  // Remove das roles as permissões que não existem mais no catálogo do sistema (preserva "*").
   const validKeys: ReadonlySet<string> = new Set([...SYSTEM_PERMISSION_KEYS, ...CLOSING_PERIOD_PERMISSIONS.items.map((p) => p.key)]);
-  void userStore.syncOrphanPermissions(validKeys);
 
   // Middleware de Autenticação
   // Administrador (isAdmin) ignora a matriz de permissões: recebe todas as permissões válidas no momento da requisição.
@@ -72,43 +73,41 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // Health check
   app.get("/api/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
 
-  // Autenticação (/api/auth) é servida pelo Module `iam`, carregado pelo Core num sub-app.
-  // O carregamento é assíncrono; a rota aguarda o módulo montar (mount síncrono evita matcher já construído).
-  // Os Plugins `closing_period` e `erp` são carregados no mesmo registro de Permissões, para o catálogo do iam listá-las.
+  // Os Modules são carregados pelo Core num sub-app; as rotas aguardam o carregamento (mount síncrono evita matcher já construído).
+  // Base System: iam e audit. Plugins: closing_period e erp (ADR 0003). Todos compartilham o registro de Permissions.
+  const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
+  const entries: ModuleEntry[] = [
+    { tier: "base", def: createIamModule({ userStore, erpStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass }) },
+    { tier: "base", def: createAuditModule({ auditLog, auth }) },
+    { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auth }) },
+    { tier: "plugin", def: createErpModule({ erpStore, clients: erpClients, clientFactory, auth }) },
+    ...(options?.extraModules ?? []),
+  ];
   const moduleApp = new Hono();
   const registry = new PermissionRegistry();
-  const modulesReady = (async () => {
-    await loadModules(
-      moduleApp,
-      [
-        createIamModule({ userStore, erpStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass }),
-        createClosingPeriodModule({ store: closingPeriodStore, auth }),
-      ],
-      { registry },
-    );
-    await loadModules(moduleApp, [createErpModule({ erpStore, clients: erpClients, clientFactory, auth })], { registry });
-  })();
-  for (const path of ["/api/auth/*", "/api/iam/*", "/api/admin/*", "/api/closing-periods", "/api/closing-periods/*"]) {
+  let started: Promise<unknown> | undefined;
+  // Remove das roles as permissões fora do catálogo, só se todos os Modules carregaram (o Core decide via pruneSafe).
+  const start = (): Promise<unknown> =>
+    (started ??= composeModules(moduleApp, entries, {
+      registry,
+      logger: console,
+      prune: (keys) => userStore.syncOrphanPermissions(new Set([...keys, ...SYSTEM_PERMISSION_KEYS])),
+    }));
+  for (const path of ["/api/auth/*", "/api/iam/*", "/api/admin/*", "/api/closing-periods", "/api/closing-periods/*", "/api/audit", "/api/audit/*"]) {
     app.all(path, async (c) => {
-      await modulesReady;
+      await start();
       return moduleApp.fetch(c.req.raw);
     });
   }
 
-  // Consulta do Audit Log (/api/audit), servida pelo Module `audit`.
-  const auditApp = new Hono();
-  const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
-  const auditReady = loadModules(auditApp, [createAuditModule({ auditLog, auth })]);
-  app.all("/api/audit/*", async (c) => {
-    await auditReady;
-    return auditApp.fetch(c.req.raw);
-  });
-  app.all("/api/audit", async (c) => {
-    await auditReady;
-    return auditApp.fetch(c.req.raw);
-  });
+  return { app, start, modules: entries.map((e) => e.def) };
+}
 
-  return app;
+export function createPlatformApp(options?: CreatePlatformAppOptions) {
+  const platform = createPlatform(options);
+  // Falha de Module do Base System: as rotas dos Modules respondem 500; quem precisa abortar o boot usa createPlatform().start().
+  void platform.start().catch((err: unknown) => console.error(err instanceof Error ? err.message : err));
+  return platform.app;
 }
 
 export type AppType = ReturnType<typeof createPlatformApp>;
@@ -143,7 +142,14 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       }
     }
 
-    const app = createPlatformApp({ userStore, erpStore, closingPeriodStore, erpClients, auditLog });
+    const platform = createPlatform({ userStore, erpStore, closingPeriodStore, erpClients, auditLog });
+    if (process.env.POSTGRES_HOST) {
+      // Verifica (sem aplicar) que as migrations dos Modules estão em dia; a mensagem nomeia o Module.
+      const { db } = await import("./db/client.js");
+      await assertMigrationsUpToDate(db, migrationPlan(platform.modules));
+    }
+    await platform.start(); // falha de Module do Base System derruba o boot
+    const app = platform.app;
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
     serve({ fetch: app.fetch, port });
