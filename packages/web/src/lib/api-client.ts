@@ -215,6 +215,16 @@ class ApiClient {
     cancel: async (id: string): Promise<void> => {
       await this.request<{ success: true }>(`/api/closing-periods/${id}`, { method: "DELETE" });
     },
+
+    updateRange: async (
+      id: string,
+      data: { startDate: string; endDate: string; version: number },
+    ): Promise<ClosingPeriodRecord> => {
+      return this.request<ClosingPeriodRecord>(`/api/closing-periods/${id}/range`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
   };
 
   // ─── ERPs ────────────────────────────────────────────────────────────────

@@ -9,12 +9,14 @@ import { authHeader, createSeededUserStore } from "./helpers/fixtures.js";
 // Seam: a API HTTP do Plugin Closing Period, montada por createPlatformApp.
 describe("Closing Period (Período de Fechamento)", () => {
   let app: ReturnType<typeof createPlatformApp>;
+  let store: MemoryClosingPeriodStore;
   let admin: Record<string, string>;
   let operator: Record<string, string>;
   let seller: Record<string, string>;
 
   beforeEach(async () => {
-    app = createPlatformApp({ userStore: createSeededUserStore() });
+    store = new MemoryClosingPeriodStore();
+    app = createPlatformApp({ userStore: createSeededUserStore(), closingPeriodStore: store });
     admin = await authHeader(app, "carlos.admin");
     operator = await authHeader(app, "maria.souza");
     seller = await authHeader(app, "joao.silva");
@@ -85,6 +87,65 @@ describe("Closing Period (Período de Fechamento)", () => {
     // operador semeado: read + create
     expect((await create(jan, operator)).status).toBe(201);
     expect((await send("GET", "/api/closing-periods", operator)).status).toBe(200);
+  });
+
+  describe("editar a faixa", () => {
+    type Period = { id: string; version: number; startDate: string; endDate: string };
+    const edit = (id: string, body: unknown, headers = admin) => send("PUT", `/api/closing-periods/${id}/range`, headers, body);
+    const make = async (body: unknown = jan) => (await (await create(body)).json()) as Period;
+
+    it("novo período começa na versão 1", async () => {
+      expect((await make()).version).toBe(1);
+    });
+
+    it("amplia para dias livres, incrementa a versão e persiste", async () => {
+      const p = await make({ name: "Ago", startDate: "2026-08-01", endDate: "2026-08-30" });
+      const res = await edit(p.id, { startDate: "2026-08-01", endDate: "2026-08-31", version: p.version });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ endDate: "2026-08-31", version: 2 });
+      expect(await (await send("GET", `/api/closing-periods/${p.id}`, admin)).json()).toMatchObject({ endDate: "2026-08-31", version: 2 });
+    });
+
+    it("reduz a faixa", async () => {
+      const p = await make();
+      const res = await edit(p.id, { startDate: "2026-01-05", endDate: "2026-01-20", version: p.version });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ startDate: "2026-01-05", endDate: "2026-01-20" });
+    });
+
+    it("rejeita ampliar sobre dias de outro período com 400, mas não conflita consigo mesmo", async () => {
+      const p = await make();
+      await create({ name: "Fev", startDate: "2026-02-01", endDate: "2026-02-28" });
+      expect((await edit(p.id, { startDate: "2026-01-01", endDate: "2026-02-01", version: 1 })).status).toBe(400);
+      expect((await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-31", version: 1 })).status).toBe(200);
+    });
+
+    it("rejeita fim anterior ao início", async () => {
+      const p = await make();
+      expect((await edit(p.id, { startDate: "2026-01-10", endDate: "2026-01-01", version: 1 })).status).toBe(400);
+    });
+
+    it("período fechado recusa a edição (409) e não muda", async () => {
+      const p = await make();
+      await store.save({ ...(await store.get(p.id))!, status: "closed" });
+      const res = await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-15", version: 1 });
+      expect(res.status).toBe(409);
+      expect((await store.get(p.id))?.endDate).toBe("2026-01-31");
+    });
+
+    it("versão desatualizada responde 409", async () => {
+      const p = await make();
+      expect((await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-20", version: 1 })).status).toBe(200);
+      const stale = await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-25", version: 1 });
+      expect(stale.status).toBe(409);
+      expect((await store.get(p.id))?.endDate).toBe("2026-01-20");
+    });
+
+    it("id desconhecido 404; sem permissão 403", async () => {
+      expect((await edit("nada", { startDate: "2026-01-01", endDate: "2026-01-02", version: 1 })).status).toBe(404);
+      const p = await make();
+      expect((await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-02", version: 1 }, seller)).status).toBe(403);
+    });
   });
 
   it("as rotas antigas de workspaces não existem mais", async () => {

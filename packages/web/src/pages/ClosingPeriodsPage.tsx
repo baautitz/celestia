@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import type { ClosingPeriodRecord } from "@platform/shared";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
@@ -10,7 +13,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@platform/ui/components/dropdown-menu";
-import { Lock, LockOpen, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
+import { Edit2, Lock, LockOpen, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
+import { DatePicker } from "@platform/ui/components/date-picker";
+import { FieldGroup } from "@platform/ui/components/field";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@platform/ui/components/form";
+import { useWindow, WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
@@ -50,6 +57,96 @@ const columns: DataTableColumn<ClosingPeriodRecord>[] = [
     skeletonClassName: "h-5 w-16",
   },
 ];
+
+/** YYYY-MM-DD para Date local (sem deslocamento de fuso). */
+const toDate = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
+/** Date local para YYYY-MM-DD (sem passar por UTC). */
+const toIso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const rangeSchema = z
+  .object({
+    startDate: z.date({ message: "Informe a Data Inicial." }),
+    endDate: z.date({ message: "Informe a Data Final." }),
+  })
+  .refine((v) => v.endDate >= v.startDate, {
+    message: "A Data Final não pode ser anterior à Data Inicial.",
+    path: ["endDate"],
+  });
+type RangeFormValues = z.infer<typeof rangeSchema>;
+
+const EditRangeSheet: React.FC<{ period: ClosingPeriodRecord }> = ({ period }) => {
+  const { resolve } = useWindow<true>();
+  const { feedback } = useUi();
+  const [saving, setSaving] = useState(false);
+  const form = useForm<RangeFormValues>({
+    resolver: zodResolver(rangeSchema),
+    defaultValues: { startDate: toDate(period.startDate), endDate: toDate(period.endDate) },
+  });
+
+  const onSubmit = async (v: RangeFormValues) => {
+    try {
+      setSaving(true);
+      await api.closingPeriods.updateRange(period.id, {
+        startDate: toIso(v.startDate),
+        endDate: toIso(v.endDate),
+        version: period.version,
+      });
+      feedback.notify({ title: "Faixa do período atualizada.", type: "success" });
+      resolve(true);
+    } catch (err: unknown) {
+      feedback.notify({ title: err instanceof Error ? err.message : "Falha ao salvar a faixa", type: "error" });
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Form {...form}>
+        <form id="period-range-form" noValidate onSubmit={form.handleSubmit(onSubmit)}>
+          <FieldGroup>
+            <FormField
+              control={form.control}
+              name="startDate"
+              render={({ field }) => (
+                <FormItem className="w-full">
+                  <FormLabel className="w-full leading-snug">Data Inicial</FormLabel>
+                  <FormControl>
+                    <DatePicker value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <FormItem className="w-full">
+                  <FormLabel className="w-full leading-snug">Data Final</FormLabel>
+                  <FormControl>
+                    <DatePicker value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </FieldGroup>
+        </form>
+      </Form>
+      <WindowActions>
+        <WindowCancelButton />
+        <Button type="submit" form="period-range-form" disabled={saving}>
+          {saving ? "Salvando..." : "Salvar"}
+        </Button>
+      </WindowActions>
+    </>
+  );
+};
 
 export const ClosingPeriodsPage: React.FC = () => {
   const ui = useUi();
@@ -113,13 +210,20 @@ export const ClosingPeriodsPage: React.FC = () => {
     const canClose = p.status === "open" && hasPermission("closing_period:period:close");
     const canReopen = p.status === "closed" && hasPermission("closing_period:period:reopen");
     const canCancel = p.status === "open" && hasPermission("closing_period:period:cancel");
-    if (!canClose && !canReopen && !canCancel) return null;
+    const canEdit = p.status === "open" && hasPermission("closing_period:period:update");
+    if (!canEdit && !canClose && !canReopen && !canCancel) return null;
     return (
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
           <MoreHorizontal className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {canEdit && (
+            <DropdownMenuItem onClick={() => openEditRange(p)} className="cursor-pointer">
+              <Edit2 className="size-4 mr-2" />
+              Editar faixa
+            </DropdownMenuItem>
+          )}
           {canClose && (
             <DropdownMenuItem onClick={() => handleClose(p)} className="cursor-pointer">
               <Lock className="size-4 mr-2" />
@@ -141,6 +245,16 @@ export const ClosingPeriodsPage: React.FC = () => {
         </DropdownMenuContent>
       </DropdownMenu>
     );
+  };
+
+  const openEditRange = async (period: ClosingPeriodRecord) => {
+    const result = await ui.windows.open<true>({
+      surface: "sheet",
+      title: `Editar faixa: ${period.name}`,
+      description: "Amplie ou reduza a faixa de datas. Os dias não podem pertencer a outro período.",
+      content: () => <EditRangeSheet period={period} />,
+    });
+    if (result.status === "confirmed") fetchData();
   };
 
   return (

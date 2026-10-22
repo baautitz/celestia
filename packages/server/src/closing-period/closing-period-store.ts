@@ -6,6 +6,11 @@ export interface ClosingPeriodStore {
   get(id: string): Promise<ClosingPeriodRecord | null>;
   save(period: ClosingPeriodRecord): Promise<void>;
   delete(id: string): Promise<void>;
+  /**
+   * Grava `period` somente se a versão armazenada for `expectedVersion` e o período
+   * estiver aberto (atômico). Retorna false quando nenhuma linha foi alterada.
+   */
+  updateIfCurrent(period: ClosingPeriodRecord, expectedVersion: number): Promise<boolean>;
 }
 
 export class MemoryClosingPeriodStore implements ClosingPeriodStore {
@@ -25,5 +30,12 @@ export class MemoryClosingPeriodStore implements ClosingPeriodStore {
 
   async delete(id: string): Promise<void> {
     this.periods.delete(id);
+  }
+
+  async updateIfCurrent(period: ClosingPeriodRecord, expectedVersion: number): Promise<boolean> {
+    const current = this.periods.get(period.id);
+    if (!current || current.version !== expectedVersion || current.status !== "open") return false;
+    this.periods.set(period.id, period);
+    return true;
   }
 }
