@@ -166,7 +166,10 @@ export function createIamModule({ userStore, connectionStore, extraPermissions =
       routes.get("/iam/permissions/catalog", auth, requirePermission(P["roles:read"]), async (c) => {
         const grouped: Record<string, PermissionItem[]> = {};
         for (const item of permissions.catalog().flatMap((m) => m.items)) {
-          (grouped[item.key.split(":")[1] ?? "general"] ??= []).push({ ...item, module: item.key.split(":")[1] ?? "general" });
+          const [namespace, resource] = item.key.split(":");
+          // Module declarado agrupa; o namespace "system" não é um Module, então usa o recurso.
+          const group = item.module && item.module !== namespace ? item.module : (resource ?? "general");
+          (grouped[group] ??= []).push({ ...item, module: group });
         }
         return c.json({ system: grouped });
       });

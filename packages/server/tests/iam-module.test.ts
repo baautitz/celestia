@@ -45,3 +45,31 @@ describe("módulo iam (autenticação)", () => {
     expect((await app.request("/api/auth/logout", { method: "POST" })).status).toBe(200);
   });
 });
+
+describe("catálogo agrupado por Module", () => {
+  it("agrupa pelo Module declarado e mantém o recurso para permissões do namespace system", async () => {
+    const userStore = createSeededUserStore();
+    const tokenService = new TokenService();
+    const mod = createIamModule({
+      userStore,
+      connectionStore: new MemoryConnectionStore(),
+      extraPermissions: [{ key: "pharmacy:audit:run", label: "Auditar", module: "pharmacy" }],
+      tokenService,
+      auth: createAuthMiddleware(tokenService, (p) => p),
+      withAdminBypass: (p) => p,
+    });
+    const app = new Hono();
+    await loadModules(app, [mod], { logger: quiet });
+    const login = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "carlos.admin", password: "Senha@123" }),
+    });
+    const { accessToken } = (await login.json()) as { accessToken: string };
+    const res = await app.request("/api/iam/permissions/catalog", { headers: { Authorization: `Bearer ${accessToken}` } });
+    const { system } = (await res.json()) as { system: Record<string, { key: string }[]> };
+    expect(system.pharmacy.map((p) => p.key)).toEqual(["pharmacy:audit:run"]);
+    expect(system.users.length).toBeGreaterThan(0);
+    expect(system.audit).toBeUndefined();
+  });
+});
