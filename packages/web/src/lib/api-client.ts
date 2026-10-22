@@ -7,6 +7,8 @@ import type {
   ErpTypeMeta,
   ErpConnection,
   ErpConnectionInput,
+  AuditLogEntry,
+  AuditLogFilter,
 } from "@platform/shared";
 
 class ApiClient {
@@ -187,6 +189,15 @@ class ApiClient {
         method: "PUT",
         body: JSON.stringify(updates),
       });
+    },
+  };
+
+  // ─── AUDIT LOG ───────────────────────────────────────────────────────────
+  audit = {
+    list: async (filter: AuditLogFilter = {}): Promise<AuditLogEntry[]> => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(filter)) if (value) params.set(key, value);
+      return this.request<AuditLogEntry[]>(`/api/audit?${params.toString()}`);
     },
   };
 
