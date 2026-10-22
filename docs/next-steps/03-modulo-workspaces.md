@@ -46,8 +46,7 @@ invariante de datas, para os módulos de negócio dependerem dele por `dependsOn
 
 10. Cancelar = remover a linha (`DELETE /api/workspaces/:id` vira o cancelamento; não existe status
    "cancelado"). O evento `before` de cancelamento deixa módulos de negócio vetarem quando há dados
-   que dependem do período. Só se cancela um período **aberto**; o fechado é reaberto antes (padrão
-   adotado, ainda não confirmado).
+   que dependem do período. Só se cancela um período **aberto**; o fechado é reaberto antes (confirmado).
 11. Auditoria por período: um **log global**, com um registro por evento do período (criar, editar
    faixa, fechar, reabrir, cancelar). Os atributos serão especificados depois; o log ainda não
    existe e a tarefa 15 (auditoria) é o lugar natural dele.
