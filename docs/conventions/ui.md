@@ -1,0 +1,48 @@
+# Convenções de UI
+
+Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md](../../AGENTS.md).
+
+## Primitivos
+
+- Todo elemento vem de `@platform/ui/components/*` (shadcn/ui sobre Base UI). Nada de HTML cru estilizado.
+- Proibido criar componentes ou wrappers com `<div>` customizado sem aprovação explícita.
+- Tema: somente claro (sem theme provider).
+- Fronteira: fora de `packages/ui`, `pnpm check:ui` proíbe importar `sonner`, `@base-ui/react/*` e `@/components/ui`, e `open=`/`onOpenChange=` declarativos em Dialog/Sheet/AlertDialog/Popover.
+
+## Botões
+
+- Com texto: `size="default"` (ou omitir). Nunca `sm`, `xs` ou `lg`.
+- Só ícone: `size="icon"`. Nunca `icon-sm` ou `icon-xs`.
+- Exceção: o `X` interno do `SheetContent` (`icon-sm`), que é parte do primitivo.
+
+## Formulários
+
+- `<Form>`, `<FormField>`, `<FormItem>`, `<FormLabel>`, `<FormControl>`, `<FormMessage>` com `react-hook-form` e `zodResolver`.
+- Rótulos sempre com `<Label>`, nunca `<label>`.
+- Dinheiro: `<MoneyInput />` (máscara em centavos, `R$ 0,00`). Nunca `<Input type="number" step="0.01" />`.
+- Busca e inputs com ícone: `InputGroup`, `InputGroupAddon`, `InputGroupInput`. Nunca `<div className="relative">` com ícone absoluto.
+
+## UI imperativa (`useUi()`)
+
+- Janelas (dialog/sheet), confirmações e toasts via `useUi()` de `@platform/ui/imperative/provider`, montado uma vez pelo `UiProvider` em `main.tsx`.
+- Conteúdo de janela usa `useWindow()` e `WindowActions` (ações do rodapé) de `@platform/ui/imperative/use-window`.
+
+## Sheets
+
+- Abertos pela superfície `"sheet"` de `useUi().windows.open`. O host implementa o layout; a janela renderiza só o corpo e publica as ações com `<WindowActions>`.
+- Host: `SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl"`; `SheetHeader className="p-6 border-b shrink-0"`; `ScrollArea className="flex-1 min-h-0"` > `<div className="p-6 flex flex-col gap-6">`; `SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover"`.
+- Submit: o botão usa `form="<id>"` e o corpo renderiza `<form id="<id>">`.
+- Conteúdo longo: `ScrollArea`; strings técnicas longas (chaves de permissão) com `break-all`; controles (switches/botões) com `shrink-0`.
+
+## Tabelas
+
+- `DataTable` de `@platform/ui/data-table/data-table`: desktop renderiza `<Table>`, mobile renderiza `<MobileCard>` via `useIsMobile()`.
+- `rowActions` são filtradas pelas permissões do usuário; sem ação permitida, omitir o botão `...` e a coluna de ações. Nunca exibir slug técnico como fallback.
+
+## Cabeçalho
+
+- Ações primárias da página (`Atualizar`, `+ Novo...`) vão para a barra superior via `<HeaderActions>` (`packages/web/src/context/HeaderActionsContext.tsx`), liberando espaço vertical para as tabelas.
+
+## Menus
+
+- `DropdownMenu`: largura `w-auto min-w-48` e `whitespace-nowrap` nos itens.
