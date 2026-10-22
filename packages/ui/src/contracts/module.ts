@@ -1,6 +1,11 @@
 import type { ComponentType } from "react"
 import type { LucideIcon } from "lucide-react"
 
+export interface NavVariant {
+  permission: string
+  component: ComponentType
+}
+
 export interface NavEntry {
   id: string
   label: string
@@ -12,7 +17,10 @@ export interface NavEntry {
   permission: string
   /** Título do breadcrumb; padrão: `label`. */
   title?: string
+  /** Tela padrão, usada quando o User tem `permission` e nenhuma variante casa. */
   component: ComponentType
+  /** Variantes de tela por Permission; a primeira que casa (ordem de declaração) vence. */
+  variants?: NavVariant[]
 }
 
 export interface WebModule {
