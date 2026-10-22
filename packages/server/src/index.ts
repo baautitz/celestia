@@ -12,6 +12,9 @@ import { ERP_TYPES, parseErpValues } from "./data/erp-types.js";
 import { encryptSecret } from "./data/secret-box.js";
 import { loadModules } from "@platform/core/loader";
 import { createIamModule } from "./iam/iam-module.js";
+import { AuditLog } from "./audit/audit-log.js";
+import { MemoryAuditStore } from "./audit/audit-store.js";
+import { createAuditModule } from "./audit/audit-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
@@ -31,6 +34,8 @@ export interface CreatePlatformAppOptions {
   workspaces?: WorkspaceRecord[];
   /** Quando informado, as Áreas de Trabalho são gravadas nele a cada mudança (o Map em memória é só cache). */
   workspaceStore?: WorkspaceStore;
+  /** Audit Log do sistema; por padrão, em memória. */
+  auditLog?: AuditLog;
 }
 
 /** Data civil estrita YYYY-MM-DD (e existente no calendário). */
@@ -99,6 +104,19 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   app.all("/api/auth/*", async (c) => {
     await iamReady;
     return iamApp.fetch(c.req.raw);
+  });
+
+  // Consulta do Audit Log (/api/audit), servida pelo Module `audit`.
+  const auditApp = new Hono();
+  const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
+  const auditReady = loadModules(auditApp, [createAuditModule({ auditLog, auth })]);
+  app.all("/api/audit/*", async (c) => {
+    await auditReady;
+    return auditApp.fetch(c.req.raw);
+  });
+  app.all("/api/audit", async (c) => {
+    await auditReady;
+    return auditApp.fetch(c.req.raw);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -634,6 +652,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     let connectionStore: ConnectionStore | undefined;
     let workspaceStore: WorkspaceStore | undefined;
     let workspaces: WorkspaceRecord[] = [];
+    let auditLog: AuditLog | undefined;
     if (process.env.POSTGRES_HOST) {
       const [{ db }, { PostgresUserStore }, { PostgresConnectionStore }, { PostgresWorkspaceStore }] = await Promise.all([
         import("./db/client.js"),
@@ -644,6 +663,8 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       userStore = new PostgresUserStore(db);
       connectionStore = new PostgresConnectionStore(db);
       workspaceStore = new PostgresWorkspaceStore(db);
+      const { PostgresAuditStore } = await import("./audit/postgres-audit-store.js");
+      auditLog = new AuditLog(new PostgresAuditStore(db));
       workspaces = await workspaceStore.list();
 
       for (const record of await connectionStore.list()) {
@@ -655,7 +676,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       }
     }
 
-    const app = createPlatformApp({ userStore, connectionStore, workspaceStore, workspaces, sourceConnectors });
+    const app = createPlatformApp({ userStore, connectionStore, workspaceStore, workspaces, sourceConnectors, auditLog });
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
     serve({ fetch: app.fetch, port });
