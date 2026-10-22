@@ -9,7 +9,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@platform/ui": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {

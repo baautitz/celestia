@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { Form } from "../components/form";
 import { DynamicFormFields } from "./DynamicFormFields";
 import { buildDynamicDefaultValues, type DynamicFormValues } from "./dynamic-form";
-import type { FormFieldDef } from "../contracts/fields";
+import type { FormFieldDef } from "@platform/shared";
 
 afterEach(cleanup);
 

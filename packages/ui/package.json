@@ -32,6 +32,7 @@
     "@hookform/resolvers": "^3.9.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "@platform/shared": "workspace:*",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.33.0",
     "next-themes": "^0.4.4",
