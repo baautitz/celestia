@@ -246,7 +246,7 @@ export function DataTable<TRow>({
           </div>
         ) : (
           <>
-            <div className={bordered ? "overflow-x-auto border border-border" : undefined}>
+            <div className={bordered ? "border border-border" : undefined}>
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
