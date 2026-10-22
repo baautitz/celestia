@@ -25,6 +25,14 @@ const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 export async function loadModules(app: Hono, modules: ModuleDef[], options: LoadOptions = {}): Promise<LoadResult> {
   // Lança em ciclo, dependência desconhecida ou id duplicado, antes de montar qualquer coisa.
   const ordered = topoSort(modules);
+  const mountOf = (d: ModuleDef): string => (d.prefix ?? `/api/m/${d.id}`).replace(/\/+$/, "") || "/";
+  const owners = new Map<string, string>();
+  for (const d of ordered) {
+    const path = mountOf(d);
+    const other = owners.get(path);
+    if (other) throw new Error(`Colisão de prefixo "${path}": os módulos "${other}" e "${d.id}" pedem o mesmo prefixo.`);
+    owners.set(path, d.id);
+  }
   const registry = options.registry ?? new PermissionRegistry();
   const events = options.events ?? new EventBus<EventMap>();
   const logger: Logger = options.logger ?? console;
@@ -63,6 +71,8 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
         run: (e, p, a) => events.run(e, p, a),
       },
       permissions: {
+        catalog: () => registry.catalog(),
+        allKeys: () => registry.allKeys(),
         registerProvider: (p) => void dynamic.push(p),
         has: (u, k) => registry.has(u, k),
       },
@@ -85,7 +95,7 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
 
     try {
       await def.register(ctx);
-      app.route(`/api/m/${def.id}`, routes);
+      app.route(mountOf(def), routes);
       services.set(def.id, own);
       loaded.push(def.id);
     } catch (e) {

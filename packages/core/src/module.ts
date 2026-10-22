@@ -23,6 +23,10 @@ export interface ModuleContext {
   routes: Hono;
   events: ScopedEvents;
   permissions: {
+    /** Catálogo agregado das permissões de todos os módulos carregados até agora. */
+    catalog(): { module: string; items: PermissionItem[] }[];
+    /** Todas as chaves de permissão disponíveis. */
+    allKeys(): Set<string>;
     registerProvider(provider: () => PermissionItem[]): void;
     has(userPermissions: readonly string[] | undefined, key: string): boolean;
   };
@@ -37,12 +41,15 @@ export interface ModuleDef {
   id: string;
   version: string;
   dependsOn?: string[];
+  /** Prefixo de montagem das rotas (ex.: "/api"). Padrão: /api/m/<id>. Dois módulos não podem pedir o mesmo. */
+  prefix?: string;
   permissions?: ModulePermissions;
   migrations?: { folder: string; schema?: string };
   register(ctx: ModuleContext): void | Promise<void>;
 }
 
 const ID = /^[a-z][a-z0-9_]*$/;
+const PREFIX = /^\/[A-Za-z0-9_\-/]*$/;
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
 export function defineModule(def: ModuleDef): ModuleDef {
@@ -51,6 +58,9 @@ export function defineModule(def: ModuleDef): ModuleDef {
   }
   if (typeof def.version !== "string" || !SEMVER.test(def.version)) {
     throw new Error(`Versão inválida "${String(def.version)}" no módulo "${def.id}": use o formato semver (ex.: 1.0.0).`);
+  }
+  if (def.prefix !== undefined && (typeof def.prefix !== "string" || !PREFIX.test(def.prefix))) {
+    throw new Error(`prefix inválido "${String(def.prefix)}" no módulo "${def.id}": use um caminho iniciado por "/" (ex.: /api).`);
   }
   if (def.dependsOn?.includes(def.id)) {
     throw new Error(`O módulo "${def.id}" não pode depender de si mesmo.`);
