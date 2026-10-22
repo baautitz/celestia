@@ -11,6 +11,9 @@ import { ERP_TYPES, parseErpValues } from "./data/erp-types.js";
 import { encryptSecret } from "./data/secret-box.js";
 import { loadModules } from "@platform/core/loader";
 import { createIamModule } from "./iam/iam-module.js";
+import { AuditLog } from "./audit/audit-log.js";
+import { MemoryAuditStore } from "./audit/audit-store.js";
+import { createAuditModule } from "./audit/audit-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
@@ -27,6 +30,8 @@ export interface CreatePlatformAppOptions {
   userStore?: UserStore;
   tokenService?: TokenService;
   closingPeriodStore?: ClosingPeriodStore;
+  /** Audit Log do sistema; por padrão, em memória. */
+  auditLog?: AuditLog;
 }
 
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
@@ -84,6 +89,19 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
       return iamApp.fetch(c.req.raw);
     });
   }
+
+  // Consulta do Audit Log (/api/audit), servida pelo Module `audit`.
+  const auditApp = new Hono();
+  const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
+  const auditReady = loadModules(auditApp, [createAuditModule({ auditLog, auth })]);
+  app.all("/api/audit/*", async (c) => {
+    await auditReady;
+    return auditApp.fetch(c.req.raw);
+  });
+  app.all("/api/audit", async (c) => {
+    await auditReady;
+    return auditApp.fetch(c.req.raw);
+  });
 
   // ─────────────────────────────────────────────────────────────
   // 2.2 GESTÃO DE CONEXÕES COM FONTES DE DADOS (a senha nunca é devolvida)
@@ -175,6 +193,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     const sourceConnectors: SourceConnectorRegistry = {};
     let connectionStore: ConnectionStore | undefined;
     let closingPeriodStore: ClosingPeriodStore | undefined;
+    let auditLog: AuditLog | undefined;
     if (process.env.POSTGRES_HOST) {
       const [{ db }, { PostgresUserStore }, { PostgresConnectionStore }, { PostgresClosingPeriodStore }] = await Promise.all([
         import("./db/client.js"),
@@ -185,6 +204,8 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       userStore = new PostgresUserStore(db);
       connectionStore = new PostgresConnectionStore(db);
       closingPeriodStore = new PostgresClosingPeriodStore(db);
+      const { PostgresAuditStore } = await import("./audit/postgres-audit-store.js");
+      auditLog = new AuditLog(new PostgresAuditStore(db));
 
       for (const record of await connectionStore.list()) {
         try {
@@ -195,7 +216,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       }
     }
 
-    const app = createPlatformApp({ userStore, connectionStore, closingPeriodStore, sourceConnectors });
+    const app = createPlatformApp({ userStore, connectionStore, closingPeriodStore, sourceConnectors, auditLog });
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
     serve({ fetch: app.fetch, port });
