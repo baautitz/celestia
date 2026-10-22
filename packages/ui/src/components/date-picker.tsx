@@ -1,10 +1,10 @@
 import React from "react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
-import { cn } from "../lib/utils";
+import { maskDate, parseDate } from "../lib/date-input";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "./input-group";
 import {
   Popover,
   PopoverContent,
@@ -24,37 +24,61 @@ export function DatePicker({
   onChange,
   className,
   disabled,
-  placeholder = "Selecione uma data",
+  placeholder = "dd/mm/aaaa",
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
+  const [text, setText] = React.useState(value ? format(value, "dd/MM/yyyy") : "");
+  const [touched, setTouched] = React.useState(false);
+
+  React.useEffect(() => {
+    setText(value ? format(value, "dd/MM/yyyy") : "");
+    setTouched(false);
+  }, [value]);
+
+  const invalid = text !== "" && !parseDate(text) && (touched || text.length === 10);
+
+  const handleChange = (raw: string) => {
+    const masked = maskDate(raw);
+    setText(masked);
+    if (masked === "") onChange(undefined);
+    else {
+      const parsed = parseDate(masked);
+      if (parsed) onChange(parsed);
+    }
+  };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            variant="outline"
-            data-empty={!value}
-            disabled={disabled}
-            className={cn(
-              "justify-start text-left font-normal data-[empty=true]:text-muted-foreground",
-              className
-            )}
-          />
-        }
-      >
-        <CalendarIcon data-icon="inline-start" />
-        <span className="truncate">
-          {value ? format(value, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : placeholder}
-        </span>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={value}
-          onSelect={onChange}
-        />
-      </PopoverContent>
-    </Popover>
+    <InputGroup className={className}>
+      <InputGroupInput
+        inputMode="numeric"
+        autoComplete="off"
+        value={text}
+        placeholder={placeholder}
+        disabled={disabled}
+        aria-invalid={invalid}
+        onChange={(e) => handleChange(e.target.value)}
+        onBlur={() => setTouched(true)}
+      />
+      <InputGroupAddon align="inline-end">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger
+            render={<Button variant="ghost" size="icon" disabled={disabled} aria-label="Abrir calendário" />}
+          >
+            <CalendarIcon />
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="single"
+              selected={value}
+              defaultMonth={value}
+              onSelect={(date) => {
+                onChange(date);
+                setOpen(false);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }
