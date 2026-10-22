@@ -8,6 +8,7 @@ import { createErpClient, type ErpClientFactory } from "./erp/erp-factory.js";
 import { createErpModule } from "./erp/erp-module.js";
 import { loadModules } from "@platform/core/loader";
 import { PermissionRegistry } from "@platform/core/permissions";
+import { LoginRateLimiter } from "./iam/login-rate-limiter.js";
 import { createIamModule } from "./iam/iam-module.js";
 import { AuditLog } from "./audit/audit-log.js";
 import { MemoryAuditStore } from "./audit/audit-store.js";
@@ -31,6 +32,8 @@ export interface CreatePlatformAppOptions {
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
   auditLog?: AuditLog;
+  /** Limite de tentativas de login (injetável em testes). */
+  loginRateLimiter?: LoginRateLimiter;
 }
 
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
@@ -84,7 +87,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
     await loadModules(
       moduleApp,
       [
-        createIamModule({ userStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass }),
+        createIamModule({ userStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }),
         createClosingPeriodModule({ store: closingPeriodStore, auth }),
       ],
       { registry },
@@ -94,7 +97,7 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   for (const path of ["/api/auth/*", "/api/iam/*", "/api/admin/*", "/api/closing-periods", "/api/closing-periods/*"]) {
     app.all(path, async (c) => {
       await modulesReady;
-      return moduleApp.fetch(c.req.raw);
+      return moduleApp.fetch(c.req.raw, c.env);
     });
   }
 
