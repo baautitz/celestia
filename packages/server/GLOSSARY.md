@@ -42,9 +42,17 @@ _Avoid_: External IDs, mapping, identifiers
 
 ### Access
 
+**User** (pt-BR: **Usuário**):
+A person who signs in to Celestia with a username and password. It is not the same as a person's own account inside an ERP, which Externals link to it.
+_Avoid_: Account, member, ERP user
+
 **Role** (pt-BR: **Perfil**):
 A named group of Permissions assigned to users. A user has exactly one Role.
 _Avoid_: Perfil de Acesso, group, profile
+
+**Deactivate** (a User):
+Stop a User from signing in while keeping the User. A deactivated User is not removed.
+_Avoid_: Delete, remove, block
 
 **Permission**:
 A key that authorizes one action, written `<module>:<resource>:<verb>`.
@@ -61,5 +69,5 @@ The single record of what happened across the whole system, shared by the Base S
 _Avoid_: History, event log, trail
 
 **Log Entry**:
-One record in the Audit Log: who did what, when. Each Log Entry has attributes that the Plugin writing it defines, so the Audit Log needs no fixed set of fields. A Log Entry stays readable after its Plugin is removed from the build.
+One record in the Audit Log: who did what, when. Each Log Entry has attributes that the Plugin writing it defines, so the Audit Log needs no fixed set of fields. A Log Entry stays readable after its Plugin is removed from the build, and its author stays identifiable after the User is deactivated.
 _Avoid_: Event, row, audit record
