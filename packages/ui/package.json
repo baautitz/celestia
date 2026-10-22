@@ -19,7 +19,8 @@
     "./adapters/*": "./src/adapters/*.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint ."
   },
   "peerDependencies": {
     "@base-ui/react": "^1.7.0",

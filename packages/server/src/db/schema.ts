@@ -1,5 +1,5 @@
 import type { User } from "@platform/shared";
-import { boolean, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const roles = pgTable("roles", {
   id: text("id").primaryKey(),
