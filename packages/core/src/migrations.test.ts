@@ -29,14 +29,15 @@ describe("planMigrations", () => {
   });
 });
 
-function fakeDb(): { db: MigrationsDb; calls: string[] } {
+function fakeDb(applied?: string[]): { db: MigrationsDb; calls: string[] } {
   const calls: string[] = [];
   const dialect = new PgDialect();
   const fake = {
     execute: async (q: SQL) => {
       const s = dialect.sqlToQuery(q).sql;
       calls.push(s);
-      return { rows: s.includes("to_regclass") ? [{ r: null }] : [] };
+      if (s.includes("to_regclass")) return { rows: [{ r: applied ? "x" : null }] };
+      return { rows: (applied ?? []).map((name) => ({ name })) };
     },
   };
   return { db: fake as unknown as MigrationsDb, calls };
@@ -79,12 +80,46 @@ describe("runModuleMigrations (db falso)", () => {
   });
 });
 
+function localMigrationsDir(names: string[]): string {
+  const dir = mkdtempSync(join(tmpdir(), "mig-"));
+  for (const n of names) {
+    mkdirSync(join(dir, n));
+    writeFileSync(join(dir, n, "migration.sql"), "select 1");
+  }
+  return dir;
+}
+
+describe("assertMigrationsUpToDate", () => {
+  it("falha com migration pendente, listando o módulo e a migration", async () => {
+    const dir = localMigrationsDir(["20240101000000_a", "20240102000000_b"]);
+    const { db } = fakeDb(["20240101000000_a"]);
+    await expect(assertMigrationsUpToDate(db, [{ moduleId: "m", folder: dir }])).rejects.toThrow(
+      /"m".*20240102000000_b/,
+    );
+  });
+  it("passa quando tudo está aplicado", async () => {
+    const dir = localMigrationsDir(["20240101000000_a"]);
+    const { db } = fakeDb(["20240101000000_a"]);
+    await expect(assertMigrationsUpToDate(db, [{ moduleId: "m", folder: dir }])).resolves.toBeUndefined();
+  });
+  it("módulo sem migrations fica fora do plano e não consulta o banco", async () => {
+    const plan = planMigrations([{ id: "sem" }]);
+    const { db, calls } = fakeDb();
+    await expect(assertMigrationsUpToDate(db, plan)).resolves.toBeUndefined();
+    expect(plan).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+});
+
 describe.skipIf(!process.env.POSTGRES_HOST || process.env.MIGRATIONS_TEST_DB !== "1")("Postgres real (opt-in)", () => {
   it("aplica e verifica uma migration trivial", async () => {
     const real = await vi.importActual<typeof import("drizzle-orm/node-postgres/migrator")>(
       "drizzle-orm/node-postgres/migrator",
     );
     migrateMock.mockImplementation(real.migrate);
+    if (!["127.0.0.1", "localhost", "::1"].includes(process.env.POSTGRES_HOST ?? "")) {
+      throw new Error(`Recusado: POSTGRES_HOST "${process.env.POSTGRES_HOST}" não é local.`);
+    }
     const db = drizzle({
       connection: {
         host: process.env.POSTGRES_HOST,
@@ -95,6 +130,7 @@ describe.skipIf(!process.env.POSTGRES_HOST || process.env.MIGRATIONS_TEST_DB !==
       },
     });
     const id = `t4_${Date.now()}`;
+    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.identifier(id)}`);
     const dir = mkdtempSync(join(tmpdir(), "mig-"));
     mkdirSync(join(dir, "20240101000000_t"));
     writeFileSync(join(dir, "20240101000000_t", "migration.sql"), `CREATE TABLE "${id}"."t" (id int)`);

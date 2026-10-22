@@ -10,6 +10,7 @@
     "test": "vitest run",
     "check:ui": "node scripts/check-ui-boundaries.mjs",
     "check:ui:test": "node scripts/check-ui-boundaries.test.mjs",
+    "test:db": "node scripts/test-db.mjs",
     "test:watch": "vitest",
     "dev:server": "pnpm --filter @platform/server dev",
     "dev:web": "pnpm --filter @platform/web dev",
