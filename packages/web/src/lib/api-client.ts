@@ -7,6 +7,7 @@ import type {
   ClosingPeriodRecord,
   ErpDriverMeta,
   Erp,
+  ErpExternalsEntry,
   ErpInput,
   AuditLogEntry,
   AuditLogFilter,
@@ -132,10 +133,6 @@ class ApiClient {
       return this.request<PermissionCatalog>("/api/iam/permissions/catalog");
     },
 
-    listErps: async (): Promise<{ id: string; name: string }[]> => {
-      return this.request<{ id: string; name: string }[]>("/api/iam/erps");
-    },
-
     listUsers: async (): Promise<User[]> => {
       return this.request<User[]>("/api/iam/users");
     },
@@ -146,7 +143,6 @@ class ApiClient {
       email: string;
       password: string;
       roleId: string;
-      externals?: Record<string, string | number>;
     }): Promise<User> => {
       return this.request<User>("/api/iam/users", {
         method: "POST",
@@ -210,6 +206,17 @@ class ApiClient {
 
   // ─── ERPs ────────────────────────────────────────────────────────────────
   erps = {
+    listExternals: async (userId: string): Promise<ErpExternalsEntry[]> => {
+      return this.request<ErpExternalsEntry[]>(`/api/admin/erp-externals/${userId}`);
+    },
+
+    saveExternals: async (userId: string, erpId: string, values: Record<string, string>): Promise<void> => {
+      await this.request(`/api/admin/erp-externals/${userId}/${erpId}`, {
+        method: "PUT",
+        body: JSON.stringify({ values }),
+      });
+    },
+
     listDrivers: async (): Promise<ErpDriverMeta[]> => {
       return this.request<ErpDriverMeta[]>("/api/admin/erp-drivers");
     },

@@ -7,6 +7,8 @@ export interface ErpDriverMeta {
   id: string;
   label: string;
   fields: FormFieldDef[];
+  /** Campos de Externals que o ERP Driver declara para mapear um User ao ERP. */
+  externalFields: FormFieldDef[];
 }
 
 /**
@@ -25,4 +27,14 @@ export interface ErpInput {
   name: string;
   driver: string;
   values: Record<string, unknown>;
+}
+
+/**
+ * Externals de um User em um ERP: os campos que o Plugin declara e os valores gravados.
+ */
+export interface ErpExternalsEntry {
+  erpId: string;
+  erpName: string;
+  fields: FormFieldDef[];
+  values: Record<string, string | number>;
 }
