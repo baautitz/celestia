@@ -7,6 +7,8 @@ import type {
   ErpDriverMeta,
   Erp,
   ErpInput,
+  AuditLogEntry,
+  AuditLogFilter,
 } from "@platform/shared";
 
 class ApiClient {
@@ -190,7 +192,16 @@ class ApiClient {
     },
   };
 
-  // ─── ERPs ──────────────────────────────────────────────
+  // ─── AUDIT LOG ───────────────────────────────────────────────────────────
+  audit = {
+    list: async (filter: AuditLogFilter = {}): Promise<AuditLogEntry[]> => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(filter)) if (value) params.set(key, value);
+      return this.request<AuditLogEntry[]>(`/api/audit?${params.toString()}`);
+    },
+  };
+
+  // ─── ERPs ────────────────────────────────────────────────────────────────
   erps = {
     listDrivers: async (): Promise<ErpDriverMeta[]> => {
       return this.request<ErpDriverMeta[]>("/api/admin/erp-drivers");
