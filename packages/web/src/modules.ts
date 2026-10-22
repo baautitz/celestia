@@ -1,4 +1,5 @@
 import type { NavEntry, WebModule } from "@platform/ui/contracts/module";
+import { canSeeEntry } from "./lib/entry-screen";
 import { coreModule } from "./modules/core";
 import { auditModule } from "./modules/audit";
 
@@ -8,4 +9,4 @@ export const modules: WebModule[] = [coreModule, auditModule];
 export const allEntries: NavEntry[] = modules.flatMap((m) => m.entries);
 
 export const accessibleEntries = (hasPermission: (permission: string) => boolean): NavEntry[] =>
-  allEntries.filter((e) => hasPermission(e.permission));
+  allEntries.filter((e) => canSeeEntry(e, hasPermission));
