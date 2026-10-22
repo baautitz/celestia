@@ -1,67 +1,13 @@
 import type { PermissionItem } from "@platform/shared";
+import { IAM_PERMISSIONS } from "./iam-permissions.js";
 
 /**
  * Catálogo estático das permissões nativas do sistema.
  * Todas seguem o formato: system:<modulo>:<acao>
  */
 export const SYSTEM_PERMISSIONS: PermissionItem[] = [
-  // ── Módulo: Usuários ───────────────────────────────────
-  {
-    key: "system:users:create",
-    label: "Criar Usuários",
-    description: "Permite cadastrar novos operadores e administradores no sistema.",
-    module: "users",
-  },
-  {
-    key: "system:users:read",
-    label: "Visualizar Usuários",
-    description: "Permite listar e visualizar o perfil e dados cadastrais dos usuários.",
-    module: "users",
-  },
-  {
-    key: "system:users:update",
-    label: "Editar Usuários",
-    description: "Permite alterar nome, cargo e mapeamento de IDs de ERP (externals) de usuários.",
-    module: "users",
-  },
-  {
-    key: "system:users:reset_password",
-    label: "Redefinir Senha de Usuários",
-    description: "Permite ao administrador definir uma nova senha para qualquer usuário.",
-    module: "users",
-  },
-  {
-    key: "system:users:delete",
-    label: "Inativar/Excluir Usuários",
-    description: "Permite desativar ou excluir contas de usuários.",
-    module: "users",
-  },
-
-  // ── Módulo: Perfis e Permissões (Roles) ─────────────────
-  {
-    key: "system:roles:create",
-    label: "Criar Grupos de Acesso",
-    description: "Permite criar novos perfis/cargos de permissão.",
-    module: "roles",
-  },
-  {
-    key: "system:roles:read",
-    label: "Visualizar Grupos e Catálogo",
-    description: "Permite listar perfis de acesso e inspecionar o catálogo de permissões.",
-    module: "roles",
-  },
-  {
-    key: "system:roles:update",
-    label: "Editar Permissões do Grupo",
-    description: "Permite alterar quais permissões do sistema pertencem a cada grupo.",
-    module: "roles",
-  },
-  {
-    key: "system:roles:delete",
-    label: "Excluir Grupos de Acesso",
-    description: "Permite remover perfis que não estejam em uso.",
-    module: "roles",
-  },
+  // Users e Roles vêm da declaração do Module `iam`; o agrupamento do catálogo usa o recurso como módulo.
+  ...IAM_PERMISSIONS.items.map(({ key, label, description }) => ({ key, label, description, module: key.split(":")[1] })),
 
   // ── Módulo: Áreas de Trabalho (Workspaces) ───────────────
   {
@@ -123,6 +69,11 @@ export const SYSTEM_PERMISSIONS: PermissionItem[] = [
     module: "audit",
   },
 ];
+
+/** Permissões `system:*` que ainda não pertencem a um Module (registradas pelo `iam` até serem modularizadas). */
+export const NON_IAM_PERMISSIONS: PermissionItem[] = SYSTEM_PERMISSIONS.filter(
+  (p) => !IAM_PERMISSIONS.items.some((i) => i.key === p.key),
+);
 
 /**
  * Retorna as permissões do sistema agrupadas por módulo.
