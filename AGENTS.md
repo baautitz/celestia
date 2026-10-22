@@ -1,22 +1,19 @@
 # AGENTS.md — Technical Architecture & Operational Directives for AI Agents
 
-> **Audience**: Autonomous Coding Agents, Antigravity, Claude Code, Cursor, Copilot, Cline, Windsurf.  
-> **Platform**: Celestia — Permission-First IAM Enterprise Platform (modular; modules a definir).  
+> **Audience**: Autonomous Coding Agents (Claude Code, Antigravity, Cursor, Copilot, Cline, Windsurf).
+> **Platform**: Celestia — Permission-First IAM Enterprise Platform (small core + modules).
 > **Runtime**: Node.js >= 24.x, TypeScript >= 5.6 (strict mode), pnpm workspaces.
 
 ---
 
-## 1. System Identity & Mission
+## 1. System Identity
 
-**Celestia** is an enterprise platform with an embedded **Permission-First IAM** system, designed for high-stakes enterprise operations (monthly closings, retail auditing, sales commissions, pharmacy/ERP reconciliations).
+**Celestia** is an enterprise platform with an embedded **Permission-First IAM**, built for high-stakes operations (monthly closings, retail auditing, sales commissions, pharmacy/ERP reconciliations).
 
-> **Recipes / SDUI were REMOVED** (user decision). There is no recipe compiler, sandbox, dashboards or recipe permissions (`recipe:*`) anymore. Customer-specific functionality will come as modules under `/integrations` (a definir). **Workspaces will become a module** (`workspaces`, a definir); today they remain in the server without any model link (`recipe_id`/`params` dropped).
-
-- **Backend**: [Hono](https://hono.dev/) on Node.js (ultra-fast, typed RPC, minimal overhead).
-- **Security**: **Argon2id** (`@node-rs/argon2`), stateless JWT (5 min) + Refresh Token (7 days).
+- **Backend**: [Hono](https://hono.dev/) on Node.js. **Security**: Argon2id, stateless JWT (5 min) + Refresh Token (7 days).
 - **Frontend**: Vite + React 19 + shadcn/ui + Tailwind CSS v4.
-- **PT-BR UI Terminology**:
-  - `Workspace` ➔ **Área de Trabalho** (the active session/closing period).
+- **Recipes / SDUI were removed.** Customer-specific features will be modules under `/integrations` (a definir). Workspaces ("Área de Trabalho", the active closing period) will become a module; today they live in the server.
+- **Target architecture** (modules as bounded contexts, `before`/`after` events, per-module migrations): see [docs/next-steps/](docs/next-steps/README.md) and [decisoes.md](docs/next-steps/decisoes.md). Not implemented yet.
 
 ---
 
@@ -25,161 +22,80 @@
 ```text
 celestia/
 ├── packages/
-│   ├── core/                     (@platform/core) -> Module framework: module contract, loader/graph, events, migrations, permissions (pruneOrphans, ...)
-│   ├── shared/                   (@platform/shared) -> Contracts & types: iam.ts, workspace.ts, erp.ts, fields.ts (re-export of @platform/ui)
-│   ├── server/                   (@platform/server) -> Hono API
-│   │   └── src/
-│   │       ├── index.ts          -> Hono app: health, auth, iam, /api/admin/connections*, /api/admin/erp-types, /api/workspaces*
-│   │       ├── iam/              -> password-service, token-service, system-permissions (SYSTEM_PERMISSIONS, SYSTEM_PERMISSION_KEYS, denyMessage),
-│   │       │                        user-store (memory) / postgres-user-store, middleware, has-permission, can-grant
-│   │       ├── engine/           -> template-engine (SQL {{...}} -> bind params), workspace-validator
-│   │       ├── data/             -> source-connector, mssql-source-connector, connection-factory/store, erp-types, secret-box, read-only-guard, workspace-store
-│   │       ├── db/               -> drizzle schema (roles, users, connections, workspaces), client, migrate
-│   │       └── cli/              -> create-admin, erp-query
-│   ├── ui/                       (@platform/ui) -> shadcn/ui primitives, imperative UI (useUi), DataTable, forms, contracts (defineWebModule)
-│   └── web/                      (@platform/web) -> SPA (Vite + React 19): modules.ts registry, pages IAMUsers/IAMRoles/ERPs/Login
+│   ├── core/     (@platform/core)   module framework: contract, loader/graph, events, migrations, permissions (pruneOrphans, ...)
+│   ├── shared/   (@platform/shared) contracts & types: iam.ts, workspace.ts, erp.ts, fields.ts
+│   ├── server/   (@platform/server) Hono API
+│   │   └── src/  index.ts (app: health, auth, iam, /api/admin/connections*, /api/admin/erp-types, /api/workspaces*),
+│   │             iam/, engine/ (template-engine, workspace-validator), data/ (connectors, stores, secret-box, read-only-guard),
+│   │             db/ (drizzle schema, client, migrate), cli/ (create-admin, erp-query)
+│   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi), DataTable, forms, defineWebModule
+│   └── web/      (@platform/web)    SPA: modules.ts registry, pages IAMUsers/IAMRoles/ERPs/Login
+├── docs/         conventions/, next-steps/, ideas/, agents/
+└── scripts/      check-ui-boundaries.mjs
 ```
 
-Migrations live in `packages/server/drizzle/`. The database is rebuilt module by module later (a definir).
+Migrations live in `packages/server/drizzle/`. The database is rebuilt module by module later.
 
 ---
 
-## 3. Hard Architectural Invariants (Non-Negotiable)
-
-When generating or modifying code in this repository, agents MUST adhere to these strict invariants:
-
-### 1. Password Hashing: Strictly Argon2id
-- **NEVER** use bcrypt, scrypt, SHA, MD5, or plain text.
-- Always use `@node-rs/argon2` with `Algorithm.Argon2id`, `memoryCost: 19456` (19 MiB), `timeCost: 2`, `parallelism: 1`.
-- Output must strictly follow the standard PHC format: `$argon2id$v=19$...`.
-
-### 2. Password Policy (Zod)
-- Minimum 8 characters.
-- Requires at least: 1 uppercase (`[A-Z]`), 1 lowercase (`[a-z]`), 1 number (`[0-9]`), 1 special character (`[^A-Za-z0-9]`).
-- **No self-service "forgot password"**: password resets are performed exclusively by admins via `POST /api/iam/users/:id/reset-password` (`system:users:reset_password`).
-
-### 3. Permission-First & Naming Format
-- Convenção de verbos e nomes (orientação, não obrigatória): [docs/conventions/permissions.md](docs/conventions/permissions.md).
-- Every action, source query, and route requires explicit permission strings.
-- **Format**:
-  - System modules: `system:<modulo>:<acao>` (e.g. `system:users:create`, `system:workspaces:create`).
-  - Valid keys are exactly `SYSTEM_PERMISSIONS` (+ the wildcard `"*"`). Module permission formats beyond `system:*`: a definir.
-- **Orphan Pruning**: at boot, `UserStore.syncOrphanPermissions(validKeys)` removes from all roles every key not in `SYSTEM_PERMISSION_KEYS` (the wildcard `"*"` is preserved; uses `pruneOrphans` from `@platform/core/permissions`).
-- **Administrator bypass (`isAdmin`)**: a user with `users.is_admin = true` ignores the permission matrix. The auth middleware replaces the token's permissions with **every valid permission key at request time** (`SYSTEM_PERMISSIONS`), so every `requirePermission` / `permissions.includes(...)` check keeps working unchanged. The flag is settable only via `UserStore.setAdmin`: by the `create-admin` CLI, or by `PUT /api/iam/users/:id` with `isAdmin`, which is accepted ONLY from a caller who is already an admin (403 otherwise) and never lets an admin demote themselves (400). `POST /api/iam/users` ignores it. This is the single, deliberate exception to least-privilege: grant it sparingly.
-
-### 5. Mandatory Workspace Dates & Temporal Protection
-- Every Workspace / Área de Trabalho must have `startDate` and `endDate` (`YYYY-MM-DD`); `POST /api/workspaces` takes `{ name, startDate, endDate }`.
-- **Strict Rule**: `end_date >= start_date`. Any request with `end_date < start_date` must be rejected with HTTP 400 and message `"A Data Final não pode ser anterior à Data Inicial."`.
-
-### 6. Zero SQL Injection (Template Engine)
-- **NEVER** concatenate user strings or raw variables into SQL queries.
-- All `{{...}}` tokens (e.g. `{{workspace.param}}`, `{{user.externals.source}}`) must be converted into bind parameters (`@p1`, `@p2`) via `TemplateEngine.parse()` (`engine/template-engine.ts`; used by connections/modules).
-
-### 8. No Credential Leakage
-- `passwordHash` must **never** be included in API responses. Always delete or omit `passwordHash` before returning `User` objects.
-
-### 9. `@platform/ui` Primitives Only (No Raw HTML)
-- Every UI element is built from `@platform/ui/components/*` (shadcn/ui, Base UI). The legacy `@/components/ui` no longer exists.
-- **Forms**: `<Form>`, `<FormField>`, `<FormItem>`, `<FormLabel>`, `<FormControl>`, `<FormMessage>` with `react-hook-form` and `zodResolver`.
-- **Labels**: always `<Label>`; never raw `<label>`.
-- **Theme**: light-only (no theme provider).
-- **Boundary**: outside `packages/ui`, `pnpm check:ui` forbids importing `sonner` or `@base-ui/react/*`, `@/components/ui`, and declarative `open=`/`onOpenChange=` on Dialog/Sheet/AlertDialog/Popover.
-
-### 11. Custom Tailwind `<div>` Components Prohibited Without Explicit Authorization
-- **NEVER** create custom components or layout wrappers using custom-styled `<div>` tags without explicit prior approval from the user.
-- All interface elements MUST use standard `shadcn/ui` components from `@/components/ui/*`.
-- Any custom abstraction or layout decision requires prior explicit confirmation.
-
-### 12. Strict Step-by-Step Explicit User Approval
-- The agent must **NEVER** make unilateral decisions regarding layout, architecture, or logic.
-- For **EVERY SINGLE STEP** to be performed, the agent MUST explicitly ask the user for permission and confirmation before executing that step.
-
-### 13. Strict & Explicit TypeScript Typing (Zero `unknown`/`any` Workarounds)
-- **NEVER** use defensive runtime type sniffing, `unknown`, or `any` when exact component signatures exist.
-- Always use the exact, native types declared by the library (e.g., `(values: string[]) => void`).
-
-### 14. Proibição Absoluta de Adivinhação & Consulta Obrigatória à Documentação Oficial em TUDO
-- **O MODELO É DESATUALIZADO E O ECOSSISTEMA MUDA RAPIDAMENTE**: O modelo deve assumir como premissa mandatória que sua memória interna sobre APIs, bibliotecas, frameworks, versões e sintaxes é defasada ou propensa a alucinações.
-- **SEMPRE consulte a documentação oficial para QUALQUER tópico**: Isso se aplica a **TUDO** (Frontend, Backend Hono, TypeScript, Zod, Argon2, Vite, shadcn/ui, Radix UI, Base UI, Tailwind CSS v4, PostgreSQL, Vitest, etc.), e não apenas a UI/Layout.
-- **PROIBIDO inventar gambiarras ou soluções improvisadas**: Nunca utilize hacks, suposições de sintaxe, *inline styles*, classes arbitrárias ou soluções baseadas em "adivinhação". Utilize exclusivamente os padrões canônicos vigentes na documentação oficial.
-- **Siga estritamente as instruções do usuário** e confirme cada ação passo a passo.
-
-### 15. Button Size Convention (Never `sm` / `icon-sm`)
-- For buttons with text: use `size="default"` (or omit — it's the default). **NEVER** use `size="sm"`, `size="xs"`, or `size="lg"` on action buttons.
-- For icon-only buttons: use `size="icon"`. **NEVER** use `size="icon-sm"` or `size="icon-xs"`.
-- The only exception is the internal `X` close button inside `SheetContent` (`size="icon-sm"`) — this is part of the primitivo and must NOT be replicated.
-- Reference: `buttonVariants` sizes are `default` (`h-8`), `xs` (`h-6`), `sm` (`h-7`), `lg` (`h-9`), `icon`/`icon-xs`/`icon-sm`/`icon-lg`. Project convention uses exclusively `default` and `icon`.
-
-### 16. Sheet Layout Convention
-- Sheets are opened via the `"sheet"` surface of `useUi().windows.open`; the window host in `@platform/ui` implements the layout, so the window component renders ONLY the body and publishes its actions with `<WindowActions>`.
-- Host layout: `SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl"`; `SheetHeader className="p-6 border-b shrink-0"` (`SheetTitle` + `SheetDescription`); `ScrollArea className="flex-1 min-h-0"` > `<div className="p-6 flex flex-col gap-6">`; `SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover"`.
-- Submit pattern: the action button uses `form="<id>"` and the body renders `<form id="<id>">`.
-
-### 17. Permission Management
-- **System permissions** (`system:*`) are configured in the Roles page (`/iam/roles`) via the edit Sheet. Where module permissions will be configured: a definir.
-- Server-side validation: `POST /api/iam/roles` and `PUT /api/iam/roles/:id` validate permission keys against `SYSTEM_PERMISSION_KEYS`. Invalid keys return HTTP 400. Wildcard `"*"` is allowed (admin only).
-- `GET /api/iam/permissions/catalog` returns `{ system }`.
-
-### 18. Search Inputs via `InputGroup` (No Custom `<div>` Wrappers)
-- Search inputs and inputs with icons MUST use the canonical `InputGroup` primitives (`InputGroup`, `InputGroupAddon`, `InputGroupInput`) from `@/components/ui/input-group`.
-- **NEVER** build custom search containers with `<div className="relative">` and absolute positioned icons.
-
-### 19. Currency & Money Input Standard (`MoneyInput`)
-- All form fields of type `money` (declarative or imperative `ui.dialog.open`) MUST use `<MoneyInput />` from `@/components/ui/money-input`.
-- **NEVER** use `<Input type="number" step="0.01" />` for currency.
-- `MoneyInput` enforces `type="text"`, `inputMode="numeric"` (opening touch numeric keyboard on mobile devices) and real-time cents-based masking in Brazilian Real (`R$ 0,00`), with full support for `prefix`, `precision`, `allowNegative` and typed float synchronization with the backend.
-
-### 20. Data Tables via `DataTable`
-- Data tables use `DataTable` from `@platform/ui/data-table/data-table`: desktop renders `<Table>`; mobile renders `<MobileCard>` via `useIsMobile()`.
-
-### Imperative UI (`useUi()`)
-- Windows (dialogs/sheets), confirmations and feedback (toasts) are opened imperatively through `useUi()` from `@platform/ui/imperative/provider`, mounted once by `UiProvider` in `main.tsx`.
-- Window content uses `useWindow()` and `WindowActions` (footer actions) from `@platform/ui/imperative/use-window`.
-
-### 21. Granular One-Line Conventional Commits & Mandatory Approval
-- All commits in this repository MUST strictly follow the **One-Line Conventional Commits** format: `<type>(<scope>): <short description in english>` (e.g. `fix(web): filter showTable rowActions by user permissions`).
-- Granularity: Commits must be separated logically by responsibility/component.
-- **NEVER** execute commits unilaterally. The agent MUST ALWAYS:
-  1. Present the detailed commit plan (messages and corresponding files) to the user.
-  2. Request explicit user confirmation.
-  3. Execute `git commit` ONLY after user approval.
-
-### 22. Named Drizzle Migrations
-- Every migration MUST have a descriptive snake_case name: `pnpm --filter @platform/server db:generate --name=<descricao>` (e.g. `--name=create_users_and_roles`). Never keep the auto-generated random names (e.g. `white_phantom_reporter`).
-- Apply with `pnpm --filter @platform/server db:migrate`. Migrations live in `packages/server/drizzle/`.
-
----
-
-## 3b. Arquitetura alvo (PLANEJADO, NAO implementado)
-
-- Modulos como bounded contexts, cada um com migrations proprias.
-- Comunicacao entre modulos por eventos `before` (cancelavel) e `after`.
-- Registro de modulos no web (hoje parcial: `modules.ts` + `modules/core.ts`).
-- Demais detalhes: a definir.
-
----
-
-## 4. Code Generation Templates
-
-Removed together with Recipes. New templates (modules under `/integrations`, `workspaces` module): a definir.
-
----
-
-## 5. Development & Testing Commands
+## 3. Commands
 
 ```bash
-# Build all packages in monorepo
-pnpm -r run build
-# Note: server depends on shared and core via dist; `pnpm -r` orders them topologically.
-# Building one package alone: run `pnpm --filter @platform/shared build` and
-# `pnpm --filter @platform/core build` before the server (build/test/dev).
-
-# Run entire Vitest test suite
-pnpm test
-
-# UI boundary check
-pnpm check:ui
-
-# Run tests in watch mode
+pnpm -r run build      # build all (server depends on shared and core via dist; pnpm -r orders them)
+pnpm test              # full Vitest suite
+pnpm check:ui          # UI boundary check
 pnpm --filter @platform/server test:watch
 ```
+
+Building one package alone: build `@platform/shared` and `@platform/core` first.
+
+---
+
+## 4. Invariants (Non-Negotiable)
+
+### Security
+- **Passwords**: only Argon2id via `@node-rs/argon2` (`memoryCost: 19456`, `timeCost: 2`, `parallelism: 1`), PHC format `$argon2id$v=19$...`. Never bcrypt/scrypt/SHA/MD5/plain text.
+- **Password policy (Zod)**: min 8 chars, with 1 uppercase, 1 lowercase, 1 number, 1 special. No self-service "forgot password": admins reset via `POST /api/iam/users/:id/reset-password` (`system:users:reset_password`).
+- **No credential leakage**: never return `passwordHash`; omit it from every `User` response.
+- **Zero SQL injection**: never concatenate user strings into SQL. All `{{...}}` tokens become bind parameters (`@p1`, `@p2`) via `TemplateEngine.parse()` (`engine/template-engine.ts`).
+- **Session (zero `localStorage`)**: the access token lives only in JS memory; the refresh token only in an `HttpOnly; SameSite=Lax; Path=/api/auth` cookie, handled with `getCookie`/`setCookie`/`deleteCookie` from `hono/cookie`. Never store tokens or credentials in `localStorage`/`sessionStorage`.
+
+### Permissions
+- Every action and route requires an explicit permission string. Naming guidance: [docs/conventions/permissions.md](docs/conventions/permissions.md).
+- Format `system:<modulo>:<acao>` (e.g. `system:users:create`). Valid keys are exactly `SYSTEM_PERMISSIONS` plus the wildcard `"*"` (admin only). Module formats: a definir.
+- **Orphan pruning**: at boot, `UserStore.syncOrphanPermissions(validKeys)` removes every key not in `SYSTEM_PERMISSION_KEYS` from all roles (keeps `"*"`; uses `pruneOrphans` from `@platform/core/permissions`).
+- **Role validation**: `POST /api/iam/roles` and `PUT /api/iam/roles/:id` reject invalid keys with HTTP 400. `GET /api/iam/permissions/catalog` returns `{ system }`. System permissions are configured in `/iam/roles` (edit Sheet).
+- **Administrator bypass (`isAdmin`)**: `users.is_admin = true` ignores the permission matrix; the auth middleware swaps the token's permissions for every key in `SYSTEM_PERMISSIONS` at request time, so `requirePermission` keeps working unchanged. Settable only via `UserStore.setAdmin`: by the `create-admin` CLI, or `PUT /api/iam/users/:id` with `isAdmin`, accepted only from a caller who is already admin (403 otherwise) and never lets an admin demote themselves (400). `POST /api/iam/users` ignores it. This is the single deliberate exception to least-privilege; grant sparingly.
+
+### Domain
+- Every Workspace has `startDate` and `endDate` (`YYYY-MM-DD`); `POST /api/workspaces` takes `{ name, startDate, endDate }`. `end_date < start_date` → HTTP 400 `"A Data Final não pode ser anterior à Data Inicial."`.
+
+### UI
+Details in [docs/conventions/ui.md](docs/conventions/ui.md).
+- Build every element from `@platform/ui/components/*`; no raw HTML, no custom-styled `<div>` components or wrappers without explicit user approval, no inline styles or arbitrary classes. `pnpm check:ui` enforces the package boundary.
+- Forms: `Form*` primitives + `react-hook-form` + `zodResolver`; always `<Label>`. Money: `<MoneyInput />`. Search/icon inputs: `InputGroup`. Tables: `DataTable`. Windows, confirmations and toasts: `useUi()`.
+- Buttons: `size="default"` or `size="icon"` only (never `sm`/`xs`/`lg`/`icon-sm`/`icon-xs`).
+- Sheets: the window renders only the body and publishes actions with `<WindowActions>`.
+- Light theme only.
+
+### Code
+- **Strict TypeScript**: no `any`, `unknown` workarounds or runtime type sniffing when the library declares exact types.
+- **Official docs first**: the model's memory of APIs, versions and syntax is stale. Consult the official documentation for anything (Hono, Zod, Vite, shadcn/ui, Base UI, Tailwind v4, PostgreSQL, Vitest, ...). No hacks or guessed syntax.
+- **Migrations** have descriptive snake_case names: `pnpm --filter @platform/server db:generate --name=<descricao>`; apply with `db:migrate`. Never keep auto-generated random names.
+
+---
+
+## 5. Working Agreement
+
+- **Explicit approval**: do not make unilateral decisions on layout, architecture or logic. Present each step, explain it, and get the user's confirmation before executing it.
+- **Commits** are One-Line Conventional Commits: `<type>(<scope>): <short description in english>` (e.g. `fix(web): filter showTable rowActions by user permissions`), split by responsibility. Never commit unilaterally: present the plan (messages + files), get confirmation, then commit.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`baautitz/celestia`, via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Multi-context: root `GLOSSARY-MAP.md` points to per-context `GLOSSARY.md` files under `packages/*`. See `docs/agents/domain.md`.
