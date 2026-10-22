@@ -1,11 +1,11 @@
 import React from "react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
-import { cn } from "../lib/utils";
+import { maskDateRange, parseDateRange } from "../lib/date-input";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "./input-group";
 import {
   Popover,
   PopoverContent,
@@ -57,48 +57,63 @@ export function DateRangePicker({
     setOpen(next);
   };
 
-  const formatDateShort = (date: Date) =>
-    format(date, "dd 'de' MMM", { locale: ptBR });
+  const toText = (range: DateRange | undefined) =>
+    range?.from && range?.to
+      ? `${format(range.from, "dd/MM/yyyy")} - ${format(range.to, "dd/MM/yyyy")}`
+      : "";
+  const [text, setText] = React.useState(toText(value));
+  const [touched, setTouched] = React.useState(false);
 
-  const formatDateFull = (date: Date) =>
-    format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+  React.useEffect(() => {
+    setText(toText(value));
+    setTouched(false);
+  }, [value?.from?.getTime(), value?.to?.getTime()]);
 
-  const label =
-    value?.from && value?.to
-      ? `${formatDateShort(value.from)} — ${formatDateShort(value.to)} ${value.to.getFullYear()}`
-      : value?.from
-        ? formatDateFull(value.from)
-        : "Selecione o período";
+  const invalid = text !== "" && !parseDateRange(text) && (touched || text.length === 23);
+
+  const handleTextChange = (raw: string) => {
+    const masked = maskDateRange(raw);
+    setText(masked);
+    if (masked === "") {
+      onChange(undefined);
+      return;
+    }
+    const parsed = parseDateRange(masked);
+    if (parsed) onChange(parsed);
+  };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger
-        render={
-          <Button
-            variant="outline"
-            data-empty={!value?.from}
-            disabled={disabled}
-            className={cn(
-              "h-8 justify-start gap-2 text-left font-normal text-sm data-[empty=true]:text-muted-foreground",
-              className
-            )}
-          />
-        }
-      >
-        <CalendarIcon data-icon="inline-start" />
-        <span className="truncate">{label}</span>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="range"
-          defaultMonth={value?.from}
-          selected={draft}
-          // Sem onSelect o react-day-picker usa estado interno e ignora `selected`; a seleção real vem de onDayClick.
-          onSelect={() => undefined}
-          onDayClick={handleDayClick}
-          numberOfMonths={2}
-        />
-      </PopoverContent>
-    </Popover>
+    <InputGroup className={className}>
+      <InputGroupInput
+        inputMode="numeric"
+        autoComplete="off"
+        value={text}
+        placeholder="dd/mm/aaaa - dd/mm/aaaa"
+        disabled={disabled}
+        aria-invalid={invalid}
+        onChange={(e) => handleTextChange(e.target.value)}
+        onBlur={() => setTouched(true)}
+      />
+      <InputGroupAddon align="inline-end">
+        <Popover open={open} onOpenChange={handleOpenChange}>
+          <PopoverTrigger
+            render={<Button variant="ghost" size="icon" disabled={disabled} aria-label="Abrir calendário" />}
+          >
+            <CalendarIcon />
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="range"
+              defaultMonth={value?.from}
+              selected={draft}
+              // Sem onSelect o react-day-picker usa estado interno e ignora `selected`; a seleção real vem de onDayClick.
+              onSelect={() => undefined}
+              onDayClick={handleDayClick}
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }
