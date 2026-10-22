@@ -206,6 +206,15 @@ class ApiClient {
     list: async (): Promise<ClosingPeriodRecord[]> => {
       return this.request<ClosingPeriodRecord[]>("/api/closing-periods");
     },
+    close: async (id: string): Promise<ClosingPeriodRecord> => {
+      return this.request<ClosingPeriodRecord>(`/api/closing-periods/${id}/close`, { method: "POST" });
+    },
+    reopen: async (id: string): Promise<ClosingPeriodRecord> => {
+      return this.request<ClosingPeriodRecord>(`/api/closing-periods/${id}/reopen`, { method: "POST" });
+    },
+    cancel: async (id: string): Promise<void> => {
+      await this.request<{ success: true }>(`/api/closing-periods/${id}`, { method: "DELETE" });
+    },
   };
 
   // ─── ERPs ────────────────────────────────────────────────────────────────

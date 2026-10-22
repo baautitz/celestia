@@ -42,4 +42,8 @@ export class PostgresClosingPeriodStore implements ClosingPeriodStore {
     };
     await this.db.insert(periods).values(values).onConflictDoUpdate({ target: periods.id, set: values });
   }
+
+  async delete(id: string): Promise<void> {
+    await this.db.delete(periods).where(eq(periods.id, id));
+  }
 }

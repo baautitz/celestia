@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createPlatformApp } from "../src/index.js";
+import { Hono } from "hono";
+import { loadModules } from "@platform/core/loader";
+import { createClosingPeriodModule } from "../src/closing-period/closing-period-module.js";
+import { MemoryClosingPeriodStore } from "../src/closing-period/closing-period-store.js";
 import { authHeader, createSeededUserStore } from "./helpers/fixtures.js";
 
 // Seam: a API HTTP do Plugin Closing Period, montada por createPlatformApp.
@@ -85,5 +89,103 @@ describe("Closing Period (Período de Fechamento)", () => {
 
   it("as rotas antigas de workspaces não existem mais", async () => {
     expect((await send("GET", "/api/workspaces", admin)).status).toBe(404);
+  });
+
+  describe("fechar, reabrir e cancelar", () => {
+    const act = (id: string, action: "close" | "reopen", headers = admin) => send("POST", `/api/closing-periods/${id}/${action}`, headers);
+    const remove = (id: string, headers = admin) => send("DELETE", `/api/closing-periods/${id}`, headers);
+    const make = async (body = jan) => ((await (await create(body)).json()) as { id: string }).id;
+    const statusOf = async (id: string) => ((await (await send("GET", `/api/closing-periods/${id}`, admin)).json()) as { status: string }).status;
+
+    it("fecha e reabre, alternando o estado entre open e closed", async () => {
+      const id = await make();
+      const closed = await act(id, "close");
+      expect(closed.status).toBe(200);
+      expect(await closed.json()).toMatchObject({ id, status: "closed" });
+      expect(await statusOf(id)).toBe("closed");
+      const reopened = await act(id, "reopen");
+      expect(await reopened.json()).toMatchObject({ status: "open" });
+      expect(await statusOf(id)).toBe("open");
+    });
+
+    it("recusa fechar um período já fechado e reabrir um aberto (409)", async () => {
+      const id = await make();
+      expect((await act(id, "reopen")).status).toBe(409);
+      await act(id, "close");
+      expect((await act(id, "close")).status).toBe(409);
+    });
+
+    it("cancela um período aberto, removendo a linha e liberando as datas", async () => {
+      const id = await make();
+      expect((await remove(id)).status).toBe(200);
+      expect((await send("GET", `/api/closing-periods/${id}`, admin)).status).toBe(404);
+      expect((await create(jan)).status).toBe(201);
+    });
+
+    it("recusa cancelar um período fechado até que seja reaberto", async () => {
+      const id = await make();
+      await act(id, "close");
+      expect((await remove(id)).status).toBe(409);
+      expect(await statusOf(id)).toBe("closed");
+      await act(id, "reopen");
+      expect((await remove(id)).status).toBe(200);
+    });
+
+    it("responde 404 para id desconhecido", async () => {
+      expect((await act("nada", "close")).status).toBe(404);
+      expect((await act("nada", "reopen")).status).toBe(404);
+      expect((await remove("nada")).status).toBe(404);
+    });
+
+    it("exige Permissions separadas para close, reopen e cancel", async () => {
+      const id = await make();
+      expect((await act(id, "close", operator)).status).toBe(403);
+      expect((await act(id, "reopen", operator)).status).toBe(403);
+      expect((await remove(id, operator)).status).toBe(403);
+      expect((await act(id, "close", seller)).status).toBe(403);
+    });
+  });
+});
+
+describe("Closing Period: veto por handler before", () => {
+  async function boot() {
+    const store = new MemoryClosingPeriodStore();
+    const app = new Hono();
+    const result = await loadModules(app, [
+      createClosingPeriodModule({
+        store,
+        auth: async (c, next) => {
+          c.set("user", { sub: "usr_test", username: "t", fullname: "T", role: "r", permissions: ["*"], externals: {} });
+          await next();
+        },
+      }),
+    ]);
+    const now = "2026-01-01T00:00:00.000Z";
+    await store.save({ id: "p1", name: "Jan", startDate: "2026-01-01", endDate: "2026-01-31", status: "open", createdAt: now, updatedAt: now });
+    return { app, store, result };
+  }
+
+  it.each([
+    ["closing_period.close", "POST", "/api/closing-periods/p1/close", "open"],
+    ["closing_period.reopen", "POST", "/api/closing-periods/p1/reopen", "closed"],
+    ["closing_period.cancel", "DELETE", "/api/closing-periods/p1", "open"],
+  ])("um before em %s veta a ação e responde 409 com o motivo", async (event, method, path, initial) => {
+    const { app, store, result } = await boot();
+    const p = (await store.get("p1"))!;
+    await store.save({ ...p, status: initial as "open" | "closed" });
+    result.events.before(event, (ctx) => ctx.cancel("há dados dependentes"));
+    const res = await app.request(path, { method });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "há dados dependentes" });
+    expect((await store.get("p1"))?.status).toBe(initial);
+  });
+
+  it("emite o evento after com o período depois de fechar", async () => {
+    const { app, result } = await boot();
+    const seen: unknown[] = [];
+    result.events.after("closing_period.close", (p) => void seen.push(p));
+    await app.request("/api/closing-periods/p1/close", { method: "POST" });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ periodId: "p1", startDate: "2026-01-01", endDate: "2026-01-31" });
   });
 });

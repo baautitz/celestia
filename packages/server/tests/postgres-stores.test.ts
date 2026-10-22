@@ -165,5 +165,13 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       expect(await store.get("w1")).toEqual({ ...ws, status: "closed" });
       expect(await store.get("nada")).toBeNull();
     });
+
+    it("remove a linha e libera o id", async () => {
+      const store = new PostgresClosingPeriodStore(db);
+      const now = "2026-10-01T00:00:00.000Z";
+      await store.save({ id: "w2", name: "x", startDate: "2026-11-01", endDate: "2026-11-30", status: "open", createdAt: now, updatedAt: now });
+      await store.delete("w2");
+      expect(await store.get("w2")).toBeNull();
+    });
   });
 });
