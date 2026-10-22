@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
-import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { serve } from "@hono/node-server";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -11,6 +10,8 @@ import type { ConnectionRecord } from "./data/connection-store.js";
 import { createConnector, readSecrets, type ConnectorFactory } from "./data/connection-factory.js";
 import { ERP_TYPES, parseErpValues } from "./data/erp-types.js";
 import { encryptSecret } from "./data/secret-box.js";
+import { loadModules } from "@platform/core/loader";
+import { createIamModule } from "./iam/iam-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
@@ -40,13 +41,6 @@ const IsoDateSchema = z
     const parsed = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
   }, "Data inexistente.");
-
-let dummyHash: string | undefined;
-/** Hash descartável para igualar o tempo do login quando o usuário não existe. */
-function getDummyHash(): string {
-  dummyHash ??= PasswordService.hash(`${randomUUID()}Aa1!`);
-  return dummyHash;
-}
 
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const app = new Hono();
@@ -98,120 +92,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   // Health check
   app.get("/api/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
 
-  // ─────────────────────────────────────────────────────────────
-  // 1. ROTAS DE AUTENTICAÇÃO (JWT 5 min + Refresh 7 dias)
-  // ─────────────────────────────────────────────────────────────
-
-  // POST /api/auth/login
-  app.post(
-    "/api/auth/login",
-    zValidator(
-      "json",
-      z.object({
-        username: z.string(),
-        password: z.string(),
-      })
-    ),
-    async (c) => {
-      const { username, password } = c.req.valid("json");
-      const user = await userStore.findByUsername(username);
-
-      // Mesma mensagem e mesmo custo (hash dummy) para inexistente, senha errada e inativo.
-      const isPasswordValid = PasswordService.verify(password, user?.passwordHash || getDummyHash());
-      if (!user || user.status === "inactive" || !isPasswordValid) {
-        return c.json({ error: "Credenciais inválidas." }, 401);
-      }
-
-      const role = await userStore.getRole(user.roleId);
-      const { token: accessToken, payload } = await tokenService.generateAccessToken(user, role || undefined);
-      const { token: refreshToken } = await tokenService.generateRefreshToken(user);
-
-      // Define cookie seguro HttpOnly para refresh token (7 dias)
-      setCookie(c, "refresh_token", refreshToken, {
-        path: "/api/auth",
-        httpOnly: true,
-        sameSite: "Lax",
-        maxAge: 7 * 24 * 3600,
-      });
-
-      return c.json({
-        accessToken,
-        refreshToken,
-        expiresIn: 300,
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        expires_in: 300, // 5 minutos em segundos
-        user: withAdminBypass(payload),
-      });
-    }
-  );
-
-  // POST /api/auth/refresh (Silent Refresh via HttpOnly Cookie)
-  app.post(
-    "/api/auth/refresh",
-    zValidator(
-      "json",
-      z.object({
-        refresh_token: z.string().optional(),
-      }).optional()
-    ),
-    async (c) => {
-      const body = c.req.valid("json");
-      const refreshToken = body?.refresh_token || getCookie(c, "refresh_token");
-
-      if (!refreshToken) {
-        return c.json({ error: "Refresh token não fornecido." }, 401);
-      }
-
-      try {
-        const refreshPayload = await tokenService.verifyRefreshToken(refreshToken);
-        const user = await userStore.findById(refreshPayload.sub);
-
-        if (!user || user.status === "inactive") {
-          return c.json({ error: "Usuário não encontrado ou inativo." }, 401);
-        }
-
-        const role = await userStore.getRole(user.roleId);
-        const { token: newAccessToken, payload: userPayload } = await tokenService.generateAccessToken(
-          user,
-          role || undefined
-        );
-        const { token: newRefreshToken } = await tokenService.generateRefreshToken(user);
-
-        setCookie(c, "refresh_token", newRefreshToken, {
-          path: "/api/auth",
-          httpOnly: true,
-          sameSite: "Lax",
-          maxAge: 7 * 24 * 3600,
-        });
-
-        return c.json({
-          accessToken: newAccessToken,
-          refreshToken: newRefreshToken,
-          expiresIn: 300,
-          access_token: newAccessToken,
-          refresh_token: newRefreshToken,
-          expires_in: 300,
-          user: withAdminBypass(userPayload),
-        });
-      } catch {
-        return c.json({ error: "Refresh token inválido ou expirado." }, 401);
-      }
-    }
-  );
-
-  // POST /api/auth/logout
-  app.post("/api/auth/logout", async (c) => {
-    deleteCookie(c, "refresh_token", {
-      path: "/api/auth",
-    });
-    return c.json({ success: true, message: "Sessão encerrada com sucesso." });
-  });
-
-  // GET /api/auth/me (Dados do usuário logado)
-  app.get("/api/auth/me", auth, async (c) => {
-    const userPayload = c.get("user");
-    return c.json(userPayload);
+  // Autenticação (/api/auth) é servida pelo Module `iam`, carregado pelo Core num sub-app.
+  // O carregamento é assíncrono; a rota aguarda o módulo montar (mount síncrono evita matcher já construído).
+  const iamApp = new Hono();
+  const iamReady = loadModules(iamApp, [createIamModule({ userStore, tokenService, auth, withAdminBypass })]);
+  app.all("/api/auth/*", async (c) => {
+    await iamReady;
+    return iamApp.fetch(c.req.raw);
   });
 
   // ─────────────────────────────────────────────────────────────
