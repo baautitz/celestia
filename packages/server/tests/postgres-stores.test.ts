@@ -154,6 +154,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         startDate: "2026-10-01",
         endDate: "2026-10-31",
         status: "open" as const,
+        version: 1,
         createdAt: "2026-10-01T00:00:00.000Z",
         updatedAt: "2026-10-01T00:00:00.000Z",
       };
@@ -162,6 +163,20 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       expect(await store.list()).toEqual([{ ...ws, status: "closed" }]);
       expect(await store.get("w1")).toEqual({ ...ws, status: "closed" });
       expect(await store.get("nada")).toBeNull();
+    });
+    it("updateIfCurrent só grava com a versão esperada e período aberto", async () => {
+      const store = new PostgresClosingPeriodStore(db);
+      const base = {
+        id: "w2", name: "Ago", startDate: "2026-08-01", endDate: "2026-08-30", status: "open" as const, version: 1,
+        createdAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:00.000Z",
+      };
+      await store.save(base);
+      const next = { ...base, endDate: "2026-08-31", version: 2 };
+      expect(await store.updateIfCurrent(next, 1)).toBe(true);
+      expect(await store.updateIfCurrent({ ...base, endDate: "2026-08-15", version: 2 }, 1)).toBe(false);
+      expect((await store.get("w2"))?.endDate).toBe("2026-08-31");
+      await store.save({ ...next, status: "closed" });
+      expect(await store.updateIfCurrent({ ...next, version: 3 }, 2)).toBe(false);
     });
   });
 });

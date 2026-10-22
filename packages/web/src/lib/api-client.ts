@@ -207,6 +207,16 @@ class ApiClient {
     list: async (): Promise<ClosingPeriodRecord[]> => {
       return this.request<ClosingPeriodRecord[]>("/api/closing-periods");
     },
+
+    updateRange: async (
+      id: string,
+      data: { startDate: string; endDate: string; version: number },
+    ): Promise<ClosingPeriodRecord> => {
+      return this.request<ClosingPeriodRecord>(`/api/closing-periods/${id}/range`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
   };
 
   erps = {

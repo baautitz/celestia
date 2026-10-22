@@ -1,0 +1,1 @@
+ALTER TABLE "closing_period"."periods" ADD COLUMN "version" integer DEFAULT 1 NOT NULL;

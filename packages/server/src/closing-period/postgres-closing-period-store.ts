@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { ClosingPeriodRecord } from "@platform/shared";
 import type { ClosingPeriodStore } from "./closing-period-store.js";
@@ -13,6 +13,7 @@ function toRecord(row: Row): ClosingPeriodRecord {
     startDate: row.startDate,
     endDate: row.endDate,
     status: row.status,
+    version: row.version,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -37,9 +38,24 @@ export class PostgresClosingPeriodStore implements ClosingPeriodStore {
       startDate: period.startDate,
       endDate: period.endDate,
       status: period.status,
+      version: period.version,
       createdAt: new Date(period.createdAt),
       updatedAt: new Date(period.updatedAt),
     };
     await this.db.insert(periods).values(values).onConflictDoUpdate({ target: periods.id, set: values });
+  }
+
+  async updateIfCurrent(period: ClosingPeriodRecord, expectedVersion: number): Promise<boolean> {
+    const updated = await this.db
+      .update(periods)
+      .set({
+        startDate: period.startDate,
+        endDate: period.endDate,
+        version: period.version,
+        updatedAt: new Date(period.updatedAt),
+      })
+      .where(and(eq(periods.id, period.id), eq(periods.version, expectedVersion), eq(periods.status, "open")))
+      .returning({ id: periods.id });
+    return updated.length === 1;
   }
 }

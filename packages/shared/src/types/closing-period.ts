@@ -11,6 +11,8 @@ export interface ClosingPeriodRecord {
   startDate: string; // Formato AAAA-MM-DD
   endDate: string; // Formato AAAA-MM-DD
   status: ClosingPeriodStatus;
+  /** Controle de concorrência otimista: começa em 1 e sobe a cada alteração. */
+  version: number;
   createdAt: string;
   updatedAt: string;
 }

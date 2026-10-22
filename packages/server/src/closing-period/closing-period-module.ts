@@ -29,6 +29,13 @@ const CreateSchema = z
     path: ["endDate"],
   });
 
+const EditRangeSchema = z
+  .object({ startDate: IsoDateSchema, endDate: IsoDateSchema, version: z.number().int().min(1) })
+  .refine((d) => d.endDate >= d.startDate, {
+    message: "A Data Final não pode ser anterior à Data Inicial.",
+    path: ["endDate"],
+  });
+
 /** Duas faixas inclusivas compartilham ao menos uma data. */
 const overlaps = (a: { startDate: string; endDate: string }, b: { startDate: string; endDate: string }): boolean =>
   a.startDate <= b.endDate && b.startDate <= a.endDate;
@@ -54,6 +61,39 @@ export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDe
         return c.json(period);
       });
 
+      routes.put(
+        "/:id/range",
+        auth,
+        requirePermission(P["period:update"]),
+        zValidator("json", EditRangeSchema),
+        async (c) => {
+          const body = c.req.valid("json");
+          const current = await store.get(c.req.param("id"));
+          if (!current) return c.json({ error: "Período de Fechamento não encontrado." }, 404);
+          if (current.status !== "open") {
+            return c.json({ error: "A faixa de um Período de Fechamento fechado não pode ser editada. Reabra-o antes." }, 409);
+          }
+          const clash = (await store.list()).find((p) => p.id !== current.id && overlaps(p, body));
+          if (clash) {
+            return c.json(
+              { error: `A nova faixa coincide com "${clash.name}" (${clash.startDate} a ${clash.endDate}). Uma data pertence a no máximo um Período de Fechamento.` },
+              400,
+            );
+          }
+          const next: ClosingPeriodRecord = {
+            ...current,
+            startDate: body.startDate,
+            endDate: body.endDate,
+            version: body.version + 1,
+            updatedAt: new Date().toISOString(),
+          };
+          if (!(await store.updateIfCurrent(next, body.version))) {
+            return c.json({ error: "O período foi alterado por outra pessoa. Recarregue e tente novamente." }, 409);
+          }
+          return c.json(next);
+        },
+      );
+
       routes.post(
         "/",
         auth,
@@ -75,6 +115,7 @@ export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDe
             startDate: body.startDate,
             endDate: body.endDate,
             status: "open",
+            version: 1,
             createdAt: now,
             updatedAt: now,
           };

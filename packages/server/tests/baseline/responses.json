@@ -34,6 +34,7 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
+          "closing_period:period:update",
           "closing_period:period:create"
         ],
         "externals": {
@@ -106,6 +107,7 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
+          "closing_period:period:update",
           "closing_period:period:create"
         ],
         "isAdmin": true,
@@ -144,6 +146,7 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
+          "closing_period:period:update",
           "closing_period:period:create"
         ],
         "externals": {
@@ -184,6 +187,7 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
+          "closing_period:period:update",
           "closing_period:period:create"
         ],
         "externals": {
@@ -243,6 +247,7 @@
         "system:sources:manage",
         "system:audit:read",
         "closing_period:period:read",
+        "closing_period:period:update",
         "closing_period:period:create"
       ],
       "externals": {
@@ -274,6 +279,7 @@
         "system:sources:manage",
         "system:audit:read",
         "closing_period:period:read",
+        "closing_period:period:update",
         "closing_period:period:create"
       ],
       "isAdmin": true,
@@ -378,6 +384,13 @@
             "label": "Visualizar Períodos de Fechamento",
             "description": "Permite listar e abrir Períodos de Fechamento.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:update",
+            "label": "Editar a faixa de Períodos de Fechamento",
+            "description": "Permite ampliar ou reduzir a faixa de datas de um Período de Fechamento aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para editar Períodos de Fechamento.",
             "module": "closing_period"
           },
           {
@@ -490,6 +503,13 @@
             "label": "Visualizar Períodos de Fechamento",
             "description": "Permite listar e abrir Períodos de Fechamento.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:update",
+            "label": "Editar a faixa de Períodos de Fechamento",
+            "description": "Permite ampliar ou reduzir a faixa de datas de um Período de Fechamento aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para editar Períodos de Fechamento.",
             "module": "closing_period"
           },
           {
@@ -669,6 +689,7 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
+          "closing_period:period:update",
           "closing_period:period:create"
         ]
       },
@@ -724,6 +745,7 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
+          "closing_period:period:update",
           "closing_period:period:create"
         ]
       },
@@ -1295,6 +1317,7 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
+          "closing_period:period:update",
           "closing_period:period:create"
         ]
       },
@@ -1420,6 +1443,7 @@
       "startDate": "2026-02-01",
       "endDate": "2026-02-28",
       "status": "open",
+      "version": 1,
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
     }
@@ -1879,7 +1903,7 @@
   "iam.grants.users.update.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create."
     }
   },
   "iam.grants.users.update.ok_subset_role": {
@@ -1898,7 +1922,7 @@
   "iam.grants.users.create.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create."
     }
   },
   "iam.grants.users.create.ok_subset_role": {
