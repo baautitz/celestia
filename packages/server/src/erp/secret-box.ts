@@ -1,9 +1,9 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 function getKey(): Buffer {
-  const key = Buffer.from(process.env.CONNECTIONS_ENCRYPTION_KEY || "", "base64");
+  const key = Buffer.from(process.env.ERP_ENCRYPTION_KEY || "", "base64");
   if (key.length !== 32) {
-    throw new Error("CONNECTIONS_ENCRYPTION_KEY deve ser uma chave de 32 bytes em base64.");
+    throw new Error("ERP_ENCRYPTION_KEY deve ser uma chave de 32 bytes em base64.");
   }
   return key;
 }

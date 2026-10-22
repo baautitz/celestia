@@ -7,7 +7,7 @@ test("cadastra um ERP e o exclui", async ({ page }) => {
 
   await page.getByRole("button", { name: "Novo ERP" }).first().click();
   const sheet = page.getByRole("dialog", { name: "Novo ERP" });
-  await sheet.getByRole("combobox", { name: "Tipo de ERP" }).click();
+  await sheet.getByRole("combobox", { name: "ERP Driver" }).click();
   await page.getByRole("option").first().click();
   await sheet.getByLabel("Nome", { exact: true }).fill("InovaFarma");
   await sheet.getByLabel("Identificador (usado nos módulos)").fill("inovafarma");

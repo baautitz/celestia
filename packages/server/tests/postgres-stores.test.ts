@@ -7,13 +7,15 @@ import { assertMigrationsUpToDate, runModuleMigrations } from "@platform/core/mi
 import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
 import { LastAdminError } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
-import { PostgresConnectionStore } from "../src/data/postgres-connection-store.js";
+import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
+import { ERP_MIGRATIONS } from "../src/erp/erp-module.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
 
 const plan = [
   { moduleId: "server", folder: resolve(import.meta.dirname, "../drizzle") },
   { moduleId: "closing_period", folder: resolve(import.meta.dirname, "../src/closing-period/drizzle") },
+  { moduleId: "erp", ...ERP_MIGRATIONS },
 ];
 
 describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
@@ -28,7 +30,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
     await assertMigrationsUpToDate(db, plan);
   });
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE users, roles, connections, closing_period.periods CASCADE`);
+    await db.execute(sql`TRUNCATE users, roles, erp.erps, closing_period.periods CASCADE`);
   });
   afterAll(async () => {
     await pool?.end();
@@ -66,10 +68,10 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
     });
   });
 
-  describe("ERPs (connections)", () => {
+  describe("ERPs", () => {
     it("salva (upsert), lê, lista e remove", async () => {
-      const store = new PostgresConnectionStore(db);
-      const input = { id: "c1", name: "ERP", type: "mssql", config: { host: "h" }, secretsEncrypted: "x" };
+      const store = new PostgresErpStore(db);
+      const input = { id: "c1", name: "ERP", driver: "mssql", config: { host: "h" }, secretsEncrypted: "x" };
       const first = await store.save(input);
       const second = await store.save({ ...input, name: "ERP 2" });
       expect(second.createdAt).toBe(first.createdAt);

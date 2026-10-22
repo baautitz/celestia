@@ -1,4 +1,5 @@
 import type { PermissionItem } from "@platform/shared";
+import { ERP_PERMISSIONS } from "../erp/erp-permissions.js";
 import { IAM_PERMISSIONS } from "./iam-permissions.js";
 
 /**
@@ -9,13 +10,8 @@ export const SYSTEM_PERMISSIONS: PermissionItem[] = [
   // Users e Roles vêm da declaração do Module `iam`; o agrupamento do catálogo usa o recurso como módulo.
   ...IAM_PERMISSIONS.items.map(({ key, label, description }) => ({ key, label, description, module: key.split(":")[1] })),
 
-  // ── Módulo: Fontes de Dados (Sources) ────────────────────
-  {
-    key: "system:sources:manage",
-    label: "Gerenciar Fontes de Dados",
-    description: "Permite configurar e testar conexões com ERPs externos (SQL Server, Postgres).",
-    module: "sources",
-  },
+  // ERPs vêm da declaração do Plugin `erp`.
+  ...ERP_PERMISSIONS.items.map(({ key, label, description }) => ({ key, label, description, module: key.split(":")[1] })),
 
   // ── Módulo: Auditoria ────────────────────────────────────
   {
@@ -28,7 +24,7 @@ export const SYSTEM_PERMISSIONS: PermissionItem[] = [
 
 /** Permissões `system:*` que ainda não pertencem a um Module (registradas pelo `iam` até serem modularizadas). */
 export const NON_IAM_PERMISSIONS: PermissionItem[] = SYSTEM_PERMISSIONS.filter(
-  (p) => !IAM_PERMISSIONS.items.some((i) => i.key === p.key),
+  (p) => ![...IAM_PERMISSIONS.items, ...ERP_PERMISSIONS.items].some((i) => i.key === p.key),
 );
 
 /**

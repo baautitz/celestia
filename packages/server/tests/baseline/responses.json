@@ -31,7 +31,7 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:sources:manage",
+          "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
           "closing_period:period:create"
@@ -103,7 +103,7 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:sources:manage",
+          "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
           "closing_period:period:create"
@@ -141,7 +141,7 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:sources:manage",
+          "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
           "closing_period:period:create"
@@ -181,7 +181,7 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:sources:manage",
+          "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
           "closing_period:period:create"
@@ -240,7 +240,7 @@
         "system:roles:read",
         "system:roles:update",
         "system:roles:delete",
-        "system:sources:manage",
+        "system:erps:manage",
         "system:audit:read",
         "closing_period:period:read",
         "closing_period:period:create"
@@ -271,7 +271,7 @@
         "system:roles:read",
         "system:roles:update",
         "system:roles:delete",
-        "system:sources:manage",
+        "system:erps:manage",
         "system:audit:read",
         "closing_period:period:read",
         "closing_period:period:create"
@@ -356,14 +356,6 @@
             "module": "roles"
           }
         ],
-        "sources": [
-          {
-            "key": "system:sources:manage",
-            "label": "Gerenciar Fontes de Dados",
-            "description": "Permite configurar e testar conexões com ERPs externos (SQL Server, Postgres).",
-            "module": "sources"
-          }
-        ],
         "audit": [
           {
             "key": "system:audit:read",
@@ -386,6 +378,14 @@
             "description": "Permite criar um Período de Fechamento com data inicial e final.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
             "module": "closing_period"
+          }
+        ],
+        "erps": [
+          {
+            "key": "system:erps:manage",
+            "label": "Gerenciar ERPs",
+            "description": "Permite cadastrar, editar, testar e remover ERPs (SQL Server) e seus dados de acesso.",
+            "module": "erps"
           }
         ]
       }
@@ -468,14 +468,6 @@
             "module": "roles"
           }
         ],
-        "sources": [
-          {
-            "key": "system:sources:manage",
-            "label": "Gerenciar Fontes de Dados",
-            "description": "Permite configurar e testar conexões com ERPs externos (SQL Server, Postgres).",
-            "module": "sources"
-          }
-        ],
         "audit": [
           {
             "key": "system:audit:read",
@@ -499,21 +491,29 @@
             "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
             "module": "closing_period"
           }
+        ],
+        "erps": [
+          {
+            "key": "system:erps:manage",
+            "label": "Gerenciar ERPs",
+            "description": "Permite cadastrar, editar, testar e remover ERPs (SQL Server) e seus dados de acesso.",
+            "module": "erps"
+          }
         ]
       }
     }
   },
-  "iam.sources.ok": {
+  "iam.erps.ok": {
     "status": 200,
     "body": []
   },
-  "iam.sources.401": {
+  "iam.erps.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "iam.sources.403": {
+  "iam.erps.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
@@ -522,7 +522,7 @@
       ]
     }
   },
-  "iam.sources.admin_bypass": {
+  "iam.erps.admin_bypass": {
     "status": 200,
     "body": []
   },
@@ -666,7 +666,7 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:sources:manage",
+          "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
           "closing_period:period:create"
@@ -721,7 +721,7 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:sources:manage",
+          "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
           "closing_period:period:create"
@@ -1292,7 +1292,7 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:sources:manage",
+          "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
           "closing_period:period:create"
@@ -1436,7 +1436,7 @@
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.erp_types.ok": {
+  "admin.erp_drivers.ok": {
     "status": 200,
     "body": [
       {
@@ -1488,22 +1488,22 @@
       }
     ]
   },
-  "admin.erp_types.401": {
+  "admin.erp_drivers.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.erp_types.403": {
+  "admin.erp_drivers.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.erp_types.admin_bypass": {
+  "admin.erp_drivers.admin_bypass": {
     "status": 200,
     "body": [
       {
@@ -1555,65 +1555,65 @@
       }
     ]
   },
-  "admin.connections.list.empty": {
+  "admin.erps.list.empty": {
     "status": 200,
     "body": []
   },
-  "admin.connections.list.401": {
+  "admin.erps.list.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.connections.list.403": {
+  "admin.erps.list.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.connections.put.401": {
+  "admin.erps.put.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.connections.put.403": {
+  "admin.erps.put.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.connections.put.400_id": {
+  "admin.erps.put.400_id": {
     "status": 400,
     "body": {
-      "error": "O id da conexão deve usar letras minúsculas, números e _ (ex.: inovafarma)."
+      "error": "O id do ERP deve usar letras minúsculas, números e _ (ex.: inovafarma)."
     }
   },
-  "admin.connections.put.400_type": {
+  "admin.erps.put.400_driver": {
     "status": 400,
     "body": {
-      "error": "Tipo de ERP 'oracle' não suportado."
+      "error": "ERP Driver 'oracle' não suportado."
     }
   },
-  "admin.connections.put.400_missing_secret": {
+  "admin.erps.put.400_missing_secret": {
     "status": 400,
     "body": {
       "error": "Senha é obrigatório."
     }
   },
-  "admin.connections.put.400_port": {
+  "admin.erps.put.400_port": {
     "status": 400,
     "body": {
       "error": "Porta fora do intervalo permitido."
     }
   },
-  "admin.connections.put.400_invalid_body": {
+  "admin.erps.put.400_invalid_body": {
     "status": 400,
     "body": {
       "success": false,
@@ -1635,7 +1635,7 @@
             "expected": "string",
             "received": "undefined",
             "path": [
-              "type"
+              "driver"
             ],
             "message": "Required"
           },
@@ -1653,12 +1653,12 @@
       }
     }
   },
-  "admin.connections.put.ok": {
+  "admin.erps.put.ok": {
     "status": 200,
     "body": {
       "id": "inovafarma",
       "name": "InovaFarma",
-      "type": "mssql",
+      "driver": "mssql",
       "config": {
         "host": "db",
         "port": 1433,
@@ -1670,12 +1670,12 @@
       "updatedAt": "<ts>"
     }
   },
-  "admin.connections.put.ok_keep_secret": {
+  "admin.erps.put.ok_keep_secret": {
     "status": 200,
     "body": {
       "id": "inovafarma",
       "name": "InovaFarma",
-      "type": "mssql",
+      "driver": "mssql",
       "config": {
         "host": "novo",
         "port": 1433,
@@ -1687,12 +1687,12 @@
       "updatedAt": "<ts>"
     }
   },
-  "admin.connections.put.admin_bypass": {
+  "admin.erps.put.admin_bypass": {
     "status": 200,
     "body": {
       "id": "ruim",
       "name": "InovaFarma",
-      "type": "mssql",
+      "driver": "mssql",
       "config": {
         "host": "bad",
         "port": 1433,
@@ -1704,13 +1704,13 @@
       "updatedAt": "<ts>"
     }
   },
-  "admin.connections.list.after": {
+  "admin.erps.list.after": {
     "status": 200,
     "body": [
       {
         "id": "inovafarma",
         "name": "InovaFarma",
-        "type": "mssql",
+        "driver": "mssql",
         "config": {
           "host": "novo",
           "port": 1433,
@@ -1724,7 +1724,7 @@
       {
         "id": "ruim",
         "name": "InovaFarma",
-        "type": "mssql",
+        "driver": "mssql",
         "config": {
           "host": "bad",
           "port": 1433,
@@ -1737,7 +1737,7 @@
       }
     ]
   },
-  "iam.sources.after": {
+  "iam.erps.after": {
     "status": 200,
     "body": [
       {
@@ -1750,64 +1750,64 @@
       }
     ]
   },
-  "admin.connections.test.ok": {
+  "admin.erps.test.ok": {
     "status": 200,
     "body": {
       "ok": true
     }
   },
-  "admin.connections.test.502": {
+  "admin.erps.test.502": {
     "status": 502,
     "body": {
       "ok": false
     }
   },
-  "admin.connections.test.404": {
+  "admin.erps.test.404": {
     "status": 404,
     "body": {
-      "error": "Conexão não encontrada."
+      "error": "ERP não encontrado."
     }
   },
-  "admin.connections.test.401": {
+  "admin.erps.test.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.connections.test.403": {
+  "admin.erps.test.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.connections.delete.401": {
+  "admin.erps.delete.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.connections.delete.403": {
+  "admin.erps.delete.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.connections.delete.ok": {
+  "admin.erps.delete.ok": {
     "status": 200,
     "body": {
       "success": true
     }
   },
-  "admin.connections.delete.404": {
+  "admin.erps.delete.404": {
     "status": 404,
     "body": {
-      "error": "Conexão não encontrada."
+      "error": "ERP não encontrado."
     }
   },
   "iam.grants.setup_role": {
@@ -1879,7 +1879,7 @@
   "iam.grants.users.update.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
     }
   },
   "iam.grants.users.update.ok_subset_role": {
@@ -1898,7 +1898,7 @@
   "iam.grants.users.create.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
     }
   },
   "iam.grants.users.create.ok_subset_role": {
@@ -1916,7 +1916,7 @@
   "iam.grants.roles.create.403_missing_keys": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:sources:manage."
+      "error": "Você não pode conceder permissões que não possui: system:erps:manage."
     }
   },
   "iam.grants.roles.create.ok_owned_keys": {
@@ -1932,7 +1932,7 @@
   "iam.grants.roles.update.403_add_missing_key": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:sources:manage."
+      "error": "Você não pode conceder permissões que não possui: system:erps:manage."
     }
   },
   "iam.grants.roles.update.ok_remove_key": {

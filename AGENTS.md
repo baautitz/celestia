@@ -25,8 +25,8 @@ celestia/
 │   ├── core/     (@platform/core)   module framework: contract, loader/graph, events, migrations, permissions (pruneOrphans, ...)
 │   ├── shared/   (@platform/shared) contracts & types: iam.ts, workspace.ts, erp.ts, fields.ts
 │   ├── server/   (@platform/server) Hono API
-│   │   └── src/  index.ts (app: health, auth, iam, /api/admin/connections*, /api/admin/erp-types, /api/closing-periods*),
-│   │             iam/, closing-period/ (Plugin: module, permissions, stores, schema, own drizzle/ migrations), engine/ (template-engine), data/ (connectors, stores, secret-box, read-only-guard),
+│   │   └── src/  index.ts (app: health, auth, iam, /api/admin/erps*, /api/admin/erp-drivers, /api/closing-periods*),
+│   │             iam/, closing-period/ (Plugin: module, permissions, stores, schema, own drizzle/ migrations), engine/ (template-engine), erp/ (Plugin: module, drivers, clients, stores, secret-box, read-only-guard, migrations),
 │   │             db/ (drizzle schema, client, migrate), cli/ (create-admin, erp-query)
 │   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi), DataTable, forms, defineWebModule
 │   └── web/      (@platform/web)    SPA: modules.ts registry, pages IAMUsers/IAMRoles/ERPs/Login

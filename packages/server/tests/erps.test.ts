@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { randomBytes } from "node:crypto";
 import { createPlatformApp } from "../src/index.js";
-import { MemoryConnectionStore } from "../src/data/connection-store.js";
-import { assertReadOnlyQuery } from "../src/data/read-only-guard.js";
-import { decryptSecret } from "../src/data/secret-box.js";
-import type { SourceConnector } from "../src/data/source-connector.js";
+import { MemoryErpStore } from "../src/erp/erp-store.js";
+import { assertReadOnlyQuery } from "../src/erp/read-only-guard.js";
+import { decryptSecret } from "../src/erp/secret-box.js";
+import type { ErpClient } from "../src/erp/erp-client.js";
 import { createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 describe("assertReadOnlyQuery", () => {
@@ -28,13 +28,13 @@ describe("assertReadOnlyQuery", () => {
   });
 });
 
-describe("Conexões com fontes de dados (/api/admin/connections)", () => {
+describe("ERPs (/api/admin/erps)", () => {
   let app: ReturnType<typeof createPlatformApp>;
-  let connectionStore: MemoryConnectionStore;
+  let erpStore: MemoryErpStore;
   const closed: string[] = [];
 
   const values = { host: "db", port: 1433, database: "erp", username: "ro", password: "Seg@1234" };
-  const body = { name: "InovaFarma", type: "mssql", values };
+  const body = { name: "InovaFarma", driver: "mssql", values };
 
   async function tokenOf(username: string): Promise<string> {
     const res = await app.request("/api/auth/login", {
@@ -53,10 +53,10 @@ describe("Conexões com fontes de dados (/api/admin/connections)", () => {
     });
 
   beforeEach(() => {
-    process.env.CONNECTIONS_ENCRYPTION_KEY = randomBytes(32).toString("base64");
-    connectionStore = new MemoryConnectionStore();
+    process.env.ERP_ENCRYPTION_KEY = randomBytes(32).toString("base64");
+    erpStore = new MemoryErpStore();
     closed.length = 0;
-    const fake: SourceConnector = {
+    const fake: ErpClient = {
       query: async () => [],
       healthCheck: async () => true,
       close: async () => {
@@ -65,33 +65,33 @@ describe("Conexões com fontes de dados (/api/admin/connections)", () => {
     };
     app = createPlatformApp({
       userStore: createSeededUserStore(),
-      connectionStore,
-      connectorFactory: () => fake,
+      erpStore,
+      clientFactory: () => fake,
     });
   });
 
   it("salva com a senha cifrada e nunca a devolve", async () => {
     const token = await tokenOf("carlos.admin");
-    const res = await send("PUT", "/api/admin/connections/inovafarma", token, body);
+    const res = await send("PUT", "/api/admin/erps/inovafarma", token, body);
     expect(res.status).toBe(200);
     expect(JSON.stringify(await res.json())).not.toMatch(/Seg@1234|password/i);
 
-    const stored = await connectionStore.get("inovafarma");
+    const stored = await erpStore.get("inovafarma");
     expect(stored!.secretsEncrypted).not.toContain("Seg@1234");
     expect(JSON.parse(decryptSecret(stored!.secretsEncrypted))).toEqual({ password: "Seg@1234" });
     expect(JSON.stringify(stored!.config)).not.toContain("Seg@1234");
 
-    const list = await (await send("GET", "/api/admin/connections", token)).text();
+    const list = await (await send("GET", "/api/admin/erps", token)).text();
     expect(list).not.toMatch(/Seg@1234|password/i);
   });
 
   it("mantém a senha ao atualizar sem informar uma nova", async () => {
     const token = await tokenOf("carlos.admin");
-    await send("PUT", "/api/admin/connections/inovafarma", token, body);
+    await send("PUT", "/api/admin/erps/inovafarma", token, body);
     const { password: _p, ...semSenha } = values;
-    const res = await send("PUT", "/api/admin/connections/inovafarma", token, { ...body, values: { ...semSenha, host: "novo" } });
+    const res = await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, values: { ...semSenha, host: "novo" } });
     expect(res.status).toBe(200);
-    const stored = await connectionStore.get("inovafarma");
+    const stored = await erpStore.get("inovafarma");
     expect(stored!.config.host).toBe("novo");
     expect(JSON.parse(decryptSecret(stored!.secretsEncrypted))).toEqual({ password: "Seg@1234" });
     expect(closed).toHaveLength(1);
@@ -100,38 +100,38 @@ describe("Conexões com fontes de dados (/api/admin/connections)", () => {
   it("exige senha ao criar, valida o id, testa e exclui", async () => {
     const token = await tokenOf("carlos.admin");
     const { password: _p, ...semSenha } = values;
-    expect((await send("PUT", "/api/admin/connections/inovafarma", token, { ...body, values: semSenha })).status).toBe(400);
-    expect((await send("PUT", "/api/admin/connections/inovafarma", token, { ...body, type: "oracle" })).status).toBe(400);
-    expect((await send("PUT", "/api/admin/connections/inovafarma", token, { ...body, values: { ...values, port: 99999 } })).status).toBe(400);
-    expect((await send("PUT", "/api/admin/connections/Inova-Farma", token, body)).status).toBe(400);
+    expect((await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, values: semSenha })).status).toBe(400);
+    expect((await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, driver: "oracle" })).status).toBe(400);
+    expect((await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, values: { ...values, port: 99999 } })).status).toBe(400);
+    expect((await send("PUT", "/api/admin/erps/Inova-Farma", token, body)).status).toBe(400);
 
-    await send("PUT", "/api/admin/connections/inovafarma", token, body);
-    expect((await send("POST", "/api/admin/connections/inovafarma/test", token)).status).toBe(200);
-    expect((await send("DELETE", "/api/admin/connections/inovafarma", token)).status).toBe(200);
-    expect(await connectionStore.get("inovafarma")).toBeNull();
-    expect((await send("POST", "/api/admin/connections/inovafarma/test", token)).status).toBe(404);
+    await send("PUT", "/api/admin/erps/inovafarma", token, body);
+    expect((await send("POST", "/api/admin/erps/inovafarma/test", token)).status).toBe(200);
+    expect((await send("DELETE", "/api/admin/erps/inovafarma", token)).status).toBe(200);
+    expect(await erpStore.get("inovafarma")).toBeNull();
+    expect((await send("POST", "/api/admin/erps/inovafarma/test", token)).status).toBe(404);
   });
 
-  it("entrega o catálogo de tipos de ERP com os campos de cada um", async () => {
-    const res = await send("GET", "/api/admin/erp-types", await tokenOf("carlos.admin"));
-    const types = (await res.json()) as { id: string; fields: { name: string; type: string }[] }[];
-    expect(types.map((t) => t.id)).toEqual(["mssql"]);
-    expect(types[0]!.fields.map((f) => f.name)).toEqual(["host", "port", "database", "username", "password", "trustServerCertificate"]);
-    expect(types[0]!.fields.find((f) => f.name === "password")!.type).toBe("password");
+  it("entrega o catálogo de ERP Drivers com os campos de cada um", async () => {
+    const res = await send("GET", "/api/admin/erp-drivers", await tokenOf("carlos.admin"));
+    const drivers = (await res.json()) as { id: string; fields: { name: string; type: string }[] }[];
+    expect(drivers.map((t) => t.id)).toEqual(["mssql"]);
+    expect(drivers[0]!.fields.map((f) => f.name)).toEqual(["host", "port", "database", "username", "password", "trustServerCertificate"]);
+    expect(drivers[0]!.fields.find((f) => f.name === "password")!.type).toBe("password");
   });
 
-  it("lista só id e nome das fontes para quem gerencia usuários", async () => {
+  it("lista só id e nome dos ERPs para quem gerencia usuários", async () => {
     const admin = await tokenOf("carlos.admin");
-    await send("PUT", "/api/admin/connections/inovafarma", admin, body);
-    const res = await send("GET", "/api/iam/sources", admin);
+    await send("PUT", "/api/admin/erps/inovafarma", admin, body);
+    const res = await send("GET", "/api/iam/erps", admin);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([{ id: "inovafarma", name: "InovaFarma" }]);
-    expect((await send("GET", "/api/iam/sources", await tokenOf("joao.silva"))).status).toBe(403);
+    expect((await send("GET", "/api/iam/erps", await tokenOf("joao.silva"))).status).toBe(403);
   });
 
-  it("nega acesso a quem não tem system:sources:manage", async () => {
+  it("nega acesso a quem não tem system:erps:manage", async () => {
     const token = await tokenOf("joao.silva");
-    expect((await send("PUT", "/api/admin/connections/inovafarma", token, body)).status).toBe(403);
-    expect((await send("GET", "/api/admin/connections", token)).status).toBe(403);
+    expect((await send("PUT", "/api/admin/erps/inovafarma", token, body)).status).toBe(403);
+    expect((await send("GET", "/api/admin/erps", token)).status).toBe(403);
   });
 });

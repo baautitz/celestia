@@ -1,28 +1,28 @@
 import type { FormFieldDef } from "./fields.js";
 
 /**
- * Tipo de ERP suportado pelo servidor, com os campos que o formulário de cadastro deve pedir.
+ * ERP Driver suportado pelo servidor, com os campos que o formulário de cadastro deve pedir.
  */
-export interface ErpTypeMeta {
+export interface ErpDriverMeta {
   id: string;
   label: string;
   fields: FormFieldDef[];
 }
 
 /**
- * ERP (fonte de dados) cadastrado. Os segredos (campos "password") nunca são devolvidos.
+ * ERP cadastrado. Os segredos (campos "password") nunca são devolvidos.
  */
-export interface ErpConnection {
+export interface Erp {
   id: string;
   name: string;
-  type: string;
+  driver: string;
   config: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface ErpConnectionInput {
+export interface ErpInput {
   name: string;
-  type: string;
+  driver: string;
   values: Record<string, unknown>;
 }

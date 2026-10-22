@@ -25,16 +25,6 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at"),
 });
 
-export const connections = pgTable("connections", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  type: text("type").notNull(),
-  config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
-  secretsEncrypted: text("secrets_encrypted").notNull().default(""),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
 export const auditLogEntries = pgTable(
   "audit_log_entries",
   {

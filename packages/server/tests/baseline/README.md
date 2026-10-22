@@ -29,5 +29,5 @@ informativos do revisor ainda em aberto.
 
 ## Não exercitado
 
-- Persistência Postgres (`POSTGRES_HOST`), `closingPeriodStore` e o bloco de boot de `index.ts`: exigem banco; fora do escopo de Memory stores.
-- Conexão real MSSQL: o `connectorFactory` é substituído por fakes (a rota `test` é coberta com fake saudável e fake que falha).
+- Persistência Postgres (`POSTGRES_HOST`), `workspaceStore` e o bloco de boot de `index.ts`: exigem banco; fora do escopo de Memory stores.
+- Conexão real MSSQL: o `clientFactory` é substituído por fakes (a rota `test` é coberta com fake saudável e fake que falha).

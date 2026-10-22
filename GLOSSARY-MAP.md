@@ -3,7 +3,7 @@
 ## Contexts
 
 - [Core](./packages/core/GLOSSARY.md): the module base that loads and connects everything else
-- [Server](./packages/server/GLOSSARY.md): IAM, ERP connections and Closing Periods (the Closing Period Plugin is already its own Module)
+- [Server](./packages/server/GLOSSARY.md): IAM, ERPs and Closing Periods (the Closing Period Plugin is already its own Module)
 
 ## Relationships
 

@@ -10,7 +10,7 @@ import type { FormFieldDef } from "@platform/shared";
 
 afterEach(cleanup);
 
-const lookup = { source: "erp", query: "select 1" };
+const lookup = { erp: "inovafarma", query: "select 1" };
 const fetchLookupOptions = async () => [{ value: "1", label: "Um" }];
 
 function Harness({ fields }: { fields: FormFieldDef[] }) {
