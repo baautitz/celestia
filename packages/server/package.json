@@ -22,7 +22,7 @@
     "@platform/core": "workspace:*",
     "@platform/shared": "workspace:*",
     "drizzle-orm": "1.0.0-rc.4",
-    "hono": "^4.6.10",
+    "hono": "^4.13.13",
     "mssql": "^12.7.4",
     "pg": "^8.23.1",
     "pino": "^9.5.0",

@@ -8,6 +8,7 @@ import { createErpModule } from "./erp/erp-module.js";
 import { composeModules, migrationPlan, type ModuleEntry } from "./boot/compose.js";
 import { assertMigrationsUpToDate } from "@platform/core/migrations";
 import { PermissionRegistry } from "@platform/core/permissions";
+import { LoginRateLimiter } from "./iam/login-rate-limiter.js";
 import { createIamModule } from "./iam/iam-module.js";
 import { AuditLog } from "./audit/audit-log.js";
 import { MemoryAuditStore } from "./audit/audit-store.js";
@@ -32,6 +33,8 @@ export interface CreatePlatformAppOptions {
   auditLog?: AuditLog;
   /** Modules adicionais compostos junto aos padrão (testes e builds de cliente). */
   extraModules?: ModuleEntry[];
+  /** Limite de tentativas de login (injetável em testes). */
+  loginRateLimiter?: LoginRateLimiter;
 }
 
 export function createPlatform(options?: CreatePlatformAppOptions) {
@@ -77,7 +80,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   // Base System: iam e audit. Plugins: closing_period e erp (ADR 0003). Todos compartilham o registro de Permissions.
   const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
   const entries: ModuleEntry[] = [
-    { tier: "base", def: createIamModule({ userStore, erpStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass }) },
+    { tier: "base", def: createIamModule({ userStore, erpStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
     { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auth }) },
     { tier: "plugin", def: createErpModule({ erpStore, clients: erpClients, clientFactory, auth }) },
@@ -96,7 +99,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   for (const path of ["/api/auth/*", "/api/iam/*", "/api/admin/*", "/api/closing-periods", "/api/closing-periods/*", "/api/audit", "/api/audit/*"]) {
     app.all(path, async (c) => {
       await start();
-      return moduleApp.fetch(c.req.raw);
+      return moduleApp.fetch(c.req.raw, c.env);
     });
   }
 
