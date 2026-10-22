@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Hono, type Context, type MiddlewareHandler } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { zValidator } from "@hono/zod-validator";
@@ -14,11 +14,9 @@ import { loadModules } from "@platform/core/loader";
 import { createIamModule } from "./iam/iam-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
-import { PasswordService, PasswordPolicySchema } from "./iam/password-service.js";
-import { grantDeniedMessage, missingGrants } from "./iam/can-grant.js";
 import { hasPermission } from "./iam/has-permission.js";
 import { denyMessage, NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
-import { createAuthMiddleware, getAuthenticatedUser, requirePermission } from "./iam/middleware.js";
+import { createAuthMiddleware, requirePermission } from "./iam/middleware.js";
 import type { WorkspaceStore } from "./data/workspace-store.js";
 import type { JWTAccessPayload, WorkspaceRecord } from "@platform/shared";
 
