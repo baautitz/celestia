@@ -1,8 +1,9 @@
 /**
- * Configuração de Lookup assíncrono em fonte externa (ERP).
+ * Configuração de Lookup assíncrono em um ERP.
  */
 export interface LookupConfig {
-  source: string;
+  /** Id do ERP consultado. */
+  erp: string;
   query: string;
   valueKey?: string;
   labelKey?: string;

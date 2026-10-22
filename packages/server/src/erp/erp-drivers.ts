@@ -1,18 +1,18 @@
 import type { FormFieldDef } from "@platform/shared";
-import { MssqlSourceConnector } from "./mssql-source-connector.js";
-import type { SourceConnector } from "./source-connector.js";
+import { MssqlErpClient } from "./mssql-erp-client.js";
+import type { ErpClient } from "./erp-client.js";
 
 export type ErpValues = Record<string, unknown>;
 
-export interface ErpTypeDef {
+export interface ErpDriverDef {
   id: string;
   label: string;
   /** Campos do formulário de cadastro; os do tipo "password" são tratados como segredo (cifrados). */
   fields: FormFieldDef[];
-  createConnector(values: ErpValues): SourceConnector;
+  createClient(values: ErpValues): ErpClient;
 }
 
-const mssql: ErpTypeDef = {
+const mssql: ErpDriverDef = {
   id: "mssql",
   label: "SQL Server",
   fields: [
@@ -29,8 +29,8 @@ const mssql: ErpTypeDef = {
       description: "Ative para servidores com certificado autoassinado.",
     },
   ],
-  createConnector: (values) =>
-    new MssqlSourceConnector({
+  createClient: (values) =>
+    new MssqlErpClient({
       server: String(values.host),
       port: Number(values.port),
       database: String(values.database),
@@ -42,21 +42,21 @@ const mssql: ErpTypeDef = {
     }),
 };
 
-export const ERP_TYPES: Record<string, ErpTypeDef> = { [mssql.id]: mssql };
+export const ERP_DRIVERS: Record<string, ErpDriverDef> = { [mssql.id]: mssql };
 
 /**
- * Valida os valores enviados contra os campos do tipo e separa config (pública) de segredos.
+ * Valida os valores enviados contra os campos do driver e separa config (pública) de segredos.
  * Segredo vazio reaproveita o valor já salvo (`currentSecrets`), quando existir.
  */
 export function parseErpValues(
-  type: ErpTypeDef,
+  driver: ErpDriverDef,
   input: ErpValues,
   currentSecrets: Record<string, string> = {}
 ): { config: ErpValues; secrets: Record<string, string> } {
   const config: ErpValues = {};
   const secrets: Record<string, string> = {};
 
-  for (const field of type.fields) {
+  for (const field of driver.fields) {
     const raw = input[field.name];
     const empty = raw === undefined || raw === null || raw === "";
 

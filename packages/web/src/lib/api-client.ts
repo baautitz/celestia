@@ -4,9 +4,9 @@ import type {
   User,
   Role,
   PermissionCatalog,
-  ErpTypeMeta,
-  ErpConnection,
-  ErpConnectionInput,
+  ErpDriverMeta,
+  Erp,
+  ErpInput,
 } from "@platform/shared";
 
 class ApiClient {
@@ -129,8 +129,8 @@ class ApiClient {
       return this.request<PermissionCatalog>("/api/iam/permissions/catalog");
     },
 
-    listSources: async (): Promise<{ id: string; name: string }[]> => {
-      return this.request<{ id: string; name: string }[]>("/api/iam/sources");
+    listErps: async (): Promise<{ id: string; name: string }[]> => {
+      return this.request<{ id: string; name: string }[]>("/api/iam/erps");
     },
 
     listUsers: async (): Promise<User[]> => {
@@ -190,18 +190,18 @@ class ApiClient {
     },
   };
 
-  // ─── ERPs (FONTES DE DADOS) ──────────────────────────────────────────────
+  // ─── ERPs ──────────────────────────────────────────────
   erps = {
-    listTypes: async (): Promise<ErpTypeMeta[]> => {
-      return this.request<ErpTypeMeta[]>("/api/admin/erp-types");
+    listDrivers: async (): Promise<ErpDriverMeta[]> => {
+      return this.request<ErpDriverMeta[]>("/api/admin/erp-drivers");
     },
 
-    list: async (): Promise<ErpConnection[]> => {
-      return this.request<ErpConnection[]>("/api/admin/connections");
+    list: async (): Promise<Erp[]> => {
+      return this.request<Erp[]>("/api/admin/erps");
     },
 
-    save: async (id: string, input: ErpConnectionInput): Promise<ErpConnection> => {
-      return this.request<ErpConnection>(`/api/admin/connections/${id}`, {
+    save: async (id: string, input: ErpInput): Promise<Erp> => {
+      return this.request<Erp>(`/api/admin/erps/${id}`, {
         method: "PUT",
         body: JSON.stringify(input),
       });
@@ -209,7 +209,7 @@ class ApiClient {
 
     test: async (id: string): Promise<boolean> => {
       try {
-        await this.request<{ ok: boolean }>(`/api/admin/connections/${id}/test`, { method: "POST" });
+        await this.request<{ ok: boolean }>(`/api/admin/erps/${id}/test`, { method: "POST" });
         return true;
       } catch {
         return false;
@@ -217,7 +217,7 @@ class ApiClient {
     },
 
     remove: async (id: string): Promise<{ success: boolean }> => {
-      return this.request<{ success: boolean }>(`/api/admin/connections/${id}`, { method: "DELETE" });
+      return this.request<{ success: boolean }>(`/api/admin/erps/${id}`, { method: "DELETE" });
     },
   };
 }

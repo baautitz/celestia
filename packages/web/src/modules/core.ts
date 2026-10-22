@@ -34,7 +34,7 @@ export const coreModule = defineWebModule({
       icon: Database,
       path: "/erps",
       group: GROUP,
-      permission: "system:sources:manage",
+      permission: "system:erps:manage",
       component: ERPsPage,
     },
   ],

@@ -5,11 +5,15 @@ import type { Pool } from "pg";
 import { sql } from "drizzle-orm";
 import { assertMigrationsUpToDate, runModuleMigrations } from "@platform/core/migrations";
 import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
-import { PostgresConnectionStore } from "../src/data/postgres-connection-store.js";
+import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
+import { ERP_MIGRATIONS } from "../src/erp/erp-module.js";
 import { PostgresWorkspaceStore } from "../src/data/postgres-workspace-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
 
-const plan = [{ moduleId: "server", folder: resolve(import.meta.dirname, "../drizzle") }];
+const plan = [
+  { moduleId: "server", folder: resolve(import.meta.dirname, "../drizzle") },
+  { moduleId: "erp", ...ERP_MIGRATIONS },
+];
 
 describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
   // Criados no beforeAll: o corpo do describe roda mesmo quando a suíte é ignorada.
@@ -23,7 +27,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
     await assertMigrationsUpToDate(db, plan);
   });
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE users, roles, connections, workspaces CASCADE`);
+    await db.execute(sql`TRUNCATE users, roles, erp.erps, workspaces CASCADE`);
   });
   afterAll(async () => {
     await pool?.end();
@@ -61,10 +65,10 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
     });
   });
 
-  describe("ERPs (connections)", () => {
+  describe("ERPs", () => {
     it("salva (upsert), lê, lista e remove", async () => {
-      const store = new PostgresConnectionStore(db);
-      const input = { id: "c1", name: "ERP", type: "mssql", config: { host: "h" }, secretsEncrypted: "x" };
+      const store = new PostgresErpStore(db);
+      const input = { id: "c1", name: "ERP", driver: "mssql", config: { host: "h" }, secretsEncrypted: "x" };
       const first = await store.save(input);
       const second = await store.save({ ...input, name: "ERP 2" });
       expect(second.createdAt).toBe(first.createdAt);

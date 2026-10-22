@@ -1,8 +1,8 @@
 import sql from "mssql";
 import { assertReadOnlyQuery } from "./read-only-guard.js";
-import type { SourceConnector } from "./source-connector.js";
+import type { ErpClient } from "./erp-client.js";
 
-export class MssqlSourceConnector implements SourceConnector {
+export class MssqlErpClient implements ErpClient {
   private pool: Promise<sql.ConnectionPool> | undefined;
 
   constructor(private config: sql.config) {}

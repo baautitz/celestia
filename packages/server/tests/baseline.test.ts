@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPlatformApp } from "../src/index.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
-import type { SourceConnector } from "../src/data/source-connector.js";
+import type { ErpClient } from "../src/erp/erp-client.js";
 import { createSeededUserStore, seededWorkspaces, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 // Baseline executável: congela status+body de todas as rotas HTTP antes da refatoração em módulos.
@@ -25,8 +25,8 @@ const normalize = (s: string): string =>
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<uuid>")
     .replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z/g, "<ts>");
 
-const okConnector: SourceConnector = { query: async () => [], healthCheck: async () => true, close: async () => {} };
-const failingConnector: SourceConnector = { query: async () => [], healthCheck: async () => false };
+const okClient: ErpClient = { query: async () => [], healthCheck: async () => true, close: async () => {} };
+const failingClient: ErpClient = { query: async () => [], healthCheck: async () => false };
 
 let app: ReturnType<typeof createPlatformApp>;
 let rootId = "";
@@ -51,7 +51,7 @@ async function fresh(): Promise<void> {
   app = createPlatformApp({
     userStore,
     workspaces: seededWorkspaces.map((w) => ({ ...w })),
-    connectorFactory: (record) => (record.config.host === "bad" ? failingConnector : okConnector),
+    clientFactory: (record) => (record.config.host === "bad" ? failingClient : okClient),
   });
 }
 
@@ -90,7 +90,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   beforeAll(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(T0);
-    process.env.CONNECTIONS_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+    process.env.ERP_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
     await fresh();
     const login = async (username: string): Promise<string> => {
       const res = await app.request("/api/auth/login", {
@@ -141,7 +141,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     // ── IAM leitura (sucesso / 401 / 403 / bypass)
     const reads: [string, string][] = [
       ["catalog", "/api/iam/permissions/catalog"],
-      ["sources", "/api/iam/sources"],
+      ["erps", "/api/iam/erps"],
       ["users", "/api/iam/users"],
       ["roles", "/api/iam/roles"],
     ];
@@ -256,40 +256,40 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     });
   });
 
-  describe("admin-connections", () => {
+  describe("admin-erps", () => {
     it("rotas", async () => {
     await fresh();
-    // ── admin connections / erp-types
-    await rec("admin.erp_types.ok", "GET", "/api/admin/erp-types", { token: A });
-    await rec("admin.erp_types.401", "GET", "/api/admin/erp-types");
-    await rec("admin.erp_types.403", "GET", "/api/admin/erp-types", { token: V });
-    await rec("admin.erp_types.admin_bypass", "GET", "/api/admin/erp-types", { token: R });
+    // ── ERPs e ERP Drivers
+    await rec("admin.erp_drivers.ok", "GET", "/api/admin/erp-drivers", { token: A });
+    await rec("admin.erp_drivers.401", "GET", "/api/admin/erp-drivers");
+    await rec("admin.erp_drivers.403", "GET", "/api/admin/erp-drivers", { token: V });
+    await rec("admin.erp_drivers.admin_bypass", "GET", "/api/admin/erp-drivers", { token: R });
     const values = { host: "db", port: 1433, database: "erp", username: "ro", password: "Seg@1234" };
-    const conn = { name: "InovaFarma", type: "mssql", values };
-    await rec("admin.connections.list.empty", "GET", "/api/admin/connections", { token: A });
-    await rec("admin.connections.list.401", "GET", "/api/admin/connections");
-    await rec("admin.connections.list.403", "GET", "/api/admin/connections", { token: V });
-    await rec("admin.connections.put.401", "PUT", "/api/admin/connections/inovafarma", { body: conn });
-    await rec("admin.connections.put.403", "PUT", "/api/admin/connections/inovafarma", { token: V, body: conn });
-    await rec("admin.connections.put.400_id", "PUT", "/api/admin/connections/Inova-Farma", { token: A, body: conn });
-    await rec("admin.connections.put.400_type", "PUT", "/api/admin/connections/inovafarma", { token: A, body: { ...conn, type: "oracle" } });
-    await rec("admin.connections.put.400_missing_secret", "PUT", "/api/admin/connections/inovafarma", { token: A, body: { ...conn, values: { ...values, password: "" } } });
-    await rec("admin.connections.put.400_port", "PUT", "/api/admin/connections/inovafarma", { token: A, body: { ...conn, values: { ...values, port: 99999 } } });
-    await rec("admin.connections.put.400_invalid_body", "PUT", "/api/admin/connections/inovafarma", { token: A, body: { name: "" } });
-    await rec("admin.connections.put.ok", "PUT", "/api/admin/connections/inovafarma", { token: A, body: conn });
-    await rec("admin.connections.put.ok_keep_secret", "PUT", "/api/admin/connections/inovafarma", { token: A, body: { ...conn, values: { ...values, host: "novo", password: "" } } });
-    await rec("admin.connections.put.admin_bypass", "PUT", "/api/admin/connections/ruim", { token: R, body: { ...conn, values: { ...values, host: "bad" } } });
-    await rec("admin.connections.list.after", "GET", "/api/admin/connections", { token: A });
-    await rec("iam.sources.after", "GET", "/api/iam/sources", { token: A });
-    await rec("admin.connections.test.ok", "POST", "/api/admin/connections/inovafarma/test", { token: A });
-    await rec("admin.connections.test.502", "POST", "/api/admin/connections/ruim/test", { token: A });
-    await rec("admin.connections.test.404", "POST", "/api/admin/connections/nada/test", { token: A });
-    await rec("admin.connections.test.401", "POST", "/api/admin/connections/inovafarma/test");
-    await rec("admin.connections.test.403", "POST", "/api/admin/connections/inovafarma/test", { token: V });
-    await rec("admin.connections.delete.401", "DELETE", "/api/admin/connections/inovafarma");
-    await rec("admin.connections.delete.403", "DELETE", "/api/admin/connections/inovafarma", { token: V });
-    await rec("admin.connections.delete.ok", "DELETE", "/api/admin/connections/inovafarma", { token: A });
-    await rec("admin.connections.delete.404", "DELETE", "/api/admin/connections/inovafarma", { token: A });
+    const erpBody = { name: "InovaFarma", driver: "mssql", values };
+    await rec("admin.erps.list.empty", "GET", "/api/admin/erps", { token: A });
+    await rec("admin.erps.list.401", "GET", "/api/admin/erps");
+    await rec("admin.erps.list.403", "GET", "/api/admin/erps", { token: V });
+    await rec("admin.erps.put.401", "PUT", "/api/admin/erps/inovafarma", { body: erpBody });
+    await rec("admin.erps.put.403", "PUT", "/api/admin/erps/inovafarma", { token: V, body: erpBody });
+    await rec("admin.erps.put.400_id", "PUT", "/api/admin/erps/Inova-Farma", { token: A, body: erpBody });
+    await rec("admin.erps.put.400_driver", "PUT", "/api/admin/erps/inovafarma", { token: A, body: { ...erpBody, driver: "oracle" } });
+    await rec("admin.erps.put.400_missing_secret", "PUT", "/api/admin/erps/inovafarma", { token: A, body: { ...erpBody, values: { ...values, password: "" } } });
+    await rec("admin.erps.put.400_port", "PUT", "/api/admin/erps/inovafarma", { token: A, body: { ...erpBody, values: { ...values, port: 99999 } } });
+    await rec("admin.erps.put.400_invalid_body", "PUT", "/api/admin/erps/inovafarma", { token: A, body: { name: "" } });
+    await rec("admin.erps.put.ok", "PUT", "/api/admin/erps/inovafarma", { token: A, body: erpBody });
+    await rec("admin.erps.put.ok_keep_secret", "PUT", "/api/admin/erps/inovafarma", { token: A, body: { ...erpBody, values: { ...values, host: "novo", password: "" } } });
+    await rec("admin.erps.put.admin_bypass", "PUT", "/api/admin/erps/ruim", { token: R, body: { ...erpBody, values: { ...values, host: "bad" } } });
+    await rec("admin.erps.list.after", "GET", "/api/admin/erps", { token: A });
+    await rec("iam.erps.after", "GET", "/api/iam/erps", { token: A });
+    await rec("admin.erps.test.ok", "POST", "/api/admin/erps/inovafarma/test", { token: A });
+    await rec("admin.erps.test.502", "POST", "/api/admin/erps/ruim/test", { token: A });
+    await rec("admin.erps.test.404", "POST", "/api/admin/erps/nada/test", { token: A });
+    await rec("admin.erps.test.401", "POST", "/api/admin/erps/inovafarma/test");
+    await rec("admin.erps.test.403", "POST", "/api/admin/erps/inovafarma/test", { token: V });
+    await rec("admin.erps.delete.401", "DELETE", "/api/admin/erps/inovafarma");
+    await rec("admin.erps.delete.403", "DELETE", "/api/admin/erps/inovafarma", { token: V });
+    await rec("admin.erps.delete.ok", "DELETE", "/api/admin/erps/inovafarma", { token: A });
+    await rec("admin.erps.delete.404", "DELETE", "/api/admin/erps/inovafarma", { token: A });
 
     });
   });
@@ -322,9 +322,9 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.grants.users.create.403_stronger_role", "POST", "/api/iam/users", { token: G, body: mk("cumplice.um", "role_admin") });
     tick();
     await rec("iam.grants.users.create.ok_subset_role", "POST", "/api/iam/users", { token: G, body: mk("legitimo.um", "role_vendedor") });
-    await rec("iam.grants.roles.create.403_missing_keys", "POST", "/api/iam/roles", { token: G, body: { id: "role_g_x", name: "Grupo GX", permissions: ["system:sources:manage"] } });
+    await rec("iam.grants.roles.create.403_missing_keys", "POST", "/api/iam/roles", { token: G, body: { id: "role_g_x", name: "Grupo GX", permissions: ["system:erps:manage"] } });
     await rec("iam.grants.roles.create.ok_owned_keys", "POST", "/api/iam/roles", { token: G, body: { id: "role_g_y", name: "Grupo GY", permissions: ["system:roles:read"] } });
-    await rec("iam.grants.roles.update.403_add_missing_key", "PUT", "/api/iam/roles/role_gestor", { token: G, body: { permissions: [...gPerms, "system:sources:manage"] } });
+    await rec("iam.grants.roles.update.403_add_missing_key", "PUT", "/api/iam/roles/role_gestor", { token: G, body: { permissions: [...gPerms, "system:erps:manage"] } });
     await rec("iam.grants.roles.update.ok_remove_key", "PUT", "/api/iam/roles/role_g_y", { token: G, body: { permissions: [] } });
     await rec("iam.grants.users.reset.403_target_admin", "POST", `/api/iam/users/${admId}/reset-password`, { token: G, body: { newPassword: "Nova@1234" } });
     await rec("iam.grants.users.update.403_inactivate_admin", "PUT", `/api/iam/users/${admId}`, { token: G, body: { status: "inactive" } });

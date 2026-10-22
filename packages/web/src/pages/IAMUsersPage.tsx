@@ -67,11 +67,11 @@ type ResetFormValues = z.infer<typeof resetSchema>;
 interface UserFormWindowProps {
   user: User | null;
   roles: Role[];
-  sources: string[];
+  erps: string[];
   currentUser: JWTAccessPayload | null;
 }
 
-const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, currentUser }) => {
+const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, erps, currentUser }) => {
   const { resolve } = useWindow<boolean>();
   const ui = useUi();
   const isEditMode = user !== null;
@@ -229,37 +229,37 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
                       Identificadores nos ERPs (Fontes de Dados)
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Mapeamento das chaves de identificação do usuário em cada fonte oficial.
+                      Mapeamento das chaves de identificação do usuário em cada ERP.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col gap-2">
-                    {sources.length === 0 && (
+                    {erps.length === 0 && (
                       <CardDescription className="text-xs">
-                        Nenhum ERP cadastrado. Cadastre uma fonte de dados para vincular identificadores.
+                        Nenhum ERP cadastrado. Cadastre um ERP para vincular identificadores.
                       </CardDescription>
                     )}
-                    {sources.map((src) => (
+                    {erps.map((erp) => (
                       <div
-                        key={src}
+                        key={erp}
                         className="flex items-center justify-between gap-4 p-2.5 border bg-muted/20 hover:bg-muted/40 transition-colors"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <Database className="size-3.5 text-muted-foreground shrink-0" />
-                          <span className="font-mono text-xs font-semibold text-foreground">{src}</span>
+                          <span className="font-mono text-xs font-semibold text-foreground">{erp}</span>
                         </div>
                         <div className="flex items-center gap-2 w-44">
                           <Input
                             placeholder="Não vinculado"
                             className="h-8 font-mono text-xs text-right"
-                            value={field.value[src] !== undefined ? String(field.value[src]) : ""}
+                            value={field.value[erp] !== undefined ? String(field.value[erp]) : ""}
                             onChange={(e) => {
                               const next = { ...field.value };
                               const val = e.target.value.trim();
                               if (!val) {
-                                delete next[src];
+                                delete next[erp];
                               } else {
                                 const num = Number(val);
-                                next[src] = isNaN(num) ? val : num;
+                                next[erp] = isNaN(num) ? val : num;
                               }
                               field.onChange(next);
                             }}
@@ -362,19 +362,19 @@ export const IAMUsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sources, setSources] = useState<{ id: string; name: string }[]>([]);
+  const [erps, setErps] = useState<{ id: string; name: string }[]>([]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [usersRes, rolesRes, sourcesRes] = await Promise.all([
+      const [usersRes, rolesRes, erpsRes] = await Promise.all([
         api.iam.listUsers(),
         api.iam.listRoles(),
-        api.iam.listSources(),
+        api.iam.listErps(),
       ]);
       setUsers(usersRes);
       setRoles(rolesRes);
-      setSources(sourcesRes);
+      setErps(erpsRes);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao carregar usuários";
       ui.feedback.notify({ type: "error", title: msg });
@@ -388,7 +388,7 @@ export const IAMUsersPage: React.FC = () => {
   }, []);
 
   const openUserWindow = async (u: User | null) => {
-    const sourceIds = sources.map((s) => s.id);
+    const erpIds = erps.map((s) => s.id);
     const result = await ui.windows.open<boolean>({
       surface: "dialog",
       size: "small",
@@ -396,7 +396,7 @@ export const IAMUsersPage: React.FC = () => {
       description: u
         ? "Atualize os dados, perfil e identificadores ERP do usuário."
         : "Crie uma nova identidade no sistema com perfil e senha inicial.",
-      content: () => <UserFormWindow user={u} roles={roles} sources={sourceIds} currentUser={currentUser} />,
+      content: () => <UserFormWindow user={u} roles={roles} erps={erpIds} currentUser={currentUser} />,
     });
     if (result.status === "confirmed") fetchData();
   };

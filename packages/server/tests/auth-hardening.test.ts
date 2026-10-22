@@ -144,9 +144,9 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     });
 
     it("POST role: só com chaves que possui; PUT role: só adicionar o que possui, remover é livre", async () => {
-      expect((await send("POST", "/api/iam/roles", gestor, { id: "role_g1", name: "G Um", permissions: ["system:sources:manage"] })).status).toBe(403);
+      expect((await send("POST", "/api/iam/roles", gestor, { id: "role_g1", name: "G Um", permissions: ["system:erps:manage"] })).status).toBe(403);
       expect((await send("POST", "/api/iam/roles", gestor, { id: "role_g2", name: "G Dois", permissions: ["system:users:read"] })).status).toBe(201);
-      expect((await send("PUT", "/api/iam/roles/role_gestor", gestor, { permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read", "system:sources:manage"] })).status).toBe(403);
+      expect((await send("PUT", "/api/iam/roles/role_gestor", gestor, { permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read", "system:erps:manage"] })).status).toBe(403);
       expect((await send("PUT", "/api/iam/roles/role_g2", gestor, { permissions: [] })).status).toBe(200);
       expect((await send("PUT", "/api/iam/roles/role_g2", gestor, { name: "Renomeado" })).status).toBe(200);
     });

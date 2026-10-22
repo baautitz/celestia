@@ -5,7 +5,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import type { JWTAccessPayload, PermissionItem } from "@platform/shared";
-import type { ConnectionStore } from "../data/connection-store.js";
+import type { ErpStore } from "../erp/erp-store.js";
 import { grantDeniedMessage, missingGrants } from "./can-grant.js";
 import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
@@ -15,8 +15,8 @@ import { PasswordService, PasswordPolicySchema } from "./password-service.js";
 
 export interface IamModuleDeps {
   userStore: UserStore;
-  /** Fontes de dados cadastradas (GET /api/iam/sources). */
-  connectionStore: ConnectionStore;
+  /** ERPs cadastrados (GET /api/iam/erps). */
+  erpStore: ErpStore;
   /** Permissões `system:*` de áreas ainda não modularizadas, registradas no catálogo junto das do iam. */
   extraPermissions?: readonly PermissionItem[];
   tokenService: TokenService;
@@ -44,7 +44,7 @@ const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total
  * iam.login, iam.user.create, iam.user.update, iam.user.delete, iam.user.reset_password,
  * iam.role.create, iam.role.update. Um `before` que cancela responde 409 com o motivo.
  */
-export function createIamModule({ userStore, connectionStore, extraPermissions = [], tokenService, auth, withAdminBypass }: IamModuleDeps): ModuleDef {
+export function createIamModule({ userStore, erpStore, extraPermissions = [], tokenService, auth, withAdminBypass }: IamModuleDeps): ModuleDef {
   return defineModule({
     id: "iam",
     version: "1.0.0",
@@ -172,8 +172,8 @@ export function createIamModule({ userStore, connectionStore, extraPermissions =
       });
 
       // ERPs cadastrados, para vincular identificadores do usuário; sem dados de acesso.
-      routes.get("/iam/sources", auth, requirePermission(P["users:read"]), async (c) => {
-        const records = await connectionStore.list();
+      routes.get("/iam/erps", auth, requirePermission(P["users:read"]), async (c) => {
+        const records = await erpStore.list();
         return c.json(records.map(({ id, name }) => ({ id, name })));
       });
 
