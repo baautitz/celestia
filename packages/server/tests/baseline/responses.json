@@ -372,20 +372,20 @@
             "module": "audit"
           }
         ],
-        "period": [
+        "closing_period": [
           {
             "key": "closing_period:period:read",
             "label": "Visualizar Períodos de Fechamento",
             "description": "Permite listar e abrir Períodos de Fechamento.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Períodos de Fechamento.",
-            "module": "period"
+            "module": "closing_period"
           },
           {
             "key": "closing_period:period:create",
             "label": "Criar Períodos de Fechamento",
             "description": "Permite criar um Período de Fechamento com data inicial e final.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
-            "module": "period"
+            "module": "closing_period"
           }
         ]
       }
@@ -484,20 +484,20 @@
             "module": "audit"
           }
         ],
-        "period": [
+        "closing_period": [
           {
             "key": "closing_period:period:read",
             "label": "Visualizar Períodos de Fechamento",
             "description": "Permite listar e abrir Períodos de Fechamento.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Períodos de Fechamento.",
-            "module": "period"
+            "module": "closing_period"
           },
           {
             "key": "closing_period:period:create",
             "label": "Criar Períodos de Fechamento",
             "description": "Permite criar um Período de Fechamento com data inicial e final.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
-            "module": "period"
+            "module": "closing_period"
           }
         ]
       }
@@ -1872,8 +1872,8 @@
       "externals": {},
       "status": "active",
       "createdAt": "<ts>",
-      "updatedAt": "<ts>",
-      "isAdmin": true
+      "isAdmin": true,
+      "updatedAt": "<ts>"
     }
   },
   "iam.grants.users.update.403_stronger_role": {
