@@ -21,7 +21,8 @@ Requer Node.js >= 24 e pnpm.
 ```bash
 pnpm install
 pnpm build         # build de todos os pacotes
-pnpm test          # vitest
+pnpm test          # vitest (inclui testes de componente)
+pnpm test:e2e      # testes de navegador (Playwright); ver docs/conventions/testing.md
 pnpm check:ui      # verifica limites de UI
 pnpm dev:server    # API
 pnpm dev:web       # SPA
