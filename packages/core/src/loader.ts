@@ -38,7 +38,7 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
     try {
       registry.registerProvider(def.id, () => [...(def.permissions?.items ?? []), ...dynamic.flatMap((p) => p())]);
     } catch (e) {
-      throw new Error(`Falha ao registrar permissões do módulo "${def.id}": ${msg(e)}`);
+      throw new Error(`Falha ao registrar permissões do módulo "${def.id}": ${msg(e)}`, { cause: e });
     }
 
     const badDep = (def.dependsOn ?? []).find((d) => failedIds.has(d));
@@ -92,7 +92,7 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
       offs.forEach((off) => off()); // atomicidade: sem handlers residuais (serviços só são publicados no sucesso)
       failedIds.add(def.id);
       failed.push({ moduleId: def.id, reason: msg(e) });
-      logger.error(`Módulo "${def.id}" falhou ao carregar: ${msg(e)}`);
+      logger.error(`Módulo "${def.id}" falhou ao carregar: ${msg(e)}`, { cause: e });
     }
   }
 
