@@ -127,10 +127,27 @@ describe("Closing Period (Período de Fechamento)", () => {
 
     it("período fechado recusa a edição (409) e não muda", async () => {
       const p = await make();
-      await store.save({ ...(await store.get(p.id))!, status: "closed" });
-      const res = await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-15", version: 1 });
+      const closed = await send("POST", `/api/closing-periods/${p.id}/close`, admin);
+      expect(closed.status).toBe(200);
+      const res = await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-15", version: p.version + 1 });
       expect(res.status).toBe(409);
       expect((await store.get(p.id))?.endDate).toBe("2026-01-31");
+    });
+
+    it("fechar e reabrir incrementam a versão; edição com versão anterior responde 409", async () => {
+      const p = await make();
+      const closed = (await (await send("POST", `/api/closing-periods/${p.id}/close`, admin)).json()) as Period;
+      expect(closed.version).toBe(p.version + 1);
+      const reopened = (await (await send("POST", `/api/closing-periods/${p.id}/reopen`, admin)).json()) as Period;
+      expect(reopened.version).toBe(p.version + 2);
+      const stale = await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-15", version: p.version });
+      expect(stale.status).toBe(409);
+      const staleClosed = await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-15", version: closed.version });
+      expect(staleClosed.status).toBe(409);
+      expect((await store.get(p.id))?.endDate).toBe("2026-01-31");
+      const fresh = await edit(p.id, { startDate: "2026-01-01", endDate: "2026-01-15", version: reopened.version });
+      expect(fresh.status).toBe(200);
+      expect(await fresh.json()).toMatchObject({ endDate: "2026-01-15", version: reopened.version + 1 });
     });
 
     it("versão desatualizada responde 409", async () => {

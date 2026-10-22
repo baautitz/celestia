@@ -80,7 +80,7 @@ export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDe
             `closing_period.${action}`,
             { actorId: getAuthenticatedUser(c).sub, ...detail(period) },
             async () => {
-              const updated: ClosingPeriodRecord = { ...period, status: to, updatedAt: new Date().toISOString() };
+              const updated: ClosingPeriodRecord = { ...period, status: to, version: period.version + 1, updatedAt: new Date().toISOString() };
               await store.save(updated);
               return updated;
             },
