@@ -34,7 +34,10 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
-          "closing_period:period:create"
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ],
         "externals": {
           "inovafarma": 1,
@@ -106,7 +109,10 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
-          "closing_period:period:create"
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ],
         "isAdmin": true,
         "externals": {},
@@ -144,7 +150,10 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
-          "closing_period:period:create"
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ],
         "externals": {
           "inovafarma": 1,
@@ -184,7 +193,10 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
-          "closing_period:period:create"
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ],
         "externals": {
           "inovafarma": 1,
@@ -243,7 +255,10 @@
         "system:sources:manage",
         "system:audit:read",
         "closing_period:period:read",
-        "closing_period:period:create"
+        "closing_period:period:create",
+        "closing_period:period:close",
+        "closing_period:period:reopen",
+        "closing_period:period:cancel"
       ],
       "externals": {
         "inovafarma": 1,
@@ -274,7 +289,10 @@
         "system:sources:manage",
         "system:audit:read",
         "closing_period:period:read",
-        "closing_period:period:create"
+        "closing_period:period:create",
+        "closing_period:period:close",
+        "closing_period:period:reopen",
+        "closing_period:period:cancel"
       ],
       "isAdmin": true,
       "externals": {},
@@ -385,6 +403,27 @@
             "label": "Criar Períodos de Fechamento",
             "description": "Permite criar um Período de Fechamento com data inicial e final.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:close",
+            "label": "Fechar Períodos de Fechamento",
+            "description": "Permite fechar um Período de Fechamento aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para fechar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:reopen",
+            "label": "Reabrir Períodos de Fechamento",
+            "description": "Permite reabrir um Período de Fechamento fechado.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para reabrir Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:cancel",
+            "label": "Cancelar Períodos de Fechamento",
+            "description": "Permite cancelar um Período de Fechamento aberto, removendo-o e liberando as datas.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para cancelar Períodos de Fechamento.",
             "module": "closing_period"
           }
         ]
@@ -497,6 +536,27 @@
             "label": "Criar Períodos de Fechamento",
             "description": "Permite criar um Período de Fechamento com data inicial e final.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:close",
+            "label": "Fechar Períodos de Fechamento",
+            "description": "Permite fechar um Período de Fechamento aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para fechar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:reopen",
+            "label": "Reabrir Períodos de Fechamento",
+            "description": "Permite reabrir um Período de Fechamento fechado.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para reabrir Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:cancel",
+            "label": "Cancelar Períodos de Fechamento",
+            "description": "Permite cancelar um Período de Fechamento aberto, removendo-o e liberando as datas.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para cancelar Períodos de Fechamento.",
             "module": "closing_period"
           }
         ]
@@ -669,7 +729,10 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
-          "closing_period:period:create"
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ]
       },
       {
@@ -724,7 +787,10 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
-          "closing_period:period:create"
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ]
       },
       {
@@ -1295,7 +1361,10 @@
           "system:sources:manage",
           "system:audit:read",
           "closing_period:period:read",
-          "closing_period:period:create"
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ]
       },
       {
@@ -1879,7 +1948,7 @@
   "iam.grants.users.update.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
     }
   },
   "iam.grants.users.update.ok_subset_role": {
@@ -1898,7 +1967,7 @@
   "iam.grants.users.create.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:sources:manage, system:audit:read, closing_period:period:read, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
     }
   },
   "iam.grants.users.create.ok_subset_role": {

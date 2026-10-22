@@ -5,6 +5,7 @@ export interface ClosingPeriodStore {
   list(): Promise<ClosingPeriodRecord[]>;
   get(id: string): Promise<ClosingPeriodRecord | null>;
   save(period: ClosingPeriodRecord): Promise<void>;
+  delete(id: string): Promise<void>;
 }
 
 export class MemoryClosingPeriodStore implements ClosingPeriodStore {
@@ -20,5 +21,9 @@ export class MemoryClosingPeriodStore implements ClosingPeriodStore {
 
   async save(period: ClosingPeriodRecord): Promise<void> {
     this.periods.set(period.id, period);
+  }
+
+  async delete(id: string): Promise<void> {
+    this.periods.delete(id);
   }
 }
