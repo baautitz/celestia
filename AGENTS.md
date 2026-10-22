@@ -13,7 +13,7 @@
 - **Backend**: [Hono](https://hono.dev/) on Node.js. **Security**: Argon2id, stateless JWT (5 min) + Refresh Token (7 days).
 - **Frontend**: Vite + React 19 + shadcn/ui + Tailwind CSS v4.
 - **Recipes / SDUI were removed.** Customer-specific features will be modules under `/integrations` (a definir). Workspaces ("Área de Trabalho", the active closing period) will become a module; today they live in the server.
-- **Target architecture** (modules as bounded contexts, `before`/`after` events, per-module migrations): see [docs/next-steps/](docs/next-steps/README.md) and [decisoes.md](docs/next-steps/decisoes.md). Not implemented yet.
+- **Target architecture** (modules as bounded contexts, `before`/`after` events, per-module migrations): see the GitHub issues, the ADRs in [docs/adr/](docs/adr/) and the glossaries ([GLOSSARY-MAP.md](GLOSSARY-MAP.md)). Not implemented yet.
 
 ---
 
@@ -30,7 +30,7 @@ celestia/
 │   │             db/ (drizzle schema, client, migrate), cli/ (create-admin, erp-query)
 │   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi), DataTable, forms, defineWebModule
 │   └── web/      (@platform/web)    SPA: modules.ts registry, pages IAMUsers/IAMRoles/ERPs/Login
-├── docs/         conventions/, next-steps/, ideas/, agents/
+├── docs/         adr/, conventions/, ideas/, agents/
 └── scripts/      check-ui-boundaries.mjs
 ```
 
