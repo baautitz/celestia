@@ -1,4 +1,3 @@
-import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 /** Os testes contra Postgres real só rodam via `pnpm test:db`, que define estas variáveis. */
