@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Context, MiddlewareHandler } from "hono";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -11,6 +12,7 @@ import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
 import type { TokenService } from "./token-service.js";
 import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
+import { LoginRateLimiter } from "./login-rate-limiter.js";
 import { PasswordService, PasswordPolicySchema } from "./password-service.js";
 
 export interface IamModuleDeps {
@@ -22,6 +24,8 @@ export interface IamModuleDeps {
   tokenService: TokenService;
   auth: MiddlewareHandler;
   withAdminBypass: (payload: JWTAccessPayload) => JWTAccessPayload;
+  /** Limite de tentativas de login; por padrão 5 falhas por username e 20 por IP a cada 15 min. */
+  loginRateLimiter?: LoginRateLimiter;
 }
 
 let dummyHash: string | undefined;
@@ -31,7 +35,18 @@ function getDummyHash(): string {
   return dummyHash;
 }
 
-const COOKIE = { path: "/api/auth", httpOnly: true, sameSite: "Lax", maxAge: 7 * 24 * 3600 } as const;
+/** `Secure` em produção (HTTPS); fora dela o cookie precisa funcionar em http://localhost. */
+const refreshCookie = () =>
+  ({ path: "/api/auth", httpOnly: true, sameSite: "Lax", maxAge: 7 * 24 * 3600, secure: process.env.NODE_ENV === "production" }) as const;
+
+/** IP do socket; indefinido quando o servidor não o expõe (ex.: testes sem `env`). Não confia em X-Forwarded-For. */
+function clientIp(c: Context): string | undefined {
+  try {
+    return getConnInfo(c).remote.address;
+  } catch {
+    return undefined;
+  }
+}
 
 const LAST_ADMIN = LAST_ADMIN_MESSAGE;
 const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
@@ -44,7 +59,7 @@ const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total
  * iam.login, iam.user.create, iam.user.update, iam.user.delete, iam.user.reset_password,
  * iam.role.create, iam.role.update. Um `before` que cancela responde 409 com o motivo.
  */
-export function createIamModule({ userStore, erpStore, extraPermissions = [], tokenService, auth, withAdminBypass }: IamModuleDeps): ModuleDef {
+export function createIamModule({ userStore, erpStore, extraPermissions = [], tokenService, auth, withAdminBypass, loginRateLimiter = new LoginRateLimiter() }: IamModuleDeps): ModuleDef {
   return defineModule({
     id: "iam",
     version: "1.0.0",
@@ -59,13 +74,21 @@ export function createIamModule({ userStore, erpStore, extraPermissions = [], to
         zValidator("json", z.object({ username: z.string(), password: z.string() })),
         async (c) => {
           const { username, password } = c.req.valid("json");
+          const ip = clientIp(c);
+          const retryAfter = loginRateLimiter.retryAfterSeconds(username, ip);
+          if (retryAfter > 0) {
+            c.header("Retry-After", String(retryAfter));
+            return c.json({ error: "Muitas tentativas de login. Tente novamente mais tarde." }, 429);
+          }
           const user = await userStore.findByUsername(username);
 
           // Mesma mensagem e mesmo custo (hash dummy) para inexistente, senha errada e inativo.
           const isPasswordValid = PasswordService.verify(password, user?.passwordHash || getDummyHash());
           if (!user || user.status === "inactive" || !isPasswordValid) {
+            loginRateLimiter.recordFailure(username, ip);
             return c.json({ error: "Credenciais inválidas." }, 401);
           }
+          loginRateLimiter.recordSuccess(username);
 
           const role = await userStore.getRole(user.roleId);
           let tokens: { accessToken: string; refreshToken: string; payload: JWTAccessPayload } | undefined;
@@ -78,7 +101,7 @@ export function createIamModule({ userStore, erpStore, extraPermissions = [], to
           if (!tokens) return c.json({ error: "Credenciais inválidas." }, 401);
           const { accessToken, refreshToken, payload } = tokens;
 
-          setCookie(c, "refresh_token", refreshToken, COOKIE);
+          setCookie(c, "refresh_token", refreshToken, refreshCookie());
 
           return c.json({
             accessToken,
@@ -119,7 +142,7 @@ export function createIamModule({ userStore, erpStore, extraPermissions = [], to
             );
             const { token: newRefreshToken } = await tokenService.generateRefreshToken(user);
 
-            setCookie(c, "refresh_token", newRefreshToken, COOKIE);
+            setCookie(c, "refresh_token", newRefreshToken, refreshCookie());
 
             return c.json({
               accessToken: newAccessToken,
