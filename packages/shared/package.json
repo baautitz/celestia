@@ -8,7 +8,6 @@
     "dev": "tsc -b -w"
   },
   "dependencies": {
-    "@platform/ui": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {
