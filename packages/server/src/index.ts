@@ -10,6 +10,7 @@ import { createConnector, readSecrets, type ConnectorFactory } from "./data/conn
 import { ERP_TYPES, parseErpValues } from "./data/erp-types.js";
 import { encryptSecret } from "./data/secret-box.js";
 import { loadModules } from "@platform/core/loader";
+import { LoginRateLimiter } from "./iam/login-rate-limiter.js";
 import { createIamModule } from "./iam/iam-module.js";
 import { AuditLog } from "./audit/audit-log.js";
 import { MemoryAuditStore } from "./audit/audit-store.js";
@@ -32,6 +33,8 @@ export interface CreatePlatformAppOptions {
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
   auditLog?: AuditLog;
+  /** Limite de tentativas de login (injetável em testes). */
+  loginRateLimiter?: LoginRateLimiter;
 }
 
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
@@ -80,13 +83,13 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const iamApp = new Hono();
   // O Plugin `closing_period` é carregado junto, para o catálogo de Permissions agregar as chaves de ambos.
   const iamReady = loadModules(iamApp, [
-    createIamModule({ userStore, connectionStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass }),
+    createIamModule({ userStore, connectionStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }),
     createClosingPeriodModule({ store: closingPeriodStore, auth }),
   ]);
   for (const path of ["/api/auth/*", "/api/iam/*", "/api/closing-periods", "/api/closing-periods/*"]) {
     app.all(path, async (c) => {
       await iamReady;
-      return iamApp.fetch(c.req.raw);
+      return iamApp.fetch(c.req.raw, c.env);
     });
   }
 
