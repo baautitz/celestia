@@ -32,13 +32,13 @@ describe("PermissionRegistry", () => {
     const r = new PermissionRegistry();
     r.register(perms);
     let n = 1;
-    r.registerProvider("recipe", () =>
-      Array.from({ length: n }, (_, i) => ({ key: `recipe:r${i}:view`, label: "v", module: "recipe" })));
+    r.registerProvider("vendas", () =>
+      Array.from({ length: n }, (_, i) => ({ key: `vendas:r${i}:view`, label: "v", module: "vendas" })));
     expect(r.allKeys().size).toBe(3);
     n = 2;
-    expect(r.allKeys().has("recipe:r1:view")).toBe(true);
-    expect(r.catalog().map((c) => c.module)).toEqual(["metas", "recipe"]);
-    r.unregisterModule("recipe");
+    expect(r.allKeys().has("vendas:r1:view")).toBe(true);
+    expect(r.catalog().map((c) => c.module)).toEqual(["metas", "vendas"]);
+    r.unregisterModule("vendas");
     expect(r.allKeys().size).toBe(2);
   });
   it("has honra *", () => {
@@ -94,9 +94,9 @@ describe("deniedMessage", () => {
   it("registry.deniedMessage inclui providers", () => {
     const r = new PermissionRegistry();
     r.register(p);
-    r.registerProvider("recipe", () => [{ key: "recipe:x:view", label: "v", module: "recipe", deniedMessage: "Sem acesso." }]);
+    r.registerProvider("vendas", () => [{ key: "vendas:x:view", label: "v", module: "vendas", deniedMessage: "Sem acesso." }]);
     expect(r.deniedMessage("fin:fechar:mes")).toBe("Só o financeiro fecha o mês.");
-    expect(r.deniedMessage("recipe:x:view")).toBe("Sem acesso.");
+    expect(r.deniedMessage("vendas:x:view")).toBe("Sem acesso.");
     expect(r.deniedMessage("nada")).toBeUndefined();
   });
 });
