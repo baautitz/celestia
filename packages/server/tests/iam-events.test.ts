@@ -35,8 +35,9 @@ describe("módulo iam: permissões declaradas", () => {
     const { mod, result } = await boot();
     const keys = (mod.permissions?.items ?? []).map((i) => i.key);
     expect(keys).toEqual(
-      expect.arrayContaining(["system:users:create", "system:users:reset_password", "system:roles:read", "system:roles:delete"]),
+      expect.arrayContaining(["system:users:create", "system:users:reset_password", "system:roles:read", "system:roles:update"]),
     );
+    expect(keys).not.toContain("system:roles:delete");
     expect(result.registry.allKeys().has("system:users:create")).toBe(true);
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { loadModules } from "@platform/core/loader";
 import { createIamModule } from "../src/iam/iam-module.js";
+import { IAM_PERMISSIONS } from "../src/iam/iam-permissions.js";
 import { TokenService } from "../src/iam/token-service.js";
 import { createAuthMiddleware } from "../src/iam/middleware.js";
 import { createSeededUserStore } from "./helpers/fixtures.js";
@@ -45,6 +46,11 @@ describe("módulo iam (autenticação)", () => {
 });
 
 describe("catálogo agrupado por Module", () => {
+  it("não inclui a permissão morta system:roles:delete", () => {
+    expect(Object.keys(IAM_PERMISSIONS.keys)).not.toContain("roles:delete");
+    expect(IAM_PERMISSIONS.items.map((i) => i.key)).not.toContain("system:roles:delete");
+  });
+
   it("agrupa pelo Module declarado e mantém o recurso para permissões do namespace system", async () => {
     const userStore = createSeededUserStore();
     const tokenService = new TokenService();
@@ -67,6 +73,7 @@ describe("catálogo agrupado por Module", () => {
     const { system } = (await res.json()) as { system: Record<string, { key: string }[]> };
     expect(system.pharmacy.map((p) => p.key)).toEqual(["pharmacy:audit:run"]);
     expect(system.users.length).toBeGreaterThan(0);
+    expect(system.roles.map((p) => p.key)).not.toContain("system:roles:delete");
     expect(system.audit).toBeUndefined();
   });
 });

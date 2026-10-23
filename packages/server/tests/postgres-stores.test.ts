@@ -72,6 +72,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       const roles = await store.listRoles();
       expect(roles).toEqual([...INITIAL_ROLES].sort((a, b) => a.name.localeCompare(b.name)));
       expect(roles.find((r) => r.id === "role_admin")).toBeUndefined();
+      expect(INITIAL_ROLES.flatMap((r) => r.permissions)).not.toContain("system:roles:delete");
+      expect(roles.flatMap((r) => r.permissions)).not.toContain("system:roles:delete");
 
       const created = await upsertAdminUser(store, {
         username: "primeiro.admin",

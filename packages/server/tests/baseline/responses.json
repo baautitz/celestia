@@ -30,7 +30,6 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
-          "system:roles:delete",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -102,7 +101,6 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
-          "system:roles:delete",
           "system:audit:read",
           "closing_period:period:read",
           "closing_period:period:update",
@@ -144,7 +142,6 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
-          "system:roles:delete",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -184,7 +181,6 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
-          "system:roles:delete",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -243,7 +239,6 @@
         "system:roles:create",
         "system:roles:read",
         "system:roles:update",
-        "system:roles:delete",
         "system:erps:manage",
         "system:audit:read",
         "closing_period:period:read",
@@ -274,7 +269,6 @@
         "system:roles:create",
         "system:roles:read",
         "system:roles:update",
-        "system:roles:delete",
         "system:audit:read",
         "closing_period:period:read",
         "closing_period:period:update",
@@ -355,12 +349,6 @@
             "key": "system:roles:update",
             "label": "Editar Permissões do Grupo",
             "description": "Permite alterar quais permissões do sistema pertencem a cada grupo.",
-            "module": "roles"
-          },
-          {
-            "key": "system:roles:delete",
-            "label": "Excluir Grupos de Acesso",
-            "description": "Permite remover perfis que não estejam em uso.",
             "module": "roles"
           }
         ],
@@ -504,12 +492,6 @@
             "key": "system:roles:update",
             "label": "Editar Permissões do Grupo",
             "description": "Permite alterar quais permissões do sistema pertencem a cada grupo.",
-            "module": "roles"
-          },
-          {
-            "key": "system:roles:delete",
-            "label": "Excluir Grupos de Acesso",
-            "description": "Permite remover perfis que não estejam em uso.",
             "module": "roles"
           }
         ],
@@ -698,7 +680,6 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
-          "system:roles:delete",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -757,7 +738,6 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
-          "system:roles:delete",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -1304,7 +1284,6 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
-          "system:roles:delete",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -1914,7 +1893,7 @@
   "iam.grants.users.update.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
     }
   },
   "iam.grants.users.update.ok_subset_role": {
@@ -1932,7 +1911,7 @@
   "iam.grants.users.create.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
     }
   },
   "iam.grants.users.create.ok_subset_role": {
