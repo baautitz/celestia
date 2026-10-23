@@ -61,7 +61,6 @@ export class TokenService {
       role: user.roleId,
       permissions: role?.permissions || [],
       ...(user.isAdmin ? { isAdmin: true } : {}),
-      externals: user.externals || {},
       iat: now,
       exp,
     };

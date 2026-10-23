@@ -120,13 +120,11 @@ describe("ERPs (/api/admin/erps)", () => {
     expect(drivers[0]!.fields.find((f) => f.name === "password")!.type).toBe("password");
   });
 
-  it("lista só id e nome dos ERPs para quem gerencia usuários", async () => {
+  it("os Externals exigem system:users:update", async () => {
     const admin = await tokenOf("carlos.admin");
     await send("PUT", "/api/admin/erps/inovafarma", admin, body);
-    const res = await send("GET", "/api/iam/erps", admin);
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual([{ id: "inovafarma", name: "InovaFarma" }]);
-    expect((await send("GET", "/api/iam/erps", await tokenOf("joao.silva"))).status).toBe(403);
+    expect((await send("GET", "/api/admin/erp-externals/usr_1002", admin)).status).toBe(200);
+    expect((await send("GET", "/api/admin/erp-externals/usr_1002", await tokenOf("joao.silva"))).status).toBe(403);
   });
 
   it("nega acesso a quem não tem system:erps:manage", async () => {

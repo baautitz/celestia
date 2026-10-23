@@ -30,7 +30,7 @@ const roles: Role[] = [
   },
 ];
 
-function user(id: string, fullname: string, username: string, email: string, roleId: string, externals: User["externals"]): User {
+function user(id: string, fullname: string, username: string, email: string, roleId: string): User {
   return {
     id,
     fullname,
@@ -38,7 +38,6 @@ function user(id: string, fullname: string, username: string, email: string, rol
     email,
     passwordHash: PasswordService.hash(TEST_PASSWORD),
     roleId,
-    externals,
     status: "active",
     createdAt: new Date().toISOString(),
   };
@@ -47,14 +46,14 @@ function user(id: string, fullname: string, username: string, email: string, rol
 /** `admin: true` acrescenta `test.root` (isAdmin) para testes que só precisam de acesso total. */
 export function createSeededUserStore(opts: { admin?: boolean } = {}): MemoryUserStore {
   const root: User[] = opts.admin
-    ? [{ ...user("usr_9000", "Test Root", "test.root", "root@farmacia.com.br", "role_vendedor", {}), isAdmin: true }]
+    ? [{ ...user("usr_9000", "Test Root", "test.root", "root@farmacia.com.br", "role_vendedor"), isAdmin: true }]
     : [];
   return new MemoryUserStore({
     roles,
     users: [
-      user("usr_1001", "Carlos Oliveira", "carlos.admin", "carlos@farmacia.com.br", "role_admin", { inovafarma: 1, sap: 9001 }),
-      user("usr_1002", "João da Silva (Vendedor 42)", "joao.silva", "joao.silva@farmacia.com.br", "role_vendedor", { inovafarma: 42, sap: 9042 }),
-      user("usr_1003", "Maria Souza (Gerente)", "maria.souza", "maria.souza@farmacia.com.br", "role_operador", { inovafarma: 99, sap: 9099 }),
+      user("usr_1001", "Carlos Oliveira", "carlos.admin", "carlos@farmacia.com.br", "role_admin"),
+      user("usr_1002", "João da Silva (Vendedor 42)", "joao.silva", "joao.silva@farmacia.com.br", "role_vendedor"),
+      user("usr_1003", "Maria Souza (Gerente)", "maria.souza", "maria.souza@farmacia.com.br", "role_operador"),
       ...root,
     ],
   });

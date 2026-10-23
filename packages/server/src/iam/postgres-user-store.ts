@@ -19,7 +19,6 @@ function toUser(row: UserRow, withHash = false): User {
     email: row.email ?? undefined,
     ...(withHash ? { passwordHash: row.passwordHash, sessionVersion: row.sessionVersion } : {}),
     roleId: row.roleId,
-    externals: row.externals,
     status: row.status,
     isAdmin: row.isAdmin,
     createdAt: row.createdAt.toISOString(),
@@ -75,7 +74,6 @@ export class PostgresUserStore implements UserStore {
         email: input.email,
         passwordHash: PasswordService.hash(input.password),
         roleId: input.roleId,
-        externals: input.externals || {},
       })
       .returning();
     return toUser(row!);
@@ -101,7 +99,6 @@ export class PostgresUserStore implements UserStore {
           email: input.email || user.email,
           status,
           ...(input.isAdmin !== undefined ? { isAdmin: input.isAdmin } : {}),
-          externals: input.externals ? { ...user.externals, ...input.externals } : user.externals,
           ...(revoke ? { sessionVersion: sql`${users.sessionVersion} + 1` } : {}),
           updatedAt: new Date(),
         })

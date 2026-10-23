@@ -40,10 +40,6 @@
           "closing_period:period:reopen",
           "closing_period:period:cancel"
         ],
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "iat": 1773144000,
         "exp": 1773144300
       }
@@ -117,7 +113,6 @@
           "closing_period:period:cancel"
         ],
         "isAdmin": true,
-        "externals": {},
         "iat": 1773144000,
         "exp": 1773144300
       }
@@ -158,10 +153,6 @@
           "closing_period:period:reopen",
           "closing_period:period:cancel"
         ],
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "iat": 1773144000,
         "exp": 1773144300
       }
@@ -202,10 +193,6 @@
           "closing_period:period:reopen",
           "closing_period:period:cancel"
         ],
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "iat": 1773144000,
         "exp": 1773144300
       }
@@ -265,10 +252,6 @@
         "closing_period:period:reopen",
         "closing_period:period:cancel"
       ],
-      "externals": {
-        "inovafarma": 1,
-        "sap": 9001
-      },
       "iat": 1773144000,
       "exp": 1773144300
     }
@@ -301,7 +284,6 @@
         "closing_period:period:cancel"
       ],
       "isAdmin": true,
-      "externals": {},
       "iat": 1773144000,
       "exp": 1773144300
     }
@@ -338,7 +320,7 @@
           {
             "key": "system:users:update",
             "label": "Editar Usuários",
-            "description": "Permite alterar nome, cargo e mapeamento de IDs de ERP (externals) de usuários.",
+            "description": "Permite alterar nome, perfil de acesso e dados cadastrais de usuários.",
             "module": "users"
           },
           {
@@ -478,7 +460,7 @@
           {
             "key": "system:users:update",
             "label": "Editar Usuários",
-            "description": "Permite alterar nome, cargo e mapeamento de IDs de ERP (externals) de usuários.",
+            "description": "Permite alterar nome, perfil de acesso e dados cadastrais de usuários.",
             "module": "users"
           },
           {
@@ -583,29 +565,6 @@
       }
     }
   },
-  "iam.erps.ok": {
-    "status": 200,
-    "body": []
-  },
-  "iam.erps.401": {
-    "status": 401,
-    "body": {
-      "error": "Não autenticado: token de acesso não fornecido."
-    }
-  },
-  "iam.erps.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: permissões insuficientes.",
-      "required": [
-        "system:users:read"
-      ]
-    }
-  },
-  "iam.erps.admin_bypass": {
-    "status": 200,
-    "body": []
-  },
   "iam.users.ok": {
     "status": 200,
     "body": [
@@ -615,10 +574,6 @@
         "username": "carlos.admin",
         "email": "carlos@farmacia.com.br",
         "roleId": "role_admin",
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -628,10 +583,6 @@
         "username": "joao.silva",
         "email": "joao.silva@farmacia.com.br",
         "roleId": "role_vendedor",
-        "externals": {
-          "inovafarma": 42,
-          "sap": 9042
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -641,10 +592,6 @@
         "username": "maria.souza",
         "email": "maria.souza@farmacia.com.br",
         "roleId": "role_operador",
-        "externals": {
-          "inovafarma": 99,
-          "sap": 9099
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -653,7 +600,6 @@
         "fullname": "Root Admin",
         "username": "root.admin",
         "roleId": "role_vendedor",
-        "externals": {},
         "status": "active",
         "createdAt": "<ts>",
         "isAdmin": true
@@ -684,10 +630,6 @@
         "username": "carlos.admin",
         "email": "carlos@farmacia.com.br",
         "roleId": "role_admin",
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -697,10 +639,6 @@
         "username": "joao.silva",
         "email": "joao.silva@farmacia.com.br",
         "roleId": "role_vendedor",
-        "externals": {
-          "inovafarma": 42,
-          "sap": 9042
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -710,10 +648,6 @@
         "username": "maria.souza",
         "email": "maria.souza@farmacia.com.br",
         "roleId": "role_operador",
-        "externals": {
-          "inovafarma": 99,
-          "sap": 9099
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -722,7 +656,6 @@
         "fullname": "Root Admin",
         "username": "root.admin",
         "roleId": "role_vendedor",
-        "externals": {},
         "status": "active",
         "createdAt": "<ts>",
         "isAdmin": true
@@ -922,9 +855,6 @@
       "fullname": "Novo Usuario",
       "username": "novo.user",
       "roleId": "role_vendedor",
-      "externals": {
-        "inovafarma": 7
-      },
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -948,9 +878,6 @@
       "fullname": "Novo Usuario",
       "username": "novo.root",
       "roleId": "role_vendedor",
-      "externals": {
-        "inovafarma": 7
-      },
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -978,9 +905,6 @@
       "username": "novo.user",
       "email": "a@b.com",
       "roleId": "role_vendedor",
-      "externals": {
-        "inovafarma": 7
-      },
       "status": "inactive",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
@@ -1029,9 +953,6 @@
       "username": "novo.user",
       "email": "a@b.com",
       "roleId": "role_vendedor",
-      "externals": {
-        "inovafarma": 7
-      },
       "status": "inactive",
       "createdAt": "<ts>",
       "updatedAt": "<ts>",
@@ -1173,10 +1094,6 @@
         "username": "carlos.admin",
         "email": "carlos@farmacia.com.br",
         "roleId": "role_admin",
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -1186,10 +1103,6 @@
         "username": "joao.silva",
         "email": "joao.silva@farmacia.com.br",
         "roleId": "role_vendedor",
-        "externals": {
-          "inovafarma": 42,
-          "sap": 9042
-        },
         "status": "active",
         "createdAt": "<ts>",
         "updatedAt": "<ts>"
@@ -1200,10 +1113,6 @@
         "username": "maria.souza",
         "email": "maria.souza@farmacia.com.br",
         "roleId": "role_operador",
-        "externals": {
-          "inovafarma": 99,
-          "sap": 9099
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -1212,7 +1121,6 @@
         "fullname": "Root Admin",
         "username": "root.admin",
         "roleId": "role_vendedor",
-        "externals": {},
         "status": "active",
         "createdAt": "<ts>",
         "isAdmin": true
@@ -1222,9 +1130,6 @@
         "fullname": "Novo Usuario",
         "username": "novo.root",
         "roleId": "role_vendedor",
-        "externals": {
-          "inovafarma": 7
-        },
         "status": "active",
         "createdAt": "<ts>"
       }
@@ -1577,6 +1482,23 @@
             "defaultValue": false,
             "description": "Ative para servidores com certificado autoassinado."
           }
+        ],
+        "externalFields": [
+          {
+            "name": "userId",
+            "label": "ID do Usuário",
+            "type": "text"
+          },
+          {
+            "name": "company",
+            "label": "Empresa",
+            "type": "text"
+          },
+          {
+            "name": "region",
+            "label": "Região",
+            "type": "text"
+          }
         ]
       }
     ]
@@ -1643,6 +1565,23 @@
             "type": "switch",
             "defaultValue": false,
             "description": "Ative para servidores com certificado autoassinado."
+          }
+        ],
+        "externalFields": [
+          {
+            "name": "userId",
+            "label": "ID do Usuário",
+            "type": "text"
+          },
+          {
+            "name": "company",
+            "label": "Empresa",
+            "type": "text"
+          },
+          {
+            "name": "region",
+            "label": "Região",
+            "type": "text"
           }
         ]
       }
@@ -1830,19 +1769,6 @@
       }
     ]
   },
-  "iam.erps.after": {
-    "status": 200,
-    "body": [
-      {
-        "id": "inovafarma",
-        "name": "InovaFarma"
-      },
-      {
-        "id": "ruim",
-        "name": "InovaFarma"
-      }
-    ]
-  },
   "admin.erps.test.ok": {
     "status": 200,
     "body": {
@@ -1926,7 +1852,6 @@
       "fullname": "Usuario Grants",
       "username": "gestor.limitado",
       "roleId": "role_gestor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -1938,7 +1863,6 @@
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -1950,7 +1874,6 @@
       "fullname": "Usuario Grants",
       "username": "alvo.admin",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -1962,7 +1885,6 @@
       "fullname": "Usuario Grants",
       "username": "alvo.admin",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>",
       "isAdmin": true,
@@ -1982,7 +1904,6 @@
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
@@ -2001,7 +1922,6 @@
       "fullname": "Usuario Grants",
       "username": "legitimo.um",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -2067,7 +1987,6 @@
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "inactive",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"

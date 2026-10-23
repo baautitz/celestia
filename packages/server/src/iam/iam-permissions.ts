@@ -4,7 +4,7 @@ import { definePermissions } from "@platform/core/permissions";
 export const IAM_PERMISSIONS = definePermissions("system", {
   "users:create": { label: "Criar Usuários", description: "Permite cadastrar novos operadores e administradores no sistema." },
   "users:read": { label: "Visualizar Usuários", description: "Permite listar e visualizar o perfil e dados cadastrais dos usuários." },
-  "users:update": { label: "Editar Usuários", description: "Permite alterar nome, cargo e mapeamento de IDs de ERP (externals) de usuários." },
+  "users:update": { label: "Editar Usuários", description: "Permite alterar nome, perfil de acesso e dados cadastrais de usuários." },
   "users:reset_password": { label: "Redefinir Senha de Usuários", description: "Permite ao administrador definir uma nova senha para qualquer usuário." },
   "users:delete": { label: "Inativar/Excluir Usuários", description: "Permite desativar ou excluir contas de usuários." },
   "roles:create": { label: "Criar Grupos de Acesso", description: "Permite criar novos perfis/cargos de permissão." },

@@ -8,7 +8,6 @@ export interface InterpolationContext {
   user?: {
     id?: string;
     role?: string;
-    externals?: Record<string, string | number>;
     [key: string]: unknown;
   };
   [key: string]: unknown;
@@ -52,7 +51,7 @@ export class TemplateEngine {
   }
 
   /**
-   * Resolve caminhos no formato "closing_period.start_date" ou "user.externals.inovafarma".
+   * Resolve caminhos no formato "closing_period.start_date" ou "user.role".
    */
   private static resolvePath(path: string, context: Record<string, unknown>): unknown {
     const parts = path.split(".");

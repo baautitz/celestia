@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
 import { MemoryErpStore, type ErpStore } from "./erp/erp-store.js";
+import { MemoryErpExternalsStore, type ErpExternalsStore } from "./erp/erp-externals-store.js";
 import { createErpClient, type ErpClientFactory } from "./erp/erp-factory.js";
 import { createErpModule } from "./erp/erp-module.js";
 import { composeModules, migrationPlan, type ModuleEntry } from "./boot/compose.js";
@@ -25,6 +26,7 @@ import type { JWTAccessPayload } from "@platform/shared";
 export interface CreatePlatformAppOptions {
   erpClients?: ErpClientRegistry;
   erpStore?: ErpStore;
+  erpExternalsStore?: ErpExternalsStore;
   clientFactory?: ErpClientFactory;
   userStore?: UserStore;
   tokenService?: TokenService;
@@ -57,6 +59,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   );
   const erpClients = options?.erpClients || {};
   const erpStore = options?.erpStore || new MemoryErpStore();
+  const erpExternalsStore = options?.erpExternalsStore || new MemoryErpExternalsStore();
   const clientFactory = options?.clientFactory || createErpClient;
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
@@ -83,7 +86,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
     { tier: "base", def: createIamModule({ userStore, erpStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
     { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auth }) },
-    { tier: "plugin", def: createErpModule({ erpStore, clients: erpClients, clientFactory, auth }) },
+    { tier: "plugin", def: createErpModule({ erpStore, externalsStore: erpExternalsStore, clients: erpClients, clientFactory, auth }) },
     ...(options?.extraModules ?? []),
   ];
   const moduleApp = new Hono();
@@ -121,6 +124,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
     let userStore: UserStore | undefined;
     const erpClients: ErpClientRegistry = {};
     let erpStore: ErpStore | undefined;
+    let erpExternalsStore: ErpExternalsStore | undefined;
     let closingPeriodStore: ClosingPeriodStore | undefined;
     let auditLog: AuditLog | undefined;
     if (process.env.POSTGRES_HOST) {
@@ -132,6 +136,8 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       ]);
       userStore = new PostgresUserStore(db);
       erpStore = new PostgresErpStore(db);
+      const { PostgresErpExternalsStore } = await import("./erp/postgres-erp-externals-store.js");
+      erpExternalsStore = new PostgresErpExternalsStore(db);
       closingPeriodStore = new PostgresClosingPeriodStore(db);
       const { PostgresAuditStore } = await import("./audit/postgres-audit-store.js");
       auditLog = new AuditLog(new PostgresAuditStore(db));
@@ -145,7 +151,7 @@ if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !proce
       }
     }
 
-    const platform = createPlatform({ userStore, erpStore, closingPeriodStore, erpClients, auditLog });
+    const platform = createPlatform({ userStore, erpStore, erpExternalsStore, closingPeriodStore, erpClients, auditLog });
     if (process.env.POSTGRES_HOST) {
       // Verifica (sem aplicar) que as migrations dos Modules estão em dia; a mensagem nomeia o Module.
       const { db } = await import("./db/client.js");
