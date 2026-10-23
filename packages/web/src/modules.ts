@@ -4,9 +4,10 @@ import { coreModule } from "./modules/core";
 import { auditModule } from "./modules/audit";
 import { closingPeriodModule } from "./modules/closing-period";
 import { exampleWebModule } from "@integrations/example/web";
+import { inovafarmaWebModule } from "@integrations/inovafarma/web";
 
 // Registro estático: um import explícito por módulo, na ordem do menu.
-export const modules: WebModule[] = [coreModule, closingPeriodModule, auditModule, exampleWebModule];
+export const modules: WebModule[] = [coreModule, closingPeriodModule, auditModule, exampleWebModule, inovafarmaWebModule];
 
 export const allEntries: NavEntry[] = modules.flatMap((m) => m.entries);
 
