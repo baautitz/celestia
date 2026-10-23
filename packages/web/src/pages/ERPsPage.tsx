@@ -134,8 +134,10 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, drivers }) => {
                       onValueChange={(val: string | null) => handleDriverChange(val ?? "")}
                     >
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o ERP Driver" />
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecione o ERP Driver">
+                            {drivers.find((d) => d.id === field.value)?.label}
+                          </SelectValue>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
