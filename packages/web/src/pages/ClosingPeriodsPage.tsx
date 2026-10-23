@@ -13,8 +13,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@platform/ui/components/dropdown-menu";
-import { Edit2, Lock, LockOpen, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
+import { Edit2, Lock, LockOpen, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { DatePicker } from "@platform/ui/components/date-picker";
+import { Input } from "@platform/ui/components/input";
 import { FieldGroup } from "@platform/ui/components/field";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@platform/ui/components/form";
 import { useWindow, WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
@@ -78,6 +79,100 @@ const rangeSchema = z
     path: ["endDate"],
   });
 type RangeFormValues = z.infer<typeof rangeSchema>;
+
+const createSchema = z
+  .object({
+    name: z.string().min(1, "Informe o nome do período."),
+    startDate: z.date({ message: "Informe a Data Inicial." }),
+    endDate: z.date({ message: "Informe a Data Final." }),
+  })
+  .refine((v) => v.endDate >= v.startDate, {
+    message: "A Data Final não pode ser anterior à Data Inicial.",
+    path: ["endDate"],
+  });
+type CreateFormValues = z.infer<typeof createSchema>;
+
+const CreatePeriodSheet: React.FC = () => {
+  const { resolve } = useWindow<true>();
+  const { feedback } = useUi();
+  const [saving, setSaving] = useState(false);
+  const form = useForm<CreateFormValues>({
+    resolver: zodResolver(createSchema),
+    defaultValues: { name: "" },
+  });
+
+  const onSubmit = async (v: CreateFormValues) => {
+    try {
+      setSaving(true);
+      await api.closingPeriods.create({
+        name: v.name.trim(),
+        startDate: toIso(v.startDate),
+        endDate: toIso(v.endDate),
+      });
+      feedback.notify({ title: "Período de Fechamento criado.", type: "success" });
+      resolve(true);
+    } catch (err: unknown) {
+      feedback.notify({ title: err instanceof Error ? err.message : "Falha ao criar período", type: "error" });
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Form {...form}>
+        <form id="create-period-form" noValidate onSubmit={form.handleSubmit(onSubmit)}>
+          <FieldGroup>
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem className="w-full">
+                  <FormLabel className="w-full leading-snug">Nome do Período</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Ex.: Outubro/2026" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="startDate"
+              render={({ field }) => (
+                <FormItem className="w-full">
+                  <FormLabel className="w-full leading-snug">Data Inicial</FormLabel>
+                  <FormControl>
+                    <DatePicker value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <FormItem className="w-full">
+                  <FormLabel className="w-full leading-snug">Data Final</FormLabel>
+                  <FormControl>
+                    <DatePicker value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </FieldGroup>
+        </form>
+      </Form>
+      <WindowActions>
+        <WindowCancelButton />
+        <Button type="submit" form="create-period-form" disabled={saving}>
+          {saving ? "Criando..." : "Criar Período"}
+        </Button>
+      </WindowActions>
+    </>
+  );
+};
 
 const EditRangeSheet: React.FC<{ period: ClosingPeriodRecord }> = ({ period }) => {
   const { resolve } = useWindow<true>();
@@ -247,6 +342,16 @@ export const ClosingPeriodsPage: React.FC = () => {
     );
   };
 
+  const openCreatePeriod = async () => {
+    const result = await ui.windows.open<true>({
+      surface: "sheet",
+      title: "Novo Período de Fechamento",
+      description: "Defina o nome e a faixa contínua de datas para o período.",
+      content: () => <CreatePeriodSheet />,
+    });
+    if (result.status === "confirmed") fetchData();
+  };
+
   const openEditRange = async (period: ClosingPeriodRecord) => {
     const result = await ui.windows.open<true>({
       surface: "sheet",
@@ -260,6 +365,12 @@ export const ClosingPeriodsPage: React.FC = () => {
   return (
     <>
       <HeaderActions>
+        {hasPermission("closing_period:period:create") && (
+          <Button onClick={openCreatePeriod} className="gap-2">
+            <Plus className="size-4" />
+            Novo Período
+          </Button>
+        )}
         <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
           <RefreshCw className={loading ? "animate-spin" : ""} />
         </Button>

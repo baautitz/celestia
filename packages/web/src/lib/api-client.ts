@@ -202,6 +202,12 @@ class ApiClient {
     list: async (): Promise<ClosingPeriodRecord[]> => {
       return this.request<ClosingPeriodRecord[]>("/api/closing-periods");
     },
+    create: async (data: { name: string; startDate: string; endDate: string }): Promise<ClosingPeriodRecord> => {
+      return this.request<ClosingPeriodRecord>("/api/closing-periods", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
     close: async (id: string): Promise<ClosingPeriodRecord> => {
       return this.request<ClosingPeriodRecord>(`/api/closing-periods/${id}/close`, { method: "POST" });
     },
