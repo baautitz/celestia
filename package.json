@@ -14,6 +14,8 @@
     "check:ui:test": "node scripts/check-ui-boundaries.test.mjs",
     "test:e2e": "pnpm --filter @platform/e2e test",
     "test:db": "node scripts/test-db.mjs",
+    "db:migrate": "pnpm --filter @platform/server db:migrate",
+    "create-admin": "pnpm --filter @platform/server create-admin",
     "test:watch": "vitest",
     "dev:server": "pnpm --filter @platform/server dev",
     "dev:web": "pnpm --filter @platform/web dev",
