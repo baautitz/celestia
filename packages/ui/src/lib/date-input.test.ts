@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { maskDate, maskDateRange, parseDate, parseDateRange } from "./date-input";
+import {
+  INVALID_DATE_MESSAGE, INVALID_RANGE_MESSAGE, dateRangeTextError, dateTextError, maskDate, maskDateRange, parseDate, parseDateRange,
+} from "./date-input";
+
+describe("dateTextError / dateRangeTextError", () => {
+  it("só acusa erro com o texto completo ou depois de sair do campo", () => {
+    expect(dateTextError("31/0", false)).toBeUndefined();
+    expect(dateTextError("31/0", true)).toBe(INVALID_DATE_MESSAGE);
+    expect(dateTextError("31/02/2026", false)).toBe(INVALID_DATE_MESSAGE);
+    expect(dateTextError("15/03/2026", true)).toBeUndefined();
+    expect(dateTextError("", true)).toBeUndefined();
+  });
+  it("trata período com fim anterior ao início como inválido", () => {
+    expect(dateRangeTextError("10/01/2026 - 01/01/2026", false)).toBe(INVALID_RANGE_MESSAGE);
+    expect(dateRangeTextError("01/01/2026 - 10/01/2026", true)).toBeUndefined();
+    expect(dateRangeTextError("01/01/2026 - 1", false)).toBeUndefined();
+  });
+});
 
 describe("maskDate", () => {
   it("inserts slashes while typing and ignores non-digits", () => {

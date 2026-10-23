@@ -2,9 +2,10 @@ import React from "react";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
-import { maskDateRange, parseDateRange } from "../lib/date-input";
+import { dateRangeTextError, maskDateRange, parseDateRange } from "../lib/date-input";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
+import { FieldError } from "./field";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "./input-group";
 import {
   Popover,
@@ -64,25 +65,31 @@ export function DateRangePicker({
   const [text, setText] = React.useState(toText(value));
   const [touched, setTouched] = React.useState(false);
 
+  // Mudança de `value` causada pela própria digitação não reescreve o texto (senão apagaria o que o usuário digita).
+  const typed = React.useRef(false);
+
   React.useEffect(() => {
+    if (typed.current) {
+      typed.current = false;
+      return;
+    }
     setText(toText(value));
     setTouched(false);
   }, [value?.from?.getTime(), value?.to?.getTime()]);
 
-  const invalid = text !== "" && !parseDateRange(text) && (touched || text.length === 23);
+  const error = dateRangeTextError(text, touched);
 
   const handleTextChange = (raw: string) => {
     const masked = maskDateRange(raw);
     setText(masked);
-    if (masked === "") {
-      onChange(undefined);
-      return;
-    }
-    const parsed = parseDateRange(masked);
-    if (parsed) onChange(parsed);
+    // Texto incompleto ou inválido nunca deixa o período anterior valendo: limpa.
+    const next = parseDateRange(masked);
+    typed.current = next?.from.getTime() !== value?.from?.getTime() || next?.to.getTime() !== value?.to?.getTime();
+    onChange(next);
   };
 
   return (
+    <>
     <InputGroup className={className}>
       <InputGroupInput
         inputMode="numeric"
@@ -90,7 +97,7 @@ export function DateRangePicker({
         value={text}
         placeholder="dd/mm/aaaa - dd/mm/aaaa"
         disabled={disabled}
-        aria-invalid={invalid}
+        aria-invalid={error !== undefined}
         onChange={(e) => handleTextChange(e.target.value)}
         onBlur={() => setTouched(true)}
       />
@@ -115,5 +122,7 @@ export function DateRangePicker({
         </Popover>
       </InputGroupAddon>
     </InputGroup>
+    {error ? <FieldError>{error}</FieldError> : null}
+    </>
   );
 }

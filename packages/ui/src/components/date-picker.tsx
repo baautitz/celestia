@@ -1,9 +1,10 @@
 import React from "react";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
-import { maskDate, parseDate } from "../lib/date-input";
+import { dateTextError, maskDate, parseDate } from "../lib/date-input";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
+import { FieldError } from "./field";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "./input-group";
 import {
   Popover,
@@ -30,24 +31,31 @@ export function DatePicker({
   const [text, setText] = React.useState(value ? format(value, "dd/MM/yyyy") : "");
   const [touched, setTouched] = React.useState(false);
 
+  // Mudança de `value` causada pela própria digitação não reescreve o texto (senão apagaria o que o usuário digita).
+  const typed = React.useRef(false);
+
   React.useEffect(() => {
+    if (typed.current) {
+      typed.current = false;
+      return;
+    }
     setText(value ? format(value, "dd/MM/yyyy") : "");
     setTouched(false);
   }, [value]);
 
-  const invalid = text !== "" && !parseDate(text) && (touched || text.length === 10);
+  const error = dateTextError(text, touched);
 
   const handleChange = (raw: string) => {
     const masked = maskDate(raw);
     setText(masked);
-    if (masked === "") onChange(undefined);
-    else {
-      const parsed = parseDate(masked);
-      if (parsed) onChange(parsed);
-    }
+    // Texto incompleto ou inválido nunca deixa o valor anterior valendo: limpa.
+    const next = parseDate(masked);
+    typed.current = next?.getTime() !== value?.getTime();
+    onChange(next);
   };
 
   return (
+    <>
     <InputGroup className={className}>
       <InputGroupInput
         inputMode="numeric"
@@ -55,7 +63,7 @@ export function DatePicker({
         value={text}
         placeholder={placeholder}
         disabled={disabled}
-        aria-invalid={invalid}
+        aria-invalid={error !== undefined}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={() => setTouched(true)}
       />
@@ -80,5 +88,7 @@ export function DatePicker({
         </Popover>
       </InputGroupAddon>
     </InputGroup>
+    {error ? <FieldError>{error}</FieldError> : null}
+    </>
   );
 }
