@@ -112,16 +112,18 @@ describe("ERPs (/api/admin/erps)", () => {
     expect((await send("POST", "/api/admin/erps/inovafarma/test", token)).status).toBe(404);
   });
 
-  it("entrega o catálogo de ERP Drivers com os campos de cada um, sem nomes de ERP específico", async () => {
+  it("entrega o catálogo de ERP Drivers com os campos de cada um", async () => {
     const res = await send("GET", "/api/admin/erp-drivers", await tokenOf("carlos.admin"));
-    const drivers = (await res.json()) as { id: string; label: string; fields: { name: string; type: string }[]; externalFields?: { name: string }[] }[];
-    expect(drivers.map((t) => t.id)).toEqual(["mssql"]);
-    expect(drivers[0]!.fields.map((f) => f.name)).toEqual(["host", "port", "database", "username", "password", "trustServerCertificate"]);
-    expect(drivers[0]!.fields.find((f) => f.name === "password")!.type).toBe("password");
-    for (const driver of drivers) {
-      expect(driver.id).not.toMatch(/inovafarma|totvs|protheus|sankhya|senior/i);
-      expect(driver.label).not.toMatch(/inovafarma|totvs|protheus|sankhya|senior/i);
-    }
+    const drivers = (await res.json()) as { id: string; label: string; fields: { name: string; type: string }[]; externalFields: { name: string }[] }[];
+    expect(drivers.map((t) => t.id).sort()).toEqual(["inovafarma", "mssql"]);
+    const inovafarma = drivers.find((d) => d.id === "inovafarma")!;
+    expect(inovafarma.label).toBe("InovaFarma");
+    expect(inovafarma.externalFields.map((f) => f.name)).toEqual(["codigoColaborador", "codigoLoja"]);
+
+    const mssql = drivers.find((d) => d.id === "mssql")!;
+    expect(mssql.label).toBe("SQL Server");
+    expect(mssql.fields.map((f) => f.name)).toEqual(["host", "port", "database", "username", "password", "trustServerCertificate"]);
+    expect(mssql.fields.find((f) => f.name === "password")!.type).toBe("password");
   });
 
   it("os Externals exigem system:users:update", async () => {

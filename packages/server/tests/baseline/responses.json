@@ -1503,6 +1503,65 @@
           }
         ],
         "externalFields": []
+      },
+      {
+        "id": "inovafarma",
+        "label": "InovaFarma",
+        "fields": [
+          {
+            "name": "host",
+            "label": "Servidor",
+            "type": "text",
+            "required": true,
+            "placeholder": "erp.empresa.com.br"
+          },
+          {
+            "name": "port",
+            "label": "Porta",
+            "type": "number",
+            "required": true,
+            "defaultValue": 1433,
+            "min": 1,
+            "max": 65535
+          },
+          {
+            "name": "database",
+            "label": "Banco de dados",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "username",
+            "label": "Usuário",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "password",
+            "label": "Senha",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "trustServerCertificate",
+            "label": "Confiar no certificado do servidor",
+            "type": "switch",
+            "defaultValue": true,
+            "description": "Ative para servidores com certificado autoassinado."
+          }
+        ],
+        "externalFields": [
+          {
+            "name": "codigoColaborador",
+            "label": "Código do Colaborador",
+            "type": "text"
+          },
+          {
+            "name": "codigoLoja",
+            "label": "Código da Loja",
+            "type": "text"
+          }
+        ]
       }
     ]
   },
@@ -1571,6 +1630,65 @@
           }
         ],
         "externalFields": []
+      },
+      {
+        "id": "inovafarma",
+        "label": "InovaFarma",
+        "fields": [
+          {
+            "name": "host",
+            "label": "Servidor",
+            "type": "text",
+            "required": true,
+            "placeholder": "erp.empresa.com.br"
+          },
+          {
+            "name": "port",
+            "label": "Porta",
+            "type": "number",
+            "required": true,
+            "defaultValue": 1433,
+            "min": 1,
+            "max": 65535
+          },
+          {
+            "name": "database",
+            "label": "Banco de dados",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "username",
+            "label": "Usuário",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "password",
+            "label": "Senha",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "trustServerCertificate",
+            "label": "Confiar no certificado do servidor",
+            "type": "switch",
+            "defaultValue": true,
+            "description": "Ative para servidores com certificado autoassinado."
+          }
+        ],
+        "externalFields": [
+          {
+            "name": "codigoColaborador",
+            "label": "Código do Colaborador",
+            "type": "text"
+          },
+          {
+            "name": "codigoLoja",
+            "label": "Código da Loja",
+            "type": "text"
+          }
+        ]
       }
     ]
   },

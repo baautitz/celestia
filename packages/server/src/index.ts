@@ -4,7 +4,8 @@ import { serve } from "@hono/node-server";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
 import { MemoryErpStore, type ErpStore } from "./erp/erp-store.js";
 import { MemoryErpExternalsStore, type ErpExternalsStore } from "./erp/erp-externals-store.js";
-import { createErpClient, type ErpClientFactory } from "./erp/erp-factory.js";
+import { createErpClientFactory, type ErpClientFactory } from "./erp/erp-factory.js";
+import { ERP_DRIVERS } from "./erp/erp-drivers.js";
 import { createErpModule } from "./erp/erp-module.js";
 import { composeModules, migrationPlan, type ModuleEntry } from "./boot/compose.js";
 import { assertMigrationsUpToDate } from "@platform/core/migrations";
@@ -18,7 +19,7 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
-import { integrationPlugins, integrationExternalFields } from "./plugins.js";
+import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
 import { createClosingPeriodModule } from "./closing-period/closing-period-module.js";
 import { MemoryClosingPeriodStore, type ClosingPeriodStore } from "./closing-period/closing-period-store.js";
 import type { JWTAccessPayload } from "@platform/shared";
@@ -60,7 +61,9 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   const erpClients = options?.erpClients || {};
   const erpStore = options?.erpStore || new MemoryErpStore();
   const erpExternalsStore = options?.erpExternalsStore || new MemoryErpExternalsStore();
-  const clientFactory = options?.clientFactory || createErpClient;
+  const extraDrivers = integrationErpDrivers();
+  const allDrivers = { ...ERP_DRIVERS, ...extraDrivers };
+  const clientFactory = options?.clientFactory || createErpClientFactory(allDrivers);
   const userStore = options?.userStore || new MemoryUserStore();
   const tokenService = options?.tokenService || new TokenService();
   const closingPeriodStore = options?.closingPeriodStore || new MemoryClosingPeriodStore();
@@ -96,6 +99,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
         clientFactory,
         auth,
         externalFieldsByErp: integrationExternalFields(),
+        extraDrivers,
       }),
     },
     ...integrationPlugins({ auth, erpClients }),
@@ -161,9 +165,10 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       const { PostgresAuditStore } = await import("./audit/postgres-audit-store.js");
       auditLog = new AuditLog(new PostgresAuditStore(db));
 
+      const bootClientFactory = createErpClientFactory({ ...ERP_DRIVERS, ...integrationErpDrivers() });
       for (const record of await erpStore.list()) {
         try {
-          erpClients[record.id] = createErpClient(record);
+          erpClients[record.id] = bootClientFactory(record);
         } catch (err: unknown) {
           console.error(`ERP '${record.id}' ignorado: ${err instanceof Error ? err.message : err}`);
         }

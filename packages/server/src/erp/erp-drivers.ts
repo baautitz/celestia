@@ -14,6 +14,18 @@ export interface ErpDriverDef {
   createClient(values: ErpValues): ErpClient;
 }
 
+export const createMssqlClient = (values: ErpValues): ErpClient =>
+  new MssqlErpClient({
+    server: String(values.host),
+    port: Number(values.port),
+    database: String(values.database),
+    user: String(values.username),
+    password: String(values.password),
+    options: { encrypt: true, trustServerCertificate: values.trustServerCertificate === true, readOnlyIntent: true },
+    requestTimeout: 30000,
+    pool: { max: 5 },
+  });
+
 const mssql: ErpDriverDef = {
   id: "mssql",
   label: "SQL Server",
@@ -32,17 +44,7 @@ const mssql: ErpDriverDef = {
     },
   ],
   externalFields: [],
-  createClient: (values) =>
-    new MssqlErpClient({
-      server: String(values.host),
-      port: Number(values.port),
-      database: String(values.database),
-      user: String(values.username),
-      password: String(values.password),
-      options: { encrypt: true, trustServerCertificate: values.trustServerCertificate === true, readOnlyIntent: true },
-      requestTimeout: 30000,
-      pool: { max: 5 },
-    }),
+  createClient: createMssqlClient,
 };
 
 export const ERP_DRIVERS: Record<string, ErpDriverDef> = { [mssql.id]: mssql };

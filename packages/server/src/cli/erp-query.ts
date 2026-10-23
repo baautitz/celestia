@@ -1,6 +1,8 @@
 import { parseArgs } from "node:util";
 import { PostgresErpStore } from "../erp/postgres-erp-store.js";
-import { createErpClient } from "../erp/erp-factory.js";
+import { createErpClientFactory } from "../erp/erp-factory.js";
+import { ERP_DRIVERS } from "../erp/erp-drivers.js";
+import { integrationErpDrivers } from "../plugins.js";
 import { db, pool } from "../db/client.js";
 
 async function main() {
@@ -16,7 +18,8 @@ async function main() {
   const record = await new PostgresErpStore(db).get(erpId);
   if (!record) throw new Error(`ERP '${erpId}' não encontrado.`);
 
-  const client = createErpClient(record);
+  const clientFactory = createErpClientFactory({ ...ERP_DRIVERS, ...integrationErpDrivers() });
+  const client = clientFactory(record);
   try {
     // A trava de somente leitura (SELECT/WITH) é aplicada pelo próprio cliente.
     const rows = await client.query<Record<string, unknown>>(sql);

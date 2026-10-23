@@ -13,5 +13,5 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/server.ts", "src/permissions.ts", "src/externals.ts"]
+  "include": ["src/server.ts", "src/permissions.ts", "src/externals.ts", "src/driver.ts"]
 }

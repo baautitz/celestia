@@ -7,7 +7,7 @@ import { defineModule, type ModuleDef } from "@platform/core/module";
 import { requirePermission } from "../iam/middleware.js";
 import { IAM_PERMISSIONS } from "../iam/iam-permissions.js";
 import type { ErpClientRegistry } from "./erp-client.js";
-import { ERP_DRIVERS, parseErpValues, parseExternals } from "./erp-drivers.js";
+import { ERP_DRIVERS, parseErpValues, parseExternals, type ErpDriverDef } from "./erp-drivers.js";
 import { readSecrets, type ErpClientFactory } from "./erp-factory.js";
 import { ERP_PERMISSIONS } from "./erp-permissions.js";
 import type { ErpExternalsStore } from "./erp-externals-store.js";
@@ -27,6 +27,8 @@ export interface ErpModuleDeps {
   auth: MiddlewareHandler;
   /** Externals declarados pelos Plugins ativos para cada ERP (por id do ERP). */
   externalFieldsByErp?: Record<string, FormFieldDef[]>;
+  /** Drivers adicionais registrados por Plugins de /integrations. */
+  extraDrivers?: Record<string, ErpDriverDef>;
 }
 
 /** A senha (segredos cifrados) nunca é devolvida. */
@@ -36,7 +38,8 @@ const publicErp = ({ secretsEncrypted: _omit, ...rest }: ErpRecord) => rest;
  * Plugin `erp`: cadastro, teste e remoção de ERPs (/api/admin/erps) e o catálogo de ERP Drivers
  * (/api/admin/erp-drivers).
  */
-export function createErpModule({ erpStore, externalsStore, clients, clientFactory, auth, externalFieldsByErp }: ErpModuleDeps): ModuleDef {
+export function createErpModule({ erpStore, externalsStore, clients, clientFactory, auth, externalFieldsByErp, extraDrivers }: ErpModuleDeps): ModuleDef {
+  const drivers: Record<string, ErpDriverDef> = { ...ERP_DRIVERS, ...(extraDrivers ?? {}) };
   return defineModule({
     id: "erp",
     version: "1.0.0",
@@ -47,7 +50,7 @@ export function createErpModule({ erpStore, externalsStore, clients, clientFacto
       const manage = requirePermission(ERP_PERMISSIONS.keys["erps:manage"]);
 
       routes.get("/erp-drivers", auth, manage, (c) =>
-        c.json(Object.values(ERP_DRIVERS).map(({ id, label, fields, externalFields }) => ({ id, label, fields, externalFields })))
+        c.json(Object.values(drivers).map(({ id, label, fields, externalFields }) => ({ id, label, fields, externalFields })))
       );
 
       routes.get("/erps", auth, manage, async (c) => c.json((await erpStore.list()).map(publicErp)));
@@ -64,7 +67,7 @@ export function createErpModule({ erpStore, externalsStore, clients, clientFacto
             return c.json({ error: "O id do ERP deve usar letras minúsculas, números e _ (ex.: inovafarma)." }, 400);
           }
           const { name, driver, values } = c.req.valid("json");
-          const driverDef = ERP_DRIVERS[driver];
+          const driverDef = drivers[driver];
           if (!driverDef) return c.json({ error: `ERP Driver '${driver}' não suportado.` }, 400);
 
           const existing = await erpStore.get(id);
@@ -96,7 +99,7 @@ export function createErpModule({ erpStore, externalsStore, clients, clientFacto
         const userId = c.req.param("userId");
         const entries = [];
         for (const erp of await erpStore.list()) {
-          const driver = ERP_DRIVERS[erp.driver];
+          const driver = drivers[erp.driver];
           if (!driver) continue;
           const fields = externalFieldsByErp?.[erp.id] ?? driver.externalFields;
           entries.push({
@@ -117,7 +120,7 @@ export function createErpModule({ erpStore, externalsStore, clients, clientFacto
         async (c) => {
           const erpId = c.req.param("erpId");
           const erp = await erpStore.get(erpId);
-          const driver = erp && ERP_DRIVERS[erp.driver];
+          const driver = erp && drivers[erp.driver];
           if (!erp || !driver) return c.json({ error: "ERP não encontrado." }, 404);
           const fields = externalFieldsByErp?.[erpId] ?? driver.externalFields;
           let values: Record<string, string | number>;
