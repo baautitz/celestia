@@ -82,7 +82,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   const entries: ModuleEntry[] = [
     { tier: "base", def: createIamModule({ userStore, erpStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
-    { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auth }) },
+    { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auditLog, auth }) },
     { tier: "plugin", def: createErpModule({ erpStore, clients: erpClients, clientFactory, auth }) },
     ...(options?.extraModules ?? []),
   ];

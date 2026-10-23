@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { defineModule, type ModuleDef } from "@platform/core/module";
@@ -8,12 +8,15 @@ import type { ClosingPeriodRecord } from "@platform/shared";
 import { getAuthenticatedUser, requirePermission } from "../iam/middleware.js";
 import { CLOSING_PERIOD_PERMISSIONS } from "./closing-period-permissions.js";
 import type { ClosingPeriodStore } from "./closing-period-store.js";
+import type { AuditLog } from "../audit/audit-log.js";
+import { CLOSING_PERIOD_PLUGIN, CLOSING_PERIOD_TARGET, declareClosingPeriodAudit } from "./closing-period-audit.js";
 
 /** Pasta de migrations do Plugin (schema Postgres "closing_period"). */
 export const CLOSING_PERIOD_MIGRATIONS = { folder: resolve(import.meta.dirname, "drizzle"), schema: "closing_period" };
 
 export interface ClosingPeriodModuleDeps {
   store: ClosingPeriodStore;
+  auditLog: AuditLog;
   auth: MiddlewareHandler;
 }
 
@@ -51,7 +54,8 @@ const overlaps = (a: { startDate: string; endDate: string }, b: { startDate: str
  * (payload: actorId, periodId, name, startDate, endDate). Um `before` que cancela veta a ação (409).
  * Só se cancela um período aberto; um fechado é reaberto antes.
  */
-export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDeps): ModuleDef {
+export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeriodModuleDeps): ModuleDef {
+  declareClosingPeriodAudit(auditLog);
   return defineModule({
     id: "closing_period",
     version: "1.0.0",
@@ -73,6 +77,17 @@ export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDe
         return c.json(period);
       });
 
+      const audit = (c: Context, action: string, p: ClosingPeriodRecord, extra: Record<string, unknown> = {}) => {
+        const user = getAuthenticatedUser(c);
+        return auditLog.record({
+          plugin: CLOSING_PERIOD_PLUGIN,
+          action,
+          actor: { id: user.sub, name: user.fullname },
+          target: { type: CLOSING_PERIOD_TARGET, id: p.id },
+          attributes: { name: p.name, startDate: p.startDate, endDate: p.endDate, ...extra },
+        });
+      };
+
       const detail = (p: ClosingPeriodRecord) => ({ periodId: p.id, name: p.name, startDate: p.startDate, endDate: p.endDate });
 
       /** Transição de estado vetável: close (open -> closed) e reopen (closed -> open). */
@@ -91,6 +106,7 @@ export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDe
             },
           );
           if (ran.cancelled) return c.json({ error: ran.reason }, 409);
+          await audit(c, action, ran.result);
           return c.json(ran.result);
         });
       transition("close", "open", "closed", "O período já está fechado.");
@@ -106,6 +122,7 @@ export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDe
           () => store.delete(period.id),
         );
         if (ran.cancelled) return c.json({ error: ran.reason }, 409);
+        await audit(c, "cancel", period);
         return c.json({ success: true });
       });
 
@@ -138,6 +155,10 @@ export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDe
           if (!(await store.updateIfCurrent(next, body.version))) {
             return c.json({ error: "O período foi alterado por outra pessoa. Recarregue e tente novamente." }, 409);
           }
+          await audit(c, "update_range", current, {
+            from: { startDate: current.startDate, endDate: current.endDate },
+            to: { startDate: next.startDate, endDate: next.endDate },
+          });
           return c.json(next);
         },
       );
@@ -168,6 +189,7 @@ export function createClosingPeriodModule({ store, auth }: ClosingPeriodModuleDe
             updatedAt: now,
           };
           await store.save(period);
+          await audit(c, "create", period);
           return c.json(period, 201);
         },
       );

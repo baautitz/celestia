@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createPlatformApp } from "../src/index.js";
+import { AuditLog } from "../src/audit/audit-log.js";
+import { MemoryAuditStore } from "../src/audit/audit-store.js";
 import { Hono } from "hono";
 import { loadModules } from "@platform/core/loader";
 import { createClosingPeriodModule } from "../src/closing-period/closing-period-module.js";
@@ -232,6 +234,7 @@ describe("Closing Period: veto por handler before", () => {
     const result = await loadModules(app, [
       createClosingPeriodModule({
         store,
+        auditLog: new AuditLog(new MemoryAuditStore()),
         auth: async (c, next) => {
           c.set("user", { sub: "usr_test", username: "t", fullname: "T", role: "r", permissions: ["*"], externals: {} });
           await next();
