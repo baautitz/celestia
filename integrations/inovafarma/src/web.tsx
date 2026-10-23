@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@platform/ui/components/card";
+import { Card, CardContent } from "@platform/ui/components/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
@@ -200,105 +200,94 @@ function VendasComissoesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Barra de Filtros e Período */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <TrendingUp className="size-5 text-primary" />
-                Vendas & Comissões
-              </CardTitle>
-              <CardDescription>
-                Relatório de vendas por colaborador integrado ao InovaFarma no Período de Fechamento.
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="default"
-                onClick={() => void fetchRelatorio()}
-                disabled={loading || !selectedPeriod}
-                className="gap-2"
-              >
-                <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-                Atualizar
-              </Button>
-            </div>
+      {/* Barra de Filtros */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 p-4 border bg-card text-card-foreground shadow-xs">
+        <div className="flex flex-wrap items-end gap-4 flex-1">
+          {/* Seletor de Período de Fechamento */}
+          <div className="flex flex-col gap-1.5 min-w-[280px] flex-1 max-w-sm">
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Calendar className="size-3.5" />
+              Período de Fechamento
+            </span>
+            <Select value={selectedPeriodId} onValueChange={(val) => val && setSelectedPeriodId(val)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione um período">{selectedPeriodLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {periods.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} ({formatDate(p.startDate)} a {formatDate(p.endDate)})
+                  </SelectItem>
+                ))}
+                {periods.length === 0 && (
+                  <div className="p-2 text-xs text-muted-foreground text-center">Nenhum período cadastrado</div>
+                )}
+              </SelectContent>
+            </Select>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-            {/* Seletor de Período de Fechamento */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <Calendar className="size-3.5" />
-                Período de Fechamento
-              </label>
-              <Select value={selectedPeriodId} onValueChange={(val) => val && setSelectedPeriodId(val)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione um período">{selectedPeriodLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {periods.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <div className="flex items-center justify-between gap-2 w-full">
-                        <span>{p.name}</span>
-                        <span className="text-muted-foreground text-xs font-mono">
-                          {formatDate(p.startDate)} a {formatDate(p.endDate)}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                  {periods.length === 0 && (
-                    <div className="p-2 text-xs text-muted-foreground text-center">Nenhum período cadastrado</div>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
 
-            {/* Seletor de Filial / Loja */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <Store className="size-3.5" />
-                Filial / Loja
-              </label>
-              <Select value={selectedLoja} onValueChange={(val) => val && setSelectedLoja(val)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione uma filial">{selectedLojaLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Filiais</SelectItem>
-                  {lojas.map((l) => (
-                    <SelectItem key={l.codigoEmpresa} value={String(l.codigoEmpresa)}>
-                      {l.codigoEmpresa} - {l.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Status do Período Selecionado */}
-            {selectedPeriod && (
-              <div className="flex flex-col justify-end">
-                <div className="flex items-center gap-2 p-2 rounded border bg-muted/30 text-xs">
-                  <span className="font-medium text-muted-foreground">Status do Período:</span>
-                  <Badge variant={selectedPeriod.status === "open" ? "default" : "secondary"}>
-                    {selectedPeriod.status === "open" ? "Aberto" : selectedPeriod.status === "closed" ? "Fechado" : "Cancelado"}
-                  </Badge>
-                </div>
-              </div>
-            )}
+          {/* Seletor de Filial / Loja */}
+          <div className="flex flex-col gap-1.5 min-w-[220px] flex-1 max-w-xs">
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Store className="size-3.5" />
+              Filial / Loja
+            </span>
+            <Select value={selectedLoja} onValueChange={(val) => val && setSelectedLoja(val)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Todas as Filiais">{selectedLojaLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Filiais</SelectItem>
+                {lojas.map((l) => (
+                  <SelectItem key={l.codigoEmpresa} value={String(l.codigoEmpresa)}>
+                    {l.codigoEmpresa} - {l.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </CardContent>
-      </Card>
+
+          {selectedPeriod && (
+            <div className="flex items-center h-8 px-2.5 border text-xs bg-muted/30">
+              <span className="text-muted-foreground mr-1.5">Status:</span>
+              <Badge variant={selectedPeriod.status === "open" ? "secondary" : "outline"} className="text-xs">
+                {selectedPeriod.status === "open" ? "Aberto" : selectedPeriod.status === "closed" ? "Fechado" : "Cancelado"}
+              </Badge>
+            </div>
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          size="default"
+          onClick={() => void fetchRelatorio()}
+          disabled={loading || !selectedPeriod}
+          className="gap-2 shrink-0"
+        >
+          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+          Atualizar
+        </Button>
+      </div>
+
+      {/* Alerta se não houver períodos */}
+      {periods.length === 0 && !loading && (
+        <div className="p-4 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-sm flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0 text-amber-600" />
+            <span>Nenhum Período de Fechamento cadastrado na plataforma.</span>
+          </div>
+          <a href="/closing-periods" className="text-xs font-medium underline underline-offset-4 hover:opacity-80">
+            Cadastrar Período
+          </a>
+        </div>
+      )}
 
       {/* Erro de conexão ou consulta */}
       {error && (
         <div className="flex items-start gap-3 p-4 rounded-md border border-destructive/30 bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="size-5 shrink-0 mt-0.5" />
           <div className="flex flex-col gap-1">
-            <span className="font-semibold">Não foi possível carregar as vendas do InovaFarma:</span>
+            <span className="font-semibold">Falha na consulta InovaFarma:</span>
             <span>{error}</span>
           </div>
         </div>
