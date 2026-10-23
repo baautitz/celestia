@@ -4,6 +4,8 @@ export interface LoginRateLimiterOptions {
   /** Falhas toleradas por IP dentro da janela. */
   maxPerIp?: number;
   windowMs?: number;
+  /** Teto de buckets em memória; ao exceder, descarta os mais antigos. */
+  maxBuckets?: number;
   now?: () => number;
 }
 
@@ -21,6 +23,7 @@ export class LoginRateLimiter {
   private readonly maxPerUsername: number;
   private readonly maxPerIp: number;
   private readonly windowMs: number;
+  private readonly maxBuckets: number;
   private readonly now: () => number;
   private readonly buckets = new Map<string, Bucket>();
 
@@ -28,7 +31,13 @@ export class LoginRateLimiter {
     this.maxPerUsername = options.maxPerUsername ?? 5;
     this.maxPerIp = options.maxPerIp ?? 20;
     this.windowMs = options.windowMs ?? 15 * 60 * 1000;
+    this.maxBuckets = options.maxBuckets ?? 10_000;
     this.now = options.now ?? Date.now;
+  }
+
+  /** Buckets atualmente guardados (para testes e monitoramento). */
+  get size(): number {
+    return this.buckets.size;
   }
 
   private active(key: string): Bucket | undefined {
@@ -62,7 +71,13 @@ export class LoginRateLimiter {
       if (!key) continue;
       const bucket = this.active(key) ?? { count: 0, resetAt: this.now() + this.windowMs };
       bucket.count += 1;
+      // Reinserir move a chave para o fim: o Map itera do mais antigo ao mais recente.
+      this.buckets.delete(key);
       this.buckets.set(key, bucket);
+    }
+    for (const key of this.buckets.keys()) {
+      if (this.buckets.size <= this.maxBuckets) break;
+      this.buckets.delete(key);
     }
   }
 
