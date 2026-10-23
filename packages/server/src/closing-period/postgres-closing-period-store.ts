@@ -62,4 +62,13 @@ export class PostgresClosingPeriodStore implements ClosingPeriodStore {
       .returning({ id: periods.id });
     return updated.length === 1;
   }
+
+  async transitionIfCurrent(period: ClosingPeriodRecord, expectedVersion: number, expectedStatus: ClosingPeriodRecord["status"]): Promise<boolean> {
+    const updated = await this.db
+      .update(periods)
+      .set({ status: period.status, version: period.version, updatedAt: new Date(period.updatedAt) })
+      .where(and(eq(periods.id, period.id), eq(periods.version, expectedVersion), eq(periods.status, expectedStatus)))
+      .returning({ id: periods.id });
+    return updated.length === 1;
+  }
 }

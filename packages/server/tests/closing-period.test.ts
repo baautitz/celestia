@@ -211,6 +211,26 @@ describe("Closing Period (Período de Fechamento)", () => {
       expect((await remove(id)).status).toBe(200);
     });
 
+    it.each(["close", "reopen"] as const)("%s não sobrescreve uma edição de faixa concorrente (409)", async (action) => {
+      const id = await make();
+      if (action === "reopen") await act(id, "close");
+      // Simula a edição concorrente: acontece logo depois da leitura feita pela rota.
+      const original = store.get.bind(store);
+      store.get = async (pid: string) => {
+        const read = await original(pid);
+        store.get = original;
+        if (read && action === "close") await store.updateIfCurrent({ ...read, endDate: "2026-01-20", version: read.version + 1 }, read.version);
+        if (read && action === "reopen") await store.save({ ...read, status: "closed", endDate: "2026-01-20", version: read.version + 1 });
+        return read;
+      };
+      const before = await original(id);
+      const res = await act(id, action);
+      expect(res.status).toBe(409);
+      const after = await original(id);
+      expect(after?.endDate).toBe("2026-01-20");
+      expect(after?.version).toBe((before?.version ?? 0) + 1);
+    });
+
     it("responde 404 para id desconhecido", async () => {
       expect((await act("nada", "close")).status).toBe(404);
       expect((await act("nada", "reopen")).status).toBe(404);

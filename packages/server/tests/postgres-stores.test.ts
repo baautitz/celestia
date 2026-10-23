@@ -204,5 +204,18 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       await store.save({ ...next, status: "closed" });
       expect(await store.updateIfCurrent({ ...next, version: 3 }, 2)).toBe(false);
     });
+
+    it("transitionIfCurrent só grava com a versão e a situação esperadas", async () => {
+      const store = new PostgresClosingPeriodStore(db);
+      const base = {
+        id: "w3", name: "Set", startDate: "2026-09-01", endDate: "2026-09-30", status: "open" as const, version: 1,
+        createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z",
+      };
+      await store.save(base);
+      expect(await store.transitionIfCurrent({ ...base, status: "closed", version: 2 }, 5, "open")).toBe(false);
+      expect(await store.transitionIfCurrent({ ...base, status: "closed", version: 2 }, 1, "closed")).toBe(false);
+      expect(await store.transitionIfCurrent({ ...base, status: "closed", version: 2 }, 1, "open")).toBe(true);
+      expect((await store.get("w3"))?.status).toBe("closed");
+    });
   });
 });

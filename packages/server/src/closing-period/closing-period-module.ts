@@ -43,6 +43,11 @@ const EditRangeSchema = z
     path: ["endDate"],
   });
 
+const CONCURRENT_CHANGE = "O período foi alterado por outra pessoa. Recarregue e tente novamente.";
+
+/** O período mudou entre a leitura e a gravação (compare-and-set falhou). */
+class ConcurrentChangeError extends Error {}
+
 /** Duas faixas inclusivas compartilham ao menos uma data. */
 const overlaps = (a: { startDate: string; endDate: string }, b: { startDate: string; endDate: string }): boolean =>
   a.startDate <= b.endDate && b.startDate <= a.endDate;
@@ -96,15 +101,21 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
           const period = await store.get(c.req.param("id"));
           if (!period) return c.json({ error: NOT_FOUND }, 404);
           if (period.status !== from) return c.json({ error: refusal }, 409);
-          const ran = await events.run(
-            `closing_period.${action}`,
-            { actorId: getAuthenticatedUser(c).sub, ...detail(period) },
-            async () => {
-              const updated: ClosingPeriodRecord = { ...period, status: to, version: period.version + 1, updatedAt: new Date().toISOString() };
-              await store.save(updated);
-              return updated;
-            },
-          );
+          let ran;
+          try {
+            ran = await events.run(
+              `closing_period.${action}`,
+              { actorId: getAuthenticatedUser(c).sub, ...detail(period) },
+              async () => {
+                const updated: ClosingPeriodRecord = { ...period, status: to, version: period.version + 1, updatedAt: new Date().toISOString() };
+                if (!(await store.transitionIfCurrent(updated, period.version, from))) throw new ConcurrentChangeError();
+                return updated;
+              },
+            );
+          } catch (err) {
+            if (err instanceof ConcurrentChangeError) return c.json({ error: CONCURRENT_CHANGE }, 409);
+            throw err;
+          }
           if (ran.cancelled) return c.json({ error: ran.reason }, 409);
           await audit(c, action, ran.result);
           return c.json(ran.result);
@@ -153,7 +164,7 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
             updatedAt: new Date().toISOString(),
           };
           if (!(await store.updateIfCurrent(next, body.version))) {
-            return c.json({ error: "O período foi alterado por outra pessoa. Recarregue e tente novamente." }, 409);
+            return c.json({ error: CONCURRENT_CHANGE }, 409);
           }
           await audit(c, "update_range", current, {
             from: { startDate: current.startDate, endDate: current.endDate },
