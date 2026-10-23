@@ -109,7 +109,6 @@
           "closing_period:period:reopen",
           "closing_period:period:cancel",
           "system:erps:manage",
-          "example:note:read",
           "inovafarma:integration:view"
         ],
         "isAdmin": true,
@@ -278,7 +277,6 @@
         "closing_period:period:reopen",
         "closing_period:period:cancel",
         "system:erps:manage",
-        "example:note:read",
         "inovafarma:integration:view"
       ],
       "isAdmin": true,
@@ -412,15 +410,6 @@
             "label": "Gerenciar ERPs",
             "description": "Permite cadastrar, editar, testar e remover ERPs (SQL Server) e seus dados de acesso.",
             "module": "erps"
-          }
-        ],
-        "example": [
-          {
-            "key": "example:note:read",
-            "label": "Visualizar o Plugin de exemplo",
-            "description": "Permite abrir a tela e chamar a rota do Plugin de exemplo.",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o Plugin de exemplo.",
-            "module": "example"
           }
         ],
         "inovafarma": [
@@ -564,15 +553,6 @@
             "label": "Gerenciar ERPs",
             "description": "Permite cadastrar, editar, testar e remover ERPs (SQL Server) e seus dados de acesso.",
             "module": "erps"
-          }
-        ],
-        "example": [
-          {
-            "key": "example:note:read",
-            "label": "Visualizar o Plugin de exemplo",
-            "description": "Permite abrir a tela e chamar a rota do Plugin de exemplo.",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o Plugin de exemplo.",
-            "module": "example"
           }
         ],
         "inovafarma": [

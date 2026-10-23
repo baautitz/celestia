@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { createPlatform } from "../src/index.js";
 import { integrationPlugins } from "../src/plugins.js";
+import { createExamplePlugin } from "@integrations/example/server";
 import { MemoryUserStore } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
+import { createAuthMiddleware } from "../src/iam/middleware.js";
+import { TokenService } from "../src/iam/token-service.js";
 
 async function boot(permissions: string[]) {
   const userStore = new MemoryUserStore({
@@ -19,7 +22,13 @@ async function boot(permissions: string[]) {
       },
     ],
   });
-  const platform = createPlatform({ userStore });
+  const tokenService = new TokenService();
+  const auth = createAuthMiddleware(tokenService);
+  const platform = createPlatform({
+    userStore,
+    tokenService,
+    extraModules: [{ tier: "plugin", def: createExamplePlugin({ auth }) }],
+  });
   await platform.start();
   const login = await platform.app.request("/api/auth/login", {
     method: "POST",
@@ -31,12 +40,12 @@ async function boot(permissions: string[]) {
 }
 
 describe("Plugin de exemplo (/integrations/example)", () => {
-  it("está na lista estática de Modules como Plugin", () => {
+  it("não está mais na lista padrão de Plugins ativos", () => {
     const entries = integrationPlugins({ auth: async (_c, next) => next() });
-    expect(entries.some((e) => e.tier === "plugin" && e.def.id === "example")).toBe(true);
+    expect(entries.some((e) => e.tier === "plugin" && e.def.id === "example")).toBe(false);
   });
 
-  it("serve a rota com a Permission e nega sem ela", async () => {
+  it("serve a rota com a Permission e nega sem ela quando montado", async () => {
     const allowed = await boot(["example:note:read"]);
     const ok = await allowed.platform.app.request("/api/m/example/hello", { headers: allowed.headers });
     expect(ok.status).toBe(200);
@@ -47,7 +56,7 @@ describe("Plugin de exemplo (/integrations/example)", () => {
     expect((await denied.platform.app.request("/api/m/example/hello")).status).toBe(401);
   });
 
-  it("registra a Permission e a migration no Module", async () => {
+  it("registra a Permission e a migration no Module quando montado", async () => {
     const { platform } = await boot([]);
     const example = platform.modules.find((m) => m.id === "example");
     expect(example?.permissions?.items.map((p) => p.key)).toEqual(["example:note:read"]);

@@ -1,5 +1,4 @@
 import type { MiddlewareHandler } from "hono";
-import { createExamplePlugin } from "@integrations/example/server";
 import { createInovafarmaPlugin, createInovafarmaDriver, INOVAFARMA_EXTERNALS } from "@integrations/inovafarma/server";
 import type { ModuleEntry } from "./boot/compose.js";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
@@ -17,7 +16,6 @@ export interface IntegrationPluginDeps {
  */
 export function integrationPlugins({ auth, erpClients }: IntegrationPluginDeps): ModuleEntry[] {
   return [
-    { tier: "plugin", def: createExamplePlugin({ auth }) },
     { tier: "plugin", def: createInovafarmaPlugin({ auth, erpClients }) },
   ];
 }
