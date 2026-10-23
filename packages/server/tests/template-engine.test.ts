@@ -6,7 +6,7 @@ describe("TemplateEngine (Segurança & Bind Parameters)", () => {
     const rawSql = `
       SELECT id, name FROM vendas 
       WHERE created_at BETWEEN {{closing_period.start_date}} AND {{closing_period.end_date}}
-        AND vendedor_id = {{user.externals.inovafarma}}
+        AND vendedor_id = {{user.seller_id}}
     `;
 
     const context = {
@@ -15,9 +15,7 @@ describe("TemplateEngine (Segurança & Bind Parameters)", () => {
         end_date: "2026-01-31",
       },
       user: {
-        externals: {
-          inovafarma: 42,
-        },
+        seller_id: 42,
       },
     };
 

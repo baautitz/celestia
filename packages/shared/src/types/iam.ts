@@ -1,10 +1,4 @@
 /**
- * Mapeamento genérico de IDs do usuário nos ERPs conectados.
- * Exemplo: { "inovafarma": 42, "sap": 9001 }
- */
-export type ExternalsMap = Record<string, string | number>;
-
-/**
  * Modelo de Usuário da plataforma.
  */
 export interface User {
@@ -14,7 +8,6 @@ export interface User {
   email?: string;
   passwordHash?: string;
   roleId: string;
-  externals: ExternalsMap;
   status: "active" | "inactive";
   /** Administrador: ignora a matriz de permissões (acesso total). Alterado pelo CLI create-admin ou por outro administrador. */
   isAdmin?: boolean;
@@ -46,7 +39,6 @@ export interface JWTAccessPayload {
   role: string;            // ID da Role (ex: "role_vendedor")
   permissions: string[];   // Lista de permissões do usuário
   isAdmin?: boolean;       // Administrador: o servidor expande para todas as permissões válidas
-  externals: ExternalsMap; // Mapeamento de chaves nos ERPs
   iat?: number;
   exp?: number;
 }
@@ -90,14 +82,12 @@ export interface CreateUserInput {
   username: string;
   password: string;
   roleId: string;
-  externals?: ExternalsMap;
   email?: string;
 }
 
 export interface UpdateUserInput {
   fullname?: string;
   roleId?: string;
-  externals?: ExternalsMap;
   status?: "active" | "inactive";
   email?: string;
   /** Promove ou rebaixa Administrator; aplicado na mesma transação da checagem do último admin ativo. */

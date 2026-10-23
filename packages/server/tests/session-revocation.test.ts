@@ -8,7 +8,7 @@ async function setup() {
   const store = createSeededUserStore({ admin: true });
   await store.createRole({ id: "role_a", name: "A", description: "d", permissions: ["system:users:read"] });
   await store.createRole({ id: "role_b", name: "B", description: "d", permissions: [] });
-  const target = await store.createUser({ fullname: "Alvo Teste", username: "alvo", password: TEST_PASSWORD, roleId: "role_a", externals: {} });
+  const target = await store.createUser({ fullname: "Alvo Teste", username: "alvo", password: TEST_PASSWORD, roleId: "role_a" });
   const app = createPlatformApp({ userStore: store });
   const admin = withAuth(createPlatformApp({ userStore: store }), "test.root");
   const login = async (): Promise<string> => {

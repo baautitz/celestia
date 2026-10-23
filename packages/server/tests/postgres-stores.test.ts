@@ -8,6 +8,7 @@ import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
 import { LastAdminError } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
+import { PostgresErpExternalsStore } from "../src/erp/postgres-erp-externals-store.js";
 import { ERP_MIGRATIONS } from "../src/erp/erp-module.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
@@ -79,6 +80,20 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       expect(await store.list()).toHaveLength(1);
       await store.delete("c1");
       expect(await store.get("c1")).toBeNull();
+    });
+  });
+
+  describe("Externals", () => {
+    it("grava por usuário e ERP e some junto com o ERP", async () => {
+      const erps = new PostgresErpStore(db);
+      const store = new PostgresErpExternalsStore(db);
+      await erps.save({ id: "ex1", name: "ERP", driver: "mssql", config: {}, secretsEncrypted: "" });
+      await store.save("usr_a", "ex1", { userId: "7" });
+      await store.save("usr_a", "ex1", { userId: "8", company: "Matriz" });
+      expect(await store.get("usr_a", "ex1")).toEqual({ userId: "8", company: "Matriz" });
+      expect(await store.get("usr_b", "ex1")).toEqual({});
+      await erps.delete("ex1");
+      expect(await store.get("usr_a", "ex1")).toEqual({});
     });
   });
 

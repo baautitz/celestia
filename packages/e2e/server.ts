@@ -20,7 +20,6 @@ const store = new MemoryUserStore({
       fullname: "Administrador E2E",
       passwordHash: PasswordService.hash(ADMIN_PASSWORD),
       roleId: "role_admin",
-      externals: {},
       status: "active",
       createdAt: new Date().toISOString(),
     },
