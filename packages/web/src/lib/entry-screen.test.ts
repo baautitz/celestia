@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NavEntry } from "@platform/ui/contracts/module";
+import { Puzzle } from "lucide-react";
 import { canSeeEntry, resolveEntryScreen } from "./entry-screen";
 
 const Default = () => null;
@@ -9,7 +10,7 @@ const B = () => null;
 const entry: NavEntry = {
   id: "x",
   label: "X",
-  icon: Default as unknown as NavEntry["icon"],
+  icon: Puzzle,
   path: "/x",
   group: "G",
   permission: "p:base",

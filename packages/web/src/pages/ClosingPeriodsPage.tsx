@@ -258,19 +258,12 @@ export const ClosingPeriodsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <HeaderActions>
-        <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+        <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
+          <RefreshCw className={loading ? "animate-spin" : ""} />
         </Button>
       </HeaderActions>
-
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Períodos de Fechamento</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Cada período é uma faixa contínua de datas; uma data pertence a no máximo um período.
-        </p>
-      </div>
 
       <DataTable
         columns={columns}
@@ -278,10 +271,11 @@ export const ClosingPeriodsPage: React.FC = () => {
         getRowId={(p) => p.id}
         loading={loading}
         skeletonRows={3}
-        title={`Períodos (${periods.length})`}
+        title={(count) => `Períodos de Fechamento (${count})`}
+        description="Cada período é uma faixa contínua de datas; uma data pertence a no máximo um período."
         emptyMessage="Nenhum Período de Fechamento criado."
         rowActions={rowMenu}
       />
-    </div>
+    </>
   );
 };

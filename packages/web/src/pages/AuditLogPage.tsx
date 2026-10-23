@@ -3,6 +3,7 @@ import type { AuditLogEntry, AuditLogFilter } from "@platform/shared";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
 import { Input } from "@platform/ui/components/input";
+import { Field, FieldGroup } from "@platform/ui/components/field";
 import { Label } from "@platform/ui/components/label";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
@@ -86,41 +87,35 @@ export const AuditLogPage: React.FC = () => {
   }, [fetchData, applied]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <HeaderActions>
         <Button variant="outline" size="icon" onClick={() => void fetchData(applied)} disabled={loading}>
           <RefreshCw className={loading ? "animate-spin" : ""} />
         </Button>
       </HeaderActions>
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Histórico de ações registradas por todo o sistema. Filtre por alvo, usuário, Plugin e data.
-        </p>
-      </div>
-
       <form
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         onSubmit={(e) => {
           e.preventDefault();
           setApplied(draft);
         }}
       >
-        {FILTER_FIELDS.map(({ key, label, type }) => (
-          <div key={key} className="flex flex-col gap-2">
-            <Label htmlFor={`audit-${key}`}>{label}</Label>
-            <Input
-              id={`audit-${key}`}
-              type={type}
-              value={draft[key] ?? ""}
-              onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-            />
-          </div>
-        ))}
-        <div className="flex items-end">
-          <Button type="submit">Filtrar</Button>
-        </div>
+        <FieldGroup>
+          {FILTER_FIELDS.map(({ key, label, type }) => (
+            <Field key={key}>
+              <Label htmlFor={`audit-${key}`}>{label}</Label>
+              <Input
+                id={`audit-${key}`}
+                type={type}
+                value={draft[key] ?? ""}
+                onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+              />
+            </Field>
+          ))}
+          <Field>
+            <Button type="submit">Filtrar</Button>
+          </Field>
+        </FieldGroup>
       </form>
 
       <DataTable
@@ -129,9 +124,10 @@ export const AuditLogPage: React.FC = () => {
         getRowId={(e) => e.id}
         loading={loading}
         skeletonRows={5}
-        title={(count) => `Entradas (${count})`}
+        title={(count) => `Audit Log (${count})`}
+        description="Histórico de ações registradas por todo o sistema. Filtre por alvo, usuário, Plugin e data."
         emptyMessage="Nenhuma entrada encontrada."
       />
-    </div>
+    </>
   );
 };
