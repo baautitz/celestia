@@ -10,5 +10,4 @@ export const IAM_PERMISSIONS = definePermissions("system", {
   "roles:create": { label: "Criar Grupos de Acesso", description: "Permite criar novos perfis/cargos de permissão." },
   "roles:read": { label: "Visualizar Grupos e Catálogo", description: "Permite listar perfis de acesso e inspecionar o catálogo de permissões." },
   "roles:update": { label: "Editar Permissões do Grupo", description: "Permite alterar quais permissões do sistema pertencem a cada grupo." },
-  "roles:delete": { label: "Excluir Grupos de Acesso", description: "Permite remover perfis que não estejam em uso." },
 });

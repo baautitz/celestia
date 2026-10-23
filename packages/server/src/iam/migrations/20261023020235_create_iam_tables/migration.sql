@@ -28,7 +28,7 @@ INSERT INTO "iam"."roles" ("id", "name", "description", "permissions") VALUES
 		'gestor',
 		'Gestor',
 		'Gestão de usuários, perfis, ERPs, períodos de fechamento e consulta de auditoria.',
-		'["system:users:create","system:users:read","system:users:update","system:users:reset_password","system:users:delete","system:roles:create","system:roles:read","system:roles:update","system:roles:delete","system:erps:manage","system:audit:read","closing_period:period:read","closing_period:period:update","closing_period:period:create","closing_period:period:close","closing_period:period:reopen","closing_period:period:cancel"]'::jsonb
+		'["system:users:create","system:users:read","system:users:update","system:users:reset_password","system:users:delete","system:roles:create","system:roles:read","system:roles:update","system:erps:manage","system:audit:read","closing_period:period:read","closing_period:period:update","closing_period:period:create","closing_period:period:close","closing_period:period:reopen","closing_period:period:cancel"]'::jsonb
 	),
 	(
 		'operador',
