@@ -134,7 +134,11 @@ export function createPlatformApp(options?: CreatePlatformAppOptions) {
 export type AppType = ReturnType<typeof createPlatformApp>;
 
 // Inicia servidor se executado diretamente
-if (typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
+const isMain =
+  typeof process !== "undefined" &&
+  Boolean(process.argv[1] && (process.argv[1].endsWith("/index.ts") || process.argv[1].endsWith("/index.js")));
+
+if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
   void (async () => {
     let userStore: UserStore | undefined;
     const erpClients: ErpClientRegistry = {};
