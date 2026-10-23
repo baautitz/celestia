@@ -421,6 +421,15 @@
             "description": "Permite cadastrar, editar, testar e remover ERPs (SQL Server) e seus dados de acesso.",
             "module": "erps"
           }
+        ],
+        "example": [
+          {
+            "key": "example:note:read",
+            "label": "Visualizar o Plugin de exemplo",
+            "description": "Permite abrir a tela e chamar a rota do Plugin de exemplo.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o Plugin de exemplo.",
+            "module": "example"
+          }
         ]
       }
     }
@@ -560,6 +569,15 @@
             "label": "Gerenciar ERPs",
             "description": "Permite cadastrar, editar, testar e remover ERPs (SQL Server) e seus dados de acesso.",
             "module": "erps"
+          }
+        ],
+        "example": [
+          {
+            "key": "example:note:read",
+            "label": "Visualizar o Plugin de exemplo",
+            "description": "Permite abrir a tela e chamar a rota do Plugin de exemplo.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o Plugin de exemplo.",
+            "module": "example"
           }
         ]
       }
