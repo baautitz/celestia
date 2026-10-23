@@ -1,6 +1,6 @@
 # Server
 
-The API behind Celestia: identity and permissions, ERP connections, and the closing periods that business work happens in.
+The API behind Celestia: identity and permissions, ERPs, and the closing periods that business work happens in.
 
 ## Language
 

@@ -1,6 +1,7 @@
 # Deps & build
 node_modules/
 packages/*/dist/
+integrations/*/dist/
 packages/shared/dist/
 packages/server/dist/
 packages/web/dist/
@@ -26,3 +27,7 @@ Thumbs.db
 *.tsbuildinfo
 coverage/
 .pnpm-store/
+
+# Playwright
+test-results/
+playwright-report/

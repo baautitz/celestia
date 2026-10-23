@@ -12,7 +12,7 @@
 
 - **Backend**: [Hono](https://hono.dev/) on Node.js. **Security**: Argon2id, stateless JWT (5 min) + Refresh Token (7 days).
 - **Frontend**: Vite + React 19 + shadcn/ui + Tailwind CSS v4.
-- **Recipes / SDUI were removed.** Customer-specific features will be modules under `/integrations` (a definir). Workspaces ("Área de Trabalho", the active closing period) will become a module; today they live in the server.
+- **Recipes / SDUI were removed.** Customer-specific features will be modules under `/integrations` (a definir). The Closing Period ("Período de Fechamento", formerly Workspace/Área de Trabalho) is already a Plugin Module (`closing_period`).
 - **Target architecture** (modules as bounded contexts, `before`/`after` events, per-module migrations): see the GitHub issues, the ADRs in [docs/adr/](docs/adr/) and the glossaries ([GLOSSARY-MAP.md](GLOSSARY-MAP.md)). Not implemented yet.
 
 ---
@@ -23,15 +23,16 @@
 celestia/
 ├── packages/
 │   ├── core/     (@platform/core)   module framework: contract, loader/graph, events, migrations, permissions (pruneOrphans, ...)
-│   ├── shared/   (@platform/shared) contracts & types: iam.ts, workspace.ts, erp.ts, fields.ts
+│   ├── shared/   (@platform/shared) contracts & types: iam.ts, closing-period.ts, audit.ts, erp.ts, fields.ts
 │   ├── server/   (@platform/server) Hono API
-│   │   └── src/  index.ts (app: health, auth, iam, /api/admin/connections*, /api/admin/erp-types, /api/workspaces*),
-│   │             iam/, engine/ (template-engine, workspace-validator), data/ (connectors, stores, secret-box, read-only-guard),
+│   │   └── src/  index.ts (app: health, auth, iam, /api/admin/erps*, /api/admin/erp-drivers, /api/closing-periods*),
+│   │             iam/, closing-period/ (Plugin: module, permissions, stores, schema, own drizzle/ migrations), engine/ (template-engine), erp/ (Plugin: module, drivers, clients, stores, secret-box, read-only-guard, migrations),
 │   │             db/ (drizzle schema, client, migrate), cli/ (create-admin, erp-query)
 │   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi), DataTable, forms, defineWebModule
 │   └── web/      (@platform/web)    SPA: modules.ts registry, pages IAMUsers/IAMRoles/ERPs/Login
 ├── docs/         adr/, conventions/, ideas/, agents/
-└── scripts/      check-ui-boundaries.mjs
+├── integrations/ Plugins por cliente (ver docs/conventions/plugins.md); fronteira checada por `pnpm check:plugins`
+└── scripts/      check-ui-boundaries.mjs, check-plugin-boundaries.mjs
 ```
 
 Migrations live in `packages/server/drizzle/`. The database is rebuilt module by module later.
@@ -43,7 +44,9 @@ Migrations live in `packages/server/drizzle/`. The database is rebuilt module by
 ```bash
 pnpm -r run build      # build all (server depends on shared and core via dist; pnpm -r orders them)
 pnpm test              # full Vitest suite
+pnpm test:db           # suite + integration tests (runner, stores) against a throwaway Docker Postgres (127.0.0.1, random port, removed at the end)
 pnpm check:ui          # UI boundary check
+pnpm check:plugins     # Plugin boundary check (integrations import only core and ui)
 pnpm --filter @platform/server test:watch
 ```
 
@@ -59,6 +62,7 @@ Building one package alone: build `@platform/shared` and `@platform/core` first.
 - **No credential leakage**: never return `passwordHash`; omit it from every `User` response.
 - **Zero SQL injection**: never concatenate user strings into SQL. All `{{...}}` tokens become bind parameters (`@p1`, `@p2`) via `TemplateEngine.parse()` (`engine/template-engine.ts`).
 - **Session (zero `localStorage`)**: the access token lives only in JS memory; the refresh token only in an `HttpOnly; SameSite=Lax; Path=/api/auth` cookie, handled with `getCookie`/`setCookie`/`deleteCookie` from `hono/cookie`. Never store tokens or credentials in `localStorage`/`sessionStorage`.
+- **Revocable sessions**: refresh tokens carry `ver`, the user's `session_version`; logout, password reset, deactivation, deletion and Role change bump it, so older refresh tokens are refused. Access tokens are stateless and stay valid up to 5 minutes after any of these (documented window, see `TokenService`). Administrator changes and the "last active Administrator" check run in one transaction with row locks (`PostgresUserStore`).
 
 ### Permissions
 - Every action and route requires an explicit permission string. Naming guidance: [docs/conventions/permissions.md](docs/conventions/permissions.md).
@@ -68,7 +72,7 @@ Building one package alone: build `@platform/shared` and `@platform/core` first.
 - **Administrator bypass (`isAdmin`)**: `users.is_admin = true` ignores the permission matrix; the auth middleware swaps the token's permissions for every key in `SYSTEM_PERMISSIONS` at request time, so `requirePermission` keeps working unchanged. Settable only via `UserStore.setAdmin`: by the `create-admin` CLI, or `PUT /api/iam/users/:id` with `isAdmin`, accepted only from a caller who is already admin (403 otherwise) and never lets an admin demote themselves (400). `POST /api/iam/users` ignores it. This is the single deliberate exception to least-privilege; grant sparingly.
 
 ### Domain
-- Every Workspace has `startDate` and `endDate` (`YYYY-MM-DD`); `POST /api/workspaces` takes `{ name, startDate, endDate }`. `end_date < start_date` → HTTP 400 `"A Data Final não pode ser anterior à Data Inicial."`.
+- A Closing Period is a contiguous range of dates (`startDate`/`endDate`, `YYYY-MM-DD`, any length); `POST /api/closing-periods` takes `{ name, startDate, endDate }` and needs `closing_period:period:create` (`GET` needs `closing_period:period:read`). `endDate < startDate` → HTTP 400 `"A Data Final não pode ser anterior à Data Inicial."`. A date belongs to at most one Closing Period (open or closed): a period sharing any date with another → HTTP 400. Unknown id → 404. Its migrations live in `packages/server/src/closing-period/drizzle` (generate with `drizzle-kit generate --config=drizzle.closing-period.config.ts --name=<descricao>`).
 
 ### UI
 Details in [docs/conventions/ui.md](docs/conventions/ui.md).

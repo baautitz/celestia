@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card";
 import { Button } from "../components/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../components/input-group";
@@ -56,6 +56,8 @@ export interface DataTableProps<TRow> {
   description?: string;
   emptyMessage?: string;
   rowActions?: (row: TRow) => React.ReactNode;
+  /** Detalhes da linha; quando informado, cada linha ganha um botão de expandir/recolher. */
+  renderExpanded?: (row: TRow) => React.ReactNode;
   actionsLabel?: string;
   actionsHeadClassName?: string;
   actionsSkeletonClassName?: string;
@@ -90,6 +92,7 @@ export function DataTable<TRow>({
   description,
   emptyMessage = "Nenhum registro encontrado.",
   rowActions,
+  renderExpanded,
   actionsLabel = "Ações",
   actionsHeadClassName = "text-right w-20",
   actionsSkeletonClassName = "h-8 w-8 ml-auto",
@@ -106,6 +109,29 @@ export function DataTable<TRow>({
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [clientPage, setClientPage] = useState(1);
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
+
+  const toggleExpanded = (id: string) =>
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  const expandButton = (row: TRow) => {
+    const id = getRowId(row);
+    const expanded = expandedIds.has(id);
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-expanded={expanded}
+        aria-label={expanded ? "Recolher linha" : "Expandir linha"}
+        onClick={() => toggleExpanded(id)}
+      >
+        <ChevronDown className={expanded ? "size-4" : "size-4 -rotate-90"} />
+      </Button>
+    );
+  };
 
   const text = (col: DataTableColumn<TRow>, row: TRow): string =>
     formatValue(col.value?.(row), col.format);
@@ -238,7 +264,17 @@ export function DataTable<TRow>({
                   primary={text(primaryCol, row)}
                   secondary={secondaryCol ? text(secondaryCol, row) : undefined}
                   fields={fieldCols.map((c) => ({ label: c.mobileLabel ?? c.label, value: cellContent(c, row) }))}
-                  actions={rowActions?.(row)}
+                  actions={
+                    renderExpanded ? (
+                      <>
+                        {expandButton(row)}
+                        {rowActions?.(row)}
+                      </>
+                    ) : (
+                      rowActions?.(row)
+                    )
+                  }
+                  details={renderExpanded && expandedIds.has(getRowId(row)) ? renderExpanded(row) : undefined}
                 />
               ))
             )}
@@ -246,10 +282,11 @@ export function DataTable<TRow>({
           </div>
         ) : (
           <>
-            <div className={bordered ? "overflow-x-auto border border-border" : undefined}>
+            <div className={bordered ? "border border-border" : undefined}>
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
+                    {renderExpanded && <TableHead className="w-12" />}
                     {columns.map((col) => (
                       <TableHead
                         key={col.key}
@@ -273,6 +310,7 @@ export function DataTable<TRow>({
                   {loading ? (
                     Array.from({ length: skeletonRows }).map((_, idx) => (
                       <TableRow key={idx}>
+                        {renderExpanded && <TableCell />}
                         {columns.map((c) => (
                           <TableCell key={c.key}>
                             <Skeleton className={c.skeletonClassName ?? "h-4 w-full"} />
@@ -288,26 +326,39 @@ export function DataTable<TRow>({
                   ) : visible.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={columns.length + (hasActions ? 1 : 0)}
+                        colSpan={columns.length + (hasActions ? 1 : 0) + (renderExpanded ? 1 : 0)}
                         className="text-center py-10 text-muted-foreground"
                       >
                         {emptyMessage}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    visible.map((row) => (
-                      <TableRow key={getRowId(row)} className="hover:bg-muted/30">
-                        {columns.map((col) => (
-                          <TableCell
-                            key={col.key}
-                            className={typeof col.cellClassName === "function" ? col.cellClassName(row) : col.cellClassName}
-                          >
-                            {cellContent(col, row)}
-                          </TableCell>
-                        ))}
-                        {hasActions && <TableCell className="text-right">{rowActions?.(row)}</TableCell>}
-                      </TableRow>
-                    ))
+                    visible.map((row) => {
+                      const expanded = renderExpanded !== undefined && expandedIds.has(getRowId(row));
+                      return (
+                        <React.Fragment key={getRowId(row)}>
+                          <TableRow className="hover:bg-muted/30">
+                            {renderExpanded && <TableCell>{expandButton(row)}</TableCell>}
+                            {columns.map((col) => (
+                              <TableCell
+                                key={col.key}
+                                className={typeof col.cellClassName === "function" ? col.cellClassName(row) : col.cellClassName}
+                              >
+                                {cellContent(col, row)}
+                              </TableCell>
+                            ))}
+                            {hasActions && <TableCell className="text-right">{rowActions?.(row)}</TableCell>}
+                          </TableRow>
+                          {expanded && (
+                            <TableRow>
+                              <TableCell colSpan={columns.length + (hasActions ? 1 : 0) + 1}>
+                                {renderExpanded(row)}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

@@ -1,0 +1,208 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "5dc81d93-3a31-4006-a36c-268397c68b96",
+  "prevIds": [
+    "a511a7aa-7043-41aa-ab5c-77a7a6ac05dd"
+  ],
+  "ddl": [
+    {
+      "name": "erp",
+      "entityType": "schemas"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "user_externals",
+      "entityType": "tables",
+      "schema": "erp"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "erps",
+      "entityType": "tables",
+      "schema": "erp"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "user_externals"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "erp_id",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "user_externals"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "values",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "user_externals"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "user_externals"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "erps"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "erps"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "driver",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "erps"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "config",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "erps"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "''",
+      "generated": null,
+      "identity": null,
+      "name": "secrets_encrypted",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "erps"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "erps"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "erp",
+      "table": "erps"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "erp_id"
+      ],
+      "schemaTo": "erp",
+      "tableTo": "erps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "user_externals_erp_id_erps_id_fkey",
+      "entityType": "fks",
+      "schema": "erp",
+      "table": "user_externals"
+    },
+    {
+      "columns": [
+        "user_id",
+        "erp_id"
+      ],
+      "nameExplicit": false,
+      "name": "user_externals_pkey",
+      "entityType": "pks",
+      "schema": "erp",
+      "table": "user_externals"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "erps_pkey",
+      "schema": "erp",
+      "table": "erps",
+      "entityType": "pks"
+    }
+  ],
+  "renames": []
+}

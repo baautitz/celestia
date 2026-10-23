@@ -1,14 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { count, eq, sql } from "drizzle-orm";
+import { and, count, eq, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CreateUserInput, Role, UpdateUserInput, User } from "@platform/shared";
 import { roles, users } from "../db/schema.js";
 import { PasswordService } from "./password-service.js";
 import { pruneOrphans } from "@platform/core/permissions";
-import type { UserStore } from "./user-store.js";
+import { LastAdminError, type UserStore } from "./user-store.js";
 
 type UserRow = typeof users.$inferSelect;
 type RoleRow = typeof roles.$inferSelect;
+type Tx = Parameters<Parameters<NodePgDatabase["transaction"]>[0]>[0];
 
 function toUser(row: UserRow, withHash = false): User {
   return {
@@ -16,9 +17,8 @@ function toUser(row: UserRow, withHash = false): User {
     fullname: row.fullname,
     username: row.username,
     email: row.email ?? undefined,
-    ...(withHash ? { passwordHash: row.passwordHash } : {}),
+    ...(withHash ? { passwordHash: row.passwordHash, sessionVersion: row.sessionVersion } : {}),
     roleId: row.roleId,
-    externals: row.externals,
     status: row.status,
     isAdmin: row.isAdmin,
     createdAt: row.createdAt.toISOString(),
@@ -74,52 +74,102 @@ export class PostgresUserStore implements UserStore {
         email: input.email,
         passwordHash: PasswordService.hash(input.password),
         roleId: input.roleId,
-        externals: input.externals || {},
       })
       .returning();
     return toUser(row!);
   }
 
   async updateUser(id: string, input: UpdateUserInput): Promise<User> {
-    const [user] = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
-    if (!user) throw new Error(`Usuário '${id}' não encontrado.`);
-
     if (input.roleId && !(await this.getRole(input.roleId))) {
       throw new Error(`Role '${input.roleId}' não encontrada.`);
     }
 
-    const [row] = await this.db
-      .update(users)
-      .set({
-        roleId: input.roleId || user.roleId,
-        fullname: input.fullname || user.fullname,
-        email: input.email || user.email,
-        status: input.status || user.status,
-        externals: input.externals ? { ...user.externals, ...input.externals } : user.externals,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, id))
-      .returning();
-    return toUser(row!);
+    return this.db.transaction(async (tx) => {
+      const user = await this.lockUser(tx, id);
+      const status = input.status ?? user.status;
+      const isAdmin = input.isAdmin ?? user.isAdmin;
+      await this.assertAdminRemains(tx, user, { isAdmin, status });
+      const revoke = (input.roleId !== undefined && input.roleId !== user.roleId) || (input.status === "inactive" && user.status !== "inactive");
+
+      const [row] = await tx
+        .update(users)
+        .set({
+          roleId: input.roleId || user.roleId,
+          fullname: input.fullname || user.fullname,
+          email: input.email || user.email,
+          status,
+          ...(input.isAdmin !== undefined ? { isAdmin: input.isAdmin } : {}),
+          ...(revoke ? { sessionVersion: sql`${users.sessionVersion} + 1` } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, id))
+        .returning();
+      return toUser(row!);
+    });
+  }
+
+  /**
+   * Trava as linhas dos Administrators ativos (em ordem de id, sem deadlock) e recusa a mudança se `user`
+   * deixaria de ser Administrator ativo sendo o último. Transações concorrentes se serializam aqui.
+   */
+  private async assertAdminRemains(
+    tx: Tx,
+    user: UserRow,
+    after: { isAdmin: boolean; status: "active" | "inactive" },
+  ): Promise<void> {
+    if (!(user.isAdmin && user.status === "active") || (after.isAdmin && after.status === "active")) return;
+    const active = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.isAdmin, true), eq(users.status, "active")))
+      .orderBy(users.id)
+      .for("update");
+    if (!active.some((a) => a.id !== user.id)) throw new LastAdminError();
+  }
+
+  /**
+   * Trava, numa só consulta ordenada por id (sem deadlock), a linha do usuário e as dos Administrators ativos,
+   * e devolve o usuário já lido sob o lock.
+   */
+  private async lockUser(tx: Tx, id: string): Promise<UserRow> {
+    const locked = await tx
+      .select()
+      .from(users)
+      .where(or(eq(users.id, id), and(eq(users.isAdmin, true), eq(users.status, "active"))))
+      .orderBy(users.id)
+      .for("update");
+    const row = locked.find((u) => u.id === id);
+    if (!row) throw new Error(`Usuário '${id}' não encontrado.`);
+    return row;
   }
 
   async resetPassword(id: string, newPasswordHash: string): Promise<void> {
     const updated = await this.db
       .update(users)
-      .set({ passwordHash: newPasswordHash, updatedAt: new Date() })
+      .set({ passwordHash: newPasswordHash, sessionVersion: sql`${users.sessionVersion} + 1`, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning({ id: users.id });
     if (updated.length === 0) throw new Error(`Usuário '${id}' não encontrado.`);
   }
 
+  async revokeSessions(id: string): Promise<void> {
+    await this.db.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, id));
+  }
+
   async deleteUser(id: string): Promise<void> {
-    const deleted = await this.db.delete(users).where(eq(users.id, id)).returning({ id: users.id });
-    if (deleted.length === 0) throw new Error(`Usuário '${id}' não encontrado.`);
+    await this.db.transaction(async (tx) => {
+      const user = await this.lockUser(tx, id);
+      await this.assertAdminRemains(tx, user, { isAdmin: false, status: "inactive" });
+      await tx.delete(users).where(eq(users.id, id));
+    });
   }
 
   async setAdmin(id: string, isAdmin: boolean): Promise<void> {
-    const updated = await this.db.update(users).set({ isAdmin }).where(eq(users.id, id)).returning({ id: users.id });
-    if (updated.length === 0) throw new Error(`Usuário '${id}' não encontrado.`);
+    await this.db.transaction(async (tx) => {
+      const user = await this.lockUser(tx, id);
+      await this.assertAdminRemains(tx, user, { isAdmin, status: user.status });
+      await tx.update(users).set({ isAdmin }).where(eq(users.id, id));
+    });
   }
 
   async listRoles(): Promise<Role[]> {

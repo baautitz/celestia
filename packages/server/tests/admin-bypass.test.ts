@@ -23,7 +23,7 @@ describe("Flag isAdmin (bypass de permissões)", () => {
   beforeEach(async () => {
     // Os dois usuários têm um grupo SEM nenhuma permissão; só um deles é admin.
     const hash = PasswordService.hash(TEST_PASSWORD);
-    const base = { fullname: "x", passwordHash: hash, roleId: "role_vazio", externals: {}, status: "active" as const, createdAt: new Date().toISOString() };
+    const base = { fullname: "x", passwordHash: hash, roleId: "role_vazio", status: "active" as const, createdAt: new Date().toISOString() };
     store = new MemoryUserStore({
       roles: [
         { id: "role_vazio", name: "Vazio", permissions: [] },
@@ -45,8 +45,8 @@ describe("Flag isAdmin (bypass de permissões)", () => {
 
     expect((await call("/api/iam/users", admin.access_token)).status).toBe(200);
     expect((await call("/api/iam/users", comum.access_token)).status).toBe(403);
-    expect((await call("/api/admin/connections", admin.access_token)).status).toBe(200);
-    expect((await call("/api/admin/connections", comum.access_token)).status).toBe(403);
+    expect((await call("/api/admin/erps", admin.access_token)).status).toBe(200);
+    expect((await call("/api/admin/erps", comum.access_token)).status).toBe(403);
   });
 
   it("o token do admin carrega todas as chaves do sistema", async () => {
@@ -60,7 +60,7 @@ describe("Flag isAdmin (bypass de permissões)", () => {
 
   it("o login já devolve as permissões expandidas ao frontend", async () => {
     const admin = await login("chefe");
-    expect(admin.user.permissions).toContain("system:sources:manage");
+    expect(admin.user.permissions).toContain("system:erps:manage");
     expect((await login("comum")).user.permissions).toEqual([]);
   });
 

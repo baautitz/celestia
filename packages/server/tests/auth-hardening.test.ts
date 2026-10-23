@@ -6,9 +6,7 @@ import { canGrant, grantDeniedMessage, missingGrants } from "../src/iam/can-gran
 import { SYSTEM_PERMISSION_KEYS } from "../src/iam/system-permissions.js";
 import { hasPermission } from "../src/iam/has-permission.js";
 import { PasswordService } from "../src/iam/password-service.js";
-import { authHeader, createSeededUserStore, seededWorkspaces, TEST_PASSWORD } from "./helpers/fixtures.js";
-
-const WS = "ws_fechamento_jan_2026";
+import { authHeader, createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 describe("hardening de auth: permissão ausente falha fechado", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -17,33 +15,28 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
 
   beforeAll(async () => {
     const userStore = createSeededUserStore();
-    await userStore.createRole({ id: "role_so_leitura", name: "Só leitura", description: "d", permissions: ["system:workspaces:read"] });
-    await userStore.createUser({ fullname: "Teste Usuario", username: "sem.view", password: TEST_PASSWORD, roleId: "role_so_leitura", externals: {} });
-    app = createPlatformApp({
-      userStore,
-      workspaces: seededWorkspaces.map((w) => ({ ...w })),
-    });
+    await userStore.createRole({ id: "role_so_leitura", name: "Só leitura", description: "d", permissions: ["closing_period:period:read"] });
+    await userStore.createUser({ fullname: "Teste Usuario", username: "sem.view", password: TEST_PASSWORD, roleId: "role_so_leitura" });
+    app = createPlatformApp({ userStore });
     // Criado após o boot: o sync de órfãs remove "*" de roles existentes na inicialização.
     await userStore.createRole({ id: "role_curinga", name: "Curinga", description: "d", permissions: ["*"] });
-    await userStore.createUser({ fullname: "Teste Usuario", username: "cur.inga", password: TEST_PASSWORD, roleId: "role_curinga", externals: {} });
+    await userStore.createUser({ fullname: "Teste Usuario", username: "cur.inga", password: TEST_PASSWORD, roleId: "role_curinga" });
     semView = await authHeader(app, "sem.view");
     curinga = await authHeader(app, "cur.inga");
   });
 
-  it("sem permissão: mutações de workspace respondem 403; sem token, 401", async () => {
+  it("sem permissão: criar Closing Period responde 403; sem token, 401", async () => {
     const send = (method: string, path: string, headers: Record<string, string> = {}, body?: object) =>
       app.request(path, { method, headers: { "Content-Type": "application/json", ...headers }, body: body ? JSON.stringify(body) : undefined });
     const novo = { name: "Nova", startDate: "2026-02-01", endDate: "2026-02-28" };
-    expect((await send("POST", "/api/workspaces", semView, novo)).status).toBe(403);
-    expect((await send("POST", `/api/workspaces/${WS}/conclude`, semView)).status).toBe(403);
-    expect((await send("DELETE", `/api/workspaces/${WS}`, semView)).status).toBe(403);
-    expect((await send("GET", "/api/workspaces")).status).toBe(401);
-    expect((await send("POST", "/api/workspaces", {}, novo)).status).toBe(401);
+    expect((await send("POST", "/api/closing-periods", semView, novo)).status).toBe(403);
+    expect((await send("GET", "/api/closing-periods")).status).toBe(401);
+    expect((await send("POST", "/api/closing-periods", {}, novo)).status).toBe(401);
   });
 
-  it("curinga '*' não-admin acessa rotas system:* e workspaces", async () => {
+  it("curinga '*' não-admin acessa rotas system:* e Closing Periods", async () => {
     expect((await app.request("/api/iam/users", { headers: curinga })).status).toBe(200);
-    expect((await app.request("/api/workspaces", { headers: curinga })).status).toBe(200);
+    expect((await app.request("/api/closing-periods", { headers: curinga })).status).toBe(200);
   });
 
   it("role com '*' mantém o curinga após o sync de órfãs", async () => {
@@ -68,7 +61,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     beforeAll(async () => {
       const store = createSeededUserStore({ admin: true });
       await store.createRole({ id: "role_gestor", name: "Gestor", description: "d", permissions: ["system:roles:create", "system:roles:update", "system:roles:read"] });
-      await store.createUser({ fullname: "Gestor Roles", username: "gestor.roles", password: TEST_PASSWORD, roleId: "role_gestor", externals: {} });
+      await store.createUser({ fullname: "Gestor Roles", username: "gestor.roles", password: TEST_PASSWORD, roleId: "role_gestor" });
       app = createPlatformApp({ userStore: store });
       gestor = await authHeader(app, "gestor.roles");
       admin = await authHeader(app, "test.root");
@@ -104,7 +97,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     let alvoAdminId = "";
     const send = (method: string, path: string, headers: Record<string, string>, body: object) =>
       app.request(path, { method, headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
-    const newUser = (username: string, roleId: string) => ({ fullname: "Novo Usuario", username, password: "Senha@456", roleId, externals: {} });
+    const newUser = (username: string, roleId: string) => ({ fullname: "Novo Usuario", username, password: "Senha@456", roleId });
 
     beforeAll(async () => {
       const store = createSeededUserStore({ admin: true });
@@ -115,9 +108,9 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
         permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:users:delete", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read"],
       });
       await store.createRole({ id: "role_pequeno", name: "Pequeno", description: "d", permissions: ["system:users:read"] });
-      await store.createUser({ fullname: "Gestor Grants", username: "gestor.grants", password: TEST_PASSWORD, roleId: "role_gestor", externals: {} });
-      const comum = await store.createUser({ fullname: "Alvo Comum", username: "alvo.comum", password: TEST_PASSWORD, roleId: "role_pequeno", externals: {} });
-      const alvoAdmin = await store.createUser({ fullname: "Alvo Admin", username: "alvo.admin", password: TEST_PASSWORD, roleId: "role_pequeno", externals: {} });
+      await store.createUser({ fullname: "Gestor Grants", username: "gestor.grants", password: TEST_PASSWORD, roleId: "role_gestor" });
+      const comum = await store.createUser({ fullname: "Alvo Comum", username: "alvo.comum", password: TEST_PASSWORD, roleId: "role_pequeno" });
+      const alvoAdmin = await store.createUser({ fullname: "Alvo Admin", username: "alvo.admin", password: TEST_PASSWORD, roleId: "role_pequeno" });
       await store.setAdmin(alvoAdmin.id, true);
       alvoComumId = comum.id;
       alvoAdminId = alvoAdmin.id;
@@ -125,7 +118,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       gestor = await authHeader(app, "gestor.grants");
       admin = await authHeader(app, "test.root");
       await store.createRole({ id: "role_total", name: "Total", description: "d", permissions: ["*"] });
-      await store.createUser({ fullname: "Coringa Geral", username: "coringa.geral", password: TEST_PASSWORD, roleId: "role_total", externals: {} });
+      await store.createUser({ fullname: "Coringa Geral", username: "coringa.geral", password: TEST_PASSWORD, roleId: "role_total" });
       coringa = await authHeader(app, "coringa.geral");
     });
 
@@ -144,9 +137,9 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     });
 
     it("POST role: só com chaves que possui; PUT role: só adicionar o que possui, remover é livre", async () => {
-      expect((await send("POST", "/api/iam/roles", gestor, { id: "role_g1", name: "G Um", permissions: ["system:sources:manage"] })).status).toBe(403);
+      expect((await send("POST", "/api/iam/roles", gestor, { id: "role_g1", name: "G Um", permissions: ["system:erps:manage"] })).status).toBe(403);
       expect((await send("POST", "/api/iam/roles", gestor, { id: "role_g2", name: "G Dois", permissions: ["system:users:read"] })).status).toBe(201);
-      expect((await send("PUT", "/api/iam/roles/role_gestor", gestor, { permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read", "system:sources:manage"] })).status).toBe(403);
+      expect((await send("PUT", "/api/iam/roles/role_gestor", gestor, { permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read", "system:erps:manage"] })).status).toBe(403);
       expect((await send("PUT", "/api/iam/roles/role_g2", gestor, { permissions: [] })).status).toBe(200);
       expect((await send("PUT", "/api/iam/roles/role_g2", gestor, { name: "Renomeado" })).status).toBe(200);
     });
@@ -178,7 +171,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect(denied.status).toBe(403);
       expect(((await denied.json()) as { error: string }).error).toBe("Somente administradores podem excluir ou inativar outro administrador.");
       expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, { status: "inactive" })).status).toBe(403);
-      for (const patch of [{ fullname: "Outro Nome" }, { email: "x@y.com" }, { externals: { sap: 1 } }, { roleId: "role_pequeno" }]) {
+      for (const patch of [{ fullname: "Outro Nome" }, { email: "x@y.com" }, { roleId: "role_pequeno" }]) {
         const res = await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, patch);
         expect(res.status).toBe(403);
         expect(((await res.json()) as { error: string }).error).toBe("Somente administradores podem alterar outro administrador.");
@@ -207,7 +200,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     beforeAll(async () => {
       const store = createSeededUserStore({ admin: true });
       await store.createRole({ id: "role_del", name: "Del", description: "d", permissions: ["system:users:delete", "system:users:update"] });
-      const g = await store.createUser({ fullname: "Gestor Del", username: "gestor.del", password: TEST_PASSWORD, roleId: "role_del", externals: {} });
+      const g = await store.createUser({ fullname: "Gestor Del", username: "gestor.del", password: TEST_PASSWORD, roleId: "role_del" });
       gerId = g.id;
       app = createPlatformApp({ userStore: store });
       ger = await authHeader(app, "gestor.del");
@@ -231,13 +224,13 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
   });
 
   describe("refresh relê o usuário do store", () => {
-    it("inativado ou excluído não renova; mudança de role vale após o refresh", async () => {
+    it("inativado ou excluído não renova; troca de role revoga o refresh e vale após novo login", async () => {
       const store = createSeededUserStore();
       await store.createRole({ id: "role_r1", name: "R Um", description: "d", permissions: ["system:users:read"] });
       await store.createRole({ id: "role_r2", name: "R Dois", description: "d", permissions: ["system:roles:read"] });
-      const a = await store.createUser({ fullname: "Usuario Um", username: "refresh.um", password: TEST_PASSWORD, roleId: "role_r1", externals: {} });
-      const b = await store.createUser({ fullname: "Usuario Dois", username: "refresh.dois", password: TEST_PASSWORD, roleId: "role_r1", externals: {} });
-      const c = await store.createUser({ fullname: "Usuario Tres", username: "refresh.tres", password: TEST_PASSWORD, roleId: "role_r1", externals: {} });
+      const a = await store.createUser({ fullname: "Usuario Um", username: "refresh.um", password: TEST_PASSWORD, roleId: "role_r1" });
+      const b = await store.createUser({ fullname: "Usuario Dois", username: "refresh.dois", password: TEST_PASSWORD, roleId: "role_r1" });
+      const c = await store.createUser({ fullname: "Usuario Tres", username: "refresh.tres", password: TEST_PASSWORD, roleId: "role_r1" });
       const local = createPlatformApp({ userStore: store });
       const login = async (username: string) => {
         const res = await local.request("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password: TEST_PASSWORD }) });
@@ -253,7 +246,8 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       await store.updateUser(c.id, { roleId: "role_r2" });
       expect((await refresh(ra)).status).toBe(401);
       expect((await refresh(rb)).status).toBe(401);
-      const ok = await refresh(rc);
+      expect((await refresh(rc)).status).toBe(401);
+      const ok = await refresh(await login("refresh.tres"));
       expect(ok.status).toBe(200);
       const body = (await ok.json()) as { user: { permissions: string[] } };
       expect(body.user.permissions).toEqual(["system:roles:read"]);
@@ -288,55 +282,10 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     });
   });
 
-  describe("Áreas de Trabalho: datas e permissões", () => {
-    let semView: Record<string, string>;
-
-    beforeAll(async () => {
-      const store = createSeededUserStore();
-      await store.createRole({ id: "role_cria", name: "Cria", description: "d", permissions: ["system:workspaces:create"] });
-      await store.createUser({ fullname: "Cria Sem Close", username: "cria.semclose", password: TEST_PASSWORD, roleId: "role_cria", externals: {} });
-      app = createPlatformApp({ userStore: store, workspaces: seededWorkspaces.map((w) => ({ ...w })) });
-      semView = await authHeader(app, "cria.semclose");
-    });
-
-    it("datas de workspace: YYYY-MM-DD estrito no POST e no PUT", async () => {
-      const gerente = await authHeader(app, "carlos.admin");
-      const put = (body: object) =>
-        app.request(`/api/workspaces/${WS}`, { method: "PUT", headers: { "Content-Type": "application/json", ...gerente }, body: JSON.stringify(body) });
-      expect((await put({ startDate: "abc" })).status).toBe(400);
-      expect((await put({ endDate: "2026-02-30" })).status).toBe(400);
-      expect((await put({ endDate: "2025-01-01" })).status).toBe(400);
-      const post = await app.request("/api/workspaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...gerente },
-        body: JSON.stringify({ name: "Fev", startDate: "01/02/2026", endDate: "2026-02-28" }),
-      });
-      expect(post.status).toBe(400);
-      expect((await put({ endDate: "2026-02-10" })).status).toBe(200);
-    });
-
-    it("conclude e reopen exigem close/reopen; só create não basta", async () => {
-      for (const action of ["conclude", "reopen"]) {
-        const res = await app.request(`/api/workspaces/${WS}/${action}`, { method: "POST", headers: semView });
-        expect(res.status).toBe(403);
-      }
-    });
-
-    it("criar exige só system:workspaces:create e o corpo não tem recipeId", async () => {
-      const res = await app.request("/api/workspaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...semView },
-        body: JSON.stringify({ name: "Fev", startDate: "2026-02-01", endDate: "2026-02-28" }),
-      });
-      expect(res.status).toBe(201);
-      expect(((await res.json()) as { recipeId?: string }).recipeId).toBeUndefined();
-    });
-  });
-
   describe("login sem enumeração de usuários", () => {
     it("mensagem única e hash verificado mesmo para usuário inexistente", async () => {
       const store = createSeededUserStore();
-      const inativo = await store.createUser({ fullname: "Usuario Inativo", username: "usuario.inativo", password: TEST_PASSWORD, roleId: "role_vendedor", externals: {} });
+      const inativo = await store.createUser({ fullname: "Usuario Inativo", username: "usuario.inativo", password: TEST_PASSWORD, roleId: "role_vendedor" });
       await store.updateUser(inativo.id, { status: "inactive" });
       const local = createPlatformApp({ userStore: store });
       const spy = vi.spyOn(PasswordService, "verify");
@@ -362,7 +311,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
   describe("ids", () => {
     it("usuários criados no mesmo instante têm ids distintos (usr_ + uuid)", async () => {
       const store = createSeededUserStore();
-      const input = { fullname: "Usuario Id", password: TEST_PASSWORD, roleId: "role_vendedor", externals: {} };
+      const input = { fullname: "Usuario Id", password: TEST_PASSWORD, roleId: "role_vendedor" };
       const a = await store.createUser({ ...input, username: "id.um" });
       const b = await store.createUser({ ...input, username: "id.dois" });
       expect(a.id).toMatch(/^usr_[0-9a-f-]{36}$/);

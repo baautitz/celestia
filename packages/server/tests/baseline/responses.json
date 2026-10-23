@@ -31,19 +31,15 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
-          "system:sources:manage",
-          "system:audit:read"
+          "system:erps:manage",
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:update",
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ],
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "iat": 1773144000,
         "exp": 1773144300
       }
@@ -107,17 +103,17 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
-          "system:sources:manage",
-          "system:audit:read"
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:update",
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel",
+          "system:erps:manage",
+          "example:note:read"
         ],
         "isAdmin": true,
-        "externals": {},
         "iat": 1773144000,
         "exp": 1773144300
       }
@@ -149,19 +145,15 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
-          "system:sources:manage",
-          "system:audit:read"
+          "system:erps:manage",
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:update",
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ],
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "iat": 1773144000,
         "exp": 1773144300
       }
@@ -193,19 +185,15 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
-          "system:sources:manage",
-          "system:audit:read"
+          "system:erps:manage",
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:update",
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ],
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "iat": 1773144000,
         "exp": 1773144300
       }
@@ -256,19 +244,15 @@
         "system:roles:read",
         "system:roles:update",
         "system:roles:delete",
-        "system:workspaces:create",
-        "system:workspaces:read",
-        "system:workspaces:update",
-        "system:workspaces:delete",
-        "system:workspaces:close",
-        "system:workspaces:reopen",
-        "system:sources:manage",
-        "system:audit:read"
+        "system:erps:manage",
+        "system:audit:read",
+        "closing_period:period:read",
+        "closing_period:period:update",
+        "closing_period:period:create",
+        "closing_period:period:close",
+        "closing_period:period:reopen",
+        "closing_period:period:cancel"
       ],
-      "externals": {
-        "inovafarma": 1,
-        "sap": 9001
-      },
       "iat": 1773144000,
       "exp": 1773144300
     }
@@ -291,17 +275,17 @@
         "system:roles:read",
         "system:roles:update",
         "system:roles:delete",
-        "system:workspaces:create",
-        "system:workspaces:read",
-        "system:workspaces:update",
-        "system:workspaces:delete",
-        "system:workspaces:close",
-        "system:workspaces:reopen",
-        "system:sources:manage",
-        "system:audit:read"
+        "system:audit:read",
+        "closing_period:period:read",
+        "closing_period:period:update",
+        "closing_period:period:create",
+        "closing_period:period:close",
+        "closing_period:period:reopen",
+        "closing_period:period:cancel",
+        "system:erps:manage",
+        "example:note:read"
       ],
       "isAdmin": true,
-      "externals": {},
       "iat": 1773144000,
       "exp": 1773144300
     }
@@ -338,7 +322,7 @@
           {
             "key": "system:users:update",
             "label": "Editar Usuários",
-            "description": "Permite alterar nome, cargo e mapeamento de IDs de ERP (externals) de usuários.",
+            "description": "Permite alterar nome, perfil de acesso e dados cadastrais de usuários.",
             "module": "users"
           },
           {
@@ -380,64 +364,73 @@
             "module": "roles"
           }
         ],
-        "workspaces": [
-          {
-            "key": "system:workspaces:create",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho.",
-            "label": "Criar Áreas de Trabalho",
-            "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:read",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho.",
-            "label": "Visualizar Áreas de Trabalho",
-            "description": "Permite listar e abrir áreas de trabalho e consultar seus dados persistidos.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:update",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho.",
-            "label": "Editar Áreas de Trabalho",
-            "description": "Permite alterar o título, o período e os parâmetros de áreas de trabalho existentes.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:delete",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete).",
-            "label": "Excluir Áreas de Trabalho",
-            "description": "Permite excluir instâncias de áreas de trabalho.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:close",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho.",
-            "label": "Concluir/Travar Áreas de Trabalho",
-            "description": "Permite finalizar e travar áreas de trabalho contra novas edições.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:reopen",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen).",
-            "label": "Reabrir Áreas de Trabalho",
-            "description": "Permite reabrir áreas de trabalho concluídas para novas edições e ações.",
-            "module": "workspaces"
-          }
-        ],
-        "sources": [
-          {
-            "key": "system:sources:manage",
-            "label": "Gerenciar Fontes de Dados",
-            "description": "Permite configurar e testar conexões com ERPs externos (SQL Server, Postgres).",
-            "module": "sources"
-          }
-        ],
         "audit": [
           {
             "key": "system:audit:read",
             "label": "Consultar Logs de Auditoria",
             "description": "Permite visualizar o histórico de mutações e ações disparadas na plataforma.",
             "module": "audit"
+          }
+        ],
+        "closing_period": [
+          {
+            "key": "closing_period:period:read",
+            "label": "Visualizar Períodos de Fechamento",
+            "description": "Permite listar e abrir Períodos de Fechamento.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:update",
+            "label": "Editar a faixa de Períodos de Fechamento",
+            "description": "Permite ampliar ou reduzir a faixa de datas de um Período de Fechamento aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para editar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:create",
+            "label": "Criar Períodos de Fechamento",
+            "description": "Permite criar um Período de Fechamento com data inicial e final.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:close",
+            "label": "Fechar Períodos de Fechamento",
+            "description": "Permite fechar um Período de Fechamento aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para fechar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:reopen",
+            "label": "Reabrir Períodos de Fechamento",
+            "description": "Permite reabrir um Período de Fechamento fechado.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para reabrir Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:cancel",
+            "label": "Cancelar Períodos de Fechamento",
+            "description": "Permite cancelar um Período de Fechamento aberto, removendo-o e liberando as datas.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para cancelar Períodos de Fechamento.",
+            "module": "closing_period"
+          }
+        ],
+        "erps": [
+          {
+            "key": "system:erps:manage",
+            "label": "Gerenciar ERPs",
+            "description": "Permite cadastrar, editar, testar e remover ERPs (SQL Server) e seus dados de acesso.",
+            "module": "erps"
+          }
+        ],
+        "example": [
+          {
+            "key": "example:note:read",
+            "label": "Visualizar o Plugin de exemplo",
+            "description": "Permite abrir a tela e chamar a rota do Plugin de exemplo.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o Plugin de exemplo.",
+            "module": "example"
           }
         ]
       }
@@ -478,7 +471,7 @@
           {
             "key": "system:users:update",
             "label": "Editar Usuários",
-            "description": "Permite alterar nome, cargo e mapeamento de IDs de ERP (externals) de usuários.",
+            "description": "Permite alterar nome, perfil de acesso e dados cadastrais de usuários.",
             "module": "users"
           },
           {
@@ -520,58 +513,6 @@
             "module": "roles"
           }
         ],
-        "workspaces": [
-          {
-            "key": "system:workspaces:create",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho.",
-            "label": "Criar Áreas de Trabalho",
-            "description": "Permite instanciar uma nova área de trabalho a partir de um Modelo.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:read",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho.",
-            "label": "Visualizar Áreas de Trabalho",
-            "description": "Permite listar e abrir áreas de trabalho e consultar seus dados persistidos.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:update",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho.",
-            "label": "Editar Áreas de Trabalho",
-            "description": "Permite alterar o título, o período e os parâmetros de áreas de trabalho existentes.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:delete",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete).",
-            "label": "Excluir Áreas de Trabalho",
-            "description": "Permite excluir instâncias de áreas de trabalho.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:close",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho.",
-            "label": "Concluir/Travar Áreas de Trabalho",
-            "description": "Permite finalizar e travar áreas de trabalho contra novas edições.",
-            "module": "workspaces"
-          },
-          {
-            "key": "system:workspaces:reopen",
-            "deniedMessage": "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen).",
-            "label": "Reabrir Áreas de Trabalho",
-            "description": "Permite reabrir áreas de trabalho concluídas para novas edições e ações.",
-            "module": "workspaces"
-          }
-        ],
-        "sources": [
-          {
-            "key": "system:sources:manage",
-            "label": "Gerenciar Fontes de Dados",
-            "description": "Permite configurar e testar conexões com ERPs externos (SQL Server, Postgres).",
-            "module": "sources"
-          }
-        ],
         "audit": [
           {
             "key": "system:audit:read",
@@ -579,32 +520,70 @@
             "description": "Permite visualizar o histórico de mutações e ações disparadas na plataforma.",
             "module": "audit"
           }
+        ],
+        "closing_period": [
+          {
+            "key": "closing_period:period:read",
+            "label": "Visualizar Períodos de Fechamento",
+            "description": "Permite listar e abrir Períodos de Fechamento.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:update",
+            "label": "Editar a faixa de Períodos de Fechamento",
+            "description": "Permite ampliar ou reduzir a faixa de datas de um Período de Fechamento aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para editar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:create",
+            "label": "Criar Períodos de Fechamento",
+            "description": "Permite criar um Período de Fechamento com data inicial e final.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para criar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:close",
+            "label": "Fechar Períodos de Fechamento",
+            "description": "Permite fechar um Período de Fechamento aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para fechar Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:reopen",
+            "label": "Reabrir Períodos de Fechamento",
+            "description": "Permite reabrir um Período de Fechamento fechado.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para reabrir Períodos de Fechamento.",
+            "module": "closing_period"
+          },
+          {
+            "key": "closing_period:period:cancel",
+            "label": "Cancelar Períodos de Fechamento",
+            "description": "Permite cancelar um Período de Fechamento aberto, removendo-o e liberando as datas.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para cancelar Períodos de Fechamento.",
+            "module": "closing_period"
+          }
+        ],
+        "erps": [
+          {
+            "key": "system:erps:manage",
+            "label": "Gerenciar ERPs",
+            "description": "Permite cadastrar, editar, testar e remover ERPs (SQL Server) e seus dados de acesso.",
+            "module": "erps"
+          }
+        ],
+        "example": [
+          {
+            "key": "example:note:read",
+            "label": "Visualizar o Plugin de exemplo",
+            "description": "Permite abrir a tela e chamar a rota do Plugin de exemplo.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o Plugin de exemplo.",
+            "module": "example"
+          }
         ]
       }
     }
-  },
-  "iam.sources.ok": {
-    "status": 200,
-    "body": []
-  },
-  "iam.sources.401": {
-    "status": 401,
-    "body": {
-      "error": "Não autenticado: token de acesso não fornecido."
-    }
-  },
-  "iam.sources.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: permissões insuficientes.",
-      "required": [
-        "system:users:read"
-      ]
-    }
-  },
-  "iam.sources.admin_bypass": {
-    "status": 200,
-    "body": []
   },
   "iam.users.ok": {
     "status": 200,
@@ -615,10 +594,6 @@
         "username": "carlos.admin",
         "email": "carlos@farmacia.com.br",
         "roleId": "role_admin",
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -628,10 +603,6 @@
         "username": "joao.silva",
         "email": "joao.silva@farmacia.com.br",
         "roleId": "role_vendedor",
-        "externals": {
-          "inovafarma": 42,
-          "sap": 9042
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -641,10 +612,6 @@
         "username": "maria.souza",
         "email": "maria.souza@farmacia.com.br",
         "roleId": "role_operador",
-        "externals": {
-          "inovafarma": 99,
-          "sap": 9099
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -653,7 +620,6 @@
         "fullname": "Root Admin",
         "username": "root.admin",
         "roleId": "role_vendedor",
-        "externals": {},
         "status": "active",
         "createdAt": "<ts>",
         "isAdmin": true
@@ -684,10 +650,6 @@
         "username": "carlos.admin",
         "email": "carlos@farmacia.com.br",
         "roleId": "role_admin",
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -697,10 +659,6 @@
         "username": "joao.silva",
         "email": "joao.silva@farmacia.com.br",
         "roleId": "role_vendedor",
-        "externals": {
-          "inovafarma": 42,
-          "sap": 9042
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -710,10 +668,6 @@
         "username": "maria.souza",
         "email": "maria.souza@farmacia.com.br",
         "roleId": "role_operador",
-        "externals": {
-          "inovafarma": 99,
-          "sap": 9099
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -722,7 +676,6 @@
         "fullname": "Root Admin",
         "username": "root.admin",
         "roleId": "role_vendedor",
-        "externals": {},
         "status": "active",
         "createdAt": "<ts>",
         "isAdmin": true
@@ -735,7 +688,7 @@
       {
         "id": "role_admin",
         "name": "Administrador",
-        "description": "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
+        "description": "Acesso total à plataforma, gestão de usuários e gestão de Períodos de Fechamento.",
         "permissions": [
           "system:users:create",
           "system:users:read",
@@ -746,24 +699,23 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
-          "system:sources:manage",
-          "system:audit:read"
+          "system:erps:manage",
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:update",
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ]
       },
       {
         "id": "role_operador",
         "name": "Operador de Fechamento",
-        "description": "Cria e conclui áreas de trabalho.",
+        "description": "Visualiza e cria Períodos de Fechamento.",
         "permissions": [
-          "system:workspaces:read",
-          "system:workspaces:create",
-          "system:workspaces:close"
+          "closing_period:period:read",
+          "closing_period:period:create"
         ]
       },
       {
@@ -795,7 +747,7 @@
       {
         "id": "role_admin",
         "name": "Administrador",
-        "description": "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
+        "description": "Acesso total à plataforma, gestão de usuários e gestão de Períodos de Fechamento.",
         "permissions": [
           "system:users:create",
           "system:users:read",
@@ -806,24 +758,23 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
-          "system:sources:manage",
-          "system:audit:read"
+          "system:erps:manage",
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:update",
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ]
       },
       {
         "id": "role_operador",
         "name": "Operador de Fechamento",
-        "description": "Cria e conclui áreas de trabalho.",
+        "description": "Visualiza e cria Períodos de Fechamento.",
         "permissions": [
-          "system:workspaces:read",
-          "system:workspaces:create",
-          "system:workspaces:close"
+          "closing_period:period:read",
+          "closing_period:period:create"
         ]
       },
       {
@@ -924,9 +875,6 @@
       "fullname": "Novo Usuario",
       "username": "novo.user",
       "roleId": "role_vendedor",
-      "externals": {
-        "inovafarma": 7
-      },
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -950,9 +898,6 @@
       "fullname": "Novo Usuario",
       "username": "novo.root",
       "roleId": "role_vendedor",
-      "externals": {
-        "inovafarma": 7
-      },
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -980,9 +925,6 @@
       "username": "novo.user",
       "email": "a@b.com",
       "roleId": "role_vendedor",
-      "externals": {
-        "inovafarma": 7
-      },
       "status": "inactive",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
@@ -1031,9 +973,6 @@
       "username": "novo.user",
       "email": "a@b.com",
       "roleId": "role_vendedor",
-      "externals": {
-        "inovafarma": 7
-      },
       "status": "inactive",
       "createdAt": "<ts>",
       "updatedAt": "<ts>",
@@ -1175,10 +1114,6 @@
         "username": "carlos.admin",
         "email": "carlos@farmacia.com.br",
         "roleId": "role_admin",
-        "externals": {
-          "inovafarma": 1,
-          "sap": 9001
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -1188,10 +1123,6 @@
         "username": "joao.silva",
         "email": "joao.silva@farmacia.com.br",
         "roleId": "role_vendedor",
-        "externals": {
-          "inovafarma": 42,
-          "sap": 9042
-        },
         "status": "active",
         "createdAt": "<ts>",
         "updatedAt": "<ts>"
@@ -1202,10 +1133,6 @@
         "username": "maria.souza",
         "email": "maria.souza@farmacia.com.br",
         "roleId": "role_operador",
-        "externals": {
-          "inovafarma": 99,
-          "sap": 9099
-        },
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -1214,7 +1141,6 @@
         "fullname": "Root Admin",
         "username": "root.admin",
         "roleId": "role_vendedor",
-        "externals": {},
         "status": "active",
         "createdAt": "<ts>",
         "isAdmin": true
@@ -1224,9 +1150,6 @@
         "fullname": "Novo Usuario",
         "username": "novo.root",
         "roleId": "role_vendedor",
-        "externals": {
-          "inovafarma": 7
-        },
         "status": "active",
         "createdAt": "<ts>"
       }
@@ -1283,7 +1206,7 @@
       "description": "d",
       "permissions": [
         "system:users:read",
-        "system:workspaces:read"
+        "closing_period:period:read"
       ]
     }
   },
@@ -1371,7 +1294,7 @@
       {
         "id": "role_admin",
         "name": "Administrador",
-        "description": "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
+        "description": "Acesso total à plataforma, gestão de usuários e gestão de Períodos de Fechamento.",
         "permissions": [
           "system:users:create",
           "system:users:read",
@@ -1382,24 +1305,23 @@
           "system:roles:read",
           "system:roles:update",
           "system:roles:delete",
-          "system:workspaces:create",
-          "system:workspaces:read",
-          "system:workspaces:update",
-          "system:workspaces:delete",
-          "system:workspaces:close",
-          "system:workspaces:reopen",
-          "system:sources:manage",
-          "system:audit:read"
+          "system:erps:manage",
+          "system:audit:read",
+          "closing_period:period:read",
+          "closing_period:period:update",
+          "closing_period:period:create",
+          "closing_period:period:close",
+          "closing_period:period:reopen",
+          "closing_period:period:cancel"
         ]
       },
       {
         "id": "role_operador",
         "name": "Operador de Fechamento",
-        "description": "Cria e conclui áreas de trabalho.",
+        "description": "Visualiza e cria Períodos de Fechamento.",
         "permissions": [
-          "system:workspaces:read",
-          "system:workspaces:create",
-          "system:workspaces:close"
+          "closing_period:period:read",
+          "closing_period:period:create"
         ]
       },
       {
@@ -1426,78 +1348,41 @@
       }
     ]
   },
-  "ws.list.401": {
+  "cp.list.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "ws.list.ok": {
+  "cp.list.ok": {
     "status": 200,
-    "body": [
-      {
-        "id": "ws_fechamento_dez_2025",
-        "name": "Fechamento Mensal — Dezembro / 2025",
-        "startDate": "2025-12-01",
-        "endDate": "2025-12-31",
-        "status": "closed",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      },
-      {
-        "id": "ws_fechamento_jan_2026",
-        "name": "Fechamento Mensal — Janeiro / 2026",
-        "startDate": "2026-01-01",
-        "endDate": "2026-01-31",
-        "status": "open",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      }
-    ]
+    "body": []
   },
-  "ws.list.403": {
+  "cp.list.403": {
     "status": 403,
     "body": {
-      "error": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho."
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "closing_period:period:read"
+      ]
     }
   },
-  "ws.detail.ok": {
-    "status": 200,
-    "body": {
-      "id": "ws_fechamento_jan_2026",
-      "name": "Fechamento Mensal — Janeiro / 2026",
-      "startDate": "2026-01-01",
-      "endDate": "2026-01-31",
-      "status": "open",
-      "createdAt": "<ts>",
-      "updatedAt": "<ts>"
-    }
-  },
-  "ws.detail.401": {
-    "status": 401,
-    "body": {
-      "error": "Não autenticado: token de acesso não fornecido."
-    }
-  },
-  "ws.detail.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para visualizar Áreas de Trabalho."
-    }
-  },
-  "ws.detail.unknown_404": {
+  "cp.detail.unknown_404": {
     "status": 404,
     "body": {
-      "error": "Área de Trabalho não encontrada."
+      "error": "Período de Fechamento não encontrado."
     }
   },
-  "ws.create.403": {
+  "cp.create.403": {
     "status": 403,
     "body": {
-      "error": "Acesso negado: o usuário não possui permissão para criar Áreas de Trabalho."
+      "error": "Acesso negado: permissões insuficientes.",
+      "required": [
+        "closing_period:period:create"
+      ]
     }
   },
-  "ws.create.400_dates": {
+  "cp.create.400_dates": {
     "status": 400,
     "body": {
       "success": false,
@@ -1515,7 +1400,7 @@
       }
     }
   },
-  "ws.create.400_missing_fields": {
+  "cp.create.400_missing_fields": {
     "status": 400,
     "body": {
       "success": false,
@@ -1544,165 +1429,32 @@
       }
     }
   },
-  "ws.create.ok": {
+  "cp.create.ok": {
     "status": 201,
     "body": {
-      "id": "ws_<uuid>",
+      "id": "cp_<uuid>",
       "name": "Fevereiro",
       "startDate": "2026-02-01",
       "endDate": "2026-02-28",
       "status": "open",
+      "version": 1,
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
     }
   },
-  "ws.create.admin_bypass": {
-    "status": 201,
+  "cp.create.400_overlap": {
+    "status": 400,
     "body": {
-      "id": "ws_<uuid>",
-      "name": "Via admin",
-      "startDate": "2026-02-01",
-      "endDate": "2026-02-28",
-      "status": "open",
-      "createdAt": "<ts>",
-      "updatedAt": "<ts>"
+      "error": "O período informado coincide com \"Fevereiro\" (2026-02-01 a 2026-02-28). Uma data pertence a no máximo um Período de Fechamento."
     }
   },
-  "ws.create.401": {
+  "cp.create.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "ws.update.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para editar Áreas de Trabalho."
-    }
-  },
-  "ws.update.ok": {
-    "status": 200,
-    "body": {
-      "id": "ws_<uuid>",
-      "name": "Renomeada",
-      "startDate": "2026-02-01",
-      "endDate": "2026-03-05",
-      "status": "open",
-      "createdAt": "<ts>",
-      "updatedAt": "<ts>"
-    }
-  },
-  "ws.update.400_dates": {
-    "status": 400,
-    "body": {
-      "error": "A Data Final não pode ser anterior à Data Inicial."
-    }
-  },
-  "ws.update.400_invalid_date": {
-    "status": 400,
-    "body": {
-      "success": false,
-      "error": {
-        "issues": [
-          {
-            "validation": "regex",
-            "code": "invalid_string",
-            "message": "Use o formato YYYY-MM-DD.",
-            "path": [
-              "startDate"
-            ]
-          },
-          {
-            "code": "custom",
-            "message": "Data inexistente.",
-            "path": [
-              "startDate"
-            ]
-          }
-        ],
-        "name": "ZodError"
-      }
-    }
-  },
-  "ws.update.404": {
-    "status": 404,
-    "body": {
-      "error": "Área de Trabalho não encontrada."
-    }
-  },
-  "ws.conclude.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para concluir Áreas de Trabalho."
-    }
-  },
-  "ws.conclude.ok": {
-    "status": 200,
-    "body": {
-      "success": true,
-      "workspace": {
-        "id": "ws_<uuid>",
-        "name": "Renomeada",
-        "startDate": "2026-02-01",
-        "endDate": "2026-03-05",
-        "status": "closed",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      }
-    }
-  },
-  "ws.conclude.unknown_404": {
-    "status": 404,
-    "body": {
-      "error": "Área de Trabalho não encontrada."
-    }
-  },
-  "ws.reopen.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para reabrir Áreas de Trabalho (system:workspaces:reopen)."
-    }
-  },
-  "ws.reopen.ok": {
-    "status": 200,
-    "body": {
-      "success": true,
-      "workspace": {
-        "id": "ws_<uuid>",
-        "name": "Renomeada",
-        "startDate": "2026-02-01",
-        "endDate": "2026-03-05",
-        "status": "open",
-        "createdAt": "<ts>",
-        "updatedAt": "<ts>"
-      }
-    }
-  },
-  "ws.reopen.unknown_404": {
-    "status": 404,
-    "body": {
-      "error": "Área de Trabalho não encontrada."
-    }
-  },
-  "ws.delete.403": {
-    "status": 403,
-    "body": {
-      "error": "Acesso negado: o usuário não possui permissão para excluir Áreas de Trabalho (system:workspaces:delete)."
-    }
-  },
-  "ws.delete.ok": {
-    "status": 200,
-    "body": {
-      "success": true
-    }
-  },
-  "ws.delete.404": {
-    "status": 404,
-    "body": {
-      "error": "Área de Trabalho não encontrada."
-    }
-  },
-  "admin.erp_types.ok": {
+  "admin.erp_drivers.ok": {
     "status": 200,
     "body": [
       {
@@ -1750,26 +1502,43 @@
             "defaultValue": false,
             "description": "Ative para servidores com certificado autoassinado."
           }
+        ],
+        "externalFields": [
+          {
+            "name": "userId",
+            "label": "ID do Usuário",
+            "type": "text"
+          },
+          {
+            "name": "company",
+            "label": "Empresa",
+            "type": "text"
+          },
+          {
+            "name": "region",
+            "label": "Região",
+            "type": "text"
+          }
         ]
       }
     ]
   },
-  "admin.erp_types.401": {
+  "admin.erp_drivers.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.erp_types.403": {
+  "admin.erp_drivers.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.erp_types.admin_bypass": {
+  "admin.erp_drivers.admin_bypass": {
     "status": 200,
     "body": [
       {
@@ -1817,69 +1586,86 @@
             "defaultValue": false,
             "description": "Ative para servidores com certificado autoassinado."
           }
+        ],
+        "externalFields": [
+          {
+            "name": "userId",
+            "label": "ID do Usuário",
+            "type": "text"
+          },
+          {
+            "name": "company",
+            "label": "Empresa",
+            "type": "text"
+          },
+          {
+            "name": "region",
+            "label": "Região",
+            "type": "text"
+          }
         ]
       }
     ]
   },
-  "admin.connections.list.empty": {
+  "admin.erps.list.empty": {
     "status": 200,
     "body": []
   },
-  "admin.connections.list.401": {
+  "admin.erps.list.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.connections.list.403": {
+  "admin.erps.list.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.connections.put.401": {
+  "admin.erps.put.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.connections.put.403": {
+  "admin.erps.put.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.connections.put.400_id": {
+  "admin.erps.put.400_id": {
     "status": 400,
     "body": {
-      "error": "O id da conexão deve usar letras minúsculas, números e _ (ex.: inovafarma)."
+      "error": "O id do ERP deve usar letras minúsculas, números e _ (ex.: inovafarma)."
     }
   },
-  "admin.connections.put.400_type": {
+  "admin.erps.put.400_driver": {
     "status": 400,
     "body": {
-      "error": "Tipo de ERP 'oracle' não suportado."
+      "error": "ERP Driver 'oracle' não suportado."
     }
   },
-  "admin.connections.put.400_missing_secret": {
+  "admin.erps.put.400_missing_secret": {
     "status": 400,
     "body": {
       "error": "Senha é obrigatório."
     }
   },
-  "admin.connections.put.400_port": {
+  "admin.erps.put.400_port": {
     "status": 400,
     "body": {
       "error": "Porta fora do intervalo permitido."
     }
   },
-  "admin.connections.put.400_invalid_body": {
+  "admin.erps.put.400_invalid_body": {
     "status": 400,
     "body": {
       "success": false,
@@ -1901,7 +1687,7 @@
             "expected": "string",
             "received": "undefined",
             "path": [
-              "type"
+              "driver"
             ],
             "message": "Required"
           },
@@ -1919,12 +1705,12 @@
       }
     }
   },
-  "admin.connections.put.ok": {
+  "admin.erps.put.ok": {
     "status": 200,
     "body": {
       "id": "inovafarma",
       "name": "InovaFarma",
-      "type": "mssql",
+      "driver": "mssql",
       "config": {
         "host": "db",
         "port": 1433,
@@ -1936,12 +1722,12 @@
       "updatedAt": "<ts>"
     }
   },
-  "admin.connections.put.ok_keep_secret": {
+  "admin.erps.put.ok_keep_secret": {
     "status": 200,
     "body": {
       "id": "inovafarma",
       "name": "InovaFarma",
-      "type": "mssql",
+      "driver": "mssql",
       "config": {
         "host": "novo",
         "port": 1433,
@@ -1953,12 +1739,12 @@
       "updatedAt": "<ts>"
     }
   },
-  "admin.connections.put.admin_bypass": {
+  "admin.erps.put.admin_bypass": {
     "status": 200,
     "body": {
       "id": "ruim",
       "name": "InovaFarma",
-      "type": "mssql",
+      "driver": "mssql",
       "config": {
         "host": "bad",
         "port": 1433,
@@ -1970,13 +1756,13 @@
       "updatedAt": "<ts>"
     }
   },
-  "admin.connections.list.after": {
+  "admin.erps.list.after": {
     "status": 200,
     "body": [
       {
         "id": "inovafarma",
         "name": "InovaFarma",
-        "type": "mssql",
+        "driver": "mssql",
         "config": {
           "host": "novo",
           "port": 1433,
@@ -1990,7 +1776,7 @@
       {
         "id": "ruim",
         "name": "InovaFarma",
-        "type": "mssql",
+        "driver": "mssql",
         "config": {
           "host": "bad",
           "port": 1433,
@@ -2003,77 +1789,64 @@
       }
     ]
   },
-  "iam.sources.after": {
-    "status": 200,
-    "body": [
-      {
-        "id": "inovafarma",
-        "name": "InovaFarma"
-      },
-      {
-        "id": "ruim",
-        "name": "InovaFarma"
-      }
-    ]
-  },
-  "admin.connections.test.ok": {
+  "admin.erps.test.ok": {
     "status": 200,
     "body": {
       "ok": true
     }
   },
-  "admin.connections.test.502": {
+  "admin.erps.test.502": {
     "status": 502,
     "body": {
       "ok": false
     }
   },
-  "admin.connections.test.404": {
+  "admin.erps.test.404": {
     "status": 404,
     "body": {
-      "error": "Conexão não encontrada."
+      "error": "ERP não encontrado."
     }
   },
-  "admin.connections.test.401": {
+  "admin.erps.test.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.connections.test.403": {
+  "admin.erps.test.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.connections.delete.401": {
+  "admin.erps.delete.401": {
     "status": 401,
     "body": {
       "error": "Não autenticado: token de acesso não fornecido."
     }
   },
-  "admin.connections.delete.403": {
+  "admin.erps.delete.403": {
     "status": 403,
     "body": {
       "error": "Acesso negado: permissões insuficientes.",
       "required": [
-        "system:sources:manage"
+        "system:erps:manage"
       ]
     }
   },
-  "admin.connections.delete.ok": {
+  "admin.erps.delete.ok": {
     "status": 200,
     "body": {
       "success": true
     }
   },
-  "admin.connections.delete.404": {
+  "admin.erps.delete.404": {
     "status": 404,
     "body": {
-      "error": "Conexão não encontrada."
+      "error": "ERP não encontrado."
     }
   },
   "iam.grants.setup_role": {
@@ -2099,7 +1872,6 @@
       "fullname": "Usuario Grants",
       "username": "gestor.limitado",
       "roleId": "role_gestor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -2111,7 +1883,6 @@
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -2123,7 +1894,6 @@
       "fullname": "Usuario Grants",
       "username": "alvo.admin",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -2135,17 +1905,16 @@
       "fullname": "Usuario Grants",
       "username": "alvo.admin",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>",
-      "updatedAt": "<ts>",
-      "isAdmin": true
+      "isAdmin": true,
+      "updatedAt": "<ts>"
     }
   },
   "iam.grants.users.update.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:workspaces:create, system:workspaces:read, system:workspaces:update, system:workspaces:delete, system:workspaces:close, system:workspaces:reopen, system:sources:manage, system:audit:read."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
     }
   },
   "iam.grants.users.update.ok_subset_role": {
@@ -2155,7 +1924,6 @@
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
@@ -2164,7 +1932,7 @@
   "iam.grants.users.create.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:workspaces:create, system:workspaces:read, system:workspaces:update, system:workspaces:delete, system:workspaces:close, system:workspaces:reopen, system:sources:manage, system:audit:read."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:roles:delete, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
     }
   },
   "iam.grants.users.create.ok_subset_role": {
@@ -2174,7 +1942,6 @@
       "fullname": "Usuario Grants",
       "username": "legitimo.um",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -2182,7 +1949,7 @@
   "iam.grants.roles.create.403_missing_keys": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:sources:manage."
+      "error": "Você não pode conceder permissões que não possui: system:erps:manage."
     }
   },
   "iam.grants.roles.create.ok_owned_keys": {
@@ -2198,7 +1965,7 @@
   "iam.grants.roles.update.403_add_missing_key": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:sources:manage."
+      "error": "Você não pode conceder permissões que não possui: system:erps:manage."
     }
   },
   "iam.grants.roles.update.ok_remove_key": {
@@ -2240,7 +2007,6 @@
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
       "roleId": "role_vendedor",
-      "externals": {},
       "status": "inactive",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"

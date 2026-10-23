@@ -33,10 +33,11 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "hono": "^4.6.10"
+    "hono": "^4.13.13"
   },
   "peerDependencies": {
     "drizzle-orm": "1.0.0-rc.4"

@@ -12,6 +12,7 @@ interface MobileCardProps {
   secondary?: string;
   fields: MobileCardField[];
   actions?: React.ReactNode;
+  details?: React.ReactNode;
 }
 
 export const MobileCard: React.FC<MobileCardProps> = ({
@@ -19,6 +20,7 @@ export const MobileCard: React.FC<MobileCardProps> = ({
   secondary,
   fields,
   actions,
+  details,
 }) => {
   return (
     <Card size="sm">
@@ -42,6 +44,13 @@ export const MobileCard: React.FC<MobileCardProps> = ({
             </div>
           ))}
         </div>
+
+        {details && (
+          <>
+            <Separator className="my-3" />
+            <div className="text-sm">{details}</div>
+          </>
+        )}
       </CardContent>
 
       {actions && (

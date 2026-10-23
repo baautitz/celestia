@@ -26,7 +26,12 @@ function resolveSecret(explicit?: string): string {
 
 export interface TokenServiceConfig {
   jwtSecret?: string;
-  accessTtlSeconds?: number;  // Default: 300 (5 min)
+  /**
+   * Default: 300 (5 min). Access tokens são stateless e NÃO são revogáveis: após logout, reset de senha,
+   * desativação, exclusão ou troca de Role o access token vigente segue válido até expirar (janela máxima de
+   * 5 minutos). Só os refresh tokens são revogados (versão de sessão do usuário).
+   */
+  accessTtlSeconds?: number;
   refreshTtlSeconds?: number; // Default: 604800 (7 dias)
 }
 
@@ -56,7 +61,6 @@ export class TokenService {
       role: user.roleId,
       permissions: role?.permissions || [],
       ...(user.isAdmin ? { isAdmin: true } : {}),
-      externals: user.externals || {},
       iat: now,
       exp,
     };
@@ -76,6 +80,7 @@ export class TokenService {
       sub: user.id,
       tokenId: randomUUID(),
       type: "refresh",
+      ver: user.sessionVersion ?? 0,
       iat: now,
       exp,
     };
@@ -100,7 +105,7 @@ export class TokenService {
    */
   async verifyRefreshToken(token: string): Promise<JWTRefreshPayload> {
     const payload = (await verify(token, this.secret, "HS256")) as unknown as JWTRefreshPayload;
-    if (!payload.sub || payload.type !== "refresh") {
+    if (!payload.sub || payload.type !== "refresh" || typeof payload.ver !== "number") {
       throw new Error("Token de renovação inválido.");
     }
     return payload;

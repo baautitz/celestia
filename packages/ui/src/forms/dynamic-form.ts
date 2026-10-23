@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { FormFieldDef } from "../contracts/fields";
+import type { FormFieldDef } from "@platform/shared";
 
 export type DynamicFormValues = Record<string, unknown>;
 

@@ -1,5 +1,5 @@
 export interface InterpolationContext {
-  workspace?: {
+  closing_period?: {
     startDate?: string;
     endDate?: string;
     params?: Record<string, unknown>;
@@ -8,7 +8,6 @@ export interface InterpolationContext {
   user?: {
     id?: string;
     role?: string;
-    externals?: Record<string, string | number>;
     [key: string]: unknown;
   };
   [key: string]: unknown;
@@ -24,7 +23,7 @@ export class TemplateEngine {
   /**
    * Converte uma query contendo tokens {{...}} em uma query parametrizada segura contra SQL Injection.
    * Exemplo:
-   *   Entrada: "SELECT * FROM vendas WHERE dt BETWEEN {{workspace.start_date}} AND {{workspace.end_date}}"
+   *   Entrada: "SELECT * FROM vendas WHERE dt BETWEEN {{closing_period.start_date}} AND {{closing_period.end_date}}"
    *   Saída: { sql: "SELECT * FROM vendas WHERE dt BETWEEN @p1 AND @p2", params: { p1: "2026-01-01", p2: "2026-01-31" } }
    */
   static parse(
@@ -52,7 +51,7 @@ export class TemplateEngine {
   }
 
   /**
-   * Resolve caminhos no formato "workspace.start_date" ou "user.externals.inovafarma".
+   * Resolve caminhos no formato "closing_period.start_date" ou "user.role".
    */
   private static resolvePath(path: string, context: Record<string, unknown>): unknown {
     const parts = path.split(".");

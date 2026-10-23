@@ -6,7 +6,8 @@
   },
   "references": [
     { "path": "../shared" },
-    { "path": "../core" }
+    { "path": "../core" },
+    { "path": "../../integrations/example" }
   ],
   "include": ["src/**/*"]
 }

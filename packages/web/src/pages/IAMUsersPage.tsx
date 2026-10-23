@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/context/AuthContext";
-import type { User, Role, JWTAccessPayload } from "@platform/shared";
+import type { User, Role, JWTAccessPayload, ErpExternalsEntry } from "@platform/shared";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@platform/ui/components/card";
 import { Button } from "@platform/ui/components/button";
 import { Input } from "@platform/ui/components/input";
@@ -55,7 +55,7 @@ const userSchema = z.object({
   roleId: z.string().min(1),
   isAdmin: z.boolean(),
   password: z.string(),
-  externals: z.record(z.union([z.string(), z.number()])),
+  externals: z.record(z.record(z.string())),
 });
 type UserFormValues = z.infer<typeof userSchema>;
 
@@ -67,11 +67,10 @@ type ResetFormValues = z.infer<typeof resetSchema>;
 interface UserFormWindowProps {
   user: User | null;
   roles: Role[];
-  sources: string[];
   currentUser: JWTAccessPayload | null;
 }
 
-const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, currentUser }) => {
+const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUser }) => {
   const { resolve } = useWindow<boolean>();
   const ui = useUi();
   const isEditMode = user !== null;
@@ -84,9 +83,28 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
       roleId: user?.roleId ?? (roles[0]?.id || "role_operador"),
       isAdmin: user?.isAdmin === true,
       password: "",
-      externals: user?.externals ?? {},
+      externals: {},
     },
   });
+  const [entries, setEntries] = useState<ErpExternalsEntry[]>([]);
+  useEffect(() => {
+    if (!user) return;
+    api.erps
+      .listExternals(user.id)
+      .then((loaded) => {
+        setEntries(loaded);
+        form.setValue(
+          "externals",
+          Object.fromEntries(
+            loaded.map((e) => [e.erpId, Object.fromEntries(Object.entries(e.values).map(([k, v]) => [k, String(v)]))])
+          )
+        );
+      })
+      .catch((err: unknown) => {
+        ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao carregar os identificadores." });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
   const roleId = form.watch("roleId");
   const getRoleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 
@@ -97,9 +115,11 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
           fullname: v.fullname.trim(),
           email: v.email.trim(),
           roleId: v.roleId,
-          externals: v.externals,
           ...(currentUser?.isAdmin ? { isAdmin: v.isAdmin } : {}),
         });
+        for (const entry of entries) {
+          await api.erps.saveExternals(user.id, entry.erpId, v.externals[entry.erpId] ?? {});
+        }
         ui.feedback.notify({ type: "success", title: "Usuário atualizado com sucesso!" });
       } else {
         await api.iam.createUser({
@@ -108,7 +128,6 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
           email: v.email.trim(),
           password: v.password,
           roleId: v.roleId,
-          externals: v.externals,
         });
         ui.feedback.notify({ type: "success", title: "Usuário cadastrado com sucesso!" });
       }
@@ -217,60 +236,51 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, sources, c
               />
             )}
 
-            {/* Seção 100% shadcn para Identificadores ERP (Fontes Oficiais) */}
-            <FormField
-              control={form.control}
-              name="externals"
-              render={({ field }) => (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Database className="size-3.5 text-primary" />
-                      Identificadores nos ERPs (Fontes de Dados)
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      Mapeamento das chaves de identificação do usuário em cada fonte oficial.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-2">
-                    {sources.length === 0 && (
-                      <CardDescription className="text-xs">
-                        Nenhum ERP cadastrado. Cadastre uma fonte de dados para vincular identificadores.
-                      </CardDescription>
-                    )}
-                    {sources.map((src) => (
-                      <div
-                        key={src}
-                        className="flex items-center justify-between gap-4 p-2.5 border bg-muted/20 hover:bg-muted/40 transition-colors"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Database className="size-3.5 text-muted-foreground shrink-0" />
-                          <span className="font-mono text-xs font-semibold text-foreground">{src}</span>
-                        </div>
-                        <div className="flex items-center gap-2 w-44">
-                          <Input
-                            placeholder="Não vinculado"
-                            className="h-8 font-mono text-xs text-right"
-                            value={field.value[src] !== undefined ? String(field.value[src]) : ""}
-                            onChange={(e) => {
-                              const next = { ...field.value };
-                              const val = e.target.value.trim();
-                              if (!val) {
-                                delete next[src];
-                              } else {
-                                const num = Number(val);
-                                next[src] = isNaN(num) ? val : num;
-                              }
-                              field.onChange(next);
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-            />
+            {/* Externals: campos declarados por cada ERP (Plugin erp). */}
+            {isEditMode && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Database className="size-3.5 text-primary" />
+                    Identificadores nos ERPs
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Valores que ligam o usuário aos conceitos de cada ERP.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  {entries.length === 0 && (
+                    <CardDescription className="text-xs">Nenhum ERP cadastrado.</CardDescription>
+                  )}
+                  {entries.map((entry) => (
+                    <FieldGroup key={entry.erpId}>
+                      <FieldLabel>{entry.erpName}</FieldLabel>
+                      {entry.fields.map((f) => (
+                        <FormField
+                          key={f.name}
+                          control={form.control}
+                          name={`externals.${entry.erpId}.${f.name}`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="w-full leading-snug">{f.label}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type={f.type === "number" ? "number" : "text"}
+                                  placeholder="Não vinculado"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </FieldGroup>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             {!isEditMode && (
               <FormField
@@ -362,19 +372,13 @@ export const IAMUsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sources, setSources] = useState<{ id: string; name: string }[]>([]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [usersRes, rolesRes, sourcesRes] = await Promise.all([
-        api.iam.listUsers(),
-        api.iam.listRoles(),
-        api.iam.listSources(),
-      ]);
+      const [usersRes, rolesRes] = await Promise.all([api.iam.listUsers(), api.iam.listRoles()]);
       setUsers(usersRes);
       setRoles(rolesRes);
-      setSources(sourcesRes);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao carregar usuários";
       ui.feedback.notify({ type: "error", title: msg });
@@ -388,7 +392,6 @@ export const IAMUsersPage: React.FC = () => {
   }, []);
 
   const openUserWindow = async (u: User | null) => {
-    const sourceIds = sources.map((s) => s.id);
     const result = await ui.windows.open<boolean>({
       surface: "dialog",
       size: "small",
@@ -396,7 +399,7 @@ export const IAMUsersPage: React.FC = () => {
       description: u
         ? "Atualize os dados, perfil e identificadores ERP do usuário."
         : "Crie uma nova identidade no sistema com perfil e senha inicial.",
-      content: () => <UserFormWindow user={u} roles={roles} sources={sourceIds} currentUser={currentUser} />,
+      content: () => <UserFormWindow user={u} roles={roles} currentUser={currentUser} />,
     });
     if (result.status === "confirmed") fetchData();
   };

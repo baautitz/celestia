@@ -5,10 +5,10 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "dev": "tsc -b -w"
+    "dev": "tsc -b -w",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "@platform/ui": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -9,7 +9,7 @@ O motor de Recipes/SDUI foi removido. Módulos de cliente ficarão em `/integrat
 | Pacote | Conteúdo |
 |---|---|
 | `packages/core` (`@platform/core`) | Framework de módulos: contrato, loader, eventos, permissões |
-| `packages/server` (`@platform/server`) | API Hono, IAM (Argon2id, JWT), conexões ERP, áreas de trabalho |
+| `packages/server` (`@platform/server`) | API Hono, IAM (Argon2id, JWT), conexões ERP, Closing Periods |
 | `packages/shared` (`@platform/shared`) | Tipos e contratos compartilhados |
 | `packages/ui` (`@platform/ui`) | Primitivos shadcn/ui, UI imperativa, DataTable, formulários |
 | `packages/web` (`@platform/web`) | SPA Vite + React 19 + Tailwind v4 |
@@ -21,7 +21,8 @@ Requer Node.js >= 24 e pnpm.
 ```bash
 pnpm install
 pnpm build         # build de todos os pacotes
-pnpm test          # vitest
+pnpm test          # vitest (inclui testes de componente)
+pnpm test:e2e      # testes de navegador (Playwright); ver docs/conventions/testing.md
 pnpm check:ui      # verifica limites de UI
 pnpm dev:server    # API
 pnpm dev:web       # SPA

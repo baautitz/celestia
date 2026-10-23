@@ -1,4 +1,5 @@
-import type { Role, User, WorkspaceRecord } from "@platform/shared";
+import type { Role, User } from "@platform/shared";
+import { CLOSING_PERIOD_PERMISSIONS } from "../../src/closing-period/closing-period-permissions.js";
 import { PasswordService } from "../../src/iam/password-service.js";
 import { SYSTEM_PERMISSIONS } from "../../src/iam/system-permissions.js";
 import { MemoryUserStore } from "../../src/iam/user-store.js";
@@ -9,17 +10,16 @@ const roles: Role[] = [
   {
     id: "role_admin",
     name: "Administrador",
-    description: "Acesso total à plataforma, gestão de usuários e criação de áreas de trabalho.",
-    permissions: SYSTEM_PERMISSIONS.map((p) => p.key),
+    description: "Acesso total à plataforma, gestão de usuários e gestão de Períodos de Fechamento.",
+    permissions: [...SYSTEM_PERMISSIONS, ...CLOSING_PERIOD_PERMISSIONS.items].map((p) => p.key),
   },
   {
     id: "role_operador",
     name: "Operador de Fechamento",
-    description: "Cria e conclui áreas de trabalho.",
+    description: "Visualiza e cria Períodos de Fechamento.",
     permissions: [
-      "system:workspaces:read",
-      "system:workspaces:create",
-      "system:workspaces:close",
+      CLOSING_PERIOD_PERMISSIONS.keys["period:read"],
+      CLOSING_PERIOD_PERMISSIONS.keys["period:create"],
     ],
   },
   {
@@ -30,7 +30,7 @@ const roles: Role[] = [
   },
 ];
 
-function user(id: string, fullname: string, username: string, email: string, roleId: string, externals: User["externals"]): User {
+function user(id: string, fullname: string, username: string, email: string, roleId: string): User {
   return {
     id,
     fullname,
@@ -38,7 +38,6 @@ function user(id: string, fullname: string, username: string, email: string, rol
     email,
     passwordHash: PasswordService.hash(TEST_PASSWORD),
     roleId,
-    externals,
     status: "active",
     createdAt: new Date().toISOString(),
   };
@@ -47,39 +46,18 @@ function user(id: string, fullname: string, username: string, email: string, rol
 /** `admin: true` acrescenta `test.root` (isAdmin) para testes que só precisam de acesso total. */
 export function createSeededUserStore(opts: { admin?: boolean } = {}): MemoryUserStore {
   const root: User[] = opts.admin
-    ? [{ ...user("usr_9000", "Test Root", "test.root", "root@farmacia.com.br", "role_vendedor", {}), isAdmin: true }]
+    ? [{ ...user("usr_9000", "Test Root", "test.root", "root@farmacia.com.br", "role_vendedor"), isAdmin: true }]
     : [];
   return new MemoryUserStore({
     roles,
     users: [
-      user("usr_1001", "Carlos Oliveira", "carlos.admin", "carlos@farmacia.com.br", "role_admin", { inovafarma: 1, sap: 9001 }),
-      user("usr_1002", "João da Silva (Vendedor 42)", "joao.silva", "joao.silva@farmacia.com.br", "role_vendedor", { inovafarma: 42, sap: 9042 }),
-      user("usr_1003", "Maria Souza (Gerente)", "maria.souza", "maria.souza@farmacia.com.br", "role_operador", { inovafarma: 99, sap: 9099 }),
+      user("usr_1001", "Carlos Oliveira", "carlos.admin", "carlos@farmacia.com.br", "role_admin"),
+      user("usr_1002", "João da Silva (Vendedor 42)", "joao.silva", "joao.silva@farmacia.com.br", "role_vendedor"),
+      user("usr_1003", "Maria Souza (Gerente)", "maria.souza", "maria.souza@farmacia.com.br", "role_operador"),
       ...root,
     ],
   });
 }
-
-export const seededWorkspaces: WorkspaceRecord[] = [
-  {
-    id: "ws_fechamento_jan_2026",
-    name: "Fechamento Mensal — Janeiro / 2026",
-    startDate: "2026-01-01",
-    endDate: "2026-01-31",
-    status: "open",
-    createdAt: "2026-02-01T08:00:00Z",
-    updatedAt: "2026-02-01T08:00:00Z",
-  },
-  {
-    id: "ws_fechamento_dez_2025",
-    name: "Fechamento Mensal — Dezembro / 2025",
-    startDate: "2025-12-01",
-    endDate: "2025-12-31",
-    status: "closed",
-    createdAt: "2026-01-02T09:30:00Z",
-    updatedAt: "2026-01-02T09:30:00Z",
-  },
-];
 
 /** Login de um usuário semeado; devolve o header Authorization pronto para `app.request`. */
 export async function authHeader(

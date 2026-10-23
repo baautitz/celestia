@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@fontsource-variable/inter": "^5.3.0",
     "@hookform/resolvers": "^3.9.1",
+    "@integrations/example": "workspace:*",
     "@platform/shared": "workspace:*",
     "@platform/ui": "workspace:*",
     "@tailwindcss/vite": "^4",

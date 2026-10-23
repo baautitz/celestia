@@ -4,6 +4,8 @@ import { LoginPage } from "./pages/LoginPage";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { allEntries, accessibleEntries } from "./modules";
+import type { NavEntry } from "@platform/ui/contracts/module";
+import { resolveEntryScreen } from "./lib/entry-screen";
 import { useAuth } from "./context/AuthContext";
 import { Card, CardHeader, CardTitle, CardDescription } from "@platform/ui/components/card";
 import { Toaster } from "@platform/ui/components/toast";
@@ -23,6 +25,24 @@ const HomeRedirect: React.FC = () => {
   );
 };
 
+const EntryScreen: React.FC<{ entry: NavEntry }> = ({ entry }) => {
+  const { hasPermission } = useAuth();
+  const Screen = resolveEntryScreen(entry, hasPermission);
+  if (!Screen) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Acesso Não Autorizado</CardTitle>
+          <CardDescription>
+            Seu perfil de acesso não possui a permissão necessária ({entry.permission}) para visualizar este módulo.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+  return <Screen />;
+};
+
 export const App: React.FC = () => {
   return (
     <TooltipProvider>
@@ -35,9 +55,7 @@ export const App: React.FC = () => {
           <Route element={<AppLayout />}>
             <Route path="/" element={<HomeRedirect />} />
             {allEntries.map((entry) => (
-              <Route key={entry.id} element={<ProtectedRoute requiredPermission={entry.permission} />}>
-                <Route path={entry.path} element={<entry.component />} />
-              </Route>
+              <Route key={entry.id} path={entry.path} element={<EntryScreen entry={entry} />} />
             ))}
           </Route>
         </Route>

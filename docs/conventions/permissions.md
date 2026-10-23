@@ -68,8 +68,8 @@ foge da convenção.
 |---|---|---|
 | users | `create`, `read`, `update`, `reset_password`, `delete` | |
 | roles | `create`, `read`, `update`, `delete` | |
-| workspaces | `create`, `update`, `delete`, `close`, `reopen` | |
-| sources | `manage` | `system:sources:manage` |
+| closing_period:period | `read`, `create` | |
+| erps | `manage` | `system:erps:manage` |
 | audit | `read` | |
 
-Legado a desmembrar (sem mudança agora): `system:sources:manage`.
+Legado a desmembrar (sem mudança agora): `system:erps:manage`.

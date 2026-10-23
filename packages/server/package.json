@@ -1,6 +1,7 @@
 {
   "name": "@platform/server",
   "version": "1.0.0",
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
@@ -11,16 +12,18 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=../../.env src/db/migrate.ts",
     "create-admin": "tsx --env-file=../../.env src/cli/create-admin.ts",
-    "erp:query": "tsx --env-file=../../.env src/cli/erp-query.ts"
+    "erp:query": "tsx --env-file=../../.env src/cli/erp-query.ts",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@hono/zod-validator": "^0.4.1",
     "@node-rs/argon2": "^2.1.0",
+    "@integrations/example": "workspace:*",
     "@platform/core": "workspace:*",
     "@platform/shared": "workspace:*",
     "drizzle-orm": "1.0.0-rc.4",
-    "hono": "^4.6.10",
+    "hono": "^4.13.13",
     "mssql": "^12.7.4",
     "pg": "^8.23.1",
     "pino": "^9.5.0",
