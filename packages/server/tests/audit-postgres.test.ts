@@ -1,4 +1,3 @@
-import { resolve } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
@@ -6,10 +5,11 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { runModuleMigrations } from "@platform/core/migrations";
 import { AuditLog } from "../src/audit/audit-log.js";
+import { AUDIT_MIGRATIONS } from "../src/audit/audit-module.js";
 import { PostgresAuditStore } from "../src/audit/postgres-audit-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
 
-const plan = [{ moduleId: "server", folder: resolve(import.meta.dirname, "../drizzle") }];
+const plan = [{ moduleId: "audit", ...AUDIT_MIGRATIONS }];
 
 describe.skipIf(!dbTestsEnabled)("Audit Log contra Postgres real", () => {
   let pool: Pool;
@@ -22,7 +22,7 @@ describe.skipIf(!dbTestsEnabled)("Audit Log contra Postgres real", () => {
     await runModuleMigrations(db, plan);
   });
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE audit_log_entries`);
+    await db.execute(sql`TRUNCATE audit.audit_log_entries`);
     log = new AuditLog(new PostgresAuditStore(db));
     log.declareAction({ plugin: "erp", action: "a", schemaVersion: 1, schema: z.object({ n: z.number() }), summary: (x) => `n=${x.n}` });
   });
@@ -43,7 +43,7 @@ describe.skipIf(!dbTestsEnabled)("Audit Log contra Postgres real", () => {
 
   it("o banco recusa alterar ou remover entradas", async () => {
     await rec("x", "2026-01-01T00:00:00Z");
-    await expect(db.execute(sql`UPDATE audit_log_entries SET summary = 'x'`)).rejects.toThrow();
-    await expect(db.execute(sql`DELETE FROM audit_log_entries`)).rejects.toThrow();
+    await expect(db.execute(sql`UPDATE audit.audit_log_entries SET summary = 'x'`)).rejects.toThrow();
+    await expect(db.execute(sql`DELETE FROM audit.audit_log_entries`)).rejects.toThrow();
   });
 });
