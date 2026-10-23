@@ -33,7 +33,7 @@ async function boot(permissions: string[]) {
 describe("Plugin de exemplo (/integrations/example)", () => {
   it("está na lista estática de Modules como Plugin", () => {
     const entries = integrationPlugins({ auth: async (_c, next) => next() });
-    expect(entries.map((e) => [e.tier, e.def.id])).toEqual([["plugin", "example"]]);
+    expect(entries.some((e) => e.tier === "plugin" && e.def.id === "example")).toBe(true);
   });
 
   it("serve a rota com a Permission e nega sem ela", async () => {

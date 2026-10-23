@@ -19,6 +19,7 @@
     "@hono/zod-validator": "^0.4.1",
     "@node-rs/argon2": "^2.1.0",
     "@integrations/example": "workspace:*",
+    "@integrations/inovafarma": "workspace:*",
     "@platform/core": "workspace:*",
     "@platform/shared": "workspace:*",
     "drizzle-orm": "1.0.0-rc.4",

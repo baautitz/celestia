@@ -31,11 +31,7 @@ const mssql: ErpDriverDef = {
       description: "Ative para servidores com certificado autoassinado.",
     },
   ],
-  externalFields: [
-    { name: "userId", label: "ID do Usuário", type: "text" },
-    { name: "company", label: "Empresa", type: "text" },
-    { name: "region", label: "Região", type: "text" },
-  ],
+  externalFields: [],
   createClient: (values) =>
     new MssqlErpClient({
       server: String(values.host),

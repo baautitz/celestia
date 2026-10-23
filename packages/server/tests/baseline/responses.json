@@ -109,7 +109,8 @@
           "closing_period:period:reopen",
           "closing_period:period:cancel",
           "system:erps:manage",
-          "example:note:read"
+          "example:note:read",
+          "inovafarma:integration:view"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -277,7 +278,8 @@
         "closing_period:period:reopen",
         "closing_period:period:cancel",
         "system:erps:manage",
-        "example:note:read"
+        "example:note:read",
+        "inovafarma:integration:view"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -419,6 +421,15 @@
             "description": "Permite abrir a tela e chamar a rota do Plugin de exemplo.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o Plugin de exemplo.",
             "module": "example"
+          }
+        ],
+        "inovafarma": [
+          {
+            "key": "inovafarma:integration:view",
+            "label": "Visualizar módulo InovaFarma",
+            "description": "Permite abrir a tela e consultar dados integrados do InovaFarma.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o InovaFarma.",
+            "module": "inovafarma"
           }
         ]
       }
@@ -562,6 +573,15 @@
             "description": "Permite abrir a tela e chamar a rota do Plugin de exemplo.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o Plugin de exemplo.",
             "module": "example"
+          }
+        ],
+        "inovafarma": [
+          {
+            "key": "inovafarma:integration:view",
+            "label": "Visualizar módulo InovaFarma",
+            "description": "Permite abrir a tela e consultar dados integrados do InovaFarma.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o InovaFarma.",
+            "module": "inovafarma"
           }
         ]
       }
@@ -1482,23 +1502,7 @@
             "description": "Ative para servidores com certificado autoassinado."
           }
         ],
-        "externalFields": [
-          {
-            "name": "userId",
-            "label": "ID do Usuário",
-            "type": "text"
-          },
-          {
-            "name": "company",
-            "label": "Empresa",
-            "type": "text"
-          },
-          {
-            "name": "region",
-            "label": "Região",
-            "type": "text"
-          }
-        ]
+        "externalFields": []
       }
     ]
   },
@@ -1566,23 +1570,7 @@
             "description": "Ative para servidores com certificado autoassinado."
           }
         ],
-        "externalFields": [
-          {
-            "name": "userId",
-            "label": "ID do Usuário",
-            "type": "text"
-          },
-          {
-            "name": "company",
-            "label": "Empresa",
-            "type": "text"
-          },
-          {
-            "name": "region",
-            "label": "Região",
-            "type": "text"
-          }
-        ]
+        "externalFields": []
       }
     ]
   },

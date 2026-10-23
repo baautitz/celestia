@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import type { MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import type { FormFieldDef } from "@platform/shared";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import { requirePermission } from "../iam/middleware.js";
 import { IAM_PERMISSIONS } from "../iam/iam-permissions.js";
@@ -24,6 +25,8 @@ export interface ErpModuleDeps {
   clients: ErpClientRegistry;
   clientFactory: ErpClientFactory;
   auth: MiddlewareHandler;
+  /** Externals declarados pelos Plugins ativos para cada ERP (por id do ERP). */
+  externalFieldsByErp?: Record<string, FormFieldDef[]>;
 }
 
 /** A senha (segredos cifrados) nunca é devolvida. */
@@ -33,7 +36,7 @@ const publicErp = ({ secretsEncrypted: _omit, ...rest }: ErpRecord) => rest;
  * Plugin `erp`: cadastro, teste e remoção de ERPs (/api/admin/erps) e o catálogo de ERP Drivers
  * (/api/admin/erp-drivers).
  */
-export function createErpModule({ erpStore, externalsStore, clients, clientFactory, auth }: ErpModuleDeps): ModuleDef {
+export function createErpModule({ erpStore, externalsStore, clients, clientFactory, auth, externalFieldsByErp }: ErpModuleDeps): ModuleDef {
   return defineModule({
     id: "erp",
     version: "1.0.0",
@@ -95,10 +98,11 @@ export function createErpModule({ erpStore, externalsStore, clients, clientFacto
         for (const erp of await erpStore.list()) {
           const driver = ERP_DRIVERS[erp.driver];
           if (!driver) continue;
+          const fields = externalFieldsByErp?.[erp.id] ?? driver.externalFields;
           entries.push({
             erpId: erp.id,
             erpName: erp.name,
-            fields: driver.externalFields,
+            fields,
             values: await externalsStore.get(userId, erp.id),
           });
         }
@@ -111,12 +115,14 @@ export function createErpModule({ erpStore, externalsStore, clients, clientFacto
         editUsers,
         zValidator("json", z.object({ values: z.record(z.unknown()) })),
         async (c) => {
-          const erp = await erpStore.get(c.req.param("erpId"));
+          const erpId = c.req.param("erpId");
+          const erp = await erpStore.get(erpId);
           const driver = erp && ERP_DRIVERS[erp.driver];
           if (!erp || !driver) return c.json({ error: "ERP não encontrado." }, 404);
+          const fields = externalFieldsByErp?.[erpId] ?? driver.externalFields;
           let values: Record<string, string | number>;
           try {
-            values = parseExternals(driver, c.req.valid("json").values);
+            values = parseExternals({ ...driver, externalFields: fields }, c.req.valid("json").values);
           } catch (err: unknown) {
             return c.json({ error: err instanceof Error ? err.message : "Valores inválidos." }, 400);
           }

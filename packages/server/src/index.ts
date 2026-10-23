@@ -18,7 +18,7 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
-import { integrationPlugins } from "./plugins.js";
+import { integrationPlugins, integrationExternalFields } from "./plugins.js";
 import { createClosingPeriodModule } from "./closing-period/closing-period-module.js";
 import { MemoryClosingPeriodStore, type ClosingPeriodStore } from "./closing-period/closing-period-store.js";
 import type { JWTAccessPayload } from "@platform/shared";
@@ -87,8 +87,18 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
     { tier: "base", def: createIamModule({ userStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
     { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auditLog, auth }) },
-    { tier: "plugin", def: createErpModule({ erpStore, externalsStore: erpExternalsStore, clients: erpClients, clientFactory, auth }) },
-    ...integrationPlugins({ auth }),
+    {
+      tier: "plugin",
+      def: createErpModule({
+        erpStore,
+        externalsStore: erpExternalsStore,
+        clients: erpClients,
+        clientFactory,
+        auth,
+        externalFieldsByErp: integrationExternalFields(),
+      }),
+    },
+    ...integrationPlugins({ auth, erpClients }),
     ...(options?.extraModules ?? []),
   ];
   const moduleApp = new Hono();

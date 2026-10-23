@@ -49,15 +49,15 @@ describe("Externals declarados pelo Plugin erp (/api/admin/erp-externals)", () =
     expect(res.status).toBe(200);
     const [entry] = (await res.json()) as { erpId: string; fields: { name: string }[]; values: object }[];
     expect(entry!.erpId).toBe("inovafarma");
-    expect(entry!.fields.map((f) => f.name)).toEqual(["userId", "company", "region"]);
+    expect(entry!.fields.map((f) => f.name)).toEqual(["codigoColaborador", "codigoLoja"]);
     expect(entry!.values).toEqual({});
   });
 
   it("grava e devolve os valores por ERP", async () => {
-    const put = await send("PUT", "/api/admin/erp-externals/usr_x/inovafarma", { values: { userId: "42", company: "Matriz" } });
+    const put = await send("PUT", "/api/admin/erp-externals/usr_x/inovafarma", { values: { codigoColaborador: "42", codigoLoja: "1" } });
     expect(put.status).toBe(200);
     const [entry] = (await (await send("GET", "/api/admin/erp-externals/usr_x")).json()) as { values: object }[];
-    expect(entry!.values).toEqual({ userId: "42", company: "Matriz" });
+    expect(entry!.values).toEqual({ codigoColaborador: "42", codigoLoja: "1" });
   });
 
   it("rejeita valores fora do que o Plugin declara", async () => {
@@ -71,7 +71,7 @@ describe("Externals declarados pelo Plugin erp (/api/admin/erp-externals)", () =
   });
 
   it("remover o ERP apaga seus Externals", async () => {
-    await send("PUT", "/api/admin/erp-externals/usr_x/inovafarma", { values: { userId: "42" } });
+    await send("PUT", "/api/admin/erp-externals/usr_x/inovafarma", { values: { codigoColaborador: "42" } });
     await send("DELETE", "/api/admin/erps/inovafarma");
     await send("PUT", "/api/admin/erps/inovafarma", {
       name: "InovaFarma",
