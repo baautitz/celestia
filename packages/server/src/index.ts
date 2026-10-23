@@ -20,7 +20,6 @@ import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permis
 import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins } from "./plugins.js";
 import { createClosingPeriodModule } from "./closing-period/closing-period-module.js";
-import { CLOSING_PERIOD_PERMISSIONS } from "./closing-period/closing-period-permissions.js";
 import { MemoryClosingPeriodStore, type ClosingPeriodStore } from "./closing-period/closing-period-store.js";
 import type { JWTAccessPayload } from "@platform/shared";
 
@@ -66,13 +65,14 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   const tokenService = options?.tokenService || new TokenService();
   const closingPeriodStore = options?.closingPeriodStore || new MemoryClosingPeriodStore();
 
-  const validKeys: ReadonlySet<string> = new Set([...SYSTEM_PERMISSION_KEYS, ...CLOSING_PERIOD_PERMISSIONS.items.map((p) => p.key)]);
+  // Registro de Permissions preenchido pelo Core ao carregar os Modules (inclui Plugins extras).
+  const registry = new PermissionRegistry();
 
   // Middleware de Autenticação
-  // Administrador (isAdmin) ignora a matriz de permissões: recebe todas as permissões válidas no momento da requisição.
+  // Administrador (isAdmin) ignora a matriz de permissões: recebe todas as permissões do registro no momento da requisição.
   const withAdminBypass = (payload: JWTAccessPayload): JWTAccessPayload =>
     payload.isAdmin
-      ? { ...payload, permissions: ["*", ...validKeys] }
+      ? { ...payload, permissions: ["*", ...registry.allKeys()] }
       : payload;
 
   const auth = createAuthMiddleware(tokenService, withAdminBypass);
@@ -92,7 +92,6 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
     ...(options?.extraModules ?? []),
   ];
   const moduleApp = new Hono();
-  const registry = new PermissionRegistry();
   let started: Promise<unknown> | undefined;
   // Remove das roles as permissões fora do catálogo, só se todos os Modules carregaram (o Core decide via pruneSafe).
   const start = (): Promise<unknown> =>
@@ -101,11 +100,15 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
       logger: console,
       prune: (keys) => userStore.syncOrphanPermissions(new Set([...keys, ...SYSTEM_PERMISSION_KEYS])),
     }));
-  for (const path of ["/api/auth/*", "/api/iam/*", "/api/admin/*", "/api/closing-periods", "/api/closing-periods/*", "/api/audit", "/api/audit/*", "/api/m/*"]) {
-    app.all(path, async (c) => {
-      await start();
-      return moduleApp.fetch(c.req.raw, c.env);
-    });
+  // O encaminhamento segue os prefixos dos Modules (o mesmo cálculo do loader: `prefix` ou `/api/m/<id>`).
+  const mounts = entries.map(({ def }) => (def.prefix ?? `/api/m/${def.id}`).replace(/\/+$/, ""));
+  for (const mount of new Set(mounts)) {
+    for (const path of mount === "" ? ["/*"] : [mount, `${mount}/*`]) {
+      app.all(path, async (c) => {
+        await start();
+        return moduleApp.fetch(c.req.raw, c.env);
+      });
+    }
   }
 
   return { app, start, modules: entries.map((e) => e.def) };
