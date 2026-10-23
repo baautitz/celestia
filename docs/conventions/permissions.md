@@ -67,7 +67,7 @@ foge da convenção.
 | Módulo | Verbos | Fora |
 |---|---|---|
 | users | `create`, `read`, `update`, `reset_password`, `delete` | |
-| roles | `create`, `read`, `update`, `delete` | |
+| roles | `create`, `read`, `update` | |
 | closing_period:period | `read`, `create` | |
 | erps | `manage` | `system:erps:manage` |
 | audit | `read` | |
