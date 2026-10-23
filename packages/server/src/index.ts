@@ -18,6 +18,7 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
+import { integrationPlugins } from "./plugins.js";
 import { createClosingPeriodModule } from "./closing-period/closing-period-module.js";
 import { CLOSING_PERIOD_PERMISSIONS } from "./closing-period/closing-period-permissions.js";
 import { MemoryClosingPeriodStore, type ClosingPeriodStore } from "./closing-period/closing-period-store.js";
@@ -87,6 +88,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
     { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auth }) },
     { tier: "plugin", def: createErpModule({ erpStore, externalsStore: erpExternalsStore, clients: erpClients, clientFactory, auth }) },
+    ...integrationPlugins({ auth }),
     ...(options?.extraModules ?? []),
   ];
   const moduleApp = new Hono();
@@ -99,7 +101,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
       logger: console,
       prune: (keys) => userStore.syncOrphanPermissions(new Set([...keys, ...SYSTEM_PERMISSION_KEYS])),
     }));
-  for (const path of ["/api/auth/*", "/api/iam/*", "/api/admin/*", "/api/closing-periods", "/api/closing-periods/*", "/api/audit", "/api/audit/*"]) {
+  for (const path of ["/api/auth/*", "/api/iam/*", "/api/admin/*", "/api/closing-periods", "/api/closing-periods/*", "/api/audit", "/api/audit/*", "/api/m/*"]) {
     app.all(path, async (c) => {
       await start();
       return moduleApp.fetch(c.req.raw, c.env);

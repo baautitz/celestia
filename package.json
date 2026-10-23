@@ -3,12 +3,14 @@
   "private": true,
   "packageManager": "pnpm@10.18.2",
   "workspaces": [
+    "integrations/*",
     "packages/*"
   ],
   "scripts": {
     "build": "pnpm -r run build",
     "test": "vitest run",
     "check:ui": "node scripts/check-ui-boundaries.mjs",
+    "check:plugins": "node scripts/check-plugin-boundaries.mjs",
     "check:ui:test": "node scripts/check-ui-boundaries.test.mjs",
     "test:e2e": "pnpm --filter @platform/e2e test",
     "test:db": "node scripts/test-db.mjs",

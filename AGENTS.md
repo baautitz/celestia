@@ -31,7 +31,8 @@ celestia/
 │   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi), DataTable, forms, defineWebModule
 │   └── web/      (@platform/web)    SPA: modules.ts registry, pages IAMUsers/IAMRoles/ERPs/Login
 ├── docs/         adr/, conventions/, ideas/, agents/
-└── scripts/      check-ui-boundaries.mjs
+├── integrations/ Plugins por cliente (ver docs/conventions/plugins.md); fronteira checada por `pnpm check:plugins`
+└── scripts/      check-ui-boundaries.mjs, check-plugin-boundaries.mjs
 ```
 
 Migrations live in `packages/server/drizzle/`. The database is rebuilt module by module later.
@@ -45,6 +46,7 @@ pnpm -r run build      # build all (server depends on shared and core via dist; 
 pnpm test              # full Vitest suite
 pnpm test:db           # suite + integration tests (runner, stores) against a throwaway Docker Postgres (127.0.0.1, random port, removed at the end)
 pnpm check:ui          # UI boundary check
+pnpm check:plugins     # Plugin boundary check (integrations import only core and ui)
 pnpm --filter @platform/server test:watch
 ```
 
