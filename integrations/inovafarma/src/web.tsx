@@ -7,6 +7,7 @@ import { Badge } from "@platform/ui/components/badge";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { defineWebModule } from "@platform/ui/contracts/module";
 import { formatCurrency, formatNumber, formatDate } from "@platform/ui/lib/format";
+import { apiFetch } from "@platform/ui/lib/api";
 
 interface ClosingPeriod {
   id: string;
@@ -121,27 +122,29 @@ function VendasComissoesPage() {
   useEffect(() => {
     async function initFilters() {
       try {
-        const [periodsRes, lojasRes] = await Promise.all([
-          fetch("/api/closing-periods", { credentials: "include" }),
-          fetch("/api/m/inovafarma/lojas", { credentials: "include" }),
+        const [periodsData, lojasData] = await Promise.all([
+          apiFetch<ClosingPeriod[]>("/api/closing-periods").catch((err) => {
+            console.error("Erro ao buscar períodos:", err);
+            return [] as ClosingPeriod[];
+          }),
+          apiFetch<Loja[]>("/api/m/inovafarma/lojas").catch((err) => {
+            console.error("Erro ao buscar lojas:", err);
+            return [] as Loja[];
+          }),
         ]);
 
-        if (periodsRes.ok) {
-          const periodsData: ClosingPeriod[] = await periodsRes.json();
-          setPeriods(periodsData);
-          if (periodsData.length > 0) {
-            // Seleciona o primeiro período aberto ou o mais recente
-            const initial = periodsData.find((p) => p.status === "open") || periodsData[0];
-            if (initial) setSelectedPeriodId((prev) => prev || initial.id);
-          }
-        }
+        setPeriods(periodsData);
+        setLojas(lojasData);
 
-        if (lojasRes.ok) {
-          const lojasData: Loja[] = await lojasRes.json();
-          setLojas(lojasData);
+        if (periodsData.length > 0) {
+          const initial = periodsData.find((p) => p.status === "open") || periodsData[0];
+          if (initial) setSelectedPeriodId((prev) => prev || initial.id);
+        } else {
+          setLoading(false);
         }
       } catch (err: unknown) {
         console.error("Falha ao inicializar filtros do InovaFarma:", err);
+        setLoading(false);
       }
     }
     void initFilters();
@@ -150,7 +153,10 @@ function VendasComissoesPage() {
   const selectedPeriod = periods.find((p) => p.id === selectedPeriodId);
 
   const fetchRelatorio = useCallback(async () => {
-    if (!selectedPeriod) return;
+    if (!selectedPeriod) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -162,16 +168,10 @@ function VendasComissoesPage() {
         params.append("codigoEmpresa", selectedLoja);
       }
 
-      const res = await fetch(`/api/m/inovafarma/relatorios/vendas-vendedor?${params.toString()}`, {
-        credentials: "include",
-      });
+      const data = await apiFetch<{ resumo: ResumoVendas; vendedores: VendedorItem[] }>(
+        `/api/m/inovafarma/relatorios/vendas-vendedor?${params.toString()}`
+      );
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || `Falha na requisição (${res.status})`);
-      }
-
-      const data = await res.json();
       setResumo(data.resumo);
       setVendedores(data.vendedores || []);
     } catch (err: unknown) {
