@@ -25,16 +25,16 @@ celestia/
 │   ├── shared/   (@platform/shared) contracts & types: iam.ts, closing-period.ts, audit.ts, erp.ts, fields.ts
 │   ├── server/   (@platform/server) Hono API
 │   │   └── src/  index.ts, boot/compose.ts, plugins.ts,
-│   │             iam/ (module, permissions, auth, stores, login-rate-limiter),
-│   │             audit/ (module, audit-log, stores),
-│   │             closing-period/ (Plugin: module, permissions, audit, stores, schema, drizzle/),
-│   │             erp/ (Plugin: module, permissions, drivers, clients, externals, stores, secret-box, read-only-guard, migrations/),
-│   │             engine/ (template-engine), db/ (schema, client, migrate), cli/ (create-admin, erp-query)
+│   │             iam/ (module, permissions, initial-roles, auth, stores, schema, migrations/, login-rate-limiter),
+│   │             audit/ (module, audit-log, stores, schema, migrations/),
+│   │             closing-period/ (Plugin: module, permissions, audit, stores, schema, migrations/),
+│   │             erp/ (Plugin: module, permissions, drivers, clients, externals, stores, secret-box, read-only-guard, schema, migrations/),
+│   │             engine/ (template-engine), db/ (client, migrate), cli/ (create-admin, erp-query)
 │   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi, WindowActions), DataTable, forms, defineWebModule
 │   ├── web/      (@platform/web)    SPA: modules.ts registry, pages (Login, IAMUsers, IAMRoles, ERPs, ClosingPeriodsPage, AuditLogPage)
 │   └── e2e/      (@platform/e2e)    Playwright E2E suite against in-memory Hono API + Vite SPA
 ├── integrations/ Customer Plugins (e.g. integrations/example); boundary checked by `pnpm check:plugins`
-├── docs/         adr/, conventions/ (ui, permissions, plugins, testing), agents/, security-audit.md
+├── docs/         adr/, conventions/ (database, ui, permissions, plugins, testing), agents/, security-audit.md
 └── scripts/      check-ui-boundaries.mjs, check-plugin-boundaries.mjs, test-db.mjs
 ```
 
@@ -48,6 +48,8 @@ See [package.json](package.json) for all workspace scripts:
 pnpm build             # build all packages (server depends on shared and core dist)
 pnpm test              # Vitest unit & component suite
 pnpm test:db           # Vitest suite + Postgres integration tests (throwaway Docker Postgres)
+pnpm db:migrate        # apply all Module migrations in dependency order
+pnpm create-admin      # create or promote (--force) an Administrator user
 pnpm test:e2e          # Playwright E2E suite
 pnpm lint              # ESLint across workspaces
 pnpm check:ui          # UI boundary check
@@ -60,6 +62,7 @@ pnpm check:plugins     # Plugin boundary check (integrations import only @platfo
 
 - **Domain vocabulary** — [GLOSSARY-MAP.md](GLOSSARY-MAP.md): read before naming symbols, routes, tables, UI labels, or Audit Log entries.
 - **Coding & review standards** — [CODING_STANDARDS.md](CODING_STANDARDS.md): registry-driven Module composition (`boot/compose.ts`), optimistic concurrency (`version` → HTTP 409), bounded in-memory state, security boundaries (Argon2id, `TemplateEngine.parse()`, `HttpOnly` refresh cookie + `session_version`), and strict TypeScript.
+- **Database & Bootstrap** — [docs/conventions/database.md](docs/conventions/database.md): per-Module Postgres schema and `migrations/` directory, `pnpm db:migrate`, initial Roles (`gestor`, `operador`), and `pnpm create-admin`.
 - **Permissions & Events** — [docs/conventions/permissions.md](docs/conventions/permissions.md): `<module>:<resource>:<verb>` naming, `deniedMessage` in PT-BR, and `before`/`after` module events.
 - **UI** — [docs/conventions/ui.md](docs/conventions/ui.md): primitives from `@platform/ui/components/*`, `useUi()` windows/sheets with `<WindowActions>`, `<HeaderActions>`, `<DataTable>`, `Form*` + `<Label>`, `<MoneyInput />`, `<InputGroup>`, `<Button size="default" | "icon">`. Enforced by `pnpm check:ui`.
 - **Plugins** — [docs/conventions/plugins.md](docs/conventions/plugins.md): customer Plugins under `integrations/<name>/`, registered in `packages/server/src/plugins.ts` and `packages/web/src/modules.ts`. Enforced by `pnpm check:plugins`.
