@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, count, eq, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CreateUserInput, Role, UpdateUserInput, User } from "@platform/shared";
-import { roles, users } from "../db/schema.js";
+import { roles, users } from "./schema.js";
 import { PasswordService } from "./password-service.js";
 import { pruneOrphans } from "@platform/core/permissions";
 import { LastAdminError, type UserStore } from "./user-store.js";

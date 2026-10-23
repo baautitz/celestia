@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import type { Context, MiddlewareHandler } from "hono";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
@@ -13,6 +14,9 @@ import type { TokenService } from "./token-service.js";
 import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
 import { LoginRateLimiter } from "./login-rate-limiter.js";
 import { PasswordService, PasswordPolicySchema } from "./password-service.js";
+
+/** Pasta de migrations do Module `iam` (schema Postgres "iam"). */
+export const IAM_MIGRATIONS = { folder: resolve(import.meta.dirname, "migrations"), schema: "iam" };
 
 export interface IamModuleDeps {
   userStore: UserStore;
@@ -62,6 +66,7 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
     version: "1.0.0",
     prefix: "/api",
     permissions: IAM_PERMISSIONS,
+    migrations: IAM_MIGRATIONS,
     register({ routes, events, permissions }) {
       permissions.registerProvider(() => extraPermissions.map((p) => ({ ...p, module: p.module ?? "system" })));
       const cancelled = (c: Context, reason: string) => c.json({ error: reason }, 409);

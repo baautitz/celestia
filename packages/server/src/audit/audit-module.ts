@@ -1,9 +1,13 @@
+import { resolve } from "node:path";
 import type { MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import { requirePermission } from "../iam/middleware.js";
 import type { AuditLog } from "./audit-log.js";
+
+/** Pasta de migrations do Module `audit` (schema Postgres "audit"). */
+export const AUDIT_MIGRATIONS = { folder: resolve(import.meta.dirname, "migrations"), schema: "audit" };
 
 export interface AuditModuleDeps {
   auditLog: AuditLog;
@@ -26,6 +30,7 @@ export function createAuditModule({ auditLog, auth }: AuditModuleDeps): ModuleDe
     id: "audit",
     version: "1.0.0",
     prefix: "/api/audit",
+    migrations: AUDIT_MIGRATIONS,
     register({ routes }) {
       routes.get("/", auth, requirePermission("system:audit:read"), zValidator("query", Query), async (c) =>
         c.json(await auditLog.list(c.req.valid("query"))),

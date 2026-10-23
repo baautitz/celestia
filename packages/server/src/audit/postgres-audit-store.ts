@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, lte, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { auditLogEntries } from "../db/schema.js";
+import { auditLogEntries } from "./schema.js";
 import type { AuditFilter, AuditStore, LogEntry } from "./audit-store.js";
 
 export class PostgresAuditStore implements AuditStore {

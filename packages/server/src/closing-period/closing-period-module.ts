@@ -12,7 +12,7 @@ import type { AuditLog } from "../audit/audit-log.js";
 import { CLOSING_PERIOD_PLUGIN, CLOSING_PERIOD_TARGET, declareClosingPeriodAudit } from "./closing-period-audit.js";
 
 /** Pasta de migrations do Plugin (schema Postgres "closing_period"). */
-export const CLOSING_PERIOD_MIGRATIONS = { folder: resolve(import.meta.dirname, "drizzle"), schema: "closing_period" };
+export const CLOSING_PERIOD_MIGRATIONS = { folder: resolve(import.meta.dirname, "migrations"), schema: "closing_period" };
 
 export interface ClosingPeriodModuleDeps {
   store: ClosingPeriodStore;
