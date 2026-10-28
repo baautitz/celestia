@@ -103,7 +103,7 @@ function Stack({
         fullWidth && "w-full",
         height === "control" && "h-8",
         padding !== undefined && paddings[padding],
-        bordered && "border",
+        bordered && "border border-foreground/10",
         surface === "card" && "bg-card text-card-foreground",
         surface === "muted" && "bg-muted/30",
         divided && "divide-y divide-border/40",
