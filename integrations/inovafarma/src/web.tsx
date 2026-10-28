@@ -74,6 +74,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.quantidadeVendas,
     format: "number",
     sortable: true,
+    firstSort: "desc",
     cellClassName: "text-right font-mono",
   },
   {
@@ -83,6 +84,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.totalBruto,
     format: "currency",
     sortable: true,
+    firstSort: "desc",
     cellClassName: "text-right font-mono",
   },
   {
@@ -92,6 +94,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.totalDesconto,
     format: "currency",
     sortable: true,
+    firstSort: "desc",
     cellClassName: "text-right font-mono text-muted-foreground",
   },
   {
@@ -101,6 +104,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.totalLiquido,
     format: "currency",
     sortable: true,
+    firstSort: "desc",
     cellClassName: "text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400",
   },
   {
@@ -110,6 +114,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.totalCmv,
     format: "currency",
     sortable: true,
+    firstSort: "desc",
     cellClassName: "text-right font-mono",
   },
   {
@@ -119,6 +124,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.cmvPercent,
     format: "percent",
     sortable: true,
+    firstSort: "desc",
     cellClassName: "text-right font-mono",
   },
   {
@@ -128,6 +134,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.ticketMedio,
     format: "currency",
     sortable: true,
+    firstSort: "desc",
     cellClassName: "text-right font-mono",
   },
   {
@@ -137,6 +144,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.participacaoPercent,
     format: "percent",
     sortable: true,
+    firstSort: "desc",
     cellClassName: "text-right font-mono",
   },
   {
@@ -146,6 +154,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.cadastroPercent,
     format: "percent",
     sortable: true,
+    firstSort: "desc",
     cellClassName: "text-right font-mono",
   },
 ];
