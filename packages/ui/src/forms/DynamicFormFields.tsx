@@ -86,6 +86,7 @@ function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormF
     return () => {
       cancelled = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `field` muda de identidade a cada render; o lookup depende só do nome
   }, [field.name, fetchLookupOptions, isLookup]);
 
   return { options, loading };

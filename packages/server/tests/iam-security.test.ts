@@ -13,6 +13,15 @@ import type {
   PermissionItem,
 } from "@platform/shared";
 
+interface AuthBody {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  username: string;
+  role: string;
+  user: { username: string; role: string; permissions: string[] };
+}
+
 describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () => {
   let app: ReturnType<typeof createPlatformApp>;
   let userStore: MemoryUserStore;
@@ -66,7 +75,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       });
 
       expect(res.status).toBe(200);
-      const data = (await res.json()) as Record<string, any>;
+      const data = (await res.json()) as AuthBody;
       expect(data.access_token).toBeDefined();
       expect(data.refresh_token).toBeDefined();
       expect(data.expires_in).toBe(300); // 5 minutos
@@ -98,7 +107,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
           password: "Senha@123",
         }),
       });
-      const loginData = (await loginRes.json()) as Record<string, any>;
+      const loginData = (await loginRes.json()) as AuthBody;
 
       // 2. Faz refresh
       const refreshRes = await app.request("/api/auth/refresh", {
@@ -110,7 +119,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       });
 
       expect(refreshRes.status).toBe(200);
-      const refreshData = (await refreshRes.json()) as Record<string, any>;
+      const refreshData = (await refreshRes.json()) as AuthBody;
       expect(refreshData.access_token).toBeDefined();
       expect(refreshData.user.username).toBe("joao.silva");
     });
@@ -124,14 +133,14 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
           password: "Senha@123",
         }),
       });
-      const { access_token } = (await loginRes.json()) as Record<string, any>;
+      const { access_token } = (await loginRes.json()) as AuthBody;
 
       const meRes = await app.request("/api/auth/me", {
         headers: { Authorization: `Bearer ${access_token}` },
       });
 
       expect(meRes.status).toBe(200);
-      const meData = (await meRes.json()) as Record<string, any>;
+      const meData = (await meRes.json()) as AuthBody;
       expect(meData.username).toBe("maria.souza");
       expect(meData.role).toBe("role_operador");
     });

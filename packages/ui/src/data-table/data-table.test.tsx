@@ -10,12 +10,16 @@ const columns = [{ key: "name", label: "Nome", value: (r: Row) => r.name }];
 
 function setViewport(width: number) {
   Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
     addEventListener: () => {},
     removeEventListener: () => {},
-  })) as unknown as typeof window.matchMedia;
+    dispatchEvent: () => false,
+  });
 }
 
 function renderTable() {

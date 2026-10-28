@@ -25,7 +25,7 @@ export function integrationPlugins({ auth, erpClients }: IntegrationPluginDeps):
  */
 export function integrationErpDrivers(): Record<string, ErpDriverDef> {
   return {
-    inovafarma: createInovafarmaDriver({ createMssqlClient }) as unknown as ErpDriverDef,
+    inovafarma: createInovafarmaDriver({ createMssqlClient }),
   };
 }
 
@@ -34,6 +34,6 @@ export function integrationErpDrivers(): Record<string, ErpDriverDef> {
  */
 export function integrationExternalFields(): Record<string, FormFieldDef[]> {
   return {
-    inovafarma: INOVAFARMA_EXTERNALS as unknown as FormFieldDef[],
+    inovafarma: [...INOVAFARMA_EXTERNALS],
   };
 }
