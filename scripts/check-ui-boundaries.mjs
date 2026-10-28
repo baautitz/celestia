@@ -54,11 +54,11 @@ for await (const rel of glob("{packages,integrations}/*/src/**/*.{ts,tsx}", { cw
           }
         }
       }
-    }
-    if (ts.isJsxOpeningLikeElement(node) && windowTags.has(node.tagName.getText(source))) {
-      for (const attr of node.attributes.properties) {
-        if (ts.isJsxAttribute(attr) && (attr.name.text === "open" || attr.name.text === "onOpenChange")) {
-          report(attr, `${attr.name.text} declarativo em ${node.tagName.getText(source)}`)
+      if (windowTags.has(tag)) {
+        for (const attr of node.attributes.properties) {
+          if (ts.isJsxAttribute(attr) && (attr.name.text === "open" || attr.name.text === "onOpenChange")) {
+            report(attr, `${attr.name.text} declarativo em ${tag}`)
+          }
         }
       }
     }
