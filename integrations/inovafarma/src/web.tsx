@@ -215,7 +215,7 @@ function VendasComissoesPage() {
         <Stack direction="row" wrap align="end" gap={4} grow>
           {/* Seletor de Período de Fechamento */}
           <Stack gap={2} grow maxWidth="sm">
-            <Stack direction="row" align="center" gap={2}>
+            <Stack direction="row" align="center" gap={2} iconSize="sm">
               <Calendar />
               <Text variant="caption" tone="muted" weight="medium">
                 Período de Fechamento
@@ -244,7 +244,7 @@ function VendasComissoesPage() {
 
           {/* Seletor de Filial / Loja */}
           <Stack gap={2} grow maxWidth="sm">
-            <Stack direction="row" align="center" gap={2}>
+            <Stack direction="row" align="center" gap={2} iconSize="sm">
               <Store />
               <Text variant="caption" tone="muted" weight="medium">
                 Filial / Loja

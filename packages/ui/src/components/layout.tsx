@@ -35,6 +35,8 @@ interface StackProps extends Omit<React.ComponentProps<"div">, "className" | "st
   wrap?: boolean
   grow?: boolean
   shrink?: boolean
+  /** Tamanho dos ícones filhos diretos (padrão 16px; `sm` = 14px). */
+  iconSize?: "sm"
   fullWidth?: boolean
   padding?: keyof typeof paddings
   bordered?: boolean
@@ -53,6 +55,7 @@ function Stack({
   wrap,
   grow,
   shrink = true,
+  iconSize,
   fullWidth,
   padding,
   bordered,
@@ -65,7 +68,8 @@ function Stack({
   return (
     <Tag
       className={cn(
-        "flex min-w-0",
+        "flex min-w-0 [&>svg]:shrink-0",
+        iconSize === "sm" ? "[&>svg]:size-3.5" : "[&>svg:not([class*='size-'])]:size-4",
         direction === "column" ? "flex-col" : "flex-row",
         gaps[gap],
         align && aligns[align],
@@ -175,7 +179,7 @@ const kpiTones = {
 /** Ícone circular colorido usado em cartões de indicador. */
 function IconBadge({ tone = "primary", children }: { tone?: keyof typeof kpiTones; children: React.ReactNode }) {
   return (
-    <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-full", kpiTones[tone])}>
+    <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-full [&_svg]:size-5", kpiTones[tone])}>
       {children}
     </span>
   )

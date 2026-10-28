@@ -190,7 +190,7 @@ export const AppLayout: React.FC = () => {
 
       <SidebarInset>
         <AppHeader>
-          <Stack direction="row" align="center" gap={2}>
+          <Stack direction="row" align="center" gap={2} grow>
             <SidebarTrigger />
             {backTo && (
               <Button

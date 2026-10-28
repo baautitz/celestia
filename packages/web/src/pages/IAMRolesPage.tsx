@@ -163,7 +163,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <Stack direction="row" align="center" gap={2}>
+                    <Stack direction="row" align="center" gap={2} iconSize="sm">
                       <Shield />
                       <Text variant="eyebrow" tone="muted">
                         Módulos de Sistema

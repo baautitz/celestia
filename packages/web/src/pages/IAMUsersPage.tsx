@@ -242,7 +242,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <Stack direction="row" align="center" gap={2}>
+                    <Stack direction="row" align="center" gap={2} iconSize="sm">
                       <Database />
                       <Text variant="eyebrow" tone="muted">
                         Identificadores nos ERPs
