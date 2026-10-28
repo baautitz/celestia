@@ -197,6 +197,7 @@ function KpiCard({
   icon,
   tone = "primary",
   highlight,
+  loading,
 }: {
   label: string
   value: React.ReactNode
@@ -204,25 +205,36 @@ function KpiCard({
   icon: React.ReactNode
   tone?: keyof typeof kpiTones
   highlight?: boolean
+  /** Troca valor e dica por skeletons enquanto os dados carregam. */
+  loading?: boolean
 }) {
   return (
     <Card>
       <CardContent>
-        <Stack direction="row" align="center" justify="between" gap={4}>
-          <Stack gap={1}>
-            <Text variant="caption" tone="muted" weight="medium">
-              {label}
-            </Text>
-            <Text variant="kpi" tone={highlight ? "success" : "default"}>
-              {value}
-            </Text>
-            {hint && (
+        <Stack gap={1}>
+          <Stack direction="row" align="center" justify="between" gap={4}>
+            <Stack gap={1}>
+              <Text variant="caption" tone="muted" weight="medium">
+                {label}
+              </Text>
+              {loading ? (
+                <Skeleton className="h-8 w-32" />
+              ) : (
+                <Text variant="kpi" tone={highlight ? "success" : "default"}>
+                  {value}
+                </Text>
+              )}
+            </Stack>
+            <IconBadge tone={tone}>{icon}</IconBadge>
+          </Stack>
+          {hint &&
+            (loading ? (
+              <Skeleton className="h-4 w-24" />
+            ) : (
               <Text variant="caption" tone="muted">
                 {hint}
               </Text>
-            )}
-          </Stack>
-          <IconBadge tone={tone}>{icon}</IconBadge>
+            ))}
         </Stack>
       </CardContent>
     </Card>
