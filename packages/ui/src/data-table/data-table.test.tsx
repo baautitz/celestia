@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DataTable } from "./data-table";
 
@@ -33,7 +33,11 @@ function renderTable() {
   );
 }
 
-afterEach(cleanup);
+const nativePrint = window.print;
+afterEach(() => {
+  cleanup();
+  window.print = nativePrint;
+});
 
 describe.each([
   ["desktop", 1280],
@@ -130,5 +134,143 @@ describe("ordenação do cabeçalho", () => {
     expect(nome.getAttribute("aria-sort")).toBe("ascending");
     await userEvent.click(nome);
     expect(nome.getAttribute("aria-sort")).toBeNull();
+  });
+});
+
+describe("impressão", () => {
+  type Sale = { id: string; seller: string; total: number };
+  const sales: Sale[] = [
+    { id: "1", seller: "Bruna", total: 300 },
+    { id: "2", seller: "Ana", total: 100 },
+    { id: "3", seller: "Carla", total: 200 },
+  ];
+  const saleColumns = [
+    { key: "seller", label: "Vendedor", tooltip: "Quem vendeu.", sortable: true, searchable: true, value: (r: Sale) => r.seller },
+    { key: "total", label: "Total", sortable: true, format: "currency" as const, value: (r: Sale) => r.total },
+  ];
+
+  const stubPrint = () => {
+    const print = vi.fn();
+    window.print = print;
+    return print;
+  };
+
+  it("mostra o botão Imprimir só com a prop print", () => {
+    setViewport(1280);
+    const { rerender } = render(<DataTable columns={saleColumns} rows={sales} getRowId={(r) => r.id} />);
+    expect(screen.queryByRole("button", { name: "Imprimir" })).toBeNull();
+    rerender(<DataTable columns={saleColumns} rows={sales} getRowId={(r) => r.id} print={{}} />);
+    expect(screen.getByRole("button", { name: "Imprimir" })).toBeTruthy();
+  });
+
+  it("chama a impressão do navegador ao clicar", async () => {
+    setViewport(1280);
+    const print = stubPrint();
+    render(<DataTable columns={saleColumns} rows={sales} getRowId={(r) => r.id} print={{}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(print).toHaveBeenCalledOnce();
+  });
+
+  const printedTable = () => screen.getByRole("table", { name: "Vendas" });
+  const printedSellers = () =>
+    within(printedTable())
+      .getAllByRole("row")
+      .slice(1)
+      .map((r) => within(r).getAllByRole("cell")[0]!.textContent);
+
+  it("imprime todas as linhas da busca e ordenação atuais, ignorando a paginação", async () => {
+    setViewport(1280);
+    stubPrint();
+    const extra = [...sales, { id: "4", seller: "Anderson", total: 50 }];
+    render(
+      <DataTable
+        columns={saleColumns}
+        rows={extra}
+        getRowId={(r) => r.id}
+        title="Vendas"
+        search={{}}
+        pagination={{ pageSize: 1 }}
+        print={{}}
+      />,
+    );
+    await userEvent.type(screen.getByRole("searchbox"), "a");
+    await userEvent.click(screen.getByRole("columnheader", { name: "Vendedor" }));
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(printedSellers()).toEqual(["Ana", "Anderson", "Bruna", "Carla"]);
+
+    fireEvent(window, new Event("afterprint"));
+    await userEvent.clear(screen.getByRole("searchbox"));
+    await userEvent.type(screen.getByRole("searchbox"), "ar");
+    await userEvent.click(screen.getByRole("columnheader", { name: "Vendedor" }));
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(printedSellers()).toEqual(["Carla"]);
+  });
+
+  it("imprime só os rótulos dos cabeçalhos, sem ações nem botões de expandir", async () => {
+    setViewport(1280);
+    stubPrint();
+    render(
+      <DataTable
+        columns={saleColumns}
+        rows={sales}
+        getRowId={(r) => r.id}
+        title="Vendas"
+        rowActions={() => <button type="button">Editar</button>}
+        renderExpanded={() => "detalhe"}
+        print={{}}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    const table = printedTable();
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Vendedor", "Total"]);
+    expect(within(table).queryAllByRole("button")).toEqual([]);
+    expect(table.querySelectorAll("svg")).toHaveLength(0);
+  });
+
+  it("usa a descrição de impressão no lugar da descrição da tela", async () => {
+    setViewport(1280);
+    stubPrint();
+    render(
+      <DataTable
+        columns={saleColumns}
+        rows={sales}
+        getRowId={(r) => r.id}
+        title="Vendas"
+        description="Descrição da tela"
+        print={{ description: "Filtros: Plugin inovafarma" }}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(screen.getByText("Filtros: Plugin inovafarma")).toBeTruthy();
+    expect(screen.getAllByText("Descrição da tela")).toHaveLength(1);
+  });
+
+  it("imprime como tabela mesmo no celular", async () => {
+    setViewport(500);
+    stubPrint();
+    render(<DataTable columns={saleColumns} rows={sales} getRowId={(r) => r.id} title="Vendas" print={{}} />);
+    expect(screen.queryByRole("table")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(printedSellers()).toEqual(["Bruna", "Ana", "Carla"]);
+  });
+
+  it("remove a tabela impressa depois de fechar a impressão", async () => {
+    setViewport(1280);
+    stubPrint();
+    render(<DataTable columns={saleColumns} rows={sales} getRowId={(r) => r.id} title="Vendas" print={{}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(printedTable()).toBeTruthy();
+    fireEvent(window, new Event("afterprint"));
+    expect(screen.queryByRole("table", { name: "Vendas" })).toBeNull();
+  });
+
+  it.each([
+    ["carregando", { loading: true }],
+    ["sem linhas", { rows: [] }],
+    ["com paginação no servidor", { manual: true, pagination: { page: 1, totalPages: 3, onPageChange: () => {} } }],
+  ])("desabilita o botão quando está %s", (_name, props) => {
+    setViewport(1280);
+    render(<DataTable columns={saleColumns} rows={sales} getRowId={(r) => r.id} print={{}} {...props} />);
+    expect(screen.getByRole("button", { name: "Imprimir" }).hasAttribute("disabled")).toBe(true);
   });
 });

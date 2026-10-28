@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card";
 import { Button } from "../components/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../components/input-group";
@@ -23,6 +24,9 @@ export type DataTableFormat = "currency" | "date" | "number" | "percent";
 
 const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set(["currency", "number", "percent"]);
 const isNumericColumn = (col: { format?: DataTableFormat }) => NUMERIC_FORMATS.has(col.format);
+/** Colunas que não quebram linha na impressão; as demais quebram para a tabela encolher menos. */
+const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([...NUMERIC_FORMATS, "date"]);
+const wrapsInPrint = (col: { format?: DataTableFormat }) => !NOWRAP_PRINT_FORMATS.has(col.format);
 
 function HeaderLabel({ col }: { col: { label: string; tooltip?: string } }) {
   if (!col.tooltip) return <span>{col.label}</span>;
@@ -63,6 +67,15 @@ export type DataTablePagination =
   | { pageSize: number }
   | { page: number; totalPages: number; onPageChange: (page: number) => void };
 
+export type DataTablePrintOrientation = "portrait" | "landscape";
+
+export interface DataTablePrintOptions {
+  /** Orientação da folha A4. Padrão: "portrait". */
+  orientation?: DataTablePrintOrientation;
+  /** Substitui `description` no papel (ex.: filtros ativos que a tela mostra fora da tabela). */
+  description?: string;
+}
+
 export interface DataTableProps<TRow> {
   columns: DataTableColumn<TRow>[];
   rows: TRow[];
@@ -89,6 +102,15 @@ export interface DataTableProps<TRow> {
   /** Envolve a tabela desktop em `border border-border` (visual do SDUITable). */
   bordered?: boolean;
   className?: string;
+  /** Liga o botão "Imprimir": todas as linhas da busca/ordenação atuais, sem a paginação. */
+  print?: DataTablePrintOptions;
+}
+
+function columnCellClassName<TRow>(col: DataTableColumn<TRow>, row: TRow): string | undefined {
+  return cn(
+    isNumericColumn(col) && "text-right tabular-nums",
+    typeof col.cellClassName === "function" ? col.cellClassName(row) : col.cellClassName,
+  );
 }
 
 function formatValue(value: CellValue, format?: DataTableFormat): string {
@@ -122,6 +144,7 @@ export function DataTable<TRow>({
   onSearchChange,
   bordered = false,
   className,
+  print,
 }: DataTableProps<TRow>) {
   const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
@@ -129,6 +152,8 @@ export function DataTable<TRow>({
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [clientPage, setClientPage] = useState(1);
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
+  const [printing, setPrinting] = useState(false);
+  const endPrinting = useCallback(() => setPrinting(false), []);
 
   const toggleExpanded = (id: string) =>
     setExpandedIds((prev) => {
@@ -176,6 +201,7 @@ export function DataTable<TRow>({
     }
   }
   const count = visible.length;
+  const printRows = visible;
 
   let page = 1;
   let totalPages = 1;
@@ -240,31 +266,49 @@ export function DataTable<TRow>({
   );
 
   const heading = typeof title === "function" ? title(count) : title;
+  const serverPaged = manual && pagination !== undefined && "onPageChange" in pagination;
+
+  const printButton = print && (
+    <Button
+      variant="outline"
+      size="default"
+      disabled={loading || count === 0 || serverPaged}
+      onClick={() => setPrinting(true)}
+    >
+      <Printer className="size-4 mr-1" />
+      Imprimir
+    </Button>
+  );
 
   return (
     <Card className={className}>
-      {(heading || description || search) && (
+      {(heading || description || search || print) && (
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             {heading && <CardTitle className="text-base font-semibold">{heading}</CardTitle>}
             {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
           </div>
-          {search && (
-            <InputGroup className={search.className ?? "w-72"}>
-              <InputGroupInput
-                type="search"
-                placeholder={search.placeholder ?? "Buscar..."}
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setClientPage(1);
-                  onSearchChange?.(e.target.value);
-                }}
-              />
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-            </InputGroup>
+          {(search || printButton) && (
+            <div className="flex items-center gap-2">
+              {printButton}
+              {search && (
+                <InputGroup className={search.className ?? "w-72"}>
+                  <InputGroupInput
+                    type="search"
+                    placeholder={search.placeholder ?? "Buscar..."}
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setClientPage(1);
+                      onSearchChange?.(e.target.value);
+                    }}
+                  />
+                  <InputGroupAddon>
+                    <Search />
+                  </InputGroupAddon>
+                </InputGroup>
+              )}
+            </div>
           )}
         </CardHeader>
       )}
@@ -375,10 +419,7 @@ export function DataTable<TRow>({
                             {columns.map((col) => (
                               <TableCell
                                 key={col.key}
-                                className={cn(
-                                  isNumericColumn(col) && "text-right tabular-nums",
-                                  typeof col.cellClassName === "function" ? col.cellClassName(row) : col.cellClassName,
-                                )}
+                                className={columnCellClassName(col, row)}
                               >
                                 {cellContent(col, row)}
                               </TableCell>
@@ -403,6 +444,133 @@ export function DataTable<TRow>({
           </>
         )}
       </CardContent>
+      {print && printing && (
+        <PrintTable
+          columns={columns}
+          rows={printRows}
+          getRowId={getRowId}
+          cellContent={cellContent}
+          title={heading}
+          description={print.description ?? description}
+          orientation={print.orientation ?? "portrait"}
+          onDone={endPrinting}
+        />
+      )}
     </Card>
+  );
+}
+
+const PAGE_WIDTH_MM = { portrait: 210, landscape: 297 } as const;
+const PAGE_MARGIN_MM = 10;
+const PX_PER_MM = 96 / 25.4;
+
+function issuedAtLabel(now: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${formatDate(now)} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+interface PrintTableProps<TRow> {
+  columns: DataTableColumn<TRow>[];
+  rows: TRow[];
+  getRowId: (row: TRow) => string;
+  cellContent: (col: DataTableColumn<TRow>, row: TRow) => React.ReactNode;
+  title?: string;
+  description?: string;
+  orientation: DataTablePrintOrientation;
+  onDone: () => void;
+}
+
+/**
+ * Versão só para impressão, montada ao clicar em "Imprimir" e desmontada no `afterprint`.
+ * Fica fora da tela (invisível) até a impressão; no papel, esconde o resto do `body`.
+ * Antes de imprimir, mede a largura mínima da tabela e aplica `zoom` só nela para caber na folha.
+ */
+function PrintTable<TRow>({
+  columns,
+  rows,
+  getRowId,
+  cellContent,
+  title,
+  description,
+  orientation,
+  onDone,
+}: PrintTableProps<TRow>) {
+  const tableRef = useRef<HTMLTableElement>(null);
+  const printed = useRef(false);
+  const [issuedAt] = useState(() => issuedAtLabel(new Date()));
+  const pageWidth = Math.floor((PAGE_WIDTH_MM[orientation] - 2 * PAGE_MARGIN_MM) * PX_PER_MM);
+  const [fit, setFit] = useState<{ width?: number; zoom: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const tableWidth = tableRef.current?.offsetWidth ?? 0;
+    setFit(tableWidth > pageWidth ? { width: tableWidth, zoom: pageWidth / tableWidth } : { zoom: 1 });
+  }, [pageWidth]);
+
+  useEffect(() => {
+    if (!fit) return;
+    window.addEventListener("afterprint", onDone);
+    // Guarda contra o efeito duplicado do StrictMode, que abriria a impressão duas vezes.
+    if (!printed.current) {
+      printed.current = true;
+      window.print();
+    }
+    return () => window.removeEventListener("afterprint", onDone);
+  }, [fit, onDone]);
+
+  const css = `@media print {
+  @page {
+    size: A4 ${orientation};
+    margin: ${PAGE_MARGIN_MM}mm ${PAGE_MARGIN_MM}mm 14mm;
+    @bottom-left { content: "Emitido em ${issuedAt}"; font-size: 8pt; color: #555; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 8pt; color: #555; }
+  }
+  body > :not([data-slot="data-table-print"]) { display: none !important; }
+  [data-slot="data-table-print"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}`;
+
+  return createPortal(
+    <div
+      data-slot="data-table-print"
+      className="invisible fixed top-0 left-0 -z-10 bg-background text-foreground print:visible print:static print:z-auto"
+      style={{ width: pageWidth }}
+    >
+      <style>{css}</style>
+      <div className="mb-3">
+        {title && <h1 className="text-base font-semibold">{title}</h1>}
+        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+      </div>
+      {/* `<table>` direto: o container do `<Table>` tem overflow/max-height e cortaria o papel numa altura de tela. */}
+      <table
+        ref={tableRef}
+        aria-label={title ?? "Impressão"}
+        className="w-full caption-bottom text-[10px]"
+        style={{ width: fit?.width, zoom: fit?.zoom ?? 1 }}
+      >
+        <TableHeader className="static">
+          <TableRow className="bg-muted/40">
+            {columns.map((col) => (
+              <TableHead key={col.key} className={cn("h-8", wrapsInPrint(col) && "whitespace-normal", isNumericColumn(col) && "text-right")}>
+                {col.label}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={getRowId(row)} className="break-inside-avoid">
+              {columns.map((col) => (
+                <TableCell
+                  key={col.key}
+                  className={cn("p-1.5", wrapsInPrint(col) && "whitespace-normal", columnCellClassName(col, row))}
+                >
+                  {cellContent(col, row)}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </table>
+    </div>,
+    document.body,
   );
 }
