@@ -94,19 +94,23 @@ export class TokenService {
    */
   async verifyAccessToken(token: string): Promise<JWTAccessPayload> {
     const claims = await verify(token, this.secret, "HS256");
-    if (typeof claims.sub !== "string" || !claims.sub || typeof claims.role !== "string" || !claims.role) {
+    const { sub, role, username, fullname, email, permissions } = claims;
+    if (
+      typeof sub !== "string" || !sub ||
+      typeof role !== "string" || !role ||
+      typeof username !== "string" ||
+      typeof fullname !== "string" ||
+      !Array.isArray(permissions) || !permissions.every((p): p is string => typeof p === "string")
+    ) {
       throw new Error("Token de acesso inválido.");
     }
-    const { sub, role } = claims;
     return {
       sub,
       role,
-      username: typeof claims.username === "string" ? claims.username : "",
-      fullname: typeof claims.fullname === "string" ? claims.fullname : "",
-      email: typeof claims.email === "string" ? claims.email : undefined,
-      permissions: Array.isArray(claims.permissions)
-        ? claims.permissions.filter((p): p is string => typeof p === "string")
-        : [],
+      username,
+      fullname,
+      email: typeof email === "string" ? email : undefined,
+      permissions,
       ...(claims.isAdmin === true ? { isAdmin: true } : {}),
       iat: claims.iat,
       exp: claims.exp,
