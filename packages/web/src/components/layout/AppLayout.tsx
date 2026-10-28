@@ -149,7 +149,7 @@ export const AppLayout: React.FC = () => {
                   <DropdownMenuContent side="bottom" align="end" sideOffset={4}>
                     <DropdownMenuGroup>
                       <DropdownMenuLabel>
-                        <Stack direction="row" align="center" gap={2}>
+                        <Stack direction="row" align="center" gap="field">
                           <Avatar>
                             <AvatarFallback>{getInitials(user.fullname)}</AvatarFallback>
                           </Avatar>
@@ -166,7 +166,7 @@ export const AppLayout: React.FC = () => {
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>
-                      <Stack direction="row" align="center" justify="between" padding={2}>
+                      <Stack direction="row" align="center" justify="between" padding="compact">
                         <Text variant="caption" tone="muted">
                           Grupo / Perfil
                         </Text>
@@ -188,7 +188,7 @@ export const AppLayout: React.FC = () => {
 
       <SidebarInset>
         <AppHeader>
-          <Stack direction="row" align="center" gap={2} grow>
+          <Stack direction="row" align="center" gap="field" grow>
             <SidebarTrigger />
             {backTo && (
               <Button
@@ -221,7 +221,7 @@ export const AppLayout: React.FC = () => {
           </Stack>
 
           {actions && (
-            <Stack direction="row" align="center" gap={2} shrink={false}>
+            <Stack direction="row" align="center" gap="field" shrink={false}>
               {actions}
             </Stack>
           )}

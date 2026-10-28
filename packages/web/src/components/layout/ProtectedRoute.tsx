@@ -23,7 +23,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredPermissi
   if (requiredPermission && !hasPermission(requiredPermission)) {
     return (
       <CenteredScreen fullHeight={false}>
-        <Stack align="center" gap={2}>
+        <Stack align="center" gap="field">
           <Text as="h2" tone="destructive" weight="bold">
             Acesso Não Autorizado
           </Text>

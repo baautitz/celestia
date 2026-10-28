@@ -242,7 +242,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <Stack direction="row" align="center" gap={2} iconSize="sm">
+                    <Stack direction="row" align="center" gap="field" iconSize="sm">
                       <Database />
                       <Text variant="eyebrow" tone="muted">
                         Identificadores nos ERPs
@@ -254,7 +254,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Stack gap={4}>
+                  <Stack gap="section">
                   {entries.length === 0 && (
                     <CardDescription>Nenhum ERP cadastrado.</CardDescription>
                   )}
@@ -447,7 +447,7 @@ export const IAMUsersPage: React.FC = () => {
   };
 
   return (
-    <Stack gap={6}>
+    <Stack gap="section">
       <HeaderActions>
         <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
           <Spin active={loading}><RefreshCw /></Spin>
@@ -543,7 +543,7 @@ export const IAMUsersPage: React.FC = () => {
           },
         ]}
         rowActions={(u) => (
-          <Stack direction="row" justify="end" gap={1}>
+          <Stack direction="row" justify="end" gap="tight">
             {hasPermission("system:users:update") && (
               <Button variant="ghost" size="icon" aria-label="Editar Usuário" title="Editar Usuário" onClick={() => openUserWindow(u)}>
                 <Edit2 />

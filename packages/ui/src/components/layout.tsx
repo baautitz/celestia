@@ -10,8 +10,28 @@ import { Skeleton } from "./skeleton"
  * (ver `pnpm check:ui`).
  */
 
-const gaps = { 0: "gap-0", 1: "gap-1", 2: "gap-2", 3: "gap-3", 4: "gap-4", 6: "gap-6", 8: "gap-8" } as const
-const paddings = { 0: "p-0", 2: "p-2", 3: "p-3", 4: "p-4", 6: "p-6" } as const
+/**
+ * Escala única de espaçamento. `section` e `card` valem o mesmo que o padding do `Card`
+ * (`--card-spacing`), para que blocos da página, cards e conteúdo interno fiquem alinhados.
+ */
+const gaps = {
+  none: "gap-0",
+  /** 4px: rótulo ↔ valor, ações compactas. */
+  tight: "gap-1",
+  /** 8px: rótulo ↔ controle, ícone ↔ texto. */
+  field: "gap-2",
+  /** 12px: itens de uma lista ou grupo dentro de um card. */
+  group: "gap-3",
+  /** 16px: blocos da página e cards entre si. */
+  section: "gap-4",
+} as const
+const paddings = {
+  none: "p-0",
+  /** 8px: linhas de lista, pílulas. */
+  compact: "p-2",
+  /** 16px: igual ao padding do `Card`. */
+  card: "p-4",
+} as const
 const aligns = { start: "items-start", center: "items-center", end: "items-end", stretch: "items-stretch" } as const
 const justifies = {
   start: "justify-start",
@@ -51,7 +71,7 @@ interface StackProps extends Omit<React.ComponentProps<"div">, "className" | "st
 
 function Stack({
   direction = "column",
-  gap = 0,
+  gap = "none",
   align,
   justify,
   wrap,
@@ -101,7 +121,7 @@ interface GridProps extends Omit<React.ComponentProps<"div">, "className" | "sty
   gap?: Gap
 }
 
-function Grid({ columns, gap = 4, ...props }: GridProps) {
+function Grid({ columns, gap = "section", ...props }: GridProps) {
   return (
     <div
       className={cn(
@@ -211,9 +231,9 @@ function KpiCard({
   return (
     <Card>
       <CardContent>
-        <Stack gap={1}>
-          <Stack direction="row" align="center" justify="between" gap={4}>
-            <Stack gap={1}>
+        <Stack gap="tight">
+          <Stack direction="row" align="center" justify="between" gap="section">
+            <Stack gap="tight">
               <Text variant="caption" tone="muted" weight="medium">
                 {label}
               </Text>
@@ -262,7 +282,7 @@ function AppHeader(props: Omit<React.ComponentProps<"header">, "className" | "st
 
 /** Área de conteúdo das páginas autenticadas. */
 function AppMain(props: Omit<React.ComponentProps<"main">, "className" | "style">) {
-  return <main className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8" {...props} />
+  return <main className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8" {...props} />
 }
 
 /** Tela central (login, carregamento, acesso negado). */

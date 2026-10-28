@@ -109,7 +109,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
           noValidate
           onSubmit={form.handleSubmit(onSubmit)}
         >
-<Stack gap={6}>
+<Stack gap="section">
           <FieldGroup>
             <FormField
               control={form.control}
@@ -163,7 +163,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    <Stack direction="row" align="center" gap={2} iconSize="sm">
+                    <Stack direction="row" align="center" gap="field" iconSize="sm">
                       <Shield />
                       <Text variant="eyebrow" tone="muted">
                         Módulos de Sistema
@@ -172,16 +172,16 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Stack gap={3}>
+                  <Stack gap="group">
                   {catalog &&
                     Object.entries(catalog.system).map(([moduleName, perms]) => (
-                      <Stack key={moduleName} gap={2}>
+                      <Stack key={moduleName} gap="field">
                         <Stack surface="muted">
                           <Text variant="eyebrow">Módulo: {moduleName}</Text>
                         </Stack>
                         <Stack divided>
                           {perms.map((p: PermissionItem) => (
-                            <Stack key={p.key} direction="row" align="center" justify="between" gap={4} padding={2}>
+                            <Stack key={p.key} direction="row" align="center" justify="between" gap="section" padding="compact">
                               <Stack grow>
                                 <Text variant="mono" weight="medium" breakAll>
                                   {p.key}
@@ -306,7 +306,7 @@ export const IAMRolesPage: React.FC = () => {
   ];
 
   return (
-    <Stack gap={6}>
+    <Stack gap="section">
       <HeaderActions>
         <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
           <Spin active={loading}><RefreshCw /></Spin>

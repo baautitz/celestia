@@ -250,27 +250,27 @@ function VendasComissoesPage() {
     : "Selecione um Período";
 
   return (
-    <Stack gap={6}>
+    <Stack gap="section">
       {/* Barra de Filtros */}
       <Stack
         direction="row"
         wrap
         align="end"
         justify="between"
-        gap={4}
-        padding={4}
+        gap="section"
+        padding="card"
         bordered
         surface="card"
       >
-        <Stack direction="row" wrap align="end" gap={4} grow>
+        <Stack direction="row" wrap align="end" gap="section" grow>
           {/* Seletor de Período de Fechamento */}
-          <Stack gap={2} grow maxWidth="sm">
-            <Stack direction="row" align="center" gap={2} iconSize="sm">
+          <Stack gap="field" grow maxWidth="sm">
+            <Stack direction="row" align="center" gap="field" iconSize="sm">
               <Calendar />
               <Text variant="caption" tone="muted" weight="medium">
                 Período de Fechamento
               </Text>
-              </Stack>
+            </Stack>
             <Select value={selectedPeriodId} onValueChange={(val) => val && setSelectedPeriodId(val)}>
               <SelectTrigger fullWidth>
                 <SelectValue placeholder="Selecione um período">{selectedPeriodLabel}</SelectValue>
@@ -282,7 +282,7 @@ function VendasComissoesPage() {
                   </SelectItem>
                 ))}
                 {periods.length === 0 && (
-                  <Stack padding={2} align="center">
+                  <Stack padding="compact" align="center">
                     <Text variant="caption" tone="muted">
                       Nenhum período cadastrado
                     </Text>
@@ -293,13 +293,13 @@ function VendasComissoesPage() {
           </Stack>
 
           {/* Seletor de Filial / Loja */}
-          <Stack gap={2} grow maxWidth="sm">
-            <Stack direction="row" align="center" gap={2} iconSize="sm">
+          <Stack gap="field" grow maxWidth="sm">
+            <Stack direction="row" align="center" gap="field" iconSize="sm">
               <Store />
               <Text variant="caption" tone="muted" weight="medium">
                 Filial / Loja
               </Text>
-              </Stack>
+            </Stack>
             <Select value={selectedLoja} onValueChange={(val) => val && setSelectedLoja(val)}>
               <SelectTrigger fullWidth>
                 <SelectValue placeholder="Todas as Filiais">{selectedLojaLabel}</SelectValue>
@@ -316,7 +316,7 @@ function VendasComissoesPage() {
           </Stack>
 
           {selectedPeriod && (
-            <Stack direction="row" align="center" gap={2} height="control" padding={2} bordered surface="muted">
+            <Stack direction="row" align="center" gap="field" height="control" padding="compact" bordered surface="muted">
               <Text variant="caption" tone="muted">
                 Status:
               </Text>

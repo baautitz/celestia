@@ -123,7 +123,7 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, drivers }) => {
     <>
       <Form {...form}>
         <form id="erp-form" onSubmit={form.handleSubmit(handleSave)} noValidate>
-<Stack gap={6}>
+<Stack gap="section">
                 <FormField
               control={form.control}
               name="driver"
@@ -328,7 +328,7 @@ export const ERPsPage: React.FC = () => {
   );
 
   return (
-    <Stack gap={6}>
+    <Stack gap="section">
       <HeaderActions>
         <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
           <Spin active={loading}><RefreshCw /></Spin>
