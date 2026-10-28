@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card";
 import { Button } from "../components/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../components/input-group";
@@ -47,6 +47,8 @@ export interface DataTableColumn<TRow> {
   render?: (row: TRow) => React.ReactNode;
   format?: DataTableFormat;
   sortable?: boolean;
+  /** Direção do primeiro clique; o ciclo é primeira → oposta → padrão (sem ordenação). Padrão: "asc". */
+  firstSort?: "asc" | "desc";
   /** Entra na busca local (requer `value`). */
   searchable?: boolean;
   /** Classes da célula no desktop (ex.: "font-mono text-xs text-muted-foreground"). */
@@ -81,7 +83,8 @@ export interface DataTableProps<TRow> {
   pagination?: DataTablePagination;
   /** Ordenação/busca/paginação feitas fora: a tabela só exibe `rows`. */
   manual?: boolean;
-  onSortChange?: (key: string, order: "asc" | "desc") => void;
+  /** `order` null = voltou à ordem padrão. */
+  onSortChange?: (key: string, order: "asc" | "desc" | null) => void;
   onSearchChange?: (value: string) => void;
   /** Envolve a tabela desktop em `border border-border` (visual do SDUITable). */
   bordered?: boolean;
@@ -189,10 +192,19 @@ export function DataTable<TRow>({
   }
 
   const handleSort = (key: string) => {
-    const next = sortKey === key && order === "asc" ? "desc" : "asc";
-    setSortKey(key);
-    setOrder(next);
-    onSortChange?.(key, next);
+    const first = columns.find((c) => c.key === key)?.firstSort ?? "asc";
+    const opposite = first === "asc" ? "desc" : "asc";
+    if (sortKey !== key) {
+      setSortKey(key);
+      setOrder(first);
+      onSortChange?.(key, first);
+    } else if (order === first) {
+      setOrder(opposite);
+      onSortChange?.(key, opposite);
+    } else {
+      setSortKey(undefined);
+      onSortChange?.(key, null);
+    }
   };
 
   const hasActions = Boolean(rowActions);
@@ -308,11 +320,16 @@ export function DataTable<TRow>({
                         key={col.key}
                         className={cn(col.sortable && "cursor-pointer select-none", isNumericColumn(col) && "text-right")}
                         onClick={() => col.sortable && handleSort(col.key)}
+                        aria-sort={col.sortable && sortKey === col.key ? (order === "asc" ? "ascending" : "descending") : undefined}
                       >
                         {col.sortable ? (
                           <div className={cn("flex items-center gap-1", isNumericColumn(col) && "justify-end")}>
                             <HeaderLabel col={col} />
-                            <ArrowUpDown className="size-3 text-muted-foreground" />
+                            {sortKey === col.key ? (
+                              order === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+                            ) : (
+                              <ArrowUpDown className="size-3 text-muted-foreground" />
+                            )}
                           </div>
                         ) : (
                           <HeaderLabel col={col} />
