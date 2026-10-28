@@ -7,9 +7,14 @@ import { fileURLToPath } from "node:url"
 const rootArg = process.argv.indexOf("--root")
 const root = rootArg > -1 ? resolve(process.argv[rootArg + 1]) : resolve(fileURLToPath(new URL("..", import.meta.url)))
 const windowModules = /^@platform\/ui\/components\/(dialog|sheet|alert-dialog|popover)$/
+const forbiddenTags = new Set([
+  "div", "span", "p", "h1", "h2", "h3", "h4", "h5", "h6", "section", "article", "aside", "header", "footer",
+  "main", "nav", "ul", "ol", "li", "label", "strong", "em", "small", "b", "i", "pre", "code",
+])
+const allowedButtonSizes = new Set(["default", "icon"])
 const violations = []
 
-for await (const rel of glob("packages/*/src/**/*.{ts,tsx}", { cwd: root })) {
+for await (const rel of glob("{packages,integrations}/*/src/**/*.{ts,tsx}", { cwd: root })) {
   const file = rel.split(sep).join("/")
   if (file.startsWith("packages/ui/") || file.includes("/node_modules/")) continue
   const source = ts.createSourceFile(file, readFileSync(resolve(root, file), "utf8"), ts.ScriptTarget.Latest, true)
@@ -33,6 +38,23 @@ for await (const rel of glob("packages/*/src/**/*.{ts,tsx}", { cwd: root })) {
   }
   visit(source)
   const visitJsx = (node) => {
+    if (ts.isJsxOpeningLikeElement(node)) {
+      const tag = node.tagName.getText(source)
+      if (forbiddenTags.has(tag)) report(node, `elemento HTML intrinseco <${tag}> (use componentes de @platform/ui)`)
+      for (const attr of node.attributes.properties) {
+        if (!ts.isJsxAttribute(attr)) continue
+        const name = attr.name.getText(source)
+        if (name === "className" || name === "style") report(attr, `${name} em JSX fora de @platform/ui`)
+        if (tag === "Button" && name === "size") {
+          const init = attr.initializer
+          const expr = init && ts.isJsxExpression(init) ? init.expression : init
+          const value = expr && ts.isStringLiteralLike(expr) ? expr.text : undefined
+          if (value === undefined || !allowedButtonSizes.has(value)) {
+            report(attr, `Button size deve ser "default" ou "icon" (literal)`)
+          }
+        }
+      }
+    }
     if (ts.isJsxOpeningLikeElement(node) && windowTags.has(node.tagName.getText(source))) {
       for (const attr of node.attributes.properties) {
         if (ts.isJsxAttribute(attr) && (attr.name.text === "open" || attr.name.text === "onOpenChange")) {
