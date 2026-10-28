@@ -1,20 +1,25 @@
 import { INOVAFARMA_EXTERNALS } from "./externals.js";
 
+interface DriverFieldBase {
+  name: string;
+  label: string;
+  required?: boolean;
+  placeholder?: string;
+  description?: string;
+}
+
+/** Subconjunto dos campos de formulário da plataforma usados pelo Driver (estruturalmente compatível com FormFieldDef). */
+export type DriverField =
+  | (DriverFieldBase & { type: "text"; defaultValue?: string })
+  | (DriverFieldBase & { type: "password" })
+  | (DriverFieldBase & { type: "number"; defaultValue?: number; min?: number; max?: number })
+  | (DriverFieldBase & { type: "switch"; defaultValue?: boolean });
+
 export interface ErpDriverDef {
   id: string;
   label: string;
-  fields: {
-    name: string;
-    label: string;
-    type: string;
-    required?: boolean;
-    defaultValue?: unknown;
-    placeholder?: string;
-    description?: string;
-    min?: number;
-    max?: number;
-  }[];
-  externalFields: readonly { name: string; label: string; type: string }[];
+  fields: DriverField[];
+  externalFields: { name: string; label: string; type: "text" }[];
   createClient(values: Record<string, unknown>): {
     query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
     healthCheck?(): Promise<boolean>;
@@ -51,7 +56,7 @@ export function createInovafarmaDriver({ createMssqlClient }: InovafarmaDriverOp
         description: "Ative para servidores com certificado autoassinado.",
       },
     ],
-    externalFields: INOVAFARMA_EXTERNALS,
+    externalFields: [...INOVAFARMA_EXTERNALS],
     createClient: createMssqlClient,
   };
 }

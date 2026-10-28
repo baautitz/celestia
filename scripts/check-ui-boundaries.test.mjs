@@ -19,6 +19,28 @@ function runTest() {
       'import { Dialog } from "@platform/ui/components/dialog"\nexport const A = () => <Dialog open={true} onOpenChange={() => {}} />\n',
     "legacy.tsx": 'import { Button } from "@/components/ui/button"\nexport const a = Button\n',
   }
+  const plugin = join(root, "integrations/acme/src")
+  mkdirSync(plugin, { recursive: true })
+  writeFileSync(join(plugin, "page.tsx"), 'import { toast } from "sonner"\nexport const a = toast\n')
+  writeFileSync(
+    join(src, "intrinsic.tsx"),
+    ["export const A = () => <div>x</div>", "export const B = () => <h1>x</h1>", "export const C = () => <span />", ""].join("\n"),
+  )
+  writeFileSync(
+    join(src, "styled.tsx"),
+    'import { Card } from "@platform/ui/components/card"\nexport const A = () => <Card className="p-4" style={{ color: "red" }} />\n',
+  )
+  writeFileSync(
+    join(src, "sizes.tsx"),
+    [
+      'import { Button } from "@platform/ui/components/button"',
+      'export const A = () => <Button size="sm" />',
+      'export const B = () => <Button size="icon" />',
+      'export const C = () => <Button size="default" />',
+      "export const D = () => <Button />",
+      "",
+    ].join("\n"),
+  )
   for (const [name, content] of Object.entries(cases)) writeFileSync(join(src, name), content)
 
   const run = () => spawnSync(process.execPath, [script, "--root", root], { encoding: "utf8" })
@@ -29,6 +51,20 @@ function runTest() {
   for (const [name, line] of [["sonner.tsx", 1], ["base.tsx", 1], ["open.tsx", 2], ["open.tsx", 2], ["legacy.tsx", 1]]) {
     assert.match(out, new RegExp(`packages/web/src/${name}:${line} `), `${name}:${line} nao citado`)
   }
+  for (const [path, line] of [
+    ["integrations/acme/src/page.tsx", 1],
+    ["packages/web/src/intrinsic.tsx", 1],
+    ["packages/web/src/intrinsic.tsx", 2],
+    ["packages/web/src/intrinsic.tsx", 3],
+    ["packages/web/src/styled.tsx", 2],
+    ["packages/web/src/sizes.tsx", 2],
+  ]) {
+    assert.match(out, new RegExp(`${path}:${line} `), `${path}:${line} nao citado`)
+  }
+  assert.match(out, /<div>/)
+  assert.match(out, /className/)
+  assert.match(out, /style/)
+  assert.doesNotMatch(out, /sizes\.tsx:[345] /, "size icon/default/omitido devem passar")
   assert.match(out, /open declarativo/)
   assert.match(out, /onOpenChange declarativo/)
 

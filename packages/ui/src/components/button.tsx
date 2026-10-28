@@ -42,12 +42,13 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  fullWidth,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { fullWidth?: boolean }) {
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size, className }), fullWidth && "w-full")}
       {...props}
     />
   )

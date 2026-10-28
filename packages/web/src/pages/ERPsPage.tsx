@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Erp, ErpDriverMeta, FormFieldDef } from "@platform/shared";
 import { Button } from "@platform/ui/components/button";
+import { PageHeader, Show, Spin, Stack } from "@platform/ui/components/layout";
 import { Input } from "@platform/ui/components/input";
 import { Badge } from "@platform/ui/components/badge";
 import {
@@ -121,7 +122,8 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, drivers }) => {
   return (
     <>
       <Form {...form}>
-        <form id="erp-form" onSubmit={form.handleSubmit(handleSave)} className="flex flex-col gap-6" noValidate>
+        <form id="erp-form" onSubmit={form.handleSubmit(handleSave)} noValidate>
+<Stack gap={6}>
                 <FormField
               control={form.control}
               name="driver"
@@ -134,7 +136,7 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, drivers }) => {
                       onValueChange={(val: string | null) => handleDriverChange(val ?? "")}
                     >
                       <FormControl>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger fullWidth>
                           <SelectValue placeholder="Selecione o ERP Driver">
                             {drivers.find((d) => d.id === field.value)?.label}
                           </SelectValue>
@@ -198,6 +200,7 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, drivers }) => {
 
 
           <DynamicFormFields fields={driverFields} form={form} />
+</Stack>
         </form>
       </Form>
       <WindowActions>
@@ -305,19 +308,19 @@ export const ERPsPage: React.FC = () => {
   const rowMenu = (erp: Erp) => (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
-        <MoreHorizontal className="size-4" />
+        <MoreHorizontal />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleTest(erp)} className="cursor-pointer">
-          <PlugZap className="size-4 mr-2" />
+        <DropdownMenuItem onClick={() => handleTest(erp)}>
+          <PlugZap />
           Testar ERP
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openSheet(erp)} className="cursor-pointer">
-          <Edit2 className="size-4 mr-2" />
+        <DropdownMenuItem onClick={() => openSheet(erp)}>
+          <Edit2 />
           Editar ERP
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleDelete(erp)} className="cursor-pointer text-destructive">
-          <Trash2 className="size-4 mr-2" />
+        <DropdownMenuItem onClick={() => handleDelete(erp)} variant="destructive">
+          <Trash2 />
           Excluir ERP
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -325,38 +328,35 @@ export const ERPsPage: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <Stack gap={6}>
       <HeaderActions>
-        <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+        <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
+          <Spin active={loading}><RefreshCw /></Spin>
         </Button>
 
-        <Button onClick={() => openSheet(null)} className="hidden lg:inline-flex shrink-0" disabled={drivers.length === 0}>
-          <PlusCircle className="size-3.5 mr-1.5" />
-          Novo ERP
-        </Button>
+        <Show on="desktop">
+          <Button onClick={() => openSheet(null)} disabled={drivers.length === 0}>
+            <PlusCircle />
+            Novo ERP
+          </Button>
+        </Show>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button variant="outline" size="icon" className="size-8 shrink-0 lg:hidden" />}
-          >
-            <MoreHorizontal className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openSheet(null)} className="cursor-pointer">
-              <PlusCircle className="size-4 mr-2" />
-              Novo ERP
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Show on="mobile">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
+              <MoreHorizontal />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => openSheet(null)}>
+                <PlusCircle />
+                Novo ERP
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Show>
       </HeaderActions>
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">ERPs</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Cadastre os ERPs de onde os módulos leem dados. As consultas aos ERPs são somente leitura.
-        </p>
-      </div>
+      <PageHeader title="ERPs" description="Cadastre os ERPs de onde os módulos leem dados. As consultas aos ERPs são somente leitura." />
 
       <DataTable
         columns={columns}
@@ -368,6 +368,6 @@ export const ERPsPage: React.FC = () => {
         emptyMessage="Nenhum ERP cadastrado."
         rowActions={rowMenu}
       />
-    </div>
+    </Stack>
   );
 };

@@ -89,6 +89,31 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  integrations/inovafarma:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@platform/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      hono:
+        specifier: ^4.13.13
+        version: 4.13.13
+      lucide-react:
+        specifier: ^1.33.0
+        version: 1.33.0(react@19.2.8)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.18
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   packages/core:
     dependencies:
       hono:
@@ -128,6 +153,9 @@ importers:
       '@integrations/example':
         specifier: workspace:*
         version: link:../../integrations/example
+      '@integrations/inovafarma':
+        specifier: workspace:*
+        version: link:../../integrations/inovafarma
       '@node-rs/argon2':
         specifier: ^2.1.0
         version: 2.1.0
@@ -272,6 +300,9 @@ importers:
       '@integrations/example':
         specifier: workspace:*
         version: link:../../integrations/example
+      '@integrations/inovafarma':
+        specifier: workspace:*
+        version: link:../../integrations/inovafarma
       '@platform/shared':
         specifier: workspace:*
         version: link:../shared
