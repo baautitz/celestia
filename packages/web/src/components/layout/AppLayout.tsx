@@ -38,6 +38,7 @@ import { Avatar, AvatarFallback } from "@platform/ui/components/avatar";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
 import { Separator } from "@platform/ui/components/separator";
+import { AppHeader, AppMain, BrandMark, Show, Stack, Text } from "@platform/ui/components/layout";
 import { LogOut, ChevronDown, ArrowLeft, Building2 } from "lucide-react";
 import { accessibleEntries } from "@/modules";
 
@@ -89,12 +90,14 @@ export const AppLayout: React.FC = () => {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" render={<Link to="/" />}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-none bg-primary text-primary-foreground">
-                  <Building2 className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Celestia</span>
-                </div>
+                <BrandMark>
+                  <Building2 />
+                </BrandMark>
+                <Stack grow>
+                  <Text variant="small" weight="semibold" truncate>
+                    Celestia
+                  </Text>
+                </Stack>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -112,8 +115,8 @@ export const AppLayout: React.FC = () => {
                       tooltip={entry.label}
                       render={<Link to={entry.path} />}
                     >
-                      <entry.icon className="size-4" />
-                      <span>{entry.label}</span>
+                      <entry.icon />
+                      <Text>{entry.label}</Text>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -130,46 +133,51 @@ export const AppLayout: React.FC = () => {
                   <DropdownMenuTrigger
                     render={
                       <SidebarMenuButton size="lg">
-                        <Avatar className="size-8">
+                        <Avatar>
                           <AvatarFallback>{getInitials(user.fullname)}</AvatarFallback>
                         </Avatar>
-                        <div className="grid flex-1 text-left text-sm leading-tight">
-                          <span className="truncate font-semibold">{user.fullname}</span>
-                          <span className="truncate text-xs text-muted-foreground">{user.username}</span>
-                        </div>
-                        <ChevronDown className="ml-auto size-4" />
+                        <Stack grow>
+                          <Text variant="small" weight="semibold" truncate>
+                            {user.fullname}
+                          </Text>
+                          <Text variant="caption" tone="muted" truncate>
+                            {user.username}
+                          </Text>
+                        </Stack>
+                        <ChevronDown />
                       </SidebarMenuButton>
                     }
                   />
-                  <DropdownMenuContent
-                    className="min-w-56"
-                    side="bottom"
-                    align="end"
-                    sideOffset={4}
-                  >
+                  <DropdownMenuContent side="bottom" align="end" sideOffset={4}>
                     <DropdownMenuGroup>
-                      <DropdownMenuLabel className="p-0 font-normal">
-                        <div className="flex items-center gap-2 px-2 py-2 text-left text-sm">
-                          <Avatar className="size-8">
+                      <DropdownMenuLabel>
+                        <Stack direction="row" align="center" gap={2}>
+                          <Avatar>
                             <AvatarFallback>{getInitials(user.fullname)}</AvatarFallback>
                           </Avatar>
-                          <div className="grid flex-1 text-left text-sm leading-tight">
-                            <span className="truncate font-semibold">{user.fullname}</span>
-                            <span className="truncate text-xs text-muted-foreground">{user.email || user.username}</span>
-                          </div>
-                        </div>
+                          <Stack grow>
+                            <Text variant="small" weight="semibold" truncate>
+                              {user.fullname}
+                            </Text>
+                            <Text variant="caption" tone="muted" truncate>
+                              {user.email || user.username}
+                            </Text>
+                          </Stack>
+                        </Stack>
                       </DropdownMenuLabel>
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>
-                      <div className="flex items-center justify-between px-2 py-1.5 text-xs text-muted-foreground">
-                        <span>Grupo / Perfil</span>
+                      <Stack direction="row" align="center" justify="between" padding={2}>
+                        <Text variant="caption" tone="muted">
+                          Grupo / Perfil
+                        </Text>
                         <Badge variant="secondary">{user.role}</Badge>
-                      </div>
+                      </Stack>
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer">
-                      <LogOut className="mr-2 size-4" />
+                    <DropdownMenuItem onClick={handleLogout} variant="destructive">
+                      <LogOut />
                       Sair da Plataforma
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -181,9 +189,9 @@ export const AppLayout: React.FC = () => {
       </Sidebar>
 
       <SidebarInset>
-        <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center border-b border-border/50 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 px-3 md:px-6 transition-[width,height] ease-linear">
-          <div className="flex items-center gap-2 min-w-0 shrink-0">
-            <SidebarTrigger className="-ml-1 size-8 shrink-0" />
+        <AppHeader>
+          <Stack direction="row" align="center" gap={2}>
+            <SidebarTrigger />
             {backTo && (
               <Button
                 variant="ghost"
@@ -192,37 +200,38 @@ export const AppLayout: React.FC = () => {
                 render={<Link to={backTo} />}
                 title="Voltar"
                 aria-label="Voltar"
-                className="size-8 shrink-0"
               >
-                <ArrowLeft className="size-4" />
+                <ArrowLeft />
               </Button>
             )}
-            <Separator orientation="vertical" className="h-4 hidden sm:block my-auto" />
-            <Breadcrumb className="min-w-0">
-              <BreadcrumbList className="items-center">
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink render={<Link to="/" />} className="cursor-pointer text-sm">
-                    Início
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block my-auto self-center" />
+            <Show on="desktop">
+              <Separator orientation="vertical" />
+            </Show>
+            <Breadcrumb>
+              <BreadcrumbList>
+                <Show on="desktop">
+                  <BreadcrumbItem>
+                    <BreadcrumbLink render={<Link to="/" />}>Início</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                </Show>
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="text-sm font-medium truncate">{pageTitle}</BreadcrumbPage>
+                  <BreadcrumbPage>{pageTitle}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-          </div>
+          </Stack>
 
           {actions && (
-            <div className="flex items-center gap-1.5 md:gap-2 ml-auto shrink-0">
+            <Stack direction="row" align="center" gap={2} shrink={false}>
               {actions}
-            </div>
+            </Stack>
           )}
-        </header>
+        </AppHeader>
 
-        <main className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
+        <AppMain>
           <Outlet />
-        </main>
+        </AppMain>
       </SidebarInset>
     </SidebarProvider>
   );

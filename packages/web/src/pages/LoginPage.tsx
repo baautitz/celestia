@@ -14,6 +14,7 @@ import {
 import { FieldGroup, Field, FieldLabel, FieldError } from "@platform/ui/components/field";
 import { Input } from "@platform/ui/components/input";
 import { Button } from "@platform/ui/components/button";
+import { CenteredScreen } from "@platform/ui/components/layout";
 import { useUi } from "@platform/ui/imperative/provider";
 
 const loginSchema = z.object({
@@ -58,10 +59,10 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4 bg-muted/20">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center items-center justify-center pb-4 flex flex-col">
-          <CardTitle className="text-2xl font-bold">Celestia</CardTitle>
+    <CenteredScreen>
+      <Card>
+        <CardHeader>
+          <CardTitle>Celestia</CardTitle>
           <CardDescription>Entre com seu usuário e senha para continuar.</CardDescription>
         </CardHeader>
 
@@ -98,7 +99,7 @@ export const LoginPage: React.FC = () => {
 
               <Button
                 type="submit"
-                className="w-full mt-2"
+                fullWidth
                 disabled={isSubmitting}
               >
                 {isSubmitting ? "Autenticando..." : "Entrar"}
@@ -108,6 +109,6 @@ export const LoginPage: React.FC = () => {
         </CardContent>
 
       </Card>
-    </main>
+    </CenteredScreen>
   );
 };

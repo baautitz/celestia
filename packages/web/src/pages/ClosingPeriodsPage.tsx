@@ -17,6 +17,7 @@ import { Edit2, Lock, LockOpen, MoreHorizontal, Plus, RefreshCw, Trash2 } from "
 import { DatePicker } from "@platform/ui/components/date-picker";
 import { Input } from "@platform/ui/components/input";
 import { FieldGroup } from "@platform/ui/components/field";
+import { Spin } from "@platform/ui/components/layout";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@platform/ui/components/form";
 import { useWindow, WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { useAuth } from "@/context/AuthContext";
@@ -126,8 +127,8 @@ const CreatePeriodSheet: React.FC = () => {
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="w-full leading-snug">Nome do Período</FormLabel>
+                <FormItem>
+                  <FormLabel>Nome do Período</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="Ex.: Outubro/2026" />
                   </FormControl>
@@ -139,8 +140,8 @@ const CreatePeriodSheet: React.FC = () => {
               control={form.control}
               name="startDate"
               render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="w-full leading-snug">Data Inicial</FormLabel>
+                <FormItem>
+                  <FormLabel>Data Inicial</FormLabel>
                   <FormControl>
                     <DatePicker value={field.value} onChange={field.onChange} />
                   </FormControl>
@@ -152,8 +153,8 @@ const CreatePeriodSheet: React.FC = () => {
               control={form.control}
               name="endDate"
               render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="w-full leading-snug">Data Final</FormLabel>
+                <FormItem>
+                  <FormLabel>Data Final</FormLabel>
                   <FormControl>
                     <DatePicker value={field.value} onChange={field.onChange} />
                   </FormControl>
@@ -208,8 +209,8 @@ const EditRangeSheet: React.FC<{ period: ClosingPeriodRecord }> = ({ period }) =
               control={form.control}
               name="startDate"
               render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="w-full leading-snug">Data Inicial</FormLabel>
+                <FormItem>
+                  <FormLabel>Data Inicial</FormLabel>
                   <FormControl>
                     <DatePicker value={field.value} onChange={field.onChange} />
                   </FormControl>
@@ -221,8 +222,8 @@ const EditRangeSheet: React.FC<{ period: ClosingPeriodRecord }> = ({ period }) =
               control={form.control}
               name="endDate"
               render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="w-full leading-snug">Data Final</FormLabel>
+                <FormItem>
+                  <FormLabel>Data Final</FormLabel>
                   <FormControl>
                     <DatePicker value={field.value} onChange={field.onChange} />
                   </FormControl>
@@ -310,30 +311,30 @@ export const ClosingPeriodsPage: React.FC = () => {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
-          <MoreHorizontal className="size-4" />
+          <MoreHorizontal />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {canEdit && (
-            <DropdownMenuItem onClick={() => openEditRange(p)} className="cursor-pointer">
-              <Edit2 className="size-4 mr-2" />
+            <DropdownMenuItem onClick={() => openEditRange(p)}>
+              <Edit2 />
               Editar faixa
             </DropdownMenuItem>
           )}
           {canClose && (
-            <DropdownMenuItem onClick={() => handleClose(p)} className="cursor-pointer">
-              <Lock className="size-4 mr-2" />
+            <DropdownMenuItem onClick={() => handleClose(p)}>
+              <Lock />
               Fechar período
             </DropdownMenuItem>
           )}
           {canReopen && (
-            <DropdownMenuItem onClick={() => handleReopen(p)} className="cursor-pointer">
-              <LockOpen className="size-4 mr-2" />
+            <DropdownMenuItem onClick={() => handleReopen(p)}>
+              <LockOpen />
               Reabrir período
             </DropdownMenuItem>
           )}
           {canCancel && (
-            <DropdownMenuItem onClick={() => handleCancel(p)} className="cursor-pointer text-destructive">
-              <Trash2 className="size-4 mr-2" />
+            <DropdownMenuItem onClick={() => handleCancel(p)} variant="destructive">
+              <Trash2 />
               Cancelar período
             </DropdownMenuItem>
           )}
@@ -366,13 +367,13 @@ export const ClosingPeriodsPage: React.FC = () => {
     <>
       <HeaderActions>
         {hasPermission("closing_period:period:create") && (
-          <Button onClick={openCreatePeriod} className="gap-2">
-            <Plus className="size-4" />
+          <Button onClick={openCreatePeriod}>
+            <Plus />
             Novo Período
           </Button>
         )}
         <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={loading ? "animate-spin" : ""} />
+          <Spin active={loading}><RefreshCw /></Spin>
         </Button>
       </HeaderActions>
 

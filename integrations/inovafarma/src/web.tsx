@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle } from "lucide-react";
-import { Card, CardContent } from "@platform/ui/components/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
+import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
+import { Grid, KpiCard, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { defineWebModule } from "@platform/ui/contracts/module";
 import { formatCurrency, formatNumber, formatDate } from "@platform/ui/lib/format";
@@ -199,18 +200,29 @@ function VendasComissoesPage() {
     : "Selecione um Período";
 
   return (
-    <div className="flex flex-col gap-6">
+    <Stack gap={6}>
       {/* Barra de Filtros */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 p-4 border bg-card text-card-foreground shadow-xs">
-        <div className="flex flex-wrap items-end gap-4 flex-1">
+      <Stack
+        direction="row"
+        wrap
+        align="end"
+        justify="between"
+        gap={4}
+        padding={4}
+        bordered
+        surface="card"
+      >
+        <Stack direction="row" wrap align="end" gap={4} grow>
           {/* Seletor de Período de Fechamento */}
-          <div className="flex flex-col gap-1.5 min-w-[280px] flex-1 max-w-sm">
-            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <Calendar className="size-3.5" />
-              Período de Fechamento
-            </span>
+          <Stack gap={2} grow maxWidth="sm">
+            <Stack direction="row" align="center" gap={2}>
+              <Calendar />
+              <Text variant="caption" tone="muted" weight="medium">
+                Período de Fechamento
+              </Text>
+              </Stack>
             <Select value={selectedPeriodId} onValueChange={(val) => val && setSelectedPeriodId(val)}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger fullWidth>
                 <SelectValue placeholder="Selecione um período">{selectedPeriodLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -220,20 +232,26 @@ function VendasComissoesPage() {
                   </SelectItem>
                 ))}
                 {periods.length === 0 && (
-                  <div className="p-2 text-xs text-muted-foreground text-center">Nenhum período cadastrado</div>
+                  <Stack padding={2} align="center">
+                    <Text variant="caption" tone="muted">
+                      Nenhum período cadastrado
+                    </Text>
+                  </Stack>
                 )}
               </SelectContent>
             </Select>
-          </div>
+          </Stack>
 
           {/* Seletor de Filial / Loja */}
-          <div className="flex flex-col gap-1.5 min-w-[220px] flex-1 max-w-xs">
-            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <Store className="size-3.5" />
-              Filial / Loja
-            </span>
+          <Stack gap={2} grow maxWidth="sm">
+            <Stack direction="row" align="center" gap={2}>
+              <Store />
+              <Text variant="caption" tone="muted" weight="medium">
+                Filial / Loja
+              </Text>
+              </Stack>
             <Select value={selectedLoja} onValueChange={(val) => val && setSelectedLoja(val)}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger fullWidth>
                 <SelectValue placeholder="Todas as Filiais">{selectedLojaLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -245,120 +263,84 @@ function VendasComissoesPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Stack>
 
           {selectedPeriod && (
-            <div className="flex items-center h-8 px-2.5 border text-xs bg-muted/30">
-              <span className="text-muted-foreground mr-1.5">Status:</span>
-              <Badge variant={selectedPeriod.status === "open" ? "secondary" : "outline"} className="text-xs">
+            <Stack direction="row" align="center" gap={2} padding={2} bordered surface="muted">
+              <Text variant="caption" tone="muted">
+                Status:
+              </Text>
+              <Badge variant={selectedPeriod.status === "open" ? "secondary" : "outline"}>
                 {selectedPeriod.status === "open" ? "Aberto" : selectedPeriod.status === "closed" ? "Fechado" : "Cancelado"}
               </Badge>
-            </div>
+            </Stack>
           )}
-        </div>
+        </Stack>
 
-        <Button
-          variant="outline"
-          size="default"
-          onClick={() => void fetchRelatorio()}
-          disabled={loading || !selectedPeriod}
-          className="gap-2 shrink-0"
-        >
-          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+        <Button variant="outline" size="default" onClick={() => void fetchRelatorio()} disabled={loading || !selectedPeriod}>
+          <Spin active={loading}>
+            <RefreshCw />
+          </Spin>
           Atualizar
         </Button>
-      </div>
+      </Stack>
 
       {/* Alerta se não houver períodos */}
       {periods.length === 0 && !loading && (
-        <div className="p-4 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-sm flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0 text-amber-600" />
-            <span>Nenhum Período de Fechamento cadastrado na plataforma.</span>
-          </div>
-          <a href="/closing-periods" className="text-xs font-medium underline underline-offset-4 hover:opacity-80">
-            Cadastrar Período
-          </a>
-        </div>
+        <Alert>
+          <AlertCircle />
+          <AlertTitle>Nenhum Período de Fechamento cadastrado na plataforma.</AlertTitle>
+          <AlertDescription>
+            <a href="/closing-periods">Cadastrar Período</a>
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Erro de conexão ou consulta */}
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-md border border-destructive/30 bg-destructive/10 text-destructive text-sm">
-          <AlertCircle className="size-5 shrink-0 mt-0.5" />
-          <div className="flex flex-col gap-1">
-            <span className="font-semibold">Falha na consulta InovaFarma:</span>
-            <span>{error}</span>
-          </div>
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertTitle>Falha na consulta InovaFarma:</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       {/* Cards de Resumo / KPI */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Total Líquido</p>
-              <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
-                {formatCurrency(resumo?.totalLiquidoGeral)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {resumo ? `${formatNumber(resumo.totalVendasGeral)} vendas realizadas` : "-"}
-              </p>
-            </div>
-            <div className="size-11 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <DollarSign className="size-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Total Bruto</p>
-              <p className="text-2xl font-bold font-mono mt-1">{formatCurrency(resumo?.totalBrutoGeral)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Descontos: {formatCurrency(resumo?.totalDescontoGeral)}
-              </p>
-            </div>
-            <div className="size-11 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-              <TrendingUp className="size-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Ticket Médio Geral</p>
-              <p className="text-2xl font-bold font-mono mt-1">
-                {resumo && resumo.totalVendasGeral > 0
-                  ? formatCurrency(resumo.totalLiquidoGeral / resumo.totalVendasGeral)
-                  : "R$ 0,00"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Média por cupom de venda</p>
-            </div>
-            <div className="size-11 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <Award className="size-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Vendedores com Venda</p>
-              <p className="text-2xl font-bold font-mono mt-1">
-                {resumo ? formatNumber(resumo.totalVendedores) : "-"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Colaboradores ativos no período</p>
-            </div>
-            <div className="size-11 rounded-full bg-sky-500/10 flex items-center justify-center text-sky-600 dark:text-sky-400">
-              <Users className="size-5" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Grid columns="cards">
+        <KpiCard
+          label="Total Líquido"
+          value={formatCurrency(resumo?.totalLiquidoGeral)}
+          hint={resumo ? `${formatNumber(resumo.totalVendasGeral)} vendas realizadas` : "-"}
+          icon={<DollarSign />}
+          tone="success"
+          highlight
+        />
+        <KpiCard
+          label="Total Bruto"
+          value={formatCurrency(resumo?.totalBrutoGeral)}
+          hint={`Descontos: ${formatCurrency(resumo?.totalDescontoGeral)}`}
+          icon={<TrendingUp />}
+          tone="primary"
+        />
+        <KpiCard
+          label="Ticket Médio Geral"
+          value={
+            resumo && resumo.totalVendasGeral > 0
+              ? formatCurrency(resumo.totalLiquidoGeral / resumo.totalVendasGeral)
+              : "R$ 0,00"
+          }
+          hint="Média por cupom de venda"
+          icon={<Award />}
+          tone="warning"
+        />
+        <KpiCard
+          label="Vendedores com Venda"
+          value={resumo ? formatNumber(resumo.totalVendedores) : "-"}
+          hint="Colaboradores ativos no período"
+          icon={<Users />}
+          tone="info"
+        />
+      </Grid>
 
       {/* Tabela de Vendedores */}
       <DataTable
@@ -379,7 +361,7 @@ function VendasComissoesPage() {
         }
         pagination={{ pageSize: 20 }}
       />
-    </div>
+    </Stack>
   );
 }
 
