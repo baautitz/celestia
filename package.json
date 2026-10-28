@@ -21,7 +21,7 @@
     "dev:server": "pnpm --filter @platform/server dev",
     "dev:web": "pnpm --filter @platform/web dev",
     "lint": "pnpm -r run lint",
-    "check": "pnpm check:ui && pnpm check:plugins && pnpm lint && pnpm build && pnpm test",
+    "check": "pnpm check:ui && pnpm check:ui:test && pnpm check:plugins && pnpm lint && pnpm build && pnpm test",
     "prepare": "node scripts/setup-git-hooks.mjs"
   },
   "dependencies": {
