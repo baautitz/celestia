@@ -52,7 +52,7 @@ describe("módulo iam: eventos", () => {
     const created = await app.request("/api/iam/users", {
       method: "POST",
       headers: authed,
-      body: JSON.stringify({ fullname: "Novo Usuario", username: "novo.user", password: TEST_PASSWORD, roleId: "role_vendedor" }),
+      body: JSON.stringify({ fullname: "Novo Usuario", username: "novo.user", password: TEST_PASSWORD, roleId: "role_colaborador" }),
     });
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
@@ -86,7 +86,7 @@ describe("módulo iam: eventos", () => {
     const res = await app.request("/api/iam/users", {
       method: "POST",
       headers: authed,
-      body: JSON.stringify({ fullname: "Novo Usuario", username: "novo.user", password: TEST_PASSWORD, roleId: "role_vendedor" }),
+      body: JSON.stringify({ fullname: "Novo Usuario", username: "novo.user", password: TEST_PASSWORD, roleId: "role_colaborador" }),
     });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "bloqueado pelo teste" });

@@ -149,7 +149,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
   // ─── 3. IAM: GESTÃO DE USUÁRIOS, ROLES E RESET DE SENHA ────────────────────
   describe("3. Gestão de Usuários e Reset Exclusivo por Administrador", () => {
     let adminToken: string;
-    let vendedorToken: string;
+    let colaboradorToken: string;
 
     beforeEach(async () => {
       const resAdmin = await app.request("/api/auth/login", {
@@ -159,12 +159,12 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
       });
       adminToken = ((await resAdmin.json()) as AuthTokens).accessToken;
 
-      const resVendedor = await app.request("/api/auth/login", {
+      const resColaborador = await app.request("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: "joao.silva", password: "Senha@123" }),
       });
-      vendedorToken = ((await resVendedor.json()) as AuthTokens).accessToken;
+      colaboradorToken = ((await resColaborador.json()) as AuthTokens).accessToken;
     });
 
     it("Admin deve criar novo usuário respeitando a política de senha", async () => {
@@ -175,24 +175,24 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          fullname: "Novo Vendedor",
-          username: "novo.vendedor",
+          fullname: "Novo Colaborador",
+          username: "novo.colaborador",
           password: "NovaSenha@2026",
-          roleId: "role_vendedor",
+          roleId: "role_colaborador",
         }),
       });
 
       expect(res.status).toBe(201);
       const newUser = (await res.json()) as User;
-      expect(newUser.username).toBe("novo.vendedor");
+      expect(newUser.username).toBe("novo.colaborador");
       expect(newUser.passwordHash).toBeUndefined(); // Proteção: nunca expõe hash
     });
 
-    it("Vendedor comum sem permissão de admin deve ser bloqueado com 403 ao tentar criar usuário", async () => {
+    it("Colaborador comum sem permissão de admin deve ser bloqueado com 403 ao tentar criar usuário", async () => {
       const res = await app.request("/api/iam/users", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${vendedorToken}`,
+          Authorization: `Bearer ${colaboradorToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

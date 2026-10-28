@@ -36,7 +36,7 @@ export interface JWTAccessPayload {
   username: string;        // "joao.silva"
   fullname: string;        // "João da Silva"
   email?: string;
-  role: string;            // ID da Role (ex: "role_vendedor")
+  role: string;            // ID da Role (ex: "role_colaborador")
   permissions: string[];   // Lista de permissões do usuário
   isAdmin?: boolean;       // Administrador: o servidor expande para todas as permissões válidas
   iat?: number;
