@@ -381,7 +381,6 @@ function VendasComissoesPage() {
           value={formatCurrency(resumo?.totalLiquidoGeral)}
           icon={<DollarSign />}
           tone="success"
-          highlight
         />
         <KpiCard
           loading={loading}
