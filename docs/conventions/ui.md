@@ -6,6 +6,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 
 - Todo elemento vem de `@platform/ui/components/*` (shadcn/ui sobre Base UI). Nada de HTML cru estilizado.
 - Proibido criar componentes ou wrappers com `<div>` customizado sem aprovação explícita.
+- Layout e tipografia fora de `packages/ui` usam `Stack`, `Grid`, `Show`, `Text`, `PageHeader`, `KpiCard` etc. de `@platform/ui/components/layout` (props tipadas). `pnpm check:ui` também inspeciona `integrations/*` e rejeita elementos HTML intrínsecos de layout/texto (`div`, `span`, `p`, `h1`–`h6`, `section`, `main`, ...), `className`/`style` em JSX e `Button` com `size` diferente de `"default"`/`"icon"`.
 - Tema: somente claro (sem theme provider).
 - Fronteira: fora de `packages/ui`, `pnpm check:ui` proíbe importar `sonner`, `@base-ui/react/*` e `@/components/ui`, e `open=`/`onOpenChange=` declarativos em Dialog/Sheet/AlertDialog/Popover.
 
