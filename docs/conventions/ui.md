@@ -38,6 +38,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 ## Tabelas
 
 - `DataTable` de `@platform/ui/data-table/data-table`: desktop renderiza `<Table>`, mobile renderiza `<MobileCard>` via `useIsMobile()`.
+- Impressão: a prop opcional `print={{ orientation?, description? }}` liga o botão "Imprimir". Use em relatórios e registros (ex.: relatório InovaFarma, Audit Log), não em cadastros. O papel traz todas as linhas da busca e da ordenação atuais, sem paginação, sempre como tabela, com fundos, cabeçalho repetido por folha e rodapé "Emitido em" / "Página X de Y" (este só no Chrome/Edge). A escala reduz a tabela até caber na largura da folha A4. `orientation` padrão é `"portrait"`; use `"landscape"` para tabelas largas. `description` substitui a descrição no papel, por exemplo com os filtros ativos que a tela mostra fora da tabela. O botão fica desabilitado durante o carregamento, sem linhas ou com paginação no servidor.
 - `rowActions` são filtradas pelas permissões do usuário; sem ação permitida, omitir o botão `...` e a coluna de ações. Nunca exibir slug técnico como fallback.
 
 ## Cabeçalho

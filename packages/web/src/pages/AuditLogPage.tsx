@@ -8,11 +8,12 @@ import { Field, FieldGroup } from "@platform/ui/components/field";
 import { Label } from "@platform/ui/components/label";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
+import { formatDate } from "@platform/ui/lib/format";
 import { RefreshCw } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 
-const formatDate = (iso: string) => new Date(iso).toLocaleString("pt-BR");
+const formatDateTime = (iso: string) => new Date(iso).toLocaleString("pt-BR");
 
 const FILTER_FIELDS: { key: keyof AuditLogFilter; label: string; type?: "date" }[] = [
   { key: "targetType", label: "Tipo do alvo" },
@@ -27,7 +28,7 @@ const columns: DataTableColumn<AuditLogEntry>[] = [
   {
     key: "occurredAt",
     label: "Quando",
-    value: (e) => formatDate(e.occurredAt),
+    value: (e) => formatDateTime(e.occurredAt),
     cellClassName: "text-xs text-muted-foreground",
     skeletonClassName: "h-4 w-32",
   },
@@ -87,6 +88,12 @@ export const AuditLogPage: React.FC = () => {
     void fetchData(applied);
   }, [fetchData, applied]);
 
+  const activeFilters = FILTER_FIELDS.flatMap(({ key, label, type }) => {
+    const value = applied[key];
+    return value ? [`${label}: ${type === "date" ? formatDate(value) : value}`] : [];
+  });
+  const printDescription = activeFilters.length > 0 ? `Filtros: ${activeFilters.join(" · ")}` : "Sem filtros.";
+
   return (
     <>
       <HeaderActions>
@@ -128,6 +135,7 @@ export const AuditLogPage: React.FC = () => {
         title={(count) => `Audit Log (${count})`}
         description="Histórico de ações registradas por todo o sistema. Filtre por alvo, usuário, Plugin e data."
         emptyMessage="Nenhuma entrada encontrada."
+        print={{ description: printDescription }}
       />
     </>
   );

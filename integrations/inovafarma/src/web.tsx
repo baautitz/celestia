@@ -434,7 +434,7 @@ function VendasComissoesPage() {
         rows={colaboradores}
         getRowId={(r) => String(r.codigoColaborador)}
         loading={loading}
-        title="Total de Vendas por Colaborador"
+        title="Desempenho por Colaborador"
         description={
           selectedPeriod
             ? `Vendas consolidadas de ${formatDate(selectedPeriod.startDate)} até ${formatDate(selectedPeriod.endDate)} (${selectedLojaLabel})`
@@ -446,6 +446,7 @@ function VendasComissoesPage() {
             : "Nenhuma venda encontrada para o período e filtros selecionados."
         }
         pagination={{ pageSize: 20 }}
+        print={{ orientation: "landscape" }}
       />
     </Stack>
   );
@@ -457,8 +458,8 @@ export const inovafarmaWebModule = defineWebModule({
   entries: [
     {
       id: "inovafarma-vendas",
-      label: "Vendas & Comissões",
-      title: "Vendas & Comissões",
+      label: "Desempenho de Vendas",
+      title: "Desempenho de Vendas",
       icon: TrendingUp,
       path: "/inovafarma/vendas",
       section: "reports",
