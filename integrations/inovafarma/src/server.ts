@@ -73,7 +73,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         }
       });
 
-      routes.get("/relatorios/vendas-vendedor", auth, async (c: Context<{ Variables: { user?: { permissions?: string[] } } }>) => {
+      routes.get("/relatorios/vendas-colaborador", auth, async (c: Context<{ Variables: { user?: { permissions?: string[] } } }>) => {
         const user = c.get("user");
         if (!permissions.has(user?.permissions, viewKey)) {
           return c.json({ error: INOVAFARMA_PERMISSIONS.items[0]?.deniedMessage ?? "Acesso negado." }, 403);
@@ -104,41 +104,64 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
           params.codigoEmpresa = Number(codigoEmpresa);
         }
 
-        const sql = `
-          SELECT 
-            v.CodigoFuncionario AS codigoFuncionario,
-            c.Nome AS nomeFuncionario,
-            COUNT(v.CodigoVenda) AS quantidadeVendas,
-            CAST(SUM(v.TotalBruto) AS float) AS totalBruto,
-            CAST(SUM(v.TotalDesconto) AS float) AS totalDesconto,
-            CAST(SUM(v.TotalLiquido) AS float) AS totalLiquido
+        const fromWhere = `
           FROM Venda v
-          JOIN Funcionario f ON f.CodigoFuncionario = v.CodigoFuncionario
+          JOIN Venda_Produto vp ON vp.CodigoVenda = v.CodigoVenda
+          JOIN Funcionario f ON f.CodigoFuncionario = vp.CodigoFuncionario
           JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
           WHERE v.Eliminado = 0
             AND v.DataVenda >= @dataInicio
             AND v.DataVenda <= @dataFim
             ${filtroEmpresa}
-          GROUP BY v.CodigoFuncionario, c.Nome
+        `;
+
+        const sql = `
+          SELECT
+            vp.CodigoFuncionario AS codigoColaborador,
+            c.Nome AS nomeColaborador,
+            COUNT(DISTINCT vp.CodigoVenda) AS quantidadeVendas,
+            CAST(SUM(vp.Total + vp.TotalDesconto) AS float) AS totalBruto,
+            CAST(SUM(vp.TotalDesconto) AS float) AS totalDesconto,
+            CAST(SUM(vp.Total) AS float) AS totalLiquido,
+            CAST(SUM(vp.Quantidade * vp.PrecoCusto) AS float) AS totalCmv,
+            COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN vp.CodigoVenda END) AS vendasComCadastro
+          ${fromWhere}
+          GROUP BY vp.CodigoFuncionario, c.Nome
           ORDER BY totalLiquido DESC
         `;
 
+        // CodigoCadastro = 0 é o "CONSUMIDOR" (venda sem cliente cadastrado).
+        // Uma venda com itens de vários Colaboradores conta em cada um; o total geral conta cada venda uma vez.
+        const sqlTotalVendas = `
+          SELECT
+            COUNT(DISTINCT v.CodigoVenda) AS totalVendasGeral,
+            COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN v.CodigoVenda END) AS totalVendasComCadastro
+          ${fromWhere}
+        `;
+
         try {
-          interface VendedorRow {
-            codigoFuncionario: number;
-            nomeFuncionario: string;
+          interface ColaboradorRow {
+            codigoColaborador: number;
+            nomeColaborador: string;
             quantidadeVendas: number;
             totalBruto: number;
             totalDesconto: number;
             totalLiquido: number;
+            totalCmv: number;
+            vendasComCadastro: number;
           }
 
-          const rows = await client.query<VendedorRow>(sql, params);
+          const [rows, [totalVendasRow]] = await Promise.all([
+            client.query<ColaboradorRow>(sql, params),
+            client.query<{ totalVendasGeral: number; totalVendasComCadastro: number }>(sqlTotalVendas, params),
+          ]);
 
-          const totalVendasGeral = rows.reduce((acc, r) => acc + (Number(r.quantidadeVendas) || 0), 0);
+          const totalVendasGeral = Number(totalVendasRow?.totalVendasGeral) || 0;
+          const totalVendasComCadastro = Number(totalVendasRow?.totalVendasComCadastro) || 0;
           const totalLiquidoGeral = rows.reduce((acc, r) => acc + (Number(r.totalLiquido) || 0), 0);
           const totalBrutoGeral = rows.reduce((acc, r) => acc + (Number(r.totalBruto) || 0), 0);
           const totalDescontoGeral = rows.reduce((acc, r) => acc + (Number(r.totalDesconto) || 0), 0);
+          const totalCmvGeral = rows.reduce((acc, r) => acc + (Number(r.totalCmv) || 0), 0);
 
           return c.json({
             resumo: {
@@ -146,20 +169,27 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
               totalLiquidoGeral,
               totalBrutoGeral,
               totalDescontoGeral,
-              totalVendedores: rows.length,
+              totalCmvGeral,
+              cmvPercentGeral: totalLiquidoGeral > 0 ? (totalCmvGeral / totalLiquidoGeral) * 100 : 0,
+              cadastroPercentGeral: totalVendasGeral > 0 ? (totalVendasComCadastro / totalVendasGeral) * 100 : 0,
+              totalColaboradores: rows.length,
             },
-            vendedores: rows.map((r) => {
+            colaboradores: rows.map((r) => {
               const liq = Number(r.totalLiquido) || 0;
               const qtd = Number(r.quantidadeVendas) || 0;
+              const cmv = Number(r.totalCmv) || 0;
               return {
-                codigoFuncionario: Number(r.codigoFuncionario),
-                nomeFuncionario: (r.nomeFuncionario || "").trim(),
+                codigoColaborador: Number(r.codigoColaborador),
+                nomeColaborador: (r.nomeColaborador || "").trim(),
                 quantidadeVendas: qtd,
                 totalBruto: Number(r.totalBruto) || 0,
                 totalDesconto: Number(r.totalDesconto) || 0,
                 totalLiquido: liq,
+                totalCmv: cmv,
+                cmvPercent: liq > 0 ? (cmv / liq) * 100 : 0,
                 ticketMedio: qtd > 0 ? liq / qtd : 0,
                 participacaoPercent: totalLiquidoGeral > 0 ? (liq / totalLiquidoGeral) * 100 : 0,
+                cadastroPercent: qtd > 0 ? ((Number(r.vendasComCadastro) || 0) / qtd) * 100 : 0,
               };
             }),
           });

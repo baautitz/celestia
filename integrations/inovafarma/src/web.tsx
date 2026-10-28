@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle } from "lucide-react";
+import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle, Package } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
@@ -7,7 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/ale
 import { Grid, KpiCard, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { defineWebModule } from "@platform/ui/contracts/module";
-import { formatCurrency, formatNumber, formatDate } from "@platform/ui/lib/format";
+import { formatCurrency, formatNumber, formatDate, formatPercent } from "@platform/ui/lib/format";
 import { apiFetch } from "@platform/ui/lib/api";
 
 interface ClosingPeriod {
@@ -23,15 +23,18 @@ interface Loja {
   nome: string;
 }
 
-interface VendedorItem {
-  codigoFuncionario: number;
-  nomeFuncionario: string;
+interface ColaboradorItem {
+  codigoColaborador: number;
+  nomeColaborador: string;
   quantidadeVendas: number;
   totalBruto: number;
   totalDesconto: number;
   totalLiquido: number;
+  totalCmv: number;
+  cmvPercent: number;
   ticketMedio: number;
   participacaoPercent: number;
+  cadastroPercent: number;
 }
 
 interface ResumoVendas {
@@ -39,22 +42,27 @@ interface ResumoVendas {
   totalLiquidoGeral: number;
   totalBrutoGeral: number;
   totalDescontoGeral: number;
-  totalVendedores: number;
+  totalCmvGeral: number;
+  cmvPercentGeral: number;
+  cadastroPercentGeral: number;
+  totalColaboradores: number;
 }
 
-const columns: DataTableColumn<VendedorItem>[] = [
+const columns: DataTableColumn<ColaboradorItem>[] = [
   {
-    key: "codigoFuncionario",
+    key: "codigoColaborador",
     label: "Cód.",
-    value: (r) => r.codigoFuncionario,
+    tooltip: "Código do Colaborador no ERP.",
+    value: (r) => r.codigoColaborador,
     sortable: true,
     searchable: true,
     cellClassName: "font-mono text-xs w-20",
   },
   {
-    key: "nomeFuncionario",
-    label: "Vendedor / Colaborador",
-    value: (r) => r.nomeFuncionario,
+    key: "nomeColaborador",
+    label: "Colaborador",
+    tooltip: "Colaborador que vendeu o item.",
+    value: (r) => r.nomeColaborador,
     sortable: true,
     searchable: true,
     cellClassName: "font-medium",
@@ -62,6 +70,7 @@ const columns: DataTableColumn<VendedorItem>[] = [
   {
     key: "quantidadeVendas",
     label: "Qtd. Vendas",
+    tooltip: "Vendas distintas com ao menos um item do Colaborador.",
     value: (r) => r.quantidadeVendas,
     format: "number",
     sortable: true,
@@ -69,7 +78,8 @@ const columns: DataTableColumn<VendedorItem>[] = [
   },
   {
     key: "totalBruto",
-    label: "Total Bruto",
+    label: "Total Bruto (R$)",
+    tooltip: "Soma dos itens vendidos, antes dos descontos.",
     value: (r) => r.totalBruto,
     format: "currency",
     sortable: true,
@@ -77,7 +87,8 @@ const columns: DataTableColumn<VendedorItem>[] = [
   },
   {
     key: "totalDesconto",
-    label: "Descontos",
+    label: "Descontos (R$)",
+    tooltip: "Soma dos descontos concedidos nos itens.",
     value: (r) => r.totalDesconto,
     format: "currency",
     sortable: true,
@@ -85,15 +96,35 @@ const columns: DataTableColumn<VendedorItem>[] = [
   },
   {
     key: "totalLiquido",
-    label: "Total Líquido",
+    label: "Total Líquido (R$)",
+    tooltip: "Total Bruto menos os descontos.",
     value: (r) => r.totalLiquido,
     format: "currency",
     sortable: true,
     cellClassName: "text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400",
   },
   {
+    key: "totalCmv",
+    label: "CMV (R$)",
+    tooltip: "Custo das mercadorias vendidas: quantidade × preço de custo.",
+    value: (r) => r.totalCmv,
+    format: "currency",
+    sortable: true,
+    cellClassName: "text-right font-mono",
+  },
+  {
+    key: "cmvPercent",
+    label: "CMV (%)",
+    tooltip: "CMV dividido pelo Total Líquido.",
+    value: (r) => r.cmvPercent,
+    format: "percent",
+    sortable: true,
+    cellClassName: "text-right font-mono",
+  },
+  {
     key: "ticketMedio",
-    label: "Ticket Médio",
+    label: "Ticket Médio (R$)",
+    tooltip: "Total Líquido dividido pela quantidade de vendas.",
     value: (r) => r.ticketMedio,
     format: "currency",
     sortable: true,
@@ -101,8 +132,18 @@ const columns: DataTableColumn<VendedorItem>[] = [
   },
   {
     key: "participacaoPercent",
-    label: "% Vendas",
+    label: "Vendas (%)",
+    tooltip: "Participação do Colaborador no Total Líquido geral.",
     value: (r) => r.participacaoPercent,
+    format: "percent",
+    sortable: true,
+    cellClassName: "text-right font-mono",
+  },
+  {
+    key: "cadastroPercent",
+    label: "Cadastros (%)",
+    tooltip: "Vendas com cliente cadastrado divididas pela quantidade de vendas. Vendas para \"CONSUMIDOR\" não contam.",
+    value: (r) => r.cadastroPercent,
     format: "percent",
     sortable: true,
     cellClassName: "text-right font-mono",
@@ -117,7 +158,7 @@ function VendasComissoesPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [resumo, setResumo] = useState<ResumoVendas | null>(null);
-  const [vendedores, setVendedores] = useState<VendedorItem[]>([]);
+  const [colaboradores, setColaboradores] = useState<ColaboradorItem[]>([]);
 
   // Carrega lista de períodos de fechamento e filiais
   useEffect(() => {
@@ -169,15 +210,15 @@ function VendasComissoesPage() {
         params.append("codigoEmpresa", selectedLoja);
       }
 
-      const data = await apiFetch<{ resumo: ResumoVendas; vendedores: VendedorItem[] }>(
-        `/api/m/inovafarma/relatorios/vendas-vendedor?${params.toString()}`
+      const data = await apiFetch<{ resumo: ResumoVendas; colaboradores: ColaboradorItem[] }>(
+        `/api/m/inovafarma/relatorios/vendas-colaborador?${params.toString()}`
       );
 
       setResumo(data.resumo);
-      setVendedores(data.vendedores || []);
+      setColaboradores(data.colaboradores || []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erro desconhecido ao carregar relatório.");
-      setVendedores([]);
+      setColaboradores([]);
       setResumo(null);
     } finally {
       setLoading(false);
@@ -308,22 +349,58 @@ function VendasComissoesPage() {
       {/* Cards de Resumo / KPI */}
       <Grid columns="cards">
         <KpiCard
+          loading={loading}
+          label="Qtd. Vendas"
+          value={resumo ? formatNumber(resumo.totalVendasGeral) : "-"}
+          hint={resumo ? `${formatNumber(resumo.totalColaboradores)} colaboradores com venda` : "-"}
+          icon={<Users />}
+          tone="info"
+        />
+        <KpiCard
+          loading={loading}
+          label="Total Bruto"
+          value={formatCurrency(resumo?.totalBrutoGeral)}
+          icon={<TrendingUp />}
+          tone="primary"
+        />
+        <KpiCard
+          loading={loading}
+          label="Descontos"
+          value={formatCurrency(resumo?.totalDescontoGeral)}
+          hint={
+            resumo && resumo.totalBrutoGeral > 0
+              ? `${formatPercent((resumo.totalDescontoGeral / resumo.totalBrutoGeral) * 100)} do Total Bruto`
+              : "-"
+          }
+          icon={<TrendingUp />}
+          tone="primary"
+        />
+        <KpiCard
+          loading={loading}
           label="Total Líquido"
           value={formatCurrency(resumo?.totalLiquidoGeral)}
-          hint={resumo ? `${formatNumber(resumo.totalVendasGeral)} vendas realizadas` : "-"}
           icon={<DollarSign />}
           tone="success"
           highlight
         />
         <KpiCard
-          label="Total Bruto"
-          value={formatCurrency(resumo?.totalBrutoGeral)}
-          hint={`Descontos: ${formatCurrency(resumo?.totalDescontoGeral)}`}
-          icon={<TrendingUp />}
+          loading={loading}
+          label="CMV (R$)"
+          value={formatCurrency(resumo?.totalCmvGeral)}
+          icon={<Package />}
           tone="primary"
         />
         <KpiCard
-          label="Ticket Médio Geral"
+          loading={loading}
+          label="CMV (%)"
+          value={resumo ? formatPercent(resumo.cmvPercentGeral) : "-"}
+          hint="do Total Líquido"
+          icon={<Package />}
+          tone="primary"
+        />
+        <KpiCard
+          loading={loading}
+          label="Ticket Médio"
           value={
             resumo && resumo.totalVendasGeral > 0
               ? formatCurrency(resumo.totalLiquidoGeral / resumo.totalVendasGeral)
@@ -334,21 +411,22 @@ function VendasComissoesPage() {
           tone="warning"
         />
         <KpiCard
-          label="Vendedores com Venda"
-          value={resumo ? formatNumber(resumo.totalVendedores) : "-"}
-          hint="Colaboradores ativos no período"
+          loading={loading}
+          label="Cadastros (%)"
+          value={resumo ? formatPercent(resumo.cadastroPercentGeral) : "-"}
+          hint="das vendas com cliente cadastrado"
           icon={<Users />}
           tone="info"
         />
       </Grid>
 
-      {/* Tabela de Vendedores */}
+      {/* Tabela de Colaboradores */}
       <DataTable
         columns={columns}
-        rows={vendedores}
-        getRowId={(r) => String(r.codigoFuncionario)}
+        rows={colaboradores}
+        getRowId={(r) => String(r.codigoColaborador)}
         loading={loading}
-        title="Total de Vendas por Vendedor"
+        title="Total de Vendas por Colaborador"
         description={
           selectedPeriod
             ? `Vendas consolidadas de ${formatDate(selectedPeriod.startDate)} até ${formatDate(selectedPeriod.endDate)} (${selectedLojaLabel})`

@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip";
 import { useIsMobile } from "../hooks/use-mobile";
 import { cn } from "../lib/utils";
 import { formatCurrency, formatDate, formatNumber, formatPercent } from "../lib/format";
@@ -23,9 +24,21 @@ export type DataTableFormat = "currency" | "date" | "number" | "percent";
 const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set(["currency", "number", "percent"]);
 const isNumericColumn = (col: { format?: DataTableFormat }) => NUMERIC_FORMATS.has(col.format);
 
+function HeaderLabel({ col }: { col: { label: string; tooltip?: string } }) {
+  if (!col.tooltip) return <span>{col.label}</span>;
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="cursor-help">{col.label}</span>} />
+      <TooltipContent>{col.tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export interface DataTableColumn<TRow> {
   key: string;
   label: string;
+  /** Explicação exibida em tooltip ao passar o mouse sobre o cabeçalho. */
+  tooltip?: string;
   /** Rótulo do campo no MobileCard; padrão: `label`. */
   mobileLabel?: string;
   /** Valor bruto da célula; usado para formato, busca, ordenação e título do MobileCard. */
@@ -298,11 +311,11 @@ export function DataTable<TRow>({
                       >
                         {col.sortable ? (
                           <div className={cn("flex items-center gap-1", isNumericColumn(col) && "justify-end")}>
-                            <span>{col.label}</span>
+                            <HeaderLabel col={col} />
                             <ArrowUpDown className="size-3 text-muted-foreground" />
                           </div>
                         ) : (
-                          col.label
+                          <HeaderLabel col={col} />
                         )}
                       </TableHead>
                     ))}

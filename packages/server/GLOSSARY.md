@@ -40,6 +40,10 @@ _Avoid_: ERP type, connector type
 The values that map a user to an ERP's own concepts, such as the user's ID, company or region in that ERP. A user has a set of Externals per ERP. The fields are declared by the module that integrates that ERP, not fixed by the platform.
 _Avoid_: External IDs, mapping, identifiers
 
+**Colaborador** (en: Collaborator):
+A person who makes sales in an ERP, identified by the `codigoColaborador` External. It is not the same as a User, who signs in to Celestia. In sales reports, a sale is attributed to the Colaborador of each item.
+_Avoid_: Vendedor, Funcionário, Seller
+
 ### Access
 
 **User** (pt-BR: **Usuário**):

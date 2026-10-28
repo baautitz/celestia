@@ -67,3 +67,18 @@ describe.each([
     expect(screen.queryByText("Detalhe de Alfa")).toBeNull();
   });
 });
+
+describe("tooltip do cabeçalho", () => {
+  it("mostra a explicação da coluna ao passar o mouse sobre o rótulo", async () => {
+    setViewport(1280);
+    render(
+      <DataTable
+        columns={[{ ...columns[0]!, tooltip: "Nome do registro." }]}
+        rows={rows}
+        getRowId={(r) => r.id}
+      />,
+    );
+    await userEvent.hover(screen.getByText("Nome"));
+    expect(await screen.findByText("Nome do registro.")).toBeTruthy();
+  });
+});

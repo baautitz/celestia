@@ -90,7 +90,7 @@
         "sub": "usr_<uuid>",
         "username": "root.admin",
         "fullname": "Root Admin",
-        "role": "role_vendedor",
+        "role": "role_colaborador",
         "permissions": [
           "*",
           "system:users:create",
@@ -258,7 +258,7 @@
       "sub": "usr_<uuid>",
       "username": "root.admin",
       "fullname": "Root Admin",
-      "role": "role_vendedor",
+      "role": "role_colaborador",
       "permissions": [
         "*",
         "system:users:create",
@@ -581,10 +581,10 @@
       },
       {
         "id": "usr_1002",
-        "fullname": "João da Silva (Vendedor 42)",
+        "fullname": "João da Silva (Colaborador 42)",
         "username": "joao.silva",
         "email": "joao.silva@farmacia.com.br",
-        "roleId": "role_vendedor",
+        "roleId": "role_colaborador",
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -601,7 +601,7 @@
         "id": "usr_<uuid>",
         "fullname": "Root Admin",
         "username": "root.admin",
-        "roleId": "role_vendedor",
+        "roleId": "role_colaborador",
         "status": "active",
         "createdAt": "<ts>",
         "isAdmin": true
@@ -637,10 +637,10 @@
       },
       {
         "id": "usr_1002",
-        "fullname": "João da Silva (Vendedor 42)",
+        "fullname": "João da Silva (Colaborador 42)",
         "username": "joao.silva",
         "email": "joao.silva@farmacia.com.br",
-        "roleId": "role_vendedor",
+        "roleId": "role_colaborador",
         "status": "active",
         "createdAt": "<ts>"
       },
@@ -657,7 +657,7 @@
         "id": "usr_<uuid>",
         "fullname": "Root Admin",
         "username": "root.admin",
-        "roleId": "role_vendedor",
+        "roleId": "role_colaborador",
         "status": "active",
         "createdAt": "<ts>",
         "isAdmin": true
@@ -700,8 +700,8 @@
         ]
       },
       {
-        "id": "role_vendedor",
-        "name": "Vendedor",
+        "id": "role_colaborador",
+        "name": "Colaborador",
         "description": "Sem permissões do sistema.",
         "permissions": []
       }
@@ -758,8 +758,8 @@
         ]
       },
       {
-        "id": "role_vendedor",
-        "name": "Vendedor",
+        "id": "role_colaborador",
+        "name": "Colaborador",
         "description": "Sem permissões do sistema.",
         "permissions": []
       }
@@ -854,7 +854,7 @@
       "id": "usr_<uuid>",
       "fullname": "Novo Usuario",
       "username": "novo.user",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -877,7 +877,7 @@
       "id": "usr_<uuid>",
       "fullname": "Novo Usuario",
       "username": "novo.root",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -904,7 +904,7 @@
       "fullname": "Nome Editado",
       "username": "novo.user",
       "email": "a@b.com",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "inactive",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
@@ -952,7 +952,7 @@
       "fullname": "Nome Editado",
       "username": "novo.user",
       "email": "a@b.com",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "inactive",
       "createdAt": "<ts>",
       "updatedAt": "<ts>",
@@ -1099,10 +1099,10 @@
       },
       {
         "id": "usr_1002",
-        "fullname": "João da Silva (Vendedor 42)",
+        "fullname": "João da Silva (Colaborador 42)",
         "username": "joao.silva",
         "email": "joao.silva@farmacia.com.br",
-        "roleId": "role_vendedor",
+        "roleId": "role_colaborador",
         "status": "active",
         "createdAt": "<ts>",
         "updatedAt": "<ts>"
@@ -1120,7 +1120,7 @@
         "id": "usr_<uuid>",
         "fullname": "Root Admin",
         "username": "root.admin",
-        "roleId": "role_vendedor",
+        "roleId": "role_colaborador",
         "status": "active",
         "createdAt": "<ts>",
         "isAdmin": true
@@ -1129,7 +1129,7 @@
         "id": "usr_<uuid>",
         "fullname": "Novo Usuario",
         "username": "novo.root",
-        "roleId": "role_vendedor",
+        "roleId": "role_colaborador",
         "status": "active",
         "createdAt": "<ts>"
       }
@@ -1304,8 +1304,8 @@
         ]
       },
       {
-        "id": "role_vendedor",
-        "name": "Vendedor",
+        "id": "role_colaborador",
+        "name": "Colaborador",
         "description": "Sem permissões do sistema.",
         "permissions": []
       },
@@ -1947,7 +1947,7 @@
       "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -1958,7 +1958,7 @@
       "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.admin",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -1969,7 +1969,7 @@
       "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.admin",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "active",
       "createdAt": "<ts>",
       "isAdmin": true,
@@ -1988,7 +1988,7 @@
       "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "active",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
@@ -2006,7 +2006,7 @@
       "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "legitimo.um",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "active",
       "createdAt": "<ts>"
     }
@@ -2071,7 +2071,7 @@
       "id": "usr_<uuid>",
       "fullname": "Usuario Grants",
       "username": "alvo.comum",
-      "roleId": "role_vendedor",
+      "roleId": "role_colaborador",
       "status": "inactive",
       "createdAt": "<ts>",
       "updatedAt": "<ts>"

@@ -285,7 +285,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
   describe("login sem enumeração de usuários", () => {
     it("mensagem única e hash verificado mesmo para usuário inexistente", async () => {
       const store = createSeededUserStore();
-      const inativo = await store.createUser({ fullname: "Usuario Inativo", username: "usuario.inativo", password: TEST_PASSWORD, roleId: "role_vendedor" });
+      const inativo = await store.createUser({ fullname: "Usuario Inativo", username: "usuario.inativo", password: TEST_PASSWORD, roleId: "role_colaborador" });
       await store.updateUser(inativo.id, { status: "inactive" });
       const local = createPlatformApp({ userStore: store });
       const spy = vi.spyOn(PasswordService, "verify");
@@ -311,7 +311,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
   describe("ids", () => {
     it("usuários criados no mesmo instante têm ids distintos (usr_ + uuid)", async () => {
       const store = createSeededUserStore();
-      const input = { fullname: "Usuario Id", password: TEST_PASSWORD, roleId: "role_vendedor" };
+      const input = { fullname: "Usuario Id", password: TEST_PASSWORD, roleId: "role_colaborador" };
       const a = await store.createUser({ ...input, username: "id.um" });
       const b = await store.createUser({ ...input, username: "id.dois" });
       expect(a.id).toMatch(/^usr_[0-9a-f-]{36}$/);

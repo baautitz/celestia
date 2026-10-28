@@ -43,7 +43,7 @@ async function fresh(): Promise<void> {
     fullname: "Root Admin",
     username: "root.admin",
     password: TEST_PASSWORD,
-    roleId: "role_vendedor",
+    roleId: "role_colaborador",
    
   });
   await userStore.setAdmin(root.id, true);
@@ -99,7 +99,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
       return ((await res.json()) as { access_token: string }).access_token;
     };
     A = await login("carlos.admin"); // role_admin com todas as permissões system:*
-    V = await login("joao.silva"); // vendedor: sem nenhuma permissão system:*
+    V = await login("joao.silva"); // colaborador: sem nenhuma permissão system:*
     O = await login("maria.souza"); // operador
     R = await login("root.admin"); // isAdmin com role sem permissões
   });
@@ -150,7 +150,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     }
 
     // ── IAM users
-    const newUser = { fullname: "Novo Usuario", username: "novo.user", password: "Senha@456", roleId: "role_vendedor" };
+    const newUser = { fullname: "Novo Usuario", username: "novo.user", password: "Senha@456", roleId: "role_colaborador" };
     await rec("iam.users.create.401", "POST", "/api/iam/users", { body: newUser });
     await rec("iam.users.create.403", "POST", "/api/iam/users", { token: V, body: newUser });
     await rec("iam.users.create.400_weak_password", "POST", "/api/iam/users", { token: A, body: { ...newUser, password: "fraca" } });
@@ -278,9 +278,9 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     tick();
     await rec("iam.grants.setup_gestor", "POST", "/api/iam/users", { token: A, body: mk("gestor.limitado", "role_gestor") });
     tick();
-    const comum = await rec("iam.grants.setup_comum", "POST", "/api/iam/users", { token: A, body: mk("alvo.comum", "role_vendedor") });
+    const comum = await rec("iam.grants.setup_comum", "POST", "/api/iam/users", { token: A, body: mk("alvo.comum", "role_colaborador") });
     tick();
-    const adm = await rec("iam.grants.setup_admin_alvo", "POST", "/api/iam/users", { token: A, body: mk("alvo.admin", "role_vendedor") });
+    const adm = await rec("iam.grants.setup_admin_alvo", "POST", "/api/iam/users", { token: A, body: mk("alvo.admin", "role_colaborador") });
     const comumId = (comum.raw as { id: string }).id;
     const admId = (adm.raw as { id: string }).id;
     await rec("iam.grants.setup_admin_flag", "PUT", `/api/iam/users/${admId}`, { token: R, body: { isAdmin: true } });
@@ -292,11 +292,11 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     const G = ((await gl.json()) as { access_token: string }).access_token;
 
     await rec("iam.grants.users.update.403_stronger_role", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { roleId: "role_admin" } });
-    await rec("iam.grants.users.update.ok_subset_role", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { roleId: "role_vendedor" } });
+    await rec("iam.grants.users.update.ok_subset_role", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { roleId: "role_colaborador" } });
     tick();
     await rec("iam.grants.users.create.403_stronger_role", "POST", "/api/iam/users", { token: G, body: mk("cumplice.um", "role_admin") });
     tick();
-    await rec("iam.grants.users.create.ok_subset_role", "POST", "/api/iam/users", { token: G, body: mk("legitimo.um", "role_vendedor") });
+    await rec("iam.grants.users.create.ok_subset_role", "POST", "/api/iam/users", { token: G, body: mk("legitimo.um", "role_colaborador") });
     await rec("iam.grants.roles.create.403_missing_keys", "POST", "/api/iam/roles", { token: G, body: { id: "role_g_x", name: "Grupo GX", permissions: ["system:erps:manage"] } });
     await rec("iam.grants.roles.create.ok_owned_keys", "POST", "/api/iam/roles", { token: G, body: { id: "role_g_y", name: "Grupo GY", permissions: ["system:roles:read"] } });
     await rec("iam.grants.roles.update.403_add_missing_key", "PUT", "/api/iam/roles/role_gestor", { token: G, body: { permissions: [...gPerms, "system:erps:manage"] } });
