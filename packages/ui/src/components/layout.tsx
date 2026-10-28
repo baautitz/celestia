@@ -38,6 +38,8 @@ interface StackProps extends Omit<React.ComponentProps<"div">, "className" | "st
   /** Tamanho dos ícones filhos diretos (padrão 16px; `sm` = 14px). */
   iconSize?: "sm"
   fullWidth?: boolean
+  /** Altura de um controle de formulário (`h-8`), para alinhar com inputs e selects. */
+  height?: "control"
   padding?: keyof typeof paddings
   bordered?: boolean
   surface?: "card" | "muted"
@@ -57,6 +59,7 @@ function Stack({
   shrink = true,
   iconSize,
   fullWidth,
+  height,
   padding,
   bordered,
   surface,
@@ -78,6 +81,7 @@ function Stack({
         grow && "flex-1",
         !shrink && "shrink-0",
         fullWidth && "w-full",
+        height === "control" && "h-8",
         padding !== undefined && paddings[padding],
         bordered && "border",
         surface === "card" && "bg-card text-card-foreground",

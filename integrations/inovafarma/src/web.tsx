@@ -266,7 +266,7 @@ function VendasComissoesPage() {
           </Stack>
 
           {selectedPeriod && (
-            <Stack direction="row" align="center" gap={2} padding={2} bordered surface="muted">
+            <Stack direction="row" align="center" gap={2} height="control" padding={2} bordered surface="muted">
               <Text variant="caption" tone="muted">
                 Status:
               </Text>
