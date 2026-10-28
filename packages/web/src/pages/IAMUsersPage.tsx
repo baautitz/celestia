@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { User, Role, JWTAccessPayload, ErpExternalsEntry } from "@platform/shared";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@platform/ui/components/card";
 import { Button } from "@platform/ui/components/button";
+import { Grid, PageHeader, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { Input } from "@platform/ui/components/input";
 import { Badge } from "@platform/ui/components/badge";
 import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription } from "@platform/ui/components/field";
@@ -144,13 +145,13 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
     <>
       <Form {...form}>
         <form id="user-form" noValidate onSubmit={form.handleSubmit(onSubmit)}>
-          <FieldGroup className="py-4">
+          <FieldGroup>
             <FormField
               control={form.control}
               name="fullname"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="w-full leading-snug">Nome Completo</FormLabel>
+                  <FormLabel>Nome Completo</FormLabel>
                   <FormControl>
                     <Input placeholder="Ex: Carlos Silva" {...field} />
                   </FormControl>
@@ -159,13 +160,13 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <Grid columns={2}>
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="w-full leading-snug">Nome de Usuário</FormLabel>
+                    <FormLabel>Nome de Usuário</FormLabel>
                     <FormControl>
                       <Input placeholder="carlos.silva" disabled={isEditMode} {...field} />
                     </FormControl>
@@ -178,7 +179,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="w-full leading-snug">E-mail</FormLabel>
+                    <FormLabel>E-mail</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="carlos@empresa.com" {...field} />
                     </FormControl>
@@ -186,17 +187,17 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
                   </FormItem>
                 )}
               />
-            </div>
+            </Grid>
 
             <FormField
               control={form.control}
               name="roleId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="w-full leading-snug">Perfil de Acesso</FormLabel>
+                  <FormLabel>Perfil de Acesso</FormLabel>
                   <Select value={field.value} onValueChange={(val: string | null) => val && field.onChange(val)}>
                     <FormControl>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger fullWidth>
                         <SelectValue placeholder="Selecione o perfil">
                           {roleId ? getRoleName(roleId) : undefined}
                         </SelectValue>
@@ -239,18 +240,23 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
             {/* Externals: campos declarados por cada ERP (Plugin erp). */}
             {isEditMode && (
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Database className="size-3.5 text-primary" />
-                    Identificadores nos ERPs
+                <CardHeader>
+                  <CardTitle>
+                    <Stack direction="row" align="center" gap={2}>
+                      <Database />
+                      <Text variant="eyebrow" tone="muted">
+                        Identificadores nos ERPs
+                      </Text>
+                    </Stack>
                   </CardTitle>
-                  <CardDescription className="text-xs">
+                  <CardDescription>
                     Valores que ligam o usuário aos conceitos de cada ERP.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-4">
+                <CardContent>
+                  <Stack gap={4}>
                   {entries.length === 0 && (
-                    <CardDescription className="text-xs">Nenhum ERP cadastrado.</CardDescription>
+                    <CardDescription>Nenhum ERP cadastrado.</CardDescription>
                   )}
                   {entries.map((entry) => (
                     <FieldGroup key={entry.erpId}>
@@ -262,7 +268,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
                           name={`externals.${entry.erpId}.${f.name}`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="w-full leading-snug">{f.label}</FormLabel>
+                              <FormLabel>{f.label}</FormLabel>
                               <FormControl>
                                 <Input
                                   type={f.type === "number" ? "number" : "text"}
@@ -278,6 +284,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
                       ))}
                     </FieldGroup>
                   ))}
+                  </Stack>
                 </CardContent>
               </Card>
             )}
@@ -288,13 +295,13 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="w-full leading-snug">Senha Inicial</FormLabel>
+                    <FormLabel>Senha Inicial</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
                     </FormControl>
-                    <span className="text-[11px] text-muted-foreground mt-1">
+                    <Text variant="tiny" tone="muted">
                       Requer: 1 maiúscula, 1 minúscula, 1 número e 1 especial.
-                    </span>
+                    </Text>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -336,19 +343,19 @@ const ResetPasswordWindow: React.FC<{ user: User }> = ({ user }) => {
     <>
       <Form {...form}>
         <form id="reset-form" noValidate onSubmit={form.handleSubmit(onSubmit)}>
-          <FieldGroup className="py-4">
+          <FieldGroup>
             <FormField
               control={form.control}
               name="newPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="w-full leading-snug">Nova Senha</FormLabel>
+                  <FormLabel>Nova Senha</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
                   </FormControl>
-                  <span className="text-[11px] text-muted-foreground mt-1">
+                  <Text variant="tiny" tone="muted">
                     Requer 1 maiúscula, 1 minúscula, 1 número e 1 especial.
-                  </span>
+                  </Text>
                   <FormMessage />
                 </FormItem>
               )}
@@ -411,7 +418,7 @@ export const IAMUsersPage: React.FC = () => {
       title: "Redefinir Senha",
       description: (
         <>
-          Defina uma nova senha para <strong>{u.fullname}</strong> ({u.username}).
+          Defina uma nova senha para <Text as="strong" weight="semibold">{u.fullname}</Text> ({u.username}).
         </>
       ),
       content: () => <ResetPasswordWindow user={u} />,
@@ -439,43 +446,40 @@ export const IAMUsersPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <Stack gap={6}>
       <HeaderActions>
-        <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+        <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
+          <Spin active={loading}><RefreshCw /></Spin>
         </Button>
 
         {hasPermission("system:users:create") && (
-          <Button onClick={() => openUserWindow(null)} className="hidden lg:inline-flex shrink-0">
-            <UserPlus className="size-3.5 mr-1.5" />
+          <Show on="desktop">
+            <Button onClick={() => openUserWindow(null)}>
+            <UserPlus />
             Novo Usuário
-          </Button>
+            </Button>
+          </Show>
         )}
 
         {hasPermission("system:users:create") && (
+          <Show on="mobile">
           <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="outline" size="icon" className="size-8 shrink-0 lg:hidden" />}
-            >
-              <MoreHorizontal className="size-4" />
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
+              <MoreHorizontal />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => openUserWindow(null)} className="cursor-pointer">
-                <UserPlus className="size-4 mr-2" />
+              <DropdownMenuItem onClick={() => openUserWindow(null)}>
+                <UserPlus />
                 Novo Usuário
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </Show>
         )}
       </HeaderActions>
 
       {/* Top Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Gestão de Usuários</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Controle de acessos, grupos e identidades de autenticação.
-        </p>
-      </div>
+      <PageHeader title="Gestão de Usuários" description="Controle de acessos, grupos e identidades de autenticação." />
 
       <DataTable<User>
         rows={users}
@@ -524,13 +528,13 @@ export const IAMUsersPage: React.FC = () => {
             value: (u) => u.status,
             render: (u) =>
               u.status === "active" ? (
-                <Badge variant="secondary" className="flex items-center gap-1 w-fit">
-                  <CheckCircle2 className="size-3 text-emerald-500" />
+                <Badge variant="secondary">
+                  <CheckCircle2 />
                   Ativo
                 </Badge>
               ) : (
-                <Badge variant="default" className="flex items-center gap-1 w-fit">
-                  <Clock className="size-3" />
+                <Badge variant="default">
+                  <Clock />
                   Inativo
                 </Badge>
               ),
@@ -538,10 +542,10 @@ export const IAMUsersPage: React.FC = () => {
           },
         ]}
         rowActions={(u) => (
-          <div className="flex justify-end gap-1">
+          <Stack direction="row" justify="end" gap={1}>
             {hasPermission("system:users:update") && (
               <Button variant="ghost" size="icon" aria-label="Editar Usuário" title="Editar Usuário" onClick={() => openUserWindow(u)}>
-                <Edit2 className="size-4" />
+                <Edit2 />
               </Button>
             )}
             {hasPermission("system:users:reset_password") && (
@@ -552,24 +556,23 @@ export const IAMUsersPage: React.FC = () => {
                 title="Redefinir Senha"
                 onClick={() => openResetWindow(u)}
               >
-                <KeyRound className="size-4" />
+                <KeyRound />
               </Button>
             )}
             {hasPermission("system:users:update") && (
               <Button
-                variant="ghost"
+                variant={u.status === "active" ? "destructive" : "ghost"}
                 size="icon"
-                className={u.status === "active" ? "text-destructive" : "text-emerald-600"}
                 aria-label={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
                 title={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
                 onClick={() => handleToggleStatus(u)}
               >
-                <Power className="size-4" />
+                <Power />
               </Button>
             )}
-          </div>
+          </Stack>
         )}
       />
-    </div>
+    </Stack>
   );
 };

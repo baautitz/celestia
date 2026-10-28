@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { Role, PermissionCatalog, PermissionItem } from "@platform/shared";
 import { Card, CardHeader, CardTitle, CardContent } from "@platform/ui/components/card";
 import { Button } from "@platform/ui/components/button";
+import { PageHeader, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { Input } from "@platform/ui/components/input";
 import { Textarea } from "@platform/ui/components/textarea";
 import { Badge } from "@platform/ui/components/badge";
@@ -107,15 +108,15 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
           id="role-form"
           noValidate
           onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col gap-6"
         >
+<Stack gap={6}>
           <FieldGroup>
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="w-full leading-snug">Nome do Grupo</FormLabel>
+                <FormItem>
+                  <FormLabel>Nome do Grupo</FormLabel>
                   <FormControl>
                     <Input placeholder="Ex: Auditor Financeiro" {...field} />
                   </FormControl>
@@ -127,8 +128,8 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
               control={form.control}
               name="slug"
               render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="w-full leading-snug">Identificador do Grupo (slug)</FormLabel>
+                <FormItem>
+                  <FormLabel>Identificador do Grupo (slug)</FormLabel>
                   <FormControl>
                     <Input placeholder="auditor_financeiro" disabled={isEditMode} {...field} />
                   </FormControl>
@@ -140,8 +141,8 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
               control={form.control}
               name="description"
               render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="w-full leading-snug">Descrição</FormLabel>
+                <FormItem>
+                  <FormLabel>Descrição</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Descreva a finalidade e escopo de acesso deste grupo..."
@@ -160,30 +161,38 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
             name="permissions"
             render={({ field }) => (
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Shield className="size-3.5 text-primary" />
-                    Módulos de Sistema
+                <CardHeader>
+                  <CardTitle>
+                    <Stack direction="row" align="center" gap={2}>
+                      <Shield />
+                      <Text variant="eyebrow" tone="muted">
+                        Módulos de Sistema
+                      </Text>
+                    </Stack>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-3">
+                <CardContent>
+                  <Stack gap={3}>
                   {catalog &&
                     Object.entries(catalog.system).map(([moduleName, perms]) => (
-                      <div key={moduleName} className="flex flex-col gap-2">
-                        <div className="bg-muted/60 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground">
-                          Módulo: {moduleName}
-                        </div>
-                        <div className="flex flex-col divide-y divide-border/40">
+                      <Stack key={moduleName} gap={2}>
+                        <Stack surface="muted">
+                          <Text variant="eyebrow">Módulo: {moduleName}</Text>
+                        </Stack>
+                        <Stack divided>
                           {perms.map((p: PermissionItem) => (
-                            <div key={p.key} className="flex items-center justify-between gap-4 py-2">
-                              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                                <span className="font-mono text-xs font-medium text-foreground break-all">{p.key}</span>
+                            <Stack key={p.key} direction="row" align="center" justify="between" gap={4} padding={2}>
+                              <Stack grow>
+                                <Text variant="mono" weight="medium" breakAll>
+                                  {p.key}
+                                </Text>
                                 {p.description && (
-                                  <span className="text-[11px] text-muted-foreground">{p.description}</span>
+                                  <Text variant="tiny" tone="muted">
+                                    {p.description}
+                                  </Text>
                                 )}
-                              </div>
+                              </Stack>
                               <Switch
-                                className="shrink-0"
                                 checked={field.value.includes("*") || field.value.includes(p.key)}
                                 onCheckedChange={(checked: boolean) =>
                                   field.onChange(
@@ -193,15 +202,17 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                                   )
                                 }
                               />
-                            </div>
+                            </Stack>
                           ))}
-                        </div>
-                      </div>
+                        </Stack>
+                      </Stack>
                     ))}
+                  </Stack>
                 </CardContent>
               </Card>
             )}
           />
+</Stack>
         </form>
       </Form>
 
@@ -294,43 +305,40 @@ export const IAMRolesPage: React.FC = () => {
   ];
 
   return (
-    <div className="flex flex-col gap-6">
+    <Stack gap={6}>
       <HeaderActions>
-        <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+        <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
+          <Spin active={loading}><RefreshCw /></Spin>
         </Button>
 
         {hasPermission("system:roles:create") && (
-          <Button onClick={openCreateSheet} className="hidden lg:inline-flex shrink-0">
-            <PlusCircle className="size-3.5 mr-1.5" />
+          <Show on="desktop">
+            <Button onClick={openCreateSheet}>
+            <PlusCircle />
             Novo Grupo
-          </Button>
+            </Button>
+          </Show>
         )}
 
         {hasPermission("system:roles:create") && (
+          <Show on="mobile">
           <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="outline" size="icon" className="size-8 shrink-0 lg:hidden" />}
-            >
-              <MoreHorizontal className="size-4" />
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
+              <MoreHorizontal />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={openCreateSheet} className="cursor-pointer">
-                <PlusCircle className="size-4 mr-2" />
+              <DropdownMenuItem onClick={openCreateSheet}>
+                <PlusCircle />
                 Novo Grupo
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </Show>
         )}
       </HeaderActions>
 
       {/* Top Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Grupos</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Gerencie permissões granulares no modelo Permission-First.
-        </p>
-      </div>
+      <PageHeader title="Grupos" description="Gerencie permissões granulares no modelo Permission-First." />
 
       <DataTable
         columns={columns}
@@ -343,11 +351,11 @@ export const IAMRolesPage: React.FC = () => {
         rowActions={(r) =>
           hasPermission("system:roles:update") ? (
             <Button variant="ghost" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditSheet(r)}>
-              <Edit2 className="size-4" />
+              <Edit2 />
             </Button>
           ) : null
         }
       />
-    </div>
+    </Stack>
   );
 };

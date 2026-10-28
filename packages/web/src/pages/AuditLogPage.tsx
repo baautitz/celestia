@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { AuditLogEntry, AuditLogFilter } from "@platform/shared";
 import { Button } from "@platform/ui/components/button";
+import { Spin } from "@platform/ui/components/layout";
 import { Badge } from "@platform/ui/components/badge";
 import { Input } from "@platform/ui/components/input";
 import { Field, FieldGroup } from "@platform/ui/components/field";
@@ -90,7 +91,7 @@ export const AuditLogPage: React.FC = () => {
     <>
       <HeaderActions>
         <Button variant="outline" size="icon" onClick={() => void fetchData(applied)} disabled={loading}>
-          <RefreshCw className={loading ? "animate-spin" : ""} />
+          <Spin active={loading}><RefreshCw /></Spin>
         </Button>
       </HeaderActions>
 
