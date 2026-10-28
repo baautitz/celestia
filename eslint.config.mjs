@@ -23,8 +23,21 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/*.test.{ts,tsx}", "**/tests/**"],
-    rules: { "@typescript-eslint/no-explicit-any": "warn" },
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "TSAsExpression > TSAsExpression[typeAnnotation.type='TSUnknownKeyword']",
+          message: "Double assertion (`as unknown as T`) is forbidden. Use the exact type.",
+        },
+        {
+          selector: "TSAsExpression > TSAsExpression[typeAnnotation.type='TSAnyKeyword']",
+          message: "Double assertion (`as any as T`) is forbidden. Use the exact type.",
+        },
+      ],
+    },
   },
   {
     files: ["**/*.tsx"],
