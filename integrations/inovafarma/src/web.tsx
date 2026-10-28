@@ -446,6 +446,7 @@ function VendasComissoesPage() {
             : "Nenhuma venda encontrada para o período e filtros selecionados."
         }
         pagination={{ pageSize: 20 }}
+        print={{ orientation: "landscape" }}
       />
     </Stack>
   );
