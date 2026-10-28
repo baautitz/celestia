@@ -75,6 +75,7 @@ export function DateRangePicker({
     }
     setText(toText(value));
     setTouched(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- sincroniza só quando as datas mudam, não a cada novo objeto `value`
   }, [value?.from?.getTime(), value?.to?.getTime()]);
 
   const error = dateRangeTextError(text, touched);
