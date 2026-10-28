@@ -20,6 +20,9 @@ import { formatCurrency, formatDate, formatNumber, formatPercent } from "../lib/
 export type CellValue = string | number | boolean | null | undefined;
 export type DataTableFormat = "currency" | "date" | "number" | "percent";
 
+const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set(["currency", "number", "percent"]);
+const isNumericColumn = (col: { format?: DataTableFormat }) => NUMERIC_FORMATS.has(col.format);
+
 export interface DataTableColumn<TRow> {
   key: string;
   label: string;
@@ -290,11 +293,11 @@ export function DataTable<TRow>({
                     {columns.map((col) => (
                       <TableHead
                         key={col.key}
-                        className={col.sortable ? "cursor-pointer select-none" : ""}
+                        className={cn(col.sortable && "cursor-pointer select-none", isNumericColumn(col) && "text-right")}
                         onClick={() => col.sortable && handleSort(col.key)}
                       >
                         {col.sortable ? (
-                          <div className="flex items-center gap-1">
+                          <div className={cn("flex items-center gap-1", isNumericColumn(col) && "justify-end")}>
                             <span>{col.label}</span>
                             <ArrowUpDown className="size-3 text-muted-foreground" />
                           </div>
@@ -342,7 +345,10 @@ export function DataTable<TRow>({
                             {columns.map((col) => (
                               <TableCell
                                 key={col.key}
-                                className={typeof col.cellClassName === "function" ? col.cellClassName(row) : col.cellClassName}
+                                className={cn(
+                                  isNumericColumn(col) && "text-right tabular-nums",
+                                  typeof col.cellClassName === "function" ? col.cellClassName(row) : col.cellClassName,
+                                )}
                               >
                                 {cellContent(col, row)}
                               </TableCell>
