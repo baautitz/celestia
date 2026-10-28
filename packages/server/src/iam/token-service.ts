@@ -65,7 +65,7 @@ export class TokenService {
       exp,
     };
 
-    const token = await sign(payload as unknown as Record<string, unknown>, this.secret);
+    const token = await sign({ ...payload }, this.secret);
     return { token, payload };
   }
 
@@ -85,7 +85,7 @@ export class TokenService {
       exp,
     };
 
-    const token = await sign(payload as unknown as Record<string, unknown>, this.secret);
+    const token = await sign({ ...payload }, this.secret);
     return { token, payload };
   }
 
@@ -93,21 +93,34 @@ export class TokenService {
    * Valida e decodifica o Access Token.
    */
   async verifyAccessToken(token: string): Promise<JWTAccessPayload> {
-    const payload = (await verify(token, this.secret, "HS256")) as unknown as JWTAccessPayload;
-    if (!payload.sub || !payload.role) {
+    const claims = await verify(token, this.secret, "HS256");
+    if (typeof claims.sub !== "string" || !claims.sub || typeof claims.role !== "string" || !claims.role) {
       throw new Error("Token de acesso inválido.");
     }
-    return payload;
+    const { sub, role } = claims;
+    return {
+      sub,
+      role,
+      username: typeof claims.username === "string" ? claims.username : "",
+      fullname: typeof claims.fullname === "string" ? claims.fullname : "",
+      email: typeof claims.email === "string" ? claims.email : undefined,
+      permissions: Array.isArray(claims.permissions)
+        ? claims.permissions.filter((p): p is string => typeof p === "string")
+        : [],
+      ...(claims.isAdmin === true ? { isAdmin: true } : {}),
+      iat: claims.iat,
+      exp: claims.exp,
+    };
   }
 
   /**
    * Valida e decodifica o Refresh Token.
    */
   async verifyRefreshToken(token: string): Promise<JWTRefreshPayload> {
-    const payload = (await verify(token, this.secret, "HS256")) as unknown as JWTRefreshPayload;
-    if (!payload.sub || payload.type !== "refresh" || typeof payload.ver !== "number") {
+    const claims = await verify(token, this.secret, "HS256");
+    if (typeof claims.sub !== "string" || !claims.sub || claims.type !== "refresh" || typeof claims.ver !== "number" || typeof claims.tokenId !== "string") {
       throw new Error("Token de renovação inválido.");
     }
-    return payload;
+    return { sub: claims.sub, tokenId: claims.tokenId, type: "refresh", ver: claims.ver, iat: claims.iat, exp: claims.exp };
   }
 }
