@@ -92,62 +92,70 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
     ]);
   });
 
-  it("calcula relatório de vendas por vendedor", async () => {
+  it("calcula relatório de vendas por colaborador do item, com CMV", async () => {
     const mockClient = {
       query: async (sql: string, params?: Record<string, unknown>) => {
-        if (sql.includes("Venda")) {
-          expect(params).toMatchObject({
-            dataInicio: "2026-10-01 00:00:00",
-            dataFim: "2026-10-31 23:59:59",
-          });
-          return [
-            {
-              codigoFuncionario: 10,
-              nomeFuncionario: "MARCOS SILVA",
-              quantidadeVendas: 100,
-              totalBruto: 12000,
-              totalDesconto: 2000,
-              totalLiquido: 10000,
-            },
-            {
-              codigoFuncionario: 20,
-              nomeFuncionario: "ANA SOUZA",
-              quantidadeVendas: 50,
-              totalBruto: 6000,
-              totalDesconto: 1000,
-              totalLiquido: 5000,
-            },
-          ];
-        }
-        return [];
+        expect(params).toMatchObject({
+          dataInicio: "2026-10-01 00:00:00",
+          dataFim: "2026-10-31 23:59:59",
+        });
+        if (sql.includes("totalVendasGeral")) return [{ totalVendasGeral: 140, totalVendasComCadastro: 70 }];
+        return [
+          {
+            codigoColaborador: 10,
+            nomeColaborador: "MARCOS SILVA",
+            quantidadeVendas: 100,
+            totalBruto: 12000,
+            totalDesconto: 2000,
+            totalLiquido: 10000,
+            totalCmv: 6500,
+            vendasComCadastro: 40,
+          },
+          {
+            codigoColaborador: 20,
+            nomeColaborador: "ANA SOUZA",
+            quantidadeVendas: 50,
+            totalBruto: 6000,
+            totalDesconto: 1000,
+            totalLiquido: 5000,
+            totalCmv: 3500,
+            vendasComCadastro: 10,
+          },
+        ];
       },
     };
     const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: mockClient });
     const res = await platform.app.request(
-      "/api/m/inovafarma/relatorios/vendas-vendedor?dataInicio=2026-10-01&dataFim=2026-10-31",
+      "/api/m/inovafarma/relatorios/vendas-colaborador?dataInicio=2026-10-01&dataFim=2026-10-31",
       { headers }
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       resumo: Record<string, unknown>;
-      vendedores: Record<string, unknown>[];
+      colaboradores: Record<string, unknown>[];
     };
     expect(body.resumo).toEqual({
-      totalVendasGeral: 150,
+      totalVendasGeral: 140,
       totalLiquidoGeral: 15000,
       totalBrutoGeral: 18000,
       totalDescontoGeral: 3000,
-      totalVendedores: 2,
+      totalCmvGeral: 10000,
+      cmvPercentGeral: (10000 / 15000) * 100,
+      cadastroPercentGeral: 50,
+      totalColaboradores: 2,
     });
-    expect(body.vendedores[0]).toEqual({
-      codigoFuncionario: 10,
-      nomeFuncionario: "MARCOS SILVA",
+    expect(body.colaboradores[0]).toEqual({
+      codigoColaborador: 10,
+      nomeColaborador: "MARCOS SILVA",
       quantidadeVendas: 100,
       totalBruto: 12000,
       totalDesconto: 2000,
       totalLiquido: 10000,
+      totalCmv: 6500,
+      cmvPercent: 65,
       ticketMedio: 100,
       participacaoPercent: (10000 / 15000) * 100,
+      cadastroPercent: 40,
     });
   });
 });
