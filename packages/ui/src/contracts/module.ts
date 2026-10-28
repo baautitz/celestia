@@ -12,8 +12,10 @@ export interface NavEntry {
   icon: LucideIcon
   /** Rota do menu e da página (ex.: "/iam/users"). */
   path: string
-  /** Rótulo do grupo do menu; entradas do mesmo grupo ficam juntas, na ordem de registro. */
-  group: string
+  /** `id` de uma Seção do Menu declarada por algum módulo. */
+  section: string
+  /** Posição dentro da Seção (crescente); ausente = depois de todas que declaram. Empate: ordem de registro. */
+  order?: number
   permission: string
   /** Título do breadcrumb; padrão: `label`. */
   title?: string
@@ -23,8 +25,17 @@ export interface NavEntry {
   variants?: NavVariant[]
 }
 
+export interface MenuSection {
+  id: string
+  label: string
+  /** Posição no menu (crescente); ausente = depois de todas que declaram. Empate: ordem de registro. */
+  order?: number
+}
+
 export interface WebModule {
   id: string
+  /** Seções do Menu declaradas pelo módulo; o `id` é único entre todos os módulos. */
+  sections?: MenuSection[]
   entries: NavEntry[]
 }
 

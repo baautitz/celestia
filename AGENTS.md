@@ -33,7 +33,7 @@ celestia/
 │   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi, WindowActions), DataTable, forms, defineWebModule
 │   ├── web/      (@platform/web)    SPA: modules.ts registry, pages (Login, IAMUsers, IAMRoles, ERPs, ClosingPeriodsPage, AuditLogPage)
 │   └── e2e/      (@platform/e2e)    Playwright E2E suite against in-memory Hono API + Vite SPA
-├── integrations/ Customer Plugins (e.g. integrations/example); boundary checked by `pnpm check:plugins`
+├── integrations/ Customer Plugins (e.g. integrations/inovafarma); boundary checked by `pnpm check:plugins`
 ├── docs/         adr/, conventions/ (database, ui, permissions, plugins, testing), agents/, security-audit.md
 └── scripts/      check-ui-boundaries.mjs, check-plugin-boundaries.mjs, test-db.mjs
 ```

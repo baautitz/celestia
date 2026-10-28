@@ -40,7 +40,7 @@ import { Button } from "@platform/ui/components/button";
 import { Separator } from "@platform/ui/components/separator";
 import { AppHeader, AppMain, BrandMark, Show, Stack, Text } from "@platform/ui/components/layout";
 import { LogOut, ChevronDown, ArrowLeft, Building2 } from "lucide-react";
-import { accessibleEntries } from "@/modules";
+import { menuSections } from "@/modules";
 
 const SidebarAutoClose: React.FC = () => {
   const { setOpenMobile } = useSidebar();
@@ -75,10 +75,8 @@ export const AppLayout: React.FC = () => {
       .toUpperCase();
   };
 
-  const entries = accessibleEntries(hasPermission);
-  const groups = [...new Set(entries.map((e) => e.group))].map(
-    (group) => [group, entries.filter((e) => e.group === group)] as const,
-  );
+  const sections = menuSections(hasPermission);
+  const entries = sections.flatMap((s) => s.entries);
   const current = entries.find((e) => location.pathname.startsWith(e.path));
   const pageTitle = current ? (current.title ?? current.label) : "Painel de Controle";
 
@@ -104,11 +102,11 @@ export const AppLayout: React.FC = () => {
         </SidebarHeader>
 
         <SidebarContent>
-          {groups.map(([group, items]) => (
-            <SidebarGroup key={group}>
-              <SidebarGroupLabel>{group}</SidebarGroupLabel>
+          {sections.map((section) => (
+            <SidebarGroup key={section.id}>
+              <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
               <SidebarMenu>
-                {items.map((entry) => (
+                {section.entries.map((entry) => (
                   <SidebarMenuItem key={entry.id}>
                     <SidebarMenuButton
                       isActive={location.pathname.startsWith(entry.path)}

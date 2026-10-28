@@ -26,6 +26,12 @@ _Avoid_: Unclose, undo
 The two states of a Closing Period. An open Closing Period can have its range edited and be cancelled.
 _Avoid_: Concluded, concluído, active
 
+### Menu
+
+**Menu Section** (pt-BR: **Seção do Menu**):
+A titled block of the side menu, declared once by a module with an `id`, a label and an `order`. Each menu entry points to a Section by `id`; Sections with no entry the user can access are hidden.
+_Avoid_: Grupo, Group (Grupo is a Role)
+
 ### ERPs
 
 **ERP**:

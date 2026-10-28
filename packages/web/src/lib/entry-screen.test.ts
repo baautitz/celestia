@@ -12,7 +12,7 @@ const entry: NavEntry = {
   label: "X",
   icon: Puzzle,
   path: "/x",
-  group: "G",
+  section: "s",
   permission: "p:base",
   component: Default,
   variants: [

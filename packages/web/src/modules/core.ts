@@ -4,10 +4,13 @@ import { IAMUsersPage } from "@/pages/IAMUsersPage";
 import { IAMRolesPage } from "@/pages/IAMRolesPage";
 import { ERPsPage } from "@/pages/ERPsPage";
 
-const GROUP = "Administração & IAM";
-
 export const coreModule = defineWebModule({
   id: "core",
+  sections: [
+    { id: "closing", label: "Fechamento", order: 100 },
+    { id: "reports", label: "Relatórios", order: 200 },
+    { id: "admin", label: "Administração & IAM", order: 300 },
+  ],
   entries: [
     {
       id: "users",
@@ -15,7 +18,8 @@ export const coreModule = defineWebModule({
       title: "Gestão de Usuários",
       icon: Users,
       path: "/iam/users",
-      group: GROUP,
+      section: "admin",
+      order: 10,
       permission: "system:users:read",
       component: IAMUsersPage,
     },
@@ -24,7 +28,8 @@ export const coreModule = defineWebModule({
       label: "Grupos",
       icon: Shield,
       path: "/iam/roles",
-      group: GROUP,
+      section: "admin",
+      order: 20,
       permission: "system:roles:read",
       component: IAMRolesPage,
     },
@@ -33,7 +38,8 @@ export const coreModule = defineWebModule({
       label: "ERPs",
       icon: Database,
       path: "/erps",
-      group: GROUP,
+      section: "admin",
+      order: 30,
       permission: "system:erps:manage",
       component: ERPsPage,
     },
