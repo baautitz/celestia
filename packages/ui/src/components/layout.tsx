@@ -122,15 +122,19 @@ const textVariants = {
   kpi: "text-2xl font-bold font-mono",
 } as const
 
-const tones = {
-  default: "",
-  muted: "text-muted-foreground",
-  destructive: "text-destructive",
+const toneText = {
   success: "text-emerald-600",
   warning: "text-amber-600",
 } as const
 
-interface TextProps extends Omit<React.ComponentProps<"span">, "className" | "style"> {
+const tones = {
+  default: "",
+  muted: "text-muted-foreground",
+  destructive: "text-destructive",
+  ...toneText,
+} as const
+
+interface TextProps extends Omit<React.HTMLAttributes<HTMLElement>, "className" | "style"> {
   as?: "span" | "p" | "h1" | "h2" | "strong"
   variant?: keyof typeof textVariants
   tone?: keyof typeof tones
@@ -139,8 +143,7 @@ interface TextProps extends Omit<React.ComponentProps<"span">, "className" | "st
   breakAll?: boolean
 }
 
-function Text({ as: tag = "span", variant = "body", tone = "default", weight, truncate, breakAll, ...props }: TextProps) {
-  const Tag = tag as "span"
+function Text({ as: Tag = "span", variant = "body", tone = "default", weight, truncate, breakAll, ...props }: TextProps) {
   return (
     <Tag
       className={cn(
@@ -164,8 +167,8 @@ function Spin({ active, children }: { active: boolean; children: React.ReactNode
 
 const kpiTones = {
   primary: "bg-primary/10 text-primary",
-  success: "bg-emerald-500/10 text-emerald-600",
-  warning: "bg-amber-500/10 text-amber-600",
+  success: `bg-emerald-500/10 ${toneText.success}`,
+  warning: `bg-amber-500/10 ${toneText.warning}`,
   info: "bg-sky-500/10 text-sky-600",
 } as const
 
