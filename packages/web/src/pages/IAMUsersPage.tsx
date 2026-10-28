@@ -389,6 +389,7 @@ export const IAMUsersPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial única
   }, []);
 
   const openUserWindow = async (u: User | null) => {

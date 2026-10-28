@@ -32,15 +32,14 @@ describe("planMigrations", () => {
 function fakeDb(applied?: string[]): { db: MigrationsDb; calls: string[] } {
   const calls: string[] = [];
   const dialect = new PgDialect();
-  const fake = {
-    execute: async (q: SQL) => {
-      const s = dialect.sqlToQuery(q).sql;
-      calls.push(s);
-      if (s.includes("to_regclass")) return { rows: [{ r: applied ? "x" : null }] };
-      return { rows: (applied ?? []).map((name) => ({ name })) };
-    },
-  };
-  return { db: fake as unknown as MigrationsDb, calls };
+  const db: MigrationsDb = drizzle.mock();
+  vi.spyOn(db, "execute").mockImplementation((async (q: SQL) => {
+    const s = dialect.sqlToQuery(q).sql;
+    calls.push(s);
+    if (s.includes("to_regclass")) return { rows: [{ r: applied ? "x" : null }] };
+    return { rows: (applied ?? []).map((name) => ({ name })) };
+  }) as typeof db.execute);
+  return { db, calls };
 }
 
 describe("runModuleMigrations (db falso)", () => {
