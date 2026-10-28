@@ -52,6 +52,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "codigoColaborador",
     label: "Cód.",
+    tooltip: "Código do Colaborador no ERP.",
     value: (r) => r.codigoColaborador,
     sortable: true,
     searchable: true,
@@ -60,6 +61,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "nomeColaborador",
     label: "Colaborador",
+    tooltip: "Colaborador que vendeu o item.",
     value: (r) => r.nomeColaborador,
     sortable: true,
     searchable: true,
@@ -68,6 +70,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "quantidadeVendas",
     label: "Qtd. Vendas",
+    tooltip: "Vendas distintas com ao menos um item do Colaborador.",
     value: (r) => r.quantidadeVendas,
     format: "number",
     sortable: true,
@@ -76,6 +79,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "totalBruto",
     label: "Total Bruto (R$)",
+    tooltip: "Soma dos itens vendidos, antes dos descontos.",
     value: (r) => r.totalBruto,
     format: "currency",
     sortable: true,
@@ -84,6 +88,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "totalDesconto",
     label: "Descontos (R$)",
+    tooltip: "Soma dos descontos concedidos nos itens.",
     value: (r) => r.totalDesconto,
     format: "currency",
     sortable: true,
@@ -92,6 +97,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "totalLiquido",
     label: "Total Líquido (R$)",
+    tooltip: "Total Bruto menos os descontos.",
     value: (r) => r.totalLiquido,
     format: "currency",
     sortable: true,
@@ -100,6 +106,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "totalCmv",
     label: "CMV (R$)",
+    tooltip: "Custo das mercadorias vendidas: quantidade × preço de custo.",
     value: (r) => r.totalCmv,
     format: "currency",
     sortable: true,
@@ -108,6 +115,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "cmvPercent",
     label: "CMV (%)",
+    tooltip: "CMV dividido pelo Total Líquido.",
     value: (r) => r.cmvPercent,
     format: "percent",
     sortable: true,
@@ -116,6 +124,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "ticketMedio",
     label: "Ticket Médio (R$)",
+    tooltip: "Total Líquido dividido pela quantidade de vendas.",
     value: (r) => r.ticketMedio,
     format: "currency",
     sortable: true,
@@ -124,6 +133,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   {
     key: "participacaoPercent",
     label: "Vendas (%)",
+    tooltip: "Participação do Colaborador no Total Líquido geral.",
     value: (r) => r.participacaoPercent,
     format: "percent",
     sortable: true,
@@ -131,7 +141,8 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   },
   {
     key: "cadastroPercent",
-    label: "Vendas c/ Cadastro (%)",
+    label: "Cadastros (%)",
+    tooltip: "Vendas com cliente cadastrado divididas pela quantidade de vendas. Vendas para \"CONSUMIDOR\" não contam.",
     value: (r) => r.cadastroPercent,
     format: "percent",
     sortable: true,
@@ -401,7 +412,7 @@ function VendasComissoesPage() {
         />
         <KpiCard
           loading={loading}
-          label="Vendas c/ Cadastro (%)"
+          label="Cadastros (%)"
           value={resumo ? formatPercent(resumo.cadastroPercentGeral) : "-"}
           hint="das vendas com cliente cadastrado"
           icon={<Users />}
