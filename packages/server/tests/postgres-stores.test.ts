@@ -40,7 +40,6 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { moduleId: "audit", schema: "audit" },
         { moduleId: "closing_period", schema: "closing_period" },
         { moduleId: "erp", schema: "erp" },
-        { moduleId: "example", schema: "example" },
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
