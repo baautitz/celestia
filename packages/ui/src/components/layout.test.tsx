@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { CenteredScreen, KpiCard, Show, Stack } from "./layout";
+import { CenteredNotice, CenteredScreen, KpiCard, Show, Stack } from "./layout";
 
 afterEach(cleanup);
 
@@ -97,5 +97,9 @@ describe("primitivos de layout enxutos", () => {
   it("CenteredScreen é sempre a tela cheia e CenteredNotice o bloco inline", () => {
     render(<CenteredScreen>tela</CenteredScreen>);
     expect(screen.getByText("tela").parentElement?.className).toContain("min-h-screen");
+    render(<CenteredNotice>aviso</CenteredNotice>);
+    const notice = screen.getByText("aviso");
+    expect(notice.tagName).toBe("MAIN");
+    expect(notice.className).not.toContain("min-h-screen");
   });
 });
