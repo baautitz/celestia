@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle, Package, Pill } from "lucide-react";
+import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
-import { Grid, KpiCard, Spin, Stack, Text } from "@platform/ui/components/layout";
+import { Grid, KpiCard, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { defineWebModule } from "@platform/ui/contracts/module";
 import { formatCurrency, formatDecimal, formatNumber, formatDate, formatPercent } from "@platform/ui/lib/format";
 import { apiFetch } from "@platform/ui/lib/api";
+import { useUi } from "@platform/ui/imperative/provider";
+import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import type { Trend } from "@platform/ui/components/trend";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
 
@@ -244,7 +246,111 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   ]),
 ];
 
+interface Filtros {
+  periodId: string;
+  loja: string;
+}
+
+const periodLabel = (p: ClosingPeriod) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})`;
+
+const lojaLabel = (lojas: Loja[], loja: string) =>
+  loja === "all" ? "Todas as Filiais" : lojas.find((l) => String(l.codigoEmpresa) === loja)?.nome || `Filial ${loja}`;
+
+function StatusBadge({ status }: { status: ClosingPeriod["status"] }) {
+  return (
+    <Badge variant={status === "open" ? "secondary" : "outline"}>
+      {status === "open" ? "Aberto" : status === "closed" ? "Fechado" : "Cancelado"}
+    </Badge>
+  );
+}
+
+/** Seletores de Período de Fechamento e Filial, na barra do desktop e no drawer do celular. */
+function FiltrosCampos({
+  periods,
+  lojas,
+  value,
+  onChange,
+}: {
+  periods: ClosingPeriod[];
+  lojas: Loja[];
+  value: Filtros;
+  onChange: (next: Filtros) => void;
+}) {
+  const period = periods.find((p) => p.id === value.periodId);
+  return (
+    <>
+      {/* Seletor de Período de Fechamento */}
+      <Stack gap="field" grow maxWidth="sm">
+        <Stack direction="row" align="center" gap="field" iconSize="sm">
+          <Calendar />
+          <Text variant="caption" tone="muted" weight="medium">
+            Período de Fechamento
+          </Text>
+        </Stack>
+        <Select value={value.periodId} onValueChange={(val) => val && onChange({ ...value, periodId: val })}>
+          <SelectTrigger fullWidth>
+            <SelectValue placeholder="Selecione um período">{period ? periodLabel(period) : "Selecione um Período"}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {periods.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {periodLabel(p)}
+              </SelectItem>
+            ))}
+            {periods.length === 0 && (
+              <Stack padding="compact" align="center">
+                <Text variant="caption" tone="muted">
+                  Nenhum período cadastrado
+                </Text>
+              </Stack>
+            )}
+          </SelectContent>
+        </Select>
+      </Stack>
+
+      {/* Seletor de Filial / Loja */}
+      <Stack gap="field" grow maxWidth="sm">
+        <Stack direction="row" align="center" gap="field" iconSize="sm">
+          <Store />
+          <Text variant="caption" tone="muted" weight="medium">
+            Filial / Loja
+          </Text>
+        </Stack>
+        <Select value={value.loja} onValueChange={(val) => val && onChange({ ...value, loja: val })}>
+          <SelectTrigger fullWidth>
+            <SelectValue placeholder="Todas as Filiais">{lojaLabel(lojas, value.loja)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Filiais</SelectItem>
+            {lojas.map((l) => (
+              <SelectItem key={l.codigoEmpresa} value={String(l.codigoEmpresa)}>
+                {l.codigoEmpresa} - {l.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Stack>
+    </>
+  );
+}
+
+/** Filtros no drawer do celular: só valem ao tocar em Aplicar, para não consultar o ERP a cada troca. */
+function FiltrosDrawer({ periods, lojas, initial }: { periods: ClosingPeriod[]; lojas: Loja[]; initial: Filtros }) {
+  const { resolve } = useWindow<Filtros>();
+  const [draft, setDraft] = useState(initial);
+  return (
+    <>
+      <FiltrosCampos periods={periods} lojas={lojas} value={draft} onChange={setDraft} />
+      <WindowActions>
+        <WindowCancelButton />
+        <Button onClick={() => resolve(draft)}>Aplicar</Button>
+      </WindowActions>
+    </>
+  );
+}
+
 function VendasComissoesPage() {
+  const ui = useUi();
   const [periods, setPeriods] = useState<ClosingPeriod[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
   const [lojas, setLojas] = useState<Loja[]>([]);
@@ -339,10 +445,22 @@ function VendasComissoesPage() {
     }
   }, [selectedPeriodId, selectedLoja, fetchRelatorio]);
 
-  const selectedLojaLabel =
-    selectedLoja === "all"
-      ? "Todas as Filiais"
-      : lojas.find((l) => String(l.codigoEmpresa) === selectedLoja)?.nome || `Filial ${selectedLoja}`;
+  const selectedLojaLabel = lojaLabel(lojas, selectedLoja);
+
+  const filtros: Filtros = { periodId: selectedPeriodId, loja: selectedLoja };
+  const applyFiltros = (next: Filtros) => {
+    setSelectedPeriodId(next.periodId);
+    setSelectedLoja(next.loja);
+  };
+
+  const openFiltros = async () => {
+    const result = await ui.windows.open<Filtros>({
+      surface: "drawer",
+      title: "Filtros",
+      content: () => <FiltrosDrawer periods={periods} lojas={lojas} initial={filtros} />,
+    });
+    if (result.status === "confirmed") applyFiltros(result.value);
+  };
 
   const tableColumns = useMemo(() => withComparison(columns, anterior), [anterior]);
 
@@ -355,95 +473,73 @@ function VendasComissoesPage() {
       ? { current: pick(resumo), previous: pick(anterior.resumo), label: anterior.label, format, favorable }
       : undefined;
 
-  const selectedPeriodLabel = selectedPeriod
-    ? `${selectedPeriod.name} (${formatDate(selectedPeriod.startDate)} a ${formatDate(selectedPeriod.endDate)})`
-    : "Selecione um Período";
-
   return (
     <Stack gap="section">
-      {/* Barra de Filtros */}
-      <Stack
-        direction="row"
-        wrap
-        align="end"
-        justify="between"
-        gap="section"
-        padding="card"
-        bordered
-        surface="card"
-      >
-        <Stack direction="row" wrap align="end" gap="section" grow>
-          {/* Seletor de Período de Fechamento */}
-          <Stack gap="field" grow maxWidth="sm">
-            <Stack direction="row" align="center" gap="field" iconSize="sm">
-              <Calendar />
-              <Text variant="caption" tone="muted" weight="medium">
-                Período de Fechamento
-              </Text>
-            </Stack>
-            <Select value={selectedPeriodId} onValueChange={(val) => val && setSelectedPeriodId(val)}>
-              <SelectTrigger fullWidth>
-                <SelectValue placeholder="Selecione um período">{selectedPeriodLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} ({formatDate(p.startDate)} a {formatDate(p.endDate)})
-                  </SelectItem>
-                ))}
-                {periods.length === 0 && (
-                  <Stack padding="compact" align="center">
-                    <Text variant="caption" tone="muted">
-                      Nenhum período cadastrado
-                    </Text>
-                  </Stack>
-                )}
-              </SelectContent>
-            </Select>
+      {/* Barra de Filtros (desktop) */}
+      <Show on="desktop">
+        <Stack
+          direction="row"
+          wrap
+          align="end"
+          justify="between"
+          gap="section"
+          padding="card"
+          bordered
+          surface="card"
+        >
+          <Stack direction="row" wrap align="end" gap="section" grow>
+            <FiltrosCampos periods={periods} lojas={lojas} value={filtros} onChange={applyFiltros} />
+
+            {selectedPeriod && (
+              <Stack direction="row" align="center" gap="field" height="control" padding="compact" bordered surface="muted">
+                <Text variant="caption" tone="muted">
+                  Status:
+                </Text>
+                <StatusBadge status={selectedPeriod.status} />
+              </Stack>
+            )}
           </Stack>
 
-          {/* Seletor de Filial / Loja */}
-          <Stack gap="field" grow maxWidth="sm">
-            <Stack direction="row" align="center" gap="field" iconSize="sm">
-              <Store />
-              <Text variant="caption" tone="muted" weight="medium">
-                Filial / Loja
-              </Text>
-            </Stack>
-            <Select value={selectedLoja} onValueChange={(val) => val && setSelectedLoja(val)}>
-              <SelectTrigger fullWidth>
-                <SelectValue placeholder="Todas as Filiais">{selectedLojaLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Filiais</SelectItem>
-                {lojas.map((l) => (
-                  <SelectItem key={l.codigoEmpresa} value={String(l.codigoEmpresa)}>
-                    {l.codigoEmpresa} - {l.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Stack>
-
-          {selectedPeriod && (
-            <Stack direction="row" align="center" gap="field" height="control" padding="compact" bordered surface="muted">
-              <Text variant="caption" tone="muted">
-                Status:
-              </Text>
-              <Badge variant={selectedPeriod.status === "open" ? "secondary" : "outline"}>
-                {selectedPeriod.status === "open" ? "Aberto" : selectedPeriod.status === "closed" ? "Fechado" : "Cancelado"}
-              </Badge>
-            </Stack>
-          )}
+          <Button variant="outline" size="default" onClick={() => void fetchRelatorio()} disabled={loading || !selectedPeriod}>
+            <Spin active={loading}>
+              <RefreshCw />
+            </Spin>
+            Atualizar
+          </Button>
         </Stack>
+      </Show>
 
-        <Button variant="outline" size="default" onClick={() => void fetchRelatorio()} disabled={loading || !selectedPeriod}>
-          <Spin active={loading}>
-            <RefreshCw />
-          </Spin>
-          Atualizar
-        </Button>
-      </Stack>
+      {/* Resumo dos filtros (celular): os selects abrem num drawer */}
+      <Show on="mobile">
+        <Stack direction="row" align="center" justify="between" gap="group" padding="card" bordered surface="card">
+          <Stack gap="tight">
+            <Text variant="small" weight="semibold" truncate>
+              {selectedPeriod?.name ?? "Selecione um Período"}
+            </Text>
+            <Text variant="caption" tone="muted" truncate>
+              {selectedLojaLabel}
+            </Text>
+          </Stack>
+          <Stack direction="row" align="center" gap="field" shrink={false}>
+            {selectedPeriod && <StatusBadge status={selectedPeriod.status} />}
+            <Button variant="outline" size="icon" aria-label="Filtros" title="Filtros" onClick={() => void openFiltros()}>
+              <SlidersHorizontal />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Atualizar"
+              title="Atualizar"
+              onClick={() => void fetchRelatorio()}
+              disabled={loading || !selectedPeriod}
+            >
+              <Spin active={loading}>
+                <RefreshCw />
+              </Spin>
+            </Button>
+          </Stack>
+        </Stack>
+      </Show>
 
       {/* Alerta se não houver períodos */}
       {periods.length === 0 && !loading && (

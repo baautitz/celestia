@@ -59,9 +59,12 @@ function ManagedWindow({ entry, controller }: {
               <AlertDialogFooter ref={setFooter} />
             </AlertDialogContent>
           </AlertDialog>
-        ) : surface === "sheet" ? (
+        ) : surface === "sheet" || surface === "drawer" ? (
           <Sheet open onOpenChange={onOpenChange}>
-            <SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl">
+            <SheetContent
+              side={surface === "drawer" ? "bottom" : "right"}
+              className={surface === "drawer" ? "flex max-h-[85svh] flex-col p-0" : "flex flex-col p-0 sm:max-w-xl"}
+            >
               <SheetHeader className="p-6 border-b shrink-0">
                 <SheetTitle>{title}</SheetTitle>
                 {options.description && <SheetDescription>{options.description}</SheetDescription>}

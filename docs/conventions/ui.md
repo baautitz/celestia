@@ -34,6 +34,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 
 - Abertos pela superfície `"sheet"` de `useUi().windows.open`. O host implementa o layout; a janela renderiza só o corpo e publica as ações com `<WindowActions>`.
 - Host: `SheetContent side="right" className="flex flex-col p-0 sm:max-w-xl"`; `SheetHeader className="p-6 border-b shrink-0"`; `ScrollArea className="flex-1 min-h-0"` > `<div className="p-6 flex flex-col gap-6">`; `SheetFooter className="p-6 border-t shrink-0 flex flex-row justify-end gap-2 bg-popover"`.
+- Drawer: a superfície `"drawer"` usa o mesmo layout, mas sobe de baixo (`side="bottom"`, até 85% da altura). É para ações no celular, como os filtros de um relatório.
 - Submit: o botão usa `form="<id>"` e o corpo renderiza `<form id="<id>">`.
 - Conteúdo longo: `ScrollArea`; strings técnicas longas (chaves de permissão) com `break-all`; controles (switches/botões) com `shrink-0`.
 
