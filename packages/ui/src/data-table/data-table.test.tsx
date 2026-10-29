@@ -264,6 +264,39 @@ describe("impressão", () => {
     expect(screen.queryByRole("table", { name: "Vendas" })).toBeNull();
   });
 
+  it("usa o nome do arquivo como título da página durante a impressão e restaura depois", async () => {
+    setViewport(1280);
+    document.title = "Celestia";
+    let titleWhilePrinting = "";
+    window.print = vi.fn(() => {
+      titleWhilePrinting = document.title;
+    });
+    render(
+      <DataTable
+        columns={saleColumns}
+        rows={sales}
+        getRowId={(r) => r.id}
+        title="Vendas"
+        print={{ fileName: "Vendas - Outubro 2026" }}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(titleWhilePrinting).toBe("Vendas - Outubro 2026");
+    fireEvent(window, new Event("afterprint"));
+    expect(document.title).toBe("Celestia");
+  });
+
+  it("usa o título da tabela como nome do arquivo por padrão", async () => {
+    setViewport(1280);
+    let titleWhilePrinting = "";
+    window.print = vi.fn(() => {
+      titleWhilePrinting = document.title;
+    });
+    render(<DataTable columns={saleColumns} rows={sales} getRowId={(r) => r.id} title="Vendas" print={{}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(titleWhilePrinting).toBe("Vendas");
+  });
+
   it.each([
     ["carregando", { loading: true }],
     ["sem linhas", { rows: [] }],

@@ -79,6 +79,8 @@ export interface DataTablePrintOptions {
   orientation?: DataTablePrintOrientation;
   /** Substitui `description` no papel (ex.: filtros ativos que a tela mostra fora da tabela). */
   description?: string;
+  /** Nome sugerido ao salvar como PDF (vira o título da página durante a impressão). Padrão: `title`. */
+  fileName?: string;
 }
 
 export interface DataTableProps<TRow> {
@@ -611,6 +613,7 @@ export function DataTable<TRow>({
           cellContent={cellContent}
           striped={striped}
           title={heading}
+          fileName={print.fileName ?? heading}
           description={print.description ?? description}
           orientation={print.orientation ?? "portrait"}
           onDone={endPrinting}
@@ -636,6 +639,7 @@ interface PrintTableProps<TRow> {
   cellContent: (col: DataTableColumn<TRow>, row: TRow) => React.ReactNode;
   striped: boolean;
   title?: string;
+  fileName?: string;
   description?: string;
   orientation: DataTablePrintOrientation;
   onDone: () => void;
@@ -653,6 +657,7 @@ function PrintTable<TRow>({
   cellContent,
   striped,
   title,
+  fileName,
   description,
   orientation,
   onDone,
@@ -668,6 +673,16 @@ function PrintTable<TRow>({
     const tableWidth = tableRef.current?.offsetWidth ?? 0;
     setFit(tableWidth > pageWidth ? { width: tableWidth, zoom: pageWidth / tableWidth } : { zoom: 1 });
   }, [pageWidth]);
+
+  // O "Salvar como PDF" do navegador sugere o título da página como nome do arquivo.
+  useEffect(() => {
+    if (!fileName) return;
+    const previous = document.title;
+    document.title = fileName;
+    return () => {
+      document.title = previous;
+    };
+  }, [fileName]);
 
   useEffect(() => {
     if (!fit) return;
