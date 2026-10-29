@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "../components/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip";
+import { TrendLine, TrendTooltip, type Trend, type TrendFormat } from "../components/trend";
 import { useIsMobile } from "../hooks/use-mobile";
 import { cn } from "../lib/utils";
 import { formatCurrency, formatDate, formatDecimal, formatNumber, formatPercent } from "../lib/format";
@@ -66,6 +67,11 @@ export interface DataTableColumn<TRow> {
   skeletonClassName?: string;
   /** Papel no MobileCard; colunas sem papel viram campos. */
   mobileRole?: "primary" | "secondary" | "hidden";
+  /**
+   * Valor anterior da célula (ex.: o mesmo Colaborador no Período anterior); `undefined` = sem comparação.
+   * Tooltip no desktop, linha abaixo do valor no MobileCard e nada na impressão. Requer `value` numérico.
+   */
+  compare?: (row: TRow) => Pick<Trend, "previous" | "label" | "favorable"> | undefined;
 }
 
 export type DataTablePagination =
@@ -206,6 +212,13 @@ function columnCellClassName<TRow>(col: DataTableColumn<TRow>, row: TRow): strin
     col.nowrap && "whitespace-nowrap",
     typeof col.cellClassName === "function" ? col.cellClassName(row) : col.cellClassName,
   );
+}
+
+function cellTrend<TRow>(col: DataTableColumn<TRow>, row: TRow): Trend | undefined {
+  const current = col.value?.(row);
+  const compared = col.compare?.(row);
+  if (!compared || typeof current !== "number" || !isNumericColumn(col)) return undefined;
+  return { ...compared, current, format: (col.format ?? "number") as TrendFormat };
 }
 
 function formatValue(value: CellValue, format?: DataTableFormat): string {
@@ -378,6 +391,26 @@ export function DataTable<TRow>({
   );
   const cellContent = (col: DataTableColumn<TRow>, row: TRow) =>
     col.render ? col.render(row) : text(col, row);
+  /** Conteúdo da tela com a comparação; a impressão usa só `cellContent`. */
+  const desktopCell = (col: DataTableColumn<TRow>, row: TRow) => {
+    const trend = cellTrend(col, row);
+    if (!trend) return cellContent(col, row);
+    return (
+      <TrendTooltip trend={trend} title={mobileLabel(col)}>
+        <span className="cursor-help">{cellContent(col, row)}</span>
+      </TrendTooltip>
+    );
+  };
+  const mobileCell = (col: DataTableColumn<TRow>, row: TRow) => {
+    const trend = cellTrend(col, row);
+    if (!trend) return cellContent(col, row);
+    return (
+      <span className="flex flex-col gap-0.5">
+        {cellContent(col, row)}
+        <TrendLine trend={trend} showPrevious />
+      </span>
+    );
+  };
   const boundaries = groupBoundaryKeys(columns);
 
   const footer = pagination && goTo && (
@@ -473,7 +506,7 @@ export function DataTable<TRow>({
                   key={getRowId(row)}
                   primary={text(primaryCol, row)}
                   secondary={secondaryCol ? text(secondaryCol, row) : undefined}
-                  fields={fieldCols.map((c) => ({ label: mobileLabel(c), value: cellContent(c, row) }))}
+                  fields={fieldCols.map((c) => ({ label: mobileLabel(c), value: mobileCell(c, row) }))}
                   actions={
                     renderExpanded ? (
                       <>
@@ -593,7 +626,7 @@ export function DataTable<TRow>({
                                   col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
                                 )}
                               >
-                                {cellContent(col, row)}
+                                {desktopCell(col, row)}
                               </TableCell>
                             ))}
                             {hasActions && <TableCell className="text-right">{rowActions?.(row)}</TableCell>}

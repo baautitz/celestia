@@ -381,3 +381,51 @@ describe("colunas fixas", () => {
     expect(screen.getByRole("columnheader", { name: "Total" }).style.position).toBe("");
   });
 });
+
+describe("comparação com o anterior", () => {
+  type Seller = { id: string; nome: string; liquido: number };
+  const sellers: Seller[] = [
+    { id: "1", nome: "Ana", liquido: 12340 },
+    { id: "2", nome: "Bruno", liquido: 500 },
+  ];
+  const previous: Record<string, number> = { "1": 11000 };
+  const comparedColumns = [
+    { key: "nome", label: "Colaborador", value: (r: Seller) => r.nome },
+    {
+      key: "liquido",
+      label: "Total Líquido (R$)",
+      format: "decimal" as const,
+      value: (r: Seller) => r.liquido,
+      compare: (r: Seller) => {
+        const p = previous[r.id];
+        return p === undefined ? undefined : { previous: p, label: "Setembro/2026" };
+      },
+    },
+  ];
+
+  it("mostra o detalhe ao passar o mouse sobre a célula no desktop", async () => {
+    setViewport(1280);
+    render(<DataTable columns={comparedColumns} rows={sellers} getRowId={(r) => r.id} />);
+    expect(screen.queryByText(/▲/)).toBeNull();
+
+    await userEvent.hover(screen.getByText("12.340,00"));
+    expect(await screen.findByText("Setembro/2026")).toBeTruthy();
+    expect(screen.getByText("11.000,00")).toBeTruthy();
+    expect(screen.getByText("▲ 12,2%")).toBeTruthy();
+  });
+
+  it("mostra a variação e o anterior abaixo do valor no celular", () => {
+    setViewport(500);
+    render(<DataTable columns={comparedColumns} rows={sellers} getRowId={(r) => r.id} />);
+    expect(screen.getByText("▲ 12,2% · 11.000")).toBeTruthy();
+    expect(screen.getAllByText(/▲/)).toHaveLength(1);
+  });
+
+  it("não imprime a comparação", async () => {
+    setViewport(500);
+    window.print = vi.fn();
+    render(<DataTable columns={comparedColumns} rows={sellers} getRowId={(r) => r.id} title="Vendas" print={{}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(within(screen.getByRole("table", { name: "Vendas" })).queryByText(/▲/)).toBeNull();
+  });
+});
