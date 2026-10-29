@@ -144,8 +144,8 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         }
 
         // Como no relatório oficial do InovaFarma: vendas sem caixa aberto (CodigoAbertura nulo) ficam fora,
-        // e o valor que um PBM com financeiro (ex.: Farmácia Popular) reembolsa à loja entra no líquido.
-        // O ERP grava esse reembolso em TotalDesconto e deixa o item com Total = 0.
+        // e o valor que um PBM com financeiro (ex.: Farmácia Popular) reembolsa à loja entra no bruto e no líquido.
+        // O ERP deixa esse item com Total = 0 e TotalDesconto = 0; o reembolso fica só em Venda_Produto_PBM.
         const reembolsoPbm = "ISNULL(pbm.DescontoUnitarioPBM * vp.Quantidade, 0)";
 
         const fromWhere = `
@@ -168,8 +168,8 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
             vp.CodigoFuncionario AS codigoColaborador,
             c.Nome AS nomeColaborador,
             COUNT(DISTINCT vp.CodigoVenda) AS quantidadeVendas,
-            CAST(SUM(vp.Total + vp.TotalDesconto) AS float) AS totalBruto,
-            CAST(SUM(vp.TotalDesconto - ${reembolsoPbm}) AS float) AS totalDesconto,
+            CAST(SUM(vp.Total + vp.TotalDesconto + ${reembolsoPbm}) AS float) AS totalBruto,
+            CAST(SUM(vp.TotalDesconto) AS float) AS totalDesconto,
             CAST(SUM(vp.Total + ${reembolsoPbm}) AS float) AS totalLiquido,
             CAST(SUM(vp.Quantidade * vp.PrecoCusto) AS float) AS totalCmv,
             COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN vp.CodigoVenda END) AS vendasComCadastro,
