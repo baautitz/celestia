@@ -10,7 +10,8 @@ export type WindowResult<TResult> =
   | { status: "confirmed"; value: TResult }
   | { status: "cancelled"; reason: CloseReason }
 
-export type WindowSurface = "dialog" | "sheet" | "confirmation"
+/** `drawer`: sheet que sobe de baixo, para ações no celular. */
+export type WindowSurface = "dialog" | "sheet" | "drawer" | "confirmation"
 export type WindowSize = "small" | "medium" | "large" | "full"
 
 /** `content` é opaco para o controller; o host decide como renderizá-lo. */

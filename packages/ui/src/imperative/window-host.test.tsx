@@ -96,3 +96,29 @@ describe("host de janelas (UiProvider)", () => {
     await waitFor(() => expect(results).toEqual([true, false]));
   });
 });
+
+describe("superfície drawer", () => {
+  function DrawerLauncher({ onResult }: { onResult: (r: WindowResult<unknown>) => void }) {
+    const ui = useUi();
+    return (
+      <button type="button" onClick={async () => onResult(await ui.windows.open<string>({ surface: "drawer", title: "Filtros", content: Body }))}>
+        Abrir drawer
+      </button>
+    );
+  }
+
+  it("abre por baixo, publica as ações no rodapé e resolve com o valor", async () => {
+    const results: WindowResult<unknown>[] = [];
+    render(
+      <UiProvider>
+        <DrawerLauncher onResult={(r) => results.push(r)} />
+      </UiProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Abrir drawer" }));
+
+    const drawer = await screen.findByRole("dialog", { name: "Filtros" });
+    expect(drawer.getAttribute("data-side")).toBe("bottom");
+    fireEvent.click(await screen.findByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(results).toEqual([{ status: "confirmed", value: "salvo" }]));
+  });
+});
