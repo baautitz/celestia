@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { dateRangeTextError, maskDateRange, parseDateRange } from "../lib/date-input";
+import { useLatest } from "../hooks/use-latest";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
 import { FieldError } from "./field";
@@ -68,10 +69,7 @@ export function DateRangePicker({
 
   // Mudança de `value` causada pela própria digitação não reescreve o texto (senão apagaria o que o usuário digita).
   const typed = React.useRef(false);
-  const valueRef = React.useRef(value);
-  React.useEffect(() => {
-    valueRef.current = value;
-  });
+  const valueRef = useLatest(value);
   const fromTime = value?.from?.getTime();
   const toTime = value?.to?.getTime();
 
@@ -82,7 +80,7 @@ export function DateRangePicker({
     }
     setText(toText(valueRef.current));
     setTouched(false);
-  }, [fromTime, toTime]);
+  }, [fromTime, toTime, valueRef]);
 
   const error = dateRangeTextError(text, touched);
 

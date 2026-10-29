@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useLatest } from "@platform/ui/hooks/use-latest";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -250,13 +251,10 @@ export const IAMRolesPage: React.FC = () => {
     }
   };
 
-  const fetchDataRef = useRef(fetchData);
-  useEffect(() => {
-    fetchDataRef.current = fetchData;
-  });
+  const fetchDataRef = useLatest(fetchData);
   useEffect(() => {
     fetchDataRef.current();
-  }, []);
+  }, [fetchDataRef]);
 
   const openSheet = async (role: Role | null) => {
     const result = await ui.windows.open<true>({

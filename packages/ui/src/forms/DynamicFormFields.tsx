@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { parseLocalDate, toLocalISODate } from "../lib/utils";
 import type { FormFieldDef } from "@platform/shared";
 import type { UseFormReturn } from "react-hook-form";
@@ -9,6 +9,7 @@ import {
   FormControl,
   FormMessage,
 } from "../components/form";
+import { useLatest } from "../hooks/use-latest";
 import { Input } from "../components/input";
 import { MoneyInput } from "../components/money-input";
 import { Textarea } from "../components/textarea";
@@ -53,10 +54,7 @@ function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormF
 
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(false);
-  const fieldRef = useRef(field);
-  useEffect(() => {
-    fieldRef.current = field;
-  });
+  const fieldRef = useLatest(field);
 
   useEffect(() => {
     const field = fieldRef.current;
@@ -91,7 +89,7 @@ function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormF
     return () => {
       cancelled = true;
     };
-  }, [field.name, fetchLookupOptions, isLookup]);
+  }, [field.name, fetchLookupOptions, isLookup, fieldRef]);
 
   return { options, loading };
 }

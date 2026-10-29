@@ -11,5 +11,5 @@ export async function loginAsAdmin(page: Page): Promise<void> {
 
 /** Navega pelo menu lateral (o token vive so em memoria: recarregar a pagina nao e uma opcao). */
 export async function openMenu(page: Page, name: string): Promise<void> {
-  await page.getByRole("link", { name, exact: true }).click();
+  await page.locator('[data-sidebar="sidebar"]').getByRole("link", { name, exact: true }).click();
 }
