@@ -128,3 +128,33 @@ export interface PermissionItem {
 export interface PermissionCatalog {
   system: Record<string, PermissionItem[]>; // Agrupado por módulo
 }
+
+export type DeviceType = "computer" | "phone";
+
+/**
+ * Dispositivo (computador ou celular) homologado, com o certificado que o Celestia emitiu para ele.
+ * A chave privada nunca é guardada: só o fingerprint e os metadados do certificado.
+ */
+export interface Device {
+  id: string;
+  name: string;
+  type: DeviceType;
+  status: "active" | "revoked";
+  /** SHA-256 do certificado em DER, hexadecimal minúsculo. */
+  fingerprint: string;
+  serial: string;
+  notAfter: string;
+  createdAt: string;
+  createdBy?: string;
+  revokedAt?: string;
+  revokedBy?: string;
+}
+
+export interface CreateDeviceInput {
+  name: string;
+  type: DeviceType;
+  fingerprint: string;
+  serial: string;
+  notAfter: string;
+  createdBy?: string;
+}
