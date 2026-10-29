@@ -53,6 +53,35 @@ const SidebarAutoClose: React.FC = () => {
   return null;
 };
 
+function getInitials(name?: string) {
+  if (!name) return "US";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+}
+
+/** Avatar com nome e uma linha de apoio (usuário/e-mail); filhos diretos do contêiner flex. */
+function UserSummary({ fullname, subtitle }: { fullname: string; subtitle: string }) {
+  return (
+    <>
+      <Avatar>
+        <AvatarFallback>{getInitials(fullname)}</AvatarFallback>
+      </Avatar>
+      <Stack grow>
+        <Text variant="small" weight="semibold" truncate>
+          {fullname}
+        </Text>
+        <Text variant="caption" tone="muted" truncate>
+          {subtitle}
+        </Text>
+      </Stack>
+    </>
+  );
+}
+
 export const AppLayout: React.FC = () => {
   const { user, logout, hasPermission } = useAuth();
   const { actions, backTo } = useHeaderActions();
@@ -63,16 +92,6 @@ export const AppLayout: React.FC = () => {
   const handleLogout = async () => {
     await logout();
     navigate("/login");
-  };
-
-  const getInitials = (name?: string) => {
-    if (!name) return "US";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .substring(0, 2)
-      .toUpperCase();
   };
 
   const sections = menuSections(hasPermission);
@@ -131,17 +150,7 @@ export const AppLayout: React.FC = () => {
                   <DropdownMenuTrigger
                     render={
                       <SidebarMenuButton>
-                        <Avatar>
-                          <AvatarFallback>{getInitials(user.fullname)}</AvatarFallback>
-                        </Avatar>
-                        <Stack grow>
-                          <Text variant="small" weight="semibold" truncate>
-                            {user.fullname}
-                          </Text>
-                          <Text variant="caption" tone="muted" truncate>
-                            {user.username}
-                          </Text>
-                        </Stack>
+                        <UserSummary fullname={user.fullname} subtitle={user.username} />
                         <ChevronDown />
                       </SidebarMenuButton>
                     }
@@ -150,17 +159,7 @@ export const AppLayout: React.FC = () => {
                     <DropdownMenuGroup>
                       <DropdownMenuLabel>
                         <Stack direction="row" align="center" gap="field">
-                          <Avatar>
-                            <AvatarFallback>{getInitials(user.fullname)}</AvatarFallback>
-                          </Avatar>
-                          <Stack grow>
-                            <Text variant="small" weight="semibold" truncate>
-                              {user.fullname}
-                            </Text>
-                            <Text variant="caption" tone="muted" truncate>
-                              {user.email || user.username}
-                            </Text>
-                          </Stack>
+                          <UserSummary fullname={user.fullname} subtitle={user.email || user.username} />
                         </Stack>
                       </DropdownMenuLabel>
                     </DropdownMenuGroup>
