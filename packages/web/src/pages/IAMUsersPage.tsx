@@ -240,9 +240,9 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
             {/* Externals: campos declarados por cada ERP (Plugin erp). */}
             {isEditMode && (
               <Card>
-                <CardHeader>
+                <CardHeader compact>
                   <CardTitle>
-                    <Stack direction="row" align="center" gap="field" iconSize="sm">
+                    <Stack direction="row" align="center" gap="field" iconSize="sm" iconTone="primary">
                       <Database />
                       <Text variant="eyebrow" tone="muted">
                         Identificadores nos ERPs
@@ -562,7 +562,8 @@ export const IAMUsersPage: React.FC = () => {
             )}
             {hasPermission("system:users:update") && (
               <Button
-                variant={u.status === "active" ? "destructive" : "ghost"}
+                variant="ghost"
+                tone={u.status === "active" ? "destructive" : "success"}
                 size="icon"
                 aria-label={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
                 title={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}

@@ -61,7 +61,7 @@ export const LoginPage: React.FC = () => {
   return (
     <CenteredScreen>
       <Card>
-        <CardHeader>
+        <CardHeader centered>
           <CardTitle>Celestia</CardTitle>
           <CardDescription>Entre com seu usuário e senha para continuar.</CardDescription>
         </CardHeader>
