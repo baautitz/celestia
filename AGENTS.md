@@ -74,6 +74,7 @@ pnpm check:plugins     # Plugin boundary check (integrations import only @platfo
 
 - **Explicit approval**: do not make unilateral decisions on layout, architecture or logic. Present each step, explain it, and get the user's confirmation before executing it.
 - **Commits** are One-Line Conventional Commits: `<type>(<scope>): <short description in english>`, split by responsibility. Never commit unilaterally: present the plan (messages + files), get confirmation, then commit.
+  - Exception: integration merges into `main` are `--no-ff` merge commits with git's default message (see [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)); they are not one-line Conventional Commits.
 
 ## Agent skills
 
