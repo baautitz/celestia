@@ -140,6 +140,8 @@ export interface DataTableProps<TRow> {
    * A função recebe as linhas da busca atual, de todas as páginas; o objeto serve ao modo `manual` e a tabelas sem busca.
    */
   totals?: DataTableTotals<TRow>;
+  /** Valor anterior de cada total, por `key` de coluna (ex.: o total do Período anterior); mesmo efeito do `compare` da coluna. */
+  totalsCompare?: Record<string, Pick<Trend, "previous" | "label" | "favorable">>;
 }
 /** Chave da coluna do botão de expandir na medição das colunas fixas. */
 const EXPAND_KEY = "__expand";
@@ -295,6 +297,7 @@ export function DataTable<TRow>({
   striped = false,
   frozenUntil,
   totals,
+  totalsCompare,
 }: DataTableProps<TRow>) {
   const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
@@ -444,6 +447,13 @@ export function DataTable<TRow>({
     );
   };
   const boundaries = groupBoundaryKeys(columns);
+  /** Comparação de um total; a primeira coluna só tem o rótulo "Total". */
+  const totalTrend = (col: DataTableColumn<TRow>, index: number): Trend | undefined => {
+    const current = totalsValues?.[col.key];
+    const compared = totalsCompare?.[col.key];
+    if (index === 0 || !compared || typeof current !== "number" || !isNumericFormat(col.format)) return undefined;
+    return { ...compared, current, format: col.format };
+  };
 
   const footer = pagination && goTo && (
     <div
@@ -558,7 +568,21 @@ export function DataTable<TRow>({
                 primary={TOTAL_LABEL}
                 fields={fieldCols
                   .filter((c) => c.key in totalsValues)
-                  .map((c) => ({ label: mobileLabel(c), value: formatValue(totalsValues[c.key], c.format) }))}
+                  .map((c) => {
+                    const trend = totalTrend(c, columns.indexOf(c));
+                    const value = formatValue(totalsValues[c.key], c.format);
+                    return {
+                      label: mobileLabel(c),
+                      value: trend ? (
+                        <span className="flex flex-col gap-0.5">
+                          {value}
+                          <TrendLine trend={trend} showPrevious />
+                        </span>
+                      ) : (
+                        value
+                      ),
+                    };
+                  })}
               />
             )}
             {footer}
@@ -701,20 +725,31 @@ export function DataTable<TRow>({
                       {renderExpanded && (
                         <TableCell style={frozenStyle(EXPAND_KEY)} className={cn(frozenClass(EXPAND_KEY, true))} />
                       )}
-                      {columns.map((col, idx) => (
-                        <TableCell
-                          key={col.key}
-                          style={frozenStyle(col.key)}
-                          className={cn(
-                            totalsCellClassName(col),
-                            boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
-                            frozenClass(col.key, true),
-                            col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
-                          )}
-                        >
-                          {totalCellText(col, idx, totalsValues)}
-                        </TableCell>
-                      ))}
+                      {columns.map((col, idx) => {
+                        const trend = totalTrend(col, idx);
+                        const cell = (
+                          <TableCell
+                            key={col.key}
+                            style={frozenStyle(col.key)}
+                            className={cn(
+                              totalsCellClassName(col),
+                              boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                              frozenClass(col.key, true),
+                              col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
+                              trend && "cursor-help",
+                            )}
+                          >
+                            {totalCellText(col, idx, totalsValues)}
+                          </TableCell>
+                        );
+                        return trend ? (
+                          <TrendTooltipTrigger key={col.key} handle={trendTooltip} trend={trend} title={mobileLabel(col)}>
+                            {cell}
+                          </TrendTooltipTrigger>
+                        ) : (
+                          cell
+                        );
+                      })}
                       {hasActions && <TableCell />}
                     </TableRow>
                   </TableFooter>
