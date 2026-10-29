@@ -408,10 +408,23 @@ describe("comparação com o anterior", () => {
     render(<DataTable columns={comparedColumns} rows={sellers} getRowId={(r) => r.id} />);
     expect(screen.queryByText(/▲/)).toBeNull();
 
-    await userEvent.hover(screen.getByText("12.340,00"));
+    await userEvent.hover(screen.getByRole("cell", { name: "12.340,00" }));
     expect(await screen.findByText("Setembro/2026")).toBeTruthy();
     expect(screen.getByText("11.000,00")).toBeTruthy();
     expect(screen.getByText("▲ 12,2%")).toBeTruthy();
+  });
+
+  it("troca o detalhe ao passar para outra célula comparada", async () => {
+    setViewport(1280);
+    previous["2"] = 1000;
+    render(<DataTable columns={comparedColumns} rows={sellers} getRowId={(r) => r.id} />);
+    await userEvent.hover(screen.getByRole("cell", { name: "12.340,00" }));
+    expect(await screen.findByText("▲ 12,2%")).toBeTruthy();
+
+    await userEvent.hover(screen.getByRole("cell", { name: "500,00" }));
+    expect(await screen.findByText("▼ 50,0%")).toBeTruthy();
+    expect(screen.queryByText("▲ 12,2%")).toBeNull();
+    delete previous["2"];
   });
 
   it("mostra a variação e o anterior abaixo do valor no celular", () => {

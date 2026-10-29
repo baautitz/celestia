@@ -15,7 +15,14 @@ import {
   TableRow,
 } from "../components/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip";
-import { TrendLine, TrendTooltip, type Trend, type TrendFormat } from "../components/trend";
+import {
+  SharedTrendTooltip,
+  TrendLine,
+  TrendTooltipTrigger,
+  useTrendTooltipHandle,
+  type Trend,
+  type TrendFormat,
+} from "../components/trend";
 import { useIsMobile } from "../hooks/use-mobile";
 import { cn } from "../lib/utils";
 import { formatCurrency, formatDate, formatDecimal, formatNumber, formatPercent } from "../lib/format";
@@ -264,6 +271,7 @@ export function DataTable<TRow>({
   const [clientPage, setClientPage] = useState(1);
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
   const [printing, setPrinting] = useState(false);
+  const trendTooltip = useTrendTooltipHandle();
   const endPrinting = useCallback(() => setPrinting(false), []);
   const headRefs = useRef(new Map<string, HTMLTableCellElement>());
   const [frozenLeft, setFrozenLeft] = useState<ReadonlyMap<string, number>>(new Map());
@@ -391,16 +399,7 @@ export function DataTable<TRow>({
   );
   const cellContent = (col: DataTableColumn<TRow>, row: TRow) =>
     col.render ? col.render(row) : text(col, row);
-  /** Conteúdo da tela com a comparação; a impressão usa só `cellContent`. */
-  const desktopCell = (col: DataTableColumn<TRow>, row: TRow) => {
-    const trend = cellTrend(col, row);
-    if (!trend) return cellContent(col, row);
-    return (
-      <TrendTooltip trend={trend} title={mobileLabel(col)}>
-        <span className="cursor-help">{cellContent(col, row)}</span>
-      </TrendTooltip>
-    );
-  };
+  /** Comparação no MobileCard; a impressão usa só `cellContent`. */
   const mobileCell = (col: DataTableColumn<TRow>, row: TRow) => {
     const trend = cellTrend(col, row);
     if (!trend) return cellContent(col, row);
@@ -615,20 +614,32 @@ export function DataTable<TRow>({
                                 {expandButton(row)}
                               </TableCell>
                             )}
-                            {columns.map((col) => (
-                              <TableCell
-                                key={col.key}
-                                style={frozenStyle(col.key)}
-                                className={cn(
-                                  columnCellClassName(col, row),
-                                  boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
-                                  frozenClass(col.key),
-                                  col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
-                                )}
-                              >
-                                {desktopCell(col, row)}
-                              </TableCell>
-                            ))}
+                            {columns.map((col) => {
+                              const trend = cellTrend(col, row);
+                              const cell = (
+                                <TableCell
+                                  key={col.key}
+                                  style={frozenStyle(col.key)}
+                                  className={cn(
+                                    columnCellClassName(col, row),
+                                    boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                                    frozenClass(col.key),
+                                    col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
+                                    trend && "cursor-help",
+                                  )}
+                                >
+                                  {cellContent(col, row)}
+                                </TableCell>
+                              );
+                              // A célula inteira é o gatilho do tooltip compartilhado da tabela.
+                              return trend ? (
+                                <TrendTooltipTrigger key={col.key} handle={trendTooltip} trend={trend} title={mobileLabel(col)}>
+                                  {cell}
+                                </TrendTooltipTrigger>
+                              ) : (
+                                cell
+                              );
+                            })}
                             {hasActions && <TableCell className="text-right">{rowActions?.(row)}</TableCell>}
                           </TableRow>
                           {expanded && (
@@ -645,6 +656,7 @@ export function DataTable<TRow>({
                 </TableBody>
               </Table>
             </div>
+            <SharedTrendTooltip handle={trendTooltip} />
             {footer}
           </>
         )}
