@@ -10,9 +10,7 @@ import { defineWebModule } from "@platform/ui/contracts/module";
 import { formatCurrency, formatDecimal, formatNumber, formatDate, formatPercent } from "@platform/ui/lib/format";
 import { apiFetch } from "@platform/ui/lib/api";
 import type { Trend } from "@platform/ui/components/trend";
-import { previousPeriodRange, type PeriodRange } from "./previous-period";
-
-type ClosingPeriod = PeriodRange;
+import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
 
 interface Loja {
   codigoEmpresa: number;
@@ -76,11 +74,12 @@ interface Anterior {
 }
 
 /** Colunas e KPIs em que subir é ruim (`down`) ou só acompanha as vendas (`neutral`). */
-const FAVORABLE: Partial<Record<string, Trend["favorable"]>> = {
+const FAVORABLE = {
   totalDesconto: "down",
   totalCmv: "neutral",
   cmvPercent: "down",
-};
+} satisfies Partial<Record<keyof ColaboradorItem, Trend["favorable"]>>;
+const favorableByColumn: Partial<Record<string, Trend["favorable"]>> = FAVORABLE;
 
 const ticketMedio = (r: ResumoVendas) => (r.totalVendasGeral > 0 ? r.totalLiquidoGeral / r.totalVendasGeral : 0);
 
@@ -101,7 +100,7 @@ function withComparison(cols: DataTableColumn<ColaboradorItem>[], anterior: Ante
       ...col,
       compare: (r) => {
         const previous = anterior.colaboradores.get(r.codigoColaborador);
-        return previous && { previous: Number(value(previous)), label: anterior.label, favorable: FAVORABLE[col.key] };
+        return previous && { previous: Number(value(previous)), label: anterior.label, favorable: favorableByColumn[col.key] };
       },
     };
   });
@@ -305,7 +304,7 @@ function VendasComissoesPage() {
         }
         return apiFetch<RelatorioVendas>(`/api/m/inovafarma/relatorios/vendas-colaborador?${params.toString()}`);
       };
-      const range = previousPeriodRange(periods, selectedPeriod, today());
+      const range = previousClosingPeriodRange(periods, selectedPeriod, today());
 
       // A comparação é opcional: se o anterior falhar, o relatório segue sem ela.
       const [data, previous] = await Promise.all([
