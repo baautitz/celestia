@@ -3,10 +3,18 @@ import { createPlatform } from "../src/index.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "../src/plugins.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
+import type { ErpClient, ErpClientRegistry } from "../src/erp/erp-client.js";
+
+/** O mock não conhece o TRow pedido pelo chamador; o cast fica confinado aqui. */
+function mockErpClient(
+  handler: (sql: string, params?: Record<string, unknown>) => unknown[] | Promise<unknown[]>
+): ErpClient {
+  return { query: async <TRow>(sql: string, params?: Record<string, unknown>) => (await handler(sql, params)) as TRow[] };
+}
 
 async function boot(
   permissions: string[],
-  erpClients: Record<string, { query: (sql: string, params?: Record<string, unknown>) => Promise<unknown[]> }> = {}
+  erpClients: ErpClientRegistry = {}
 ) {
   const userStore = new MemoryUserStore({
     roles: [{ id: "r", name: "R", permissions }],
@@ -71,8 +79,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
   });
 
   it("lista lojas através da tabela Config", async () => {
-    const mockClient = {
-      query: async (sql: string) => {
+    const mockClient = mockErpClient(async (sql: string) => {
         if (sql.includes("Config")) {
           return [
             { codigoEmpresa: 1, nome: "Loja Centro" },
@@ -80,8 +87,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
           ];
         }
         return [];
-      },
-    };
+    });
     const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: mockClient });
     const res = await platform.app.request("/api/m/inovafarma/lojas", { headers });
     expect(res.status).toBe(200);
@@ -93,8 +99,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
   });
 
   it("calcula relatório de vendas por colaborador do item, com CMV", async () => {
-    const mockClient = {
-      query: async (sql: string, params?: Record<string, unknown>) => {
+    const mockClient = mockErpClient(async (sql: string, params?: Record<string, unknown>) => {
         expect(params).toMatchObject({
           dataInicio: "2026-10-01 00:00:00",
           dataFim: "2026-10-31 23:59:59",
@@ -126,8 +131,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
             vendasComCadastro: 10,
           },
         ];
-      },
-    };
+    });
     const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: mockClient });
     const res = await platform.app.request(
       "/api/m/inovafarma/relatorios/vendas-colaborador?dataInicio=2026-10-01&dataFim=2026-10-31",
@@ -166,8 +170,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
   });
 
   it("soma Qtde e Valor de Vitaminas, Genéricos, Similares, Incentivos e Total Foco por colaborador e no resumo", async () => {
-    const mockClient = {
-      query: async (sql: string) => {
+    const mockClient = mockErpClient(async (sql: string) => {
         if (sql.includes("totalVendasGeral")) return [{ totalVendasGeral: 3, totalVendasComCadastro: 0 }];
         for (const filtro of ["p.CodigoGrupo = 44", "p.CodigoSessao = 261", "p.CodigoSessao = 271", "p.CodigoSessao = 281"]) {
           expect(sql).toContain(`CASE WHEN ${filtro} THEN vp.Quantidade END`);
@@ -219,8 +222,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
             valorTotalFoco: 100,
           },
         ];
-      },
-    };
+    });
     const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: mockClient });
     const res = await platform.app.request(
       "/api/m/inovafarma/relatorios/vendas-colaborador?dataInicio=2026-10-01&dataFim=2026-10-31",
