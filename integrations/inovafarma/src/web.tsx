@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle, Package } from "lucide-react";
+import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle, Package, Pill } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
@@ -23,6 +23,17 @@ interface Loja {
   nome: string;
 }
 
+type Categoria = "vitaminas" | "genericos" | "similares" | "incentivos";
+type CategoriaTotais = Record<Categoria, { quantidade: number; valor: number }>;
+
+/** Categorias de produto exibidas com Qtde e Valor; os IDs ficam fixos no servidor do Plugin. */
+const CATEGORIAS: { key: Categoria; label: string; tooltip: string }[] = [
+  { key: "vitaminas", label: "Vitaminas", tooltip: "Itens do grupo de produto VITAMINAS (44)." },
+  { key: "genericos", label: "Genéricos", tooltip: "Itens da seção de produto GENERICOS (261)." },
+  { key: "similares", label: "Similares", tooltip: "Itens da seção de produto SIMILARES (271)." },
+  { key: "incentivos", label: "Incentivos", tooltip: "Itens da seção de produto INCENTIVOS (281)." },
+];
+
 interface ColaboradorItem {
   codigoColaborador: number;
   nomeColaborador: string;
@@ -35,6 +46,7 @@ interface ColaboradorItem {
   ticketMedio: number;
   participacaoPercent: number;
   cadastroPercent: number;
+  categorias: CategoriaTotais;
 }
 
 interface ResumoVendas {
@@ -46,6 +58,7 @@ interface ResumoVendas {
   cmvPercentGeral: number;
   cadastroPercentGeral: number;
   totalColaboradores: number;
+  categorias: CategoriaTotais;
 }
 
 const columns: DataTableColumn<ColaboradorItem>[] = [
@@ -157,6 +170,32 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     firstSort: "desc",
     cellClassName: "text-right font-mono",
   },
+  ...CATEGORIAS.flatMap(({ key, label, tooltip }): DataTableColumn<ColaboradorItem>[] => [
+    {
+      key: `${key}-quantidade`,
+      label: "Qtde",
+      group: label,
+      tooltip: `${tooltip} Unidades vendidas.`,
+      value: (r) => r.categorias[key].quantidade,
+      render: (r) => (r.categorias[key].quantidade === 0 ? "-" : formatNumber(r.categorias[key].quantidade)),
+      format: "number",
+      sortable: true,
+      firstSort: "desc",
+      cellClassName: "text-right font-mono",
+    },
+    {
+      key: `${key}-valor`,
+      label: "Valor (R$)",
+      group: label,
+      tooltip: `${tooltip} Valor líquido vendido.`,
+      value: (r) => r.categorias[key].valor,
+      render: (r) => (r.categorias[key].valor === 0 ? "-" : formatCurrency(r.categorias[key].valor)),
+      format: "currency",
+      sortable: true,
+      firstSort: "desc",
+      cellClassName: "text-right font-mono",
+    },
+  ]),
 ];
 
 function VendasComissoesPage() {
@@ -426,6 +465,17 @@ function VendasComissoesPage() {
           icon={<Users />}
           tone="info"
         />
+        {CATEGORIAS.map(({ key, label }) => (
+          <KpiCard
+            key={key}
+            loading={loading}
+            label={label}
+            value={formatCurrency(resumo?.categorias[key].valor)}
+            hint={resumo ? `${formatNumber(resumo.categorias[key].quantidade)} un` : "-"}
+            icon={<Pill />}
+            tone="primary"
+          />
+        ))}
       </Grid>
 
       {/* Tabela de Colaboradores */}

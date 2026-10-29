@@ -143,6 +143,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       cmvPercentGeral: (10000 / 15000) * 100,
       cadastroPercentGeral: 50,
       totalColaboradores: 2,
+      categorias: expect.any(Object),
     });
     expect(body.colaboradores[0]).toEqual({
       codigoColaborador: 10,
@@ -156,6 +157,87 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       ticketMedio: 100,
       participacaoPercent: (10000 / 15000) * 100,
       cadastroPercent: 40,
+      categorias: expect.any(Object),
+    });
+  });
+
+  it("soma Qtde e Valor de Vitaminas, Genéricos, Similares e Incentivos por colaborador e no resumo", async () => {
+    const mockClient = {
+      query: async (sql: string) => {
+        if (sql.includes("totalVendasGeral")) return [{ totalVendasGeral: 3, totalVendasComCadastro: 0 }];
+        for (const filtro of ["p.CodigoGrupo = 44", "p.CodigoSessao = 261", "p.CodigoSessao = 271", "p.CodigoSessao = 281"]) {
+          expect(sql).toContain(`CASE WHEN ${filtro} THEN vp.Quantidade END`);
+          expect(sql).toContain(`CASE WHEN ${filtro} THEN vp.Total END`);
+        }
+        return [
+          {
+            codigoColaborador: 10,
+            nomeColaborador: "MARCOS SILVA",
+            quantidadeVendas: 2,
+            totalBruto: 500,
+            totalDesconto: 0,
+            totalLiquido: 500,
+            totalCmv: 0,
+            vendasComCadastro: 0,
+            qtdVitaminas: 3,
+            valorVitaminas: 90.5,
+            qtdGenericos: 10,
+            valorGenericos: 200,
+            qtdSimilares: 0,
+            valorSimilares: 0,
+            qtdIncentivos: 1,
+            valorIncentivos: 35,
+          },
+          {
+            codigoColaborador: 20,
+            nomeColaborador: "ANA SOUZA",
+            quantidadeVendas: 1,
+            totalBruto: 100,
+            totalDesconto: 0,
+            totalLiquido: 100,
+            totalCmv: 0,
+            vendasComCadastro: 0,
+            qtdVitaminas: null,
+            valorVitaminas: null,
+            qtdGenericos: 2,
+            valorGenericos: 40,
+            qtdSimilares: 4,
+            valorSimilares: 60,
+            qtdIncentivos: null,
+            valorIncentivos: null,
+          },
+        ];
+      },
+    };
+    const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: mockClient });
+    const res = await platform.app.request(
+      "/api/m/inovafarma/relatorios/vendas-colaborador?dataInicio=2026-10-01&dataFim=2026-10-31",
+      { headers }
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      resumo: { categorias: unknown };
+      colaboradores: { categorias: unknown }[];
+    };
+    expect(body.colaboradores.map((c) => c.categorias)).toEqual([
+      {
+        vitaminas: { quantidade: 3, valor: 90.5 },
+        genericos: { quantidade: 10, valor: 200 },
+        similares: { quantidade: 0, valor: 0 },
+        incentivos: { quantidade: 1, valor: 35 },
+      },
+      {
+        vitaminas: { quantidade: 0, valor: 0 },
+        genericos: { quantidade: 2, valor: 40 },
+        similares: { quantidade: 4, valor: 60 },
+        incentivos: { quantidade: 0, valor: 0 },
+      },
+    ]);
+    expect(body.resumo.categorias).toEqual({
+      vitaminas: { quantidade: 3, valor: 90.5 },
+      genericos: { quantidade: 12, valor: 240 },
+      similares: { quantidade: 4, valor: 60 },
+      incentivos: { quantidade: 1, valor: 35 },
     });
   });
 });

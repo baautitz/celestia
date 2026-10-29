@@ -6,6 +6,30 @@ import { createInovafarmaDriver } from "./driver.js";
 
 export { INOVAFARMA_PERMISSIONS, INOVAFARMA_EXTERNALS, createInovafarmaDriver };
 
+/**
+ * Categorias de produto somadas no Desempenho de Vendas (Qtde em unidades e Valor líquido).
+ * IDs fixos da base do cliente: Vitaminas por Produto_Grupo; as demais por Produto_Sessao.
+ * `filtro` entra literal no SQL: é constante, nunca entrada do usuário.
+ */
+const CATEGORIAS = {
+  vitaminas: { coluna: "Vitaminas", filtro: "p.CodigoGrupo = 44" },
+  genericos: { coluna: "Genericos", filtro: "p.CodigoSessao = 261" },
+  similares: { coluna: "Similares", filtro: "p.CodigoSessao = 271" },
+  incentivos: { coluna: "Incentivos", filtro: "p.CodigoSessao = 281" },
+} as const;
+
+type Categoria = keyof typeof CATEGORIAS;
+type CategoriaColuna = (typeof CATEGORIAS)[Categoria]["coluna"];
+type CategoriaTotal = { quantidade: number; valor: number };
+type CategoriaTotais = Record<Categoria, CategoriaTotal>;
+
+const porCategoria = (fn: (categoria: Categoria) => CategoriaTotal): CategoriaTotais => ({
+  vitaminas: fn("vitaminas"),
+  genericos: fn("genericos"),
+  similares: fn("similares"),
+  incentivos: fn("incentivos"),
+});
+
 export interface ErpQueryClient {
   query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
   healthCheck?(): Promise<boolean>;
@@ -109,6 +133,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
           JOIN Venda_Produto vp ON vp.CodigoVenda = v.CodigoVenda
           JOIN Funcionario f ON f.CodigoFuncionario = vp.CodigoFuncionario
           JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
+          LEFT JOIN Produto p ON p.CodigoProduto = vp.CodigoProduto
           WHERE v.Eliminado = 0
             AND v.DataVenda >= @dataInicio
             AND v.DataVenda <= @dataFim
@@ -124,7 +149,11 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
             CAST(SUM(vp.TotalDesconto) AS float) AS totalDesconto,
             CAST(SUM(vp.Total) AS float) AS totalLiquido,
             CAST(SUM(vp.Quantidade * vp.PrecoCusto) AS float) AS totalCmv,
-            COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN vp.CodigoVenda END) AS vendasComCadastro
+            COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN vp.CodigoVenda END) AS vendasComCadastro,
+            ${Object.values(CATEGORIAS).map(({ coluna, filtro }) => {
+              return `CAST(SUM(CASE WHEN ${filtro} THEN vp.Quantidade END) AS float) AS qtd${coluna},
+            CAST(SUM(CASE WHEN ${filtro} THEN vp.Total END) AS float) AS valor${coluna}`;
+            }).join(",\n            ")}
           ${fromWhere}
           GROUP BY vp.CodigoFuncionario, c.Nome
           ORDER BY totalLiquido DESC
@@ -140,7 +169,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         `;
 
         try {
-          interface ColaboradorRow {
+          type ColaboradorRow = Record<`qtd${CategoriaColuna}` | `valor${CategoriaColuna}`, number | null> & {
             codigoColaborador: number;
             nomeColaborador: string;
             quantidadeVendas: number;
@@ -149,7 +178,13 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
             totalLiquido: number;
             totalCmv: number;
             vendasComCadastro: number;
-          }
+          };
+
+          const categoriasDe = (r: ColaboradorRow): CategoriaTotais =>
+            porCategoria((k) => {
+              const { coluna } = CATEGORIAS[k];
+              return { quantidade: Number(r[`qtd${coluna}`]) || 0, valor: Number(r[`valor${coluna}`]) || 0 };
+            });
 
           const [rows, [totalVendasRow]] = await Promise.all([
             client.query<ColaboradorRow>(sql, params),
@@ -162,6 +197,11 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
           const totalBrutoGeral = rows.reduce((acc, r) => acc + (Number(r.totalBruto) || 0), 0);
           const totalDescontoGeral = rows.reduce((acc, r) => acc + (Number(r.totalDesconto) || 0), 0);
           const totalCmvGeral = rows.reduce((acc, r) => acc + (Number(r.totalCmv) || 0), 0);
+          const categoriasPorLinha = rows.map(categoriasDe);
+          const categoriasGeral = porCategoria((k) => ({
+            quantidade: categoriasPorLinha.reduce((acc, cat) => acc + cat[k].quantidade, 0),
+            valor: categoriasPorLinha.reduce((acc, cat) => acc + cat[k].valor, 0),
+          }));
 
           return c.json({
             resumo: {
@@ -173,8 +213,9 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
               cmvPercentGeral: totalLiquidoGeral > 0 ? (totalCmvGeral / totalLiquidoGeral) * 100 : 0,
               cadastroPercentGeral: totalVendasGeral > 0 ? (totalVendasComCadastro / totalVendasGeral) * 100 : 0,
               totalColaboradores: rows.length,
+              categorias: categoriasGeral,
             },
-            colaboradores: rows.map((r) => {
+            colaboradores: rows.map((r, i) => {
               const liq = Number(r.totalLiquido) || 0;
               const qtd = Number(r.quantidadeVendas) || 0;
               const cmv = Number(r.totalCmv) || 0;
@@ -190,6 +231,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
                 ticketMedio: qtd > 0 ? liq / qtd : 0,
                 participacaoPercent: totalLiquidoGeral > 0 ? (liq / totalLiquidoGeral) * 100 : 0,
                 cadastroPercent: qtd > 0 ? ((Number(r.vendasComCadastro) || 0) / qtd) * 100 : 0,
+                categorias: categoriasPorLinha[i],
               };
             }),
           });
