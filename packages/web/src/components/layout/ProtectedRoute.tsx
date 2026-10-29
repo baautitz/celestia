@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { CenteredScreen, LoadingScreen, Stack, Text } from "@platform/ui/components/layout";
+import { CenteredNotice, LoadingScreen, Stack, Text } from "@platform/ui/components/layout";
 
 interface ProtectedRouteProps {
   requiredPermission?: string;
@@ -22,7 +22,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredPermissi
 
   if (requiredPermission && !hasPermission(requiredPermission)) {
     return (
-      <CenteredScreen fullHeight={false}>
+      <CenteredNotice>
         <Stack align="center" gap="field">
           <Text as="h2" tone="destructive" weight="bold">
             Acesso Não Autorizado
@@ -31,7 +31,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredPermissi
             Seu perfil de acesso não possui a permissão necessária ({requiredPermission}) para visualizar este módulo.
           </Text>
         </Stack>
-      </CenteredScreen>
+      </CenteredNotice>
     );
   }
 

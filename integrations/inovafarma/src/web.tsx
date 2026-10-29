@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
@@ -264,6 +264,21 @@ function StatusBadge({ status }: { status: ClosingPeriod["status"] }) {
   );
 }
 
+/** Campo de filtro: rótulo com ícone acima do controle. */
+function FiltroSelect({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
+  return (
+    <Stack gap="field" grow narrow>
+      <Stack direction="row" align="center" gap="field" iconSize="sm">
+        {icon}
+        <Text variant="caption" tone="muted" weight="medium">
+          {label}
+        </Text>
+      </Stack>
+      {children}
+    </Stack>
+  );
+}
+
 /** Seletores de Período de Fechamento e Filial, na barra do desktop e no drawer do celular. */
 function FiltrosCampos({
   periods,
@@ -279,16 +294,9 @@ function FiltrosCampos({
   const period = periods.find((p) => p.id === value.periodId);
   return (
     <>
-      {/* Seletor de Período de Fechamento */}
-      <Stack gap="field" grow maxWidth="sm">
-        <Stack direction="row" align="center" gap="field" iconSize="sm">
-          <Calendar />
-          <Text variant="caption" tone="muted" weight="medium">
-            Período de Fechamento
-          </Text>
-        </Stack>
+      <FiltroSelect icon={<Calendar />} label="Período de Fechamento">
         <Select value={value.periodId} onValueChange={(val) => val && onChange({ ...value, periodId: val })}>
-          <SelectTrigger fullWidth>
+          <SelectTrigger>
             <SelectValue placeholder="Selecione um período">{period ? periodLabel(period) : "Selecione um Período"}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -306,18 +314,11 @@ function FiltrosCampos({
             )}
           </SelectContent>
         </Select>
-      </Stack>
+      </FiltroSelect>
 
-      {/* Seletor de Filial / Loja */}
-      <Stack gap="field" grow maxWidth="sm">
-        <Stack direction="row" align="center" gap="field" iconSize="sm">
-          <Store />
-          <Text variant="caption" tone="muted" weight="medium">
-            Filial / Loja
-          </Text>
-        </Stack>
+      <FiltroSelect icon={<Store />} label="Filial / Loja">
         <Select value={value.loja} onValueChange={(val) => val && onChange({ ...value, loja: val })}>
-          <SelectTrigger fullWidth>
+          <SelectTrigger>
             <SelectValue placeholder="Todas as Filiais">{lojaLabel(lojas, value.loja)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -329,7 +330,7 @@ function FiltrosCampos({
             ))}
           </SelectContent>
         </Select>
-      </Stack>
+      </FiltroSelect>
     </>
   );
 }
@@ -476,22 +477,20 @@ function VendasComissoesPage() {
   return (
     <Stack gap="section">
       {/* Barra de Filtros (desktop) */}
-      <Show on="desktop">
+      <Show on="lgUp">
         <Stack
           direction="row"
           wrap
           align="end"
           justify="between"
           gap="section"
-          padding="card"
-          bordered
           surface="card"
         >
           <Stack direction="row" wrap align="end" gap="section" grow>
             <FiltrosCampos periods={periods} lojas={lojas} value={filtros} onChange={applyFiltros} />
 
             {selectedPeriod && (
-              <Stack direction="row" align="center" gap="field" height="control" padding="compact" bordered surface="muted">
+              <Stack direction="row" align="center" gap="field" height="control" surface="muted">
                 <Text variant="caption" tone="muted">
                   Status:
                 </Text>
@@ -510,8 +509,8 @@ function VendasComissoesPage() {
       </Show>
 
       {/* Resumo dos filtros (celular): os selects abrem num drawer */}
-      <Show on="mobile">
-        <Stack direction="row" align="center" justify="between" gap="group" padding="card" bordered surface="card">
+      <Show on="belowLg">
+        <Stack direction="row" align="center" justify="between" gap="group" surface="card">
           <Stack gap="tight">
             <Text variant="small" weight="semibold" truncate>
               {selectedPeriod?.name ?? "Selecione um Período"}

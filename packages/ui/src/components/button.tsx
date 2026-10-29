@@ -44,15 +44,14 @@ function Button({
   className,
   variant = "default",
   size = "default",
-  fullWidth,
   tone,
   ...props
 }: ButtonPrimitive.Props &
-  VariantProps<typeof buttonVariants> & { fullWidth?: boolean; tone?: "destructive" | "success" }) {
+  VariantProps<typeof buttonVariants> & { tone?: "destructive" | "success" }) {
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }), fullWidth && "w-full", tone && buttonTones[tone])}
+      className={cn(buttonVariants({ variant, size, className }), tone && buttonTones[tone])}
       {...props}
     />
   )

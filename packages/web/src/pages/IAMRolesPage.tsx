@@ -316,7 +316,7 @@ export const IAMRolesPage: React.FC = () => {
         </Button>
 
         {hasPermission("system:roles:create") && (
-          <Show on="desktop">
+          <Show on="lgUp">
             <Button onClick={openCreateSheet}>
             <PlusCircle />
             Novo Grupo
@@ -325,7 +325,7 @@ export const IAMRolesPage: React.FC = () => {
         )}
 
         {hasPermission("system:roles:create") && (
-          <Show on="mobile">
+          <Show on="belowLg">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
               <MoreHorizontal />

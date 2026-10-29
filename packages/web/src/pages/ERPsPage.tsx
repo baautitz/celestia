@@ -136,7 +136,7 @@ const ErpFormContent: React.FC<ErpFormProps> = ({ editing, drivers }) => {
                       onValueChange={(val: string | null) => handleDriverChange(val ?? "")}
                     >
                       <FormControl>
-                        <SelectTrigger fullWidth>
+                        <SelectTrigger>
                           <SelectValue placeholder="Selecione o ERP Driver">
                             {drivers.find((d) => d.id === field.value)?.label}
                           </SelectValue>
@@ -334,14 +334,14 @@ export const ERPsPage: React.FC = () => {
           <Spin active={loading}><RefreshCw /></Spin>
         </Button>
 
-        <Show on="desktop">
+        <Show on="lgUp">
           <Button onClick={() => openSheet(null)} disabled={drivers.length === 0}>
             <PlusCircle />
             Novo ERP
           </Button>
         </Show>
 
-        <Show on="mobile">
+        <Show on="belowLg">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
               <MoreHorizontal />
