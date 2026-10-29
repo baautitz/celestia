@@ -144,6 +144,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         }
 
         // Como no relatório oficial do InovaFarma: vendas sem caixa aberto (CodigoAbertura nulo) ficam fora,
+        // a Taxa de Entrega (Produto_Inventario_Grupo 3) não conta como venda,
         // e o valor que um PBM com financeiro (ex.: Farmácia Popular) reembolsa à loja entra no bruto e no líquido.
         // O ERP deixa esse item com Total = 0 e TotalDesconto = 0; o reembolso fica só em Venda_Produto_PBM.
         const reembolsoPbm = "ISNULL(pbm.DescontoUnitarioPBM * vp.Quantidade, 0)";
@@ -158,6 +159,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
             AND EXISTS (SELECT 1 FROM Venda_PBM vpb WHERE vpb.CodigoVenda = v.CodigoVenda AND vpb.TemFinanceiro = 1)
           WHERE v.Eliminado = 0
             AND v.CodigoAbertura IS NOT NULL
+            AND ISNULL(p.CodigoGrupoInventario, 0) <> 3
             AND v.DataVenda >= @dataInicio
             AND v.DataVenda <= @dataFim
             ${filtroEmpresa}
