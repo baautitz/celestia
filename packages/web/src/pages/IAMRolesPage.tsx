@@ -254,7 +254,7 @@ export const IAMRolesPage: React.FC = () => {
   const fetchDataRef = useLatest(fetchData);
   useEffect(() => {
     fetchDataRef.current();
-  }, []);
+  }, [fetchDataRef]);
 
   const openSheet = async (role: Role | null) => {
     const result = await ui.windows.open<true>({

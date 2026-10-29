@@ -106,7 +106,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
       .catch((err: unknown) => {
         uiRef.current.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao carregar os identificadores." });
       });
-  }, [user, form]);
+  }, [user, form, uiRef]);
   const roleId = form.watch("roleId");
   const getRoleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 
@@ -398,7 +398,7 @@ export const IAMUsersPage: React.FC = () => {
   const fetchDataRef = useLatest(fetchData);
   useEffect(() => {
     fetchDataRef.current();
-  }, []);
+  }, [fetchDataRef]);
 
   const openUserWindow = async (u: User | null) => {
     const result = await ui.windows.open<boolean>({

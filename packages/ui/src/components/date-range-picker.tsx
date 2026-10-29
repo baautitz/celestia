@@ -80,7 +80,7 @@ export function DateRangePicker({
     }
     setText(toText(valueRef.current));
     setTouched(false);
-  }, [fromTime, toTime]);
+  }, [fromTime, toTime, valueRef]);
 
   const error = dateRangeTextError(text, touched);
 

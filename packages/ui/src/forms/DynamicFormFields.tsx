@@ -89,7 +89,7 @@ function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormF
     return () => {
       cancelled = true;
     };
-  }, [field.name, fetchLookupOptions, isLookup]);
+  }, [field.name, fetchLookupOptions, isLookup, fieldRef]);
 
   return { options, loading };
 }
