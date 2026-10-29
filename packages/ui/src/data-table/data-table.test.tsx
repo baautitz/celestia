@@ -303,6 +303,18 @@ describe("grupo de colunas", () => {
     expect(groupHeader(screen.getByRole("table", { name: "Vendas" })).colSpan).toBe(2);
   });
 
+  it("formata decimal com duas casas e sem símbolo de moeda", () => {
+    setViewport(1280);
+    render(
+      <DataTable
+        columns={[{ key: "valor", label: "Valor (R$)", format: "decimal" as const, value: (r: Seller) => r.valor }]}
+        rows={[{ id: "1", nome: "Ana", qtd: 3, valor: 3388.3 }]}
+        getRowId={(r) => r.id}
+      />,
+    );
+    expect(screen.getByRole("cell", { name: "3.388,30" })).toBeTruthy();
+  });
+
   it("prefixa o rótulo com o grupo no celular", () => {
     setViewport(500);
     render(<DataTable columns={groupedColumns} rows={sellers} getRowId={(r) => r.id} />);
@@ -310,3 +322,4 @@ describe("grupo de colunas", () => {
     expect(screen.getByText("Vitaminas · Valor (R$)")).toBeTruthy();
   });
 });
+

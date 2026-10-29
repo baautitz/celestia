@@ -11,6 +11,13 @@ export function formatNumber(value: number | string | undefined | null): string 
   return new Intl.NumberFormat("pt-BR").format(num);
 }
 
+/** Valor monetário com duas casas e sem símbolo (ex.: 3388.3 vira "3.388,30"), para colunas com "(R$)" no rótulo. */
+export function formatDecimal(value: number | string | undefined | null): string {
+  const num = Number(value);
+  if (value === undefined || value === null || value === "" || isNaN(num)) return "-";
+  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+}
+
 /** Recebe o valor já em pontos percentuais (ex.: 33.5 vira "33,5%"). */
 export function formatPercent(value: number | string | undefined | null): string {
   const num = Number(value);

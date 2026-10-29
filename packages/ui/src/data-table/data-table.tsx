@@ -17,16 +17,17 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip";
 import { useIsMobile } from "../hooks/use-mobile";
 import { cn } from "../lib/utils";
-import { formatCurrency, formatDate, formatNumber, formatPercent } from "../lib/format";
+import { formatCurrency, formatDate, formatDecimal, formatNumber, formatPercent } from "../lib/format";
 
 export type CellValue = string | number | boolean | null | undefined;
-export type DataTableFormat = "currency" | "date" | "number" | "percent";
+export type DataTableFormat = "currency" | "date" | "decimal" | "number" | "percent";
 
-const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set(["currency", "number", "percent"]);
+const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set(["currency", "decimal", "number", "percent"]);
 const isNumericColumn = (col: { format?: DataTableFormat }) => NUMERIC_FORMATS.has(col.format);
 /** Colunas que não quebram linha na impressão; as demais quebram para a tabela encolher menos. */
 const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([...NUMERIC_FORMATS, "date"]);
-const wrapsInPrint = (col: { format?: DataTableFormat }) => !NOWRAP_PRINT_FORMATS.has(col.format);
+const wrapsInPrint = (col: { format?: DataTableFormat; nowrap?: boolean }) =>
+  !col.nowrap && !NOWRAP_PRINT_FORMATS.has(col.format);
 
 function HeaderLabel({ col }: { col: { label: string; tooltip?: string } }) {
   if (!col.tooltip) return <span>{col.label}</span>;
@@ -47,6 +48,8 @@ export interface DataTableColumn<TRow> {
   mobileLabel?: string;
   /** Rótulo de um cabeçalho acima do `label`, mesclado entre colunas vizinhas do mesmo grupo. */
   group?: string;
+  /** Mantém o conteúdo numa linha só, também na impressão (ex.: nomes que encareceriam a altura da linha). */
+  nowrap?: boolean;
   /** Valor bruto da célula; usado para formato, busca, ordenação e título do MobileCard. */
   value?: (row: TRow) => CellValue;
   /** Conteúdo customizado (badges etc.); tem precedência sobre `value`/`format` na célula. */
@@ -106,8 +109,9 @@ export interface DataTableProps<TRow> {
   className?: string;
   /** Liga o botão "Imprimir": todas as linhas da busca/ordenação atuais, sem a paginação. */
   print?: DataTablePrintOptions;
+  /** Alterna o fundo das linhas, na tela e na impressão, para guiar a leitura de tabelas largas. */
+  striped?: boolean;
 }
-
 function mobileLabel(col: { label: string; mobileLabel?: string; group?: string }): string {
   return col.mobileLabel ?? (col.group ? `${col.group} · ${col.label}` : col.label);
 }
@@ -123,6 +127,7 @@ function GroupHeaderRow({
   trailing?: number;
 }) {
   if (!columns.some((c) => c.group)) return null;
+  const boundaries = groupBoundaryKeys(columns);
   const spans: { key: string; group?: string; span: number }[] = [];
   for (const col of columns) {
     const last = spans[spans.length - 1];
@@ -133,7 +138,7 @@ function GroupHeaderRow({
     <TableRow className="bg-muted/40">
       {leading > 0 && <TableHead colSpan={leading} />}
       {spans.map(({ key, group, span }) => (
-        <TableHead key={key} colSpan={span} className={cn("h-8", group && "text-center border-x border-border")}>
+        <TableHead key={key} colSpan={span} className={cn("h-8", group && "text-center", boundaries.has(key) && GROUP_BOUNDARY_CLASS)}>
           {group}
         </TableHead>
       ))}
@@ -142,9 +147,22 @@ function GroupHeaderRow({
   );
 }
 
+/** Colunas que começam ou encerram um grupo ganham uma divisória à esquerda, do cabeçalho ao corpo. */
+function groupBoundaryKeys(columns: { key: string; group?: string }[]): ReadonlySet<string> {
+  const keys = new Set<string>();
+  columns.forEach((col, i) => {
+    const prev = columns[i - 1];
+    if (prev && prev.group !== col.group && (prev.group || col.group)) keys.add(col.key);
+  });
+  return keys;
+}
+
+const GROUP_BOUNDARY_CLASS = "border-l border-border";
+
 function columnCellClassName<TRow>(col: DataTableColumn<TRow>, row: TRow): string | undefined {
   return cn(
     isNumericColumn(col) && "text-right tabular-nums",
+    col.nowrap && "whitespace-nowrap",
     typeof col.cellClassName === "function" ? col.cellClassName(row) : col.cellClassName,
   );
 }
@@ -154,6 +172,7 @@ function formatValue(value: CellValue, format?: DataTableFormat): string {
   if (typeof value === "boolean") return String(value);
   if (format === "currency") return formatCurrency(value);
   if (format === "date") return formatDate(String(value));
+  if (format === "decimal") return formatDecimal(value);
   if (format === "number") return formatNumber(value);
   if (format === "percent") return formatPercent(value);
   return String(value);
@@ -181,6 +200,7 @@ export function DataTable<TRow>({
   bordered = false,
   className,
   print,
+  striped = false,
 }: DataTableProps<TRow>) {
   const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
@@ -277,6 +297,7 @@ export function DataTable<TRow>({
   );
   const cellContent = (col: DataTableColumn<TRow>, row: TRow) =>
     col.render ? col.render(row) : text(col, row);
+  const boundaries = groupBoundaryKeys(columns);
 
   const footer = pagination && goTo && (
     <div
@@ -399,7 +420,11 @@ export function DataTable<TRow>({
                     {columns.map((col) => (
                       <TableHead
                         key={col.key}
-                        className={cn(col.sortable && "cursor-pointer select-none", isNumericColumn(col) && "text-right")}
+                        className={cn(
+                          col.sortable && "cursor-pointer select-none",
+                          isNumericColumn(col) && "text-right",
+                          boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                        )}
                         onClick={() => col.sortable && handleSort(col.key)}
                         aria-sort={col.sortable && sortKey === col.key ? (order === "asc" ? "ascending" : "descending") : undefined}
                       >
@@ -451,12 +476,12 @@ export function DataTable<TRow>({
                       const expanded = renderExpanded !== undefined && expandedIds.has(getRowId(row));
                       return (
                         <React.Fragment key={getRowId(row)}>
-                          <TableRow className="hover:bg-muted/30">
+                          <TableRow className={cn("hover:bg-muted/30", striped && "even:bg-muted/20")}>
                             {renderExpanded && <TableCell>{expandButton(row)}</TableCell>}
                             {columns.map((col) => (
                               <TableCell
                                 key={col.key}
-                                className={columnCellClassName(col, row)}
+                                className={cn(columnCellClassName(col, row), boundaries.has(col.key) && GROUP_BOUNDARY_CLASS)}
                               >
                                 {cellContent(col, row)}
                               </TableCell>
@@ -487,6 +512,7 @@ export function DataTable<TRow>({
           rows={printRows}
           getRowId={getRowId}
           cellContent={cellContent}
+          striped={striped}
           title={heading}
           description={print.description ?? description}
           orientation={print.orientation ?? "portrait"}
@@ -511,6 +537,7 @@ interface PrintTableProps<TRow> {
   rows: TRow[];
   getRowId: (row: TRow) => string;
   cellContent: (col: DataTableColumn<TRow>, row: TRow) => React.ReactNode;
+  striped: boolean;
   title?: string;
   description?: string;
   orientation: DataTablePrintOrientation;
@@ -527,11 +554,13 @@ function PrintTable<TRow>({
   rows,
   getRowId,
   cellContent,
+  striped,
   title,
   description,
   orientation,
   onDone,
 }: PrintTableProps<TRow>) {
+  const boundaries = groupBoundaryKeys(columns);
   const tableRef = useRef<HTMLTableElement>(null);
   const printed = useRef(false);
   const [issuedAt] = useState(() => issuedAtLabel(new Date()));
@@ -563,6 +592,8 @@ function PrintTable<TRow>({
   }
   body > :not([data-slot="data-table-print"]) { display: none !important; }
   [data-slot="data-table-print"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  /* Papel em preto: os tons de destaque da tela (verde, cinza) não carregam sentido impressos. */
+  [data-slot="data-table-print"] td, [data-slot="data-table-print"] td * { color: #000 !important; }
 }`;
 
   return createPortal(
@@ -587,7 +618,15 @@ function PrintTable<TRow>({
           <GroupHeaderRow columns={columns} />
           <TableRow className="bg-muted/40">
             {columns.map((col) => (
-              <TableHead key={col.key} className={cn("h-8", wrapsInPrint(col) && "whitespace-normal", isNumericColumn(col) && "text-right")}>
+              <TableHead
+                key={col.key}
+                className={cn(
+                  "h-8",
+                  wrapsInPrint(col) && "whitespace-normal",
+                  isNumericColumn(col) && "text-right",
+                  boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                )}
+              >
                 {col.label}
               </TableHead>
             ))}
@@ -595,11 +634,16 @@ function PrintTable<TRow>({
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
-            <TableRow key={getRowId(row)} className="break-inside-avoid">
+            <TableRow key={getRowId(row)} className={cn("break-inside-avoid", striped && "even:bg-muted/30")}>
               {columns.map((col) => (
                 <TableCell
                   key={col.key}
-                  className={cn("p-1.5", wrapsInPrint(col) && "whitespace-normal", columnCellClassName(col, row))}
+                  className={cn(
+                    "p-1.5",
+                    wrapsInPrint(col) && "whitespace-normal",
+                    columnCellClassName(col, row),
+                    boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                  )}
                 >
                   {cellContent(col, row)}
                 </TableCell>
