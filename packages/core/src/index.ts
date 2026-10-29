@@ -1,2 +1,1 @@
-// owner: T0 barrel
-export {};
+export type * from "./fields.js";
