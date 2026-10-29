@@ -11,11 +11,25 @@ export { INOVAFARMA_PERMISSIONS, INOVAFARMA_EXTERNALS, createInovafarmaDriver };
  * IDs fixos da base do cliente: Vitaminas por Produto_Grupo; as demais por Produto_Sessao.
  * `filtro` entra literal no SQL: é constante, nunca entrada do usuário.
  */
-const CATEGORIAS = {
+const CATEGORIAS_FOCO = {
   vitaminas: { coluna: "Vitaminas", filtro: "p.CodigoGrupo = 44" },
   genericos: { coluna: "Genericos", filtro: "p.CodigoSessao = 261" },
   similares: { coluna: "Similares", filtro: "p.CodigoSessao = 271" },
   incentivos: { coluna: "Incentivos", filtro: "p.CodigoSessao = 281" },
+} as const;
+
+/**
+ * Total Foco: itens de qualquer categoria, contados uma vez. Uma Vitamina pode estar na seção de
+ * Similares ou Incentivos, então somar as colunas contaria o item em dobro; o OR no SQL evita isso.
+ */
+const CATEGORIAS = {
+  ...CATEGORIAS_FOCO,
+  totalFoco: {
+    coluna: "TotalFoco",
+    filtro: `(${Object.values(CATEGORIAS_FOCO)
+      .map((c) => c.filtro)
+      .join(" OR ")})`,
+  },
 } as const;
 
 type Categoria = keyof typeof CATEGORIAS;
@@ -28,6 +42,7 @@ const porCategoria = (fn: (categoria: Categoria) => CategoriaTotal): CategoriaTo
   genericos: fn("genericos"),
   similares: fn("similares"),
   incentivos: fn("incentivos"),
+  totalFoco: fn("totalFoco"),
 });
 
 export interface ErpQueryClient {

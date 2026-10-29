@@ -161,7 +161,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
     });
   });
 
-  it("soma Qtde e Valor de Vitaminas, Genéricos, Similares e Incentivos por colaborador e no resumo", async () => {
+  it("soma Qtde e Valor de Vitaminas, Genéricos, Similares, Incentivos e Total Foco por colaborador e no resumo", async () => {
     const mockClient = {
       query: async (sql: string) => {
         if (sql.includes("totalVendasGeral")) return [{ totalVendasGeral: 3, totalVendasComCadastro: 0 }];
@@ -169,6 +169,10 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
           expect(sql).toContain(`CASE WHEN ${filtro} THEN vp.Quantidade END`);
           expect(sql).toContain(`CASE WHEN ${filtro} THEN vp.Total END`);
         }
+        // Total Foco: um item conta uma vez, mesmo sendo Vitamina e também de uma seção.
+        const foco = "(p.CodigoGrupo = 44 OR p.CodigoSessao = 261 OR p.CodigoSessao = 271 OR p.CodigoSessao = 281)";
+        expect(sql).toContain(`CASE WHEN ${foco} THEN vp.Quantidade END`);
+        expect(sql).toContain(`CASE WHEN ${foco} THEN vp.Total END`);
         return [
           {
             codigoColaborador: 10,
@@ -187,6 +191,8 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
             valorSimilares: 0,
             qtdIncentivos: 1,
             valorIncentivos: 35,
+            qtdTotalFoco: 13,
+            valorTotalFoco: 290.5,
           },
           {
             codigoColaborador: 20,
@@ -205,6 +211,8 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
             valorSimilares: 60,
             qtdIncentivos: null,
             valorIncentivos: null,
+            qtdTotalFoco: 6,
+            valorTotalFoco: 100,
           },
         ];
       },
@@ -225,12 +233,14 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
         genericos: { quantidade: 10, valor: 200 },
         similares: { quantidade: 0, valor: 0 },
         incentivos: { quantidade: 1, valor: 35 },
+        totalFoco: { quantidade: 13, valor: 290.5 },
       },
       {
         vitaminas: { quantidade: 0, valor: 0 },
         genericos: { quantidade: 2, valor: 40 },
         similares: { quantidade: 4, valor: 60 },
         incentivos: { quantidade: 0, valor: 0 },
+        totalFoco: { quantidade: 6, valor: 100 },
       },
     ]);
     expect(body.resumo.categorias).toEqual({
@@ -238,6 +248,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       genericos: { quantidade: 12, valor: 240 },
       similares: { quantidade: 4, valor: 60 },
       incentivos: { quantidade: 1, valor: 35 },
+      totalFoco: { quantidade: 19, valor: 390.5 },
     });
   });
 });

@@ -23,7 +23,7 @@ interface Loja {
   nome: string;
 }
 
-type Categoria = "vitaminas" | "genericos" | "similares" | "incentivos";
+type Categoria = "vitaminas" | "genericos" | "similares" | "incentivos" | "totalFoco";
 type CategoriaTotais = Record<Categoria, { quantidade: number; valor: number }>;
 
 /** Categorias de produto exibidas com Qtde e Valor; os IDs ficam fixos no servidor do Plugin. */
@@ -32,6 +32,12 @@ const CATEGORIAS: { key: Categoria; label: string; tooltip: string }[] = [
   { key: "genericos", label: "Genéricos", tooltip: "Itens da seção de produto GENERICOS (261)." },
   { key: "similares", label: "Similares", tooltip: "Itens da seção de produto SIMILARES (271)." },
   { key: "incentivos", label: "Incentivos", tooltip: "Itens da seção de produto INCENTIVOS (281)." },
+  {
+    key: "totalFoco",
+    label: "Total Foco",
+    tooltip:
+      "Itens de Vitaminas, Genéricos, Similares ou Incentivos, contados uma vez: uma Vitamina que também é de Similares ou Incentivos não entra em dobro, por isso pode ficar abaixo da soma das colunas.",
+  },
 ];
 
 interface ColaboradorItem {
