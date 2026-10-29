@@ -7,7 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/ale
 import { Grid, KpiCard, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { defineWebModule } from "@platform/ui/contracts/module";
-import { formatCurrency, formatNumber, formatDate, formatPercent } from "@platform/ui/lib/format";
+import { formatCurrency, formatDecimal, formatNumber, formatDate, formatPercent } from "@platform/ui/lib/format";
 import { apiFetch } from "@platform/ui/lib/api";
 
 interface ClosingPeriod {
@@ -78,6 +78,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     value: (r) => r.nomeColaborador,
     sortable: true,
     searchable: true,
+    nowrap: true,
     cellClassName: "font-medium",
   },
   {
@@ -95,7 +96,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     label: "Total Bruto (R$)",
     tooltip: "Soma dos itens vendidos, antes dos descontos.",
     value: (r) => r.totalBruto,
-    format: "currency",
+    format: "decimal",
     sortable: true,
     firstSort: "desc",
     cellClassName: "text-right font-mono",
@@ -105,27 +106,27 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     label: "Descontos (R$)",
     tooltip: "Soma dos descontos concedidos nos itens.",
     value: (r) => r.totalDesconto,
-    format: "currency",
+    format: "decimal",
     sortable: true,
     firstSort: "desc",
-    cellClassName: "text-right font-mono text-muted-foreground",
+    cellClassName: "text-right font-mono",
   },
   {
     key: "totalLiquido",
     label: "Total Líquido (R$)",
     tooltip: "Total Bruto menos os descontos.",
     value: (r) => r.totalLiquido,
-    format: "currency",
+    format: "decimal",
     sortable: true,
     firstSort: "desc",
-    cellClassName: "text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400",
+    cellClassName: "text-right font-mono font-semibold",
   },
   {
     key: "totalCmv",
     label: "CMV (R$)",
     tooltip: "Custo das mercadorias vendidas: quantidade × preço de custo.",
     value: (r) => r.totalCmv,
-    format: "currency",
+    format: "decimal",
     sortable: true,
     firstSort: "desc",
     cellClassName: "text-right font-mono",
@@ -145,7 +146,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     label: "Ticket Médio (R$)",
     tooltip: "Total Líquido dividido pela quantidade de vendas.",
     value: (r) => r.ticketMedio,
-    format: "currency",
+    format: "decimal",
     sortable: true,
     firstSort: "desc",
     cellClassName: "text-right font-mono",
@@ -189,8 +190,8 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
       group: label,
       tooltip: `${tooltip} Valor líquido vendido.`,
       value: (r) => r.categorias[key].valor,
-      render: (r) => (r.categorias[key].valor === 0 ? "-" : formatCurrency(r.categorias[key].valor)),
-      format: "currency",
+      render: (r) => (r.categorias[key].valor === 0 ? "-" : formatDecimal(r.categorias[key].valor)),
+      format: "decimal",
       sortable: true,
       firstSort: "desc",
       cellClassName: "text-right font-mono",
@@ -496,6 +497,8 @@ function VendasComissoesPage() {
             : "Nenhuma venda encontrada para o período e filtros selecionados."
         }
         pagination={{ pageSize: 20 }}
+        striped
+        frozenUntil="nomeColaborador"
         print={{ orientation: "landscape" }}
       />
     </Stack>
