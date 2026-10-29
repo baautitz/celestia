@@ -53,8 +53,7 @@ const SidebarAutoClose: React.FC = () => {
   return null;
 };
 
-function getInitials(name?: string) {
-  if (!name) return "US";
+function getInitials(name: string) {
   return name
     .split(" ")
     .map((n) => n[0])
