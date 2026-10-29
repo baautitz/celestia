@@ -20,12 +20,19 @@ function Card({
   )
 }
 
-function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
+function CardHeader({
+  className,
+  centered,
+  compact,
+  ...props
+}: React.ComponentProps<"div"> & { centered?: boolean; compact?: boolean }) {
   return (
     <div
       data-slot="card-header"
       className={cn(
         "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-none px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
+        centered && "justify-items-center text-center",
+        compact && "pb-3",
         className
       )}
       {...props}

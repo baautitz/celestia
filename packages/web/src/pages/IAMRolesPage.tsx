@@ -161,9 +161,9 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
             name="permissions"
             render={({ field }) => (
               <Card>
-                <CardHeader>
+                <CardHeader compact>
                   <CardTitle>
-                    <Stack direction="row" align="center" gap="field" iconSize="sm">
+                    <Stack direction="row" align="center" gap="field" iconSize="sm" iconTone="primary">
                       <Shield />
                       <Text variant="eyebrow" tone="muted">
                         Módulos de Sistema
@@ -176,8 +176,8 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                   {catalog &&
                     Object.entries(catalog.system).map(([moduleName, perms]) => (
                       <Stack key={moduleName} gap="field">
-                        <Stack surface="muted">
-                          <Text variant="eyebrow">Módulo: {moduleName}</Text>
+                        <Stack surface="banner">
+                          <Text variant="eyebrow" weight="semibold">Módulo: {moduleName}</Text>
                         </Stack>
                         <Stack divided>
                           {perms.map((p: PermissionItem) => (

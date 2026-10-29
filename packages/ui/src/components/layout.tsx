@@ -58,12 +58,14 @@ interface StackProps extends Omit<React.ComponentProps<"div">, "className" | "st
   shrink?: boolean
   /** Tamanho dos ícones filhos diretos (padrão 16px; `sm` = 14px). */
   iconSize?: "sm"
+  /** Cor dos ícones filhos diretos. */
+  iconTone?: "primary"
   fullWidth?: boolean
   /** Altura de um controle de formulário (`h-8`), para alinhar com inputs e selects. */
   height?: "control"
   padding?: keyof typeof paddings
   bordered?: boolean
-  surface?: "card" | "muted"
+  surface?: "card" | "muted" | "banner"
   divided?: boolean
   /** Largura máxima de leitura. */
   maxWidth?: "sm" | "md"
@@ -79,6 +81,7 @@ function Stack({
   grow,
   shrink = true,
   iconSize,
+  iconTone,
   fullWidth,
   height,
   padding,
@@ -94,6 +97,7 @@ function Stack({
       className={cn(
         "flex min-w-0 [&>svg]:shrink-0",
         iconSize === "sm" ? "[&>svg]:size-3.5" : "[&>svg:not([class*='size-'])]:size-4",
+        iconTone === "primary" && "[&>svg]:text-primary",
         direction === "column" ? "flex-col" : "flex-row",
         gaps[gap],
         align && aligns[align],
@@ -107,6 +111,7 @@ function Stack({
         bordered && "border border-foreground/10",
         surface === "card" && "bg-card text-card-foreground",
         surface === "muted" && "bg-muted/30",
+        surface === "banner" && "bg-muted/60 py-0.5",
         divided && "divide-y divide-border/40",
         maxWidth === "sm" && "max-w-sm",
         maxWidth === "md" && "max-w-md"
