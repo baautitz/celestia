@@ -442,3 +442,131 @@ describe("comparação com o anterior", () => {
     expect(within(screen.getByRole("table", { name: "Vendas" })).queryByText(/▲/)).toBeNull();
   });
 });
+
+describe("totalizador", () => {
+  type Seller = { id: string; nome: string; qtd: number; valor: number };
+  const sellers: Seller[] = [
+    { id: "1", nome: "Ana", qtd: 3, valor: 90 },
+    { id: "2", nome: "Bia", qtd: 2, valor: 60 },
+  ];
+  const totalColumns = [
+    { key: "nome", label: "Colaborador", value: (r: Seller) => r.nome },
+    { key: "qtd", label: "Qtde", format: "number" as const, value: (r: Seller) => r.qtd },
+    { key: "valor", label: "Valor (R$)", format: "currency" as const, value: (r: Seller) => r.valor },
+  ];
+
+  it("não mostra a linha Total sem totals", () => {
+    setViewport(1280);
+    render(<DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} />);
+    expect(screen.queryByText("Total")).toBeNull();
+  });
+
+  it("mostra a linha Total com os valores formatados pela coluna e deixa as demais em branco", () => {
+    setViewport(1280);
+    render(<DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} totals={{ valor: 150 }} />);
+    const footerRow = within(screen.getByRole("table")).getAllByRole("row").at(-1)!;
+    const cells = within(footerRow).getAllByRole("cell");
+    expect(cells.map((c) => c.textContent?.replace(/\u00a0/g, " "))).toEqual(["Total", "", "R$ 150,00"]);
+  });
+
+  it("recalcula o total pela função com as linhas da busca, de todas as páginas", async () => {
+    setViewport(1280);
+    const many: Seller[] = Array.from({ length: 5 }, (_, i) => ({ id: String(i), nome: i < 4 ? `Ana ${i}` : "Bia", qtd: 1, valor: 10 }));
+    const totals = vi.fn((filtered: Seller[]) => ({ valor: filtered.reduce((sum, r) => sum + r.valor, 0) }));
+    render(
+      <DataTable
+        columns={[{ ...totalColumns[0]!, searchable: true }, ...totalColumns.slice(1)]}
+        rows={many}
+        getRowId={(r) => r.id}
+        search={{ placeholder: "Buscar" }}
+        pagination={{ pageSize: 2 }}
+        totals={totals}
+      />,
+    );
+    const lastCells = () => within(within(screen.getByRole("table")).getAllByRole("row").at(-1)!).getAllByRole("cell");
+    expect(lastCells().at(-1)!.textContent?.replace(/\u00a0/g, " ")).toBe("R$ 50,00");
+
+    await userEvent.type(screen.getByPlaceholderText("Buscar"), "Ana");
+    expect(lastCells().at(-1)!.textContent?.replace(/\u00a0/g, " ")).toBe("R$ 40,00");
+    expect(totals).toHaveBeenLastCalledWith(many.slice(0, 4));
+  });
+
+  it("mostra no celular um card Total só com as colunas que têm valor", () => {
+    setViewport(500);
+    render(<DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} totals={{ valor: 150 }} />);
+    expect(screen.getAllByText("Valor (R$)")).toHaveLength(3);
+    expect(screen.getAllByText("Qtde")).toHaveLength(2);
+    expect(screen.getByText("Total")).toBeTruthy();
+    expect(screen.getAllByText(/R\$\s150,00/)).toHaveLength(1);
+  });
+
+  it("imprime a linha Total no fim da tabela impressa", async () => {
+    setViewport(1280);
+    window.print = vi.fn();
+    render(
+      <DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} title="Vendas" print={{}} totals={{ valor: 150 }} />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    const printed = screen.getByRole("table", { name: "Vendas" });
+    const cells = within(within(printed).getAllByRole("row").at(-1)!).getAllByRole("cell");
+    expect(cells.map((c) => c.textContent?.replace(/\u00a0/g, " "))).toEqual(["Total", "", "R$ 150,00"]);
+  });
+
+  it("não mostra a linha Total sem totals no celular nem na impressão", async () => {
+    setViewport(500);
+    const { unmount } = render(<DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} />);
+    expect(screen.queryByText("Total")).toBeNull();
+    unmount();
+
+    setViewport(1280);
+    window.print = vi.fn();
+    render(<DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} title="Vendas" print={{}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(within(screen.getByRole("table", { name: "Vendas" })).queryByText("Total")).toBeNull();
+  });
+
+  it("imprime o total calculado pela função com as linhas da busca", async () => {
+    setViewport(1280);
+    window.print = vi.fn();
+    render(
+      <DataTable
+        columns={totalColumns}
+        rows={sellers}
+        getRowId={(r) => r.id}
+        title="Vendas"
+        print={{}}
+        totals={(filtered) => ({ qtd: filtered.reduce((sum, r) => sum + r.qtd, 0) })}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    const cells = within(within(screen.getByRole("table", { name: "Vendas" })).getAllByRole("row").at(-1)!).getAllByRole("cell");
+    expect(cells.map((c) => c.textContent)).toEqual(["Total", "5", ""]);
+  });
+
+  it("deixa a linha Total por último, depois das linhas da página", () => {
+    setViewport(1280);
+    render(<DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} totals={{ valor: 150 }} />);
+    const rowsInTable = within(screen.getByRole("table")).getAllByRole("row");
+    expect(rowsInTable.map((r) => (r.firstElementChild as HTMLElement).textContent)).toEqual(["Colaborador", "Ana", "Bia", "Total"]);
+    expect(screen.getByRole("table").querySelector("tfoot")?.className).not.toContain("sticky");
+  });
+
+  it("esconde a linha Total quando a tabela está vazia ou carregando", () => {
+    setViewport(1280);
+    const { rerender } = render(<DataTable columns={totalColumns} rows={[]} getRowId={(r) => r.id} totals={{ valor: 0 }} />);
+    expect(screen.queryByText("Total")).toBeNull();
+    rerender(<DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} loading totals={{ valor: 150 }} />);
+    expect(screen.queryByText("Total")).toBeNull();
+  });
+
+  it("imprime o total como grupo de linhas comum, para não se repetir em toda folha", async () => {
+    setViewport(1280);
+    window.print = vi.fn();
+    render(
+      <DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} title="Vendas" print={{}} totals={{ valor: 150 }} />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    const footer = screen.getByRole("table", { name: "Vendas" }).querySelector("tfoot");
+    expect(footer?.classList.contains("table-row-group")).toBe(true);
+  });
+});

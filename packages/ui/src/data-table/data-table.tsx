@@ -10,6 +10,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -82,6 +83,11 @@ export interface DataTableColumn<TRow> {
   compare?: (row: TRow) => Pick<Trend, "previous" | "label" | "favorable"> | undefined;
 }
 
+/** Valores do Totalizador por `key` de coluna. */
+export type TotalsValues = Record<string, CellValue>;
+
+export type DataTableTotals<TRow> = TotalsValues | ((filteredRows: TRow[]) => TotalsValues);
+
 export type DataTablePagination =
   | { pageSize: number }
   | { page: number; totalPages: number; onPageChange: (page: number) => void };
@@ -129,6 +135,11 @@ export interface DataTableProps<TRow> {
   striped?: boolean;
   /** `key` da última coluna presa à esquerda na rolagem horizontal; ela e as anteriores ficam fixas. Não afeta a impressão. */
   frozenUntil?: string;
+  /**
+   * Totalizador: valores por `key` de coluna, calculados por quem usa a tabela e formatados pelo `format` da coluna.
+   * A função recebe as linhas da busca atual, de todas as páginas; o objeto serve ao modo `manual` e a tabelas sem busca.
+   */
+  totals?: DataTableTotals<TRow>;
 }
 /** Chave da coluna do botão de expandir na medição das colunas fixas. */
 const EXPAND_KEY = "__expand";
@@ -222,6 +233,15 @@ function columnCellClassName<TRow>(col: DataTableColumn<TRow>, row: TRow): strin
   );
 }
 
+/** Classes de uma célula do Totalizador: o alinhamento e a fonte da coluna, sem as que dependem da linha. */
+function totalsCellClassName<TRow>(col: DataTableColumn<TRow>): string | undefined {
+  return cn(
+    isNumericColumn(col) && "text-right tabular-nums",
+    col.nowrap && "whitespace-nowrap",
+    typeof col.cellClassName === "string" && col.cellClassName,
+  );
+}
+
 function cellTrend<TRow>(col: DataTableColumn<TRow>, row: TRow): Trend | undefined {
   const current = col.value?.(row);
   const compared = col.compare?.(row);
@@ -238,6 +258,16 @@ function formatValue(value: CellValue, format?: DataTableFormat): string {
   if (format === "number") return formatNumber(value);
   if (format === "percent") return formatPercent(value);
   return String(value);
+}
+
+const TOTAL_LABEL = "Total";
+/** Classes do Totalizador, na tela e no papel: negrito e borda superior destacada. */
+const TOTALS_CLASS = "font-bold border-t-2 border-border bg-muted/40";
+
+/** Texto da célula do Totalizador: o rótulo na primeira coluna (prevalece sobre um valor dela), em branco sem valor. */
+function totalCellText(col: { key: string; format?: DataTableFormat }, index: number, totals: TotalsValues): string {
+  if (index === 0) return TOTAL_LABEL;
+  return col.key in totals ? formatValue(totals[col.key], col.format) : "";
 }
 
 export function DataTable<TRow>({
@@ -264,6 +294,7 @@ export function DataTable<TRow>({
   print,
   striped = false,
   frozenUntil,
+  totals,
 }: DataTableProps<TRow>) {
   const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
@@ -361,6 +392,7 @@ export function DataTable<TRow>({
   }
   const count = visible.length;
   const printRows = visible;
+  const totalsValues = typeof totals === "function" ? totals(printRows) : totals;
 
   let page = 1;
   let totalPages = 1;
@@ -521,6 +553,14 @@ export function DataTable<TRow>({
                 />
               ))
             )}
+            {totalsValues && !loading && visible.length > 0 && (
+              <MobileCard
+                primary={TOTAL_LABEL}
+                fields={fieldCols
+                  .filter((c) => c.key in totalsValues)
+                  .map((c) => ({ label: mobileLabel(c), value: formatValue(totalsValues[c.key], c.format) }))}
+              />
+            )}
             {footer}
           </div>
         ) : (
@@ -655,6 +695,30 @@ export function DataTable<TRow>({
                     })
                   )}
                 </TableBody>
+                {totalsValues && !loading && visible.length > 0 && (
+                  <TableFooter className={TOTALS_CLASS}>
+                    <TableRow>
+                      {renderExpanded && (
+                        <TableCell style={frozenStyle(EXPAND_KEY)} className={cn(frozenClass(EXPAND_KEY, true))} />
+                      )}
+                      {columns.map((col, idx) => (
+                        <TableCell
+                          key={col.key}
+                          style={frozenStyle(col.key)}
+                          className={cn(
+                            totalsCellClassName(col),
+                            boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                            frozenClass(col.key, true),
+                            col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
+                          )}
+                        >
+                          {totalCellText(col, idx, totalsValues)}
+                        </TableCell>
+                      ))}
+                      {hasActions && <TableCell />}
+                    </TableRow>
+                  </TableFooter>
+                )}
               </Table>
             </div>
             <SharedTrendTooltip handle={trendTooltip} />
@@ -666,6 +730,7 @@ export function DataTable<TRow>({
         <PrintTable
           columns={columns}
           rows={printRows}
+          totals={totalsValues}
           getRowId={getRowId}
           cellContent={cellContent}
           striped={striped}
@@ -694,6 +759,7 @@ function issuedAtLabel(now: Date): string {
 interface PrintTableProps<TRow> {
   columns: DataTableColumn<TRow>[];
   rows: TRow[];
+  totals?: TotalsValues;
   getRowId: (row: TRow) => string;
   cellContent: (col: DataTableColumn<TRow>, row: TRow) => React.ReactNode;
   striped: boolean;
@@ -715,6 +781,7 @@ interface PrintTableProps<TRow> {
 function PrintTable<TRow>({
   columns,
   rows,
+  totals,
   getRowId,
   cellContent,
   striped,
@@ -835,6 +902,21 @@ function PrintTable<TRow>({
             </TableRow>
           ))}
         </TableBody>
+        {totals && rows.length > 0 && (
+          // `table-row-group`: um `<tfoot>` comum se repete em toda folha; assim o total sai só depois da última linha.
+          <TableFooter className={cn(TOTALS_CLASS, "table-row-group")}>
+            <TableRow className="break-inside-avoid">
+              {columns.map((col, idx) => (
+                <TableCell
+                  key={col.key}
+                  className={cn("p-1.5", totalsCellClassName(col), boundaries.has(col.key) && GROUP_BOUNDARY_CLASS, frozenEdge(col.key))}
+                >
+                  {totalCellText(col, idx, totals)}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableFooter>
+        )}
       </table>
     </div>,
     document.body,
