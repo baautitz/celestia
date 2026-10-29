@@ -1,19 +1,8 @@
+import type { FormFieldDef } from "@platform/core";
 import { INOVAFARMA_EXTERNALS } from "./externals.js";
 
-interface DriverFieldBase {
-  name: string;
-  label: string;
-  required?: boolean;
-  placeholder?: string;
-  description?: string;
-}
-
-/** Subconjunto dos campos de formulário da plataforma usados pelo Driver (estruturalmente compatível com FormFieldDef). */
-export type DriverField =
-  | (DriverFieldBase & { type: "text"; defaultValue?: string })
-  | (DriverFieldBase & { type: "password" })
-  | (DriverFieldBase & { type: "number"; defaultValue?: number; min?: number; max?: number })
-  | (DriverFieldBase & { type: "switch"; defaultValue?: boolean });
+/** Campo de formulário da plataforma, compartilhado com o servidor via `@platform/core`. */
+export type DriverField = FormFieldDef;
 
 export interface ErpDriverDef {
   id: string;

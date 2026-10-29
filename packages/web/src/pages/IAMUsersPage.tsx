@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLatest } from "@platform/ui/hooks/use-latest";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -88,6 +89,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
     },
   });
   const [entries, setEntries] = useState<ErpExternalsEntry[]>([]);
+  const uiRef = useLatest(ui);
   useEffect(() => {
     if (!user) return;
     api.erps
@@ -102,10 +104,9 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
         );
       })
       .catch((err: unknown) => {
-        ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao carregar os identificadores." });
+        uiRef.current.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao carregar os identificadores." });
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, form, uiRef]);
   const roleId = form.watch("roleId");
   const getRoleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 
@@ -197,7 +198,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
                   <FormLabel>Perfil de Acesso</FormLabel>
                   <Select value={field.value} onValueChange={(val: string | null) => val && field.onChange(val)}>
                     <FormControl>
-                      <SelectTrigger fullWidth>
+                      <SelectTrigger>
                         <SelectValue placeholder="Selecione o perfil">
                           {roleId ? getRoleName(roleId) : undefined}
                         </SelectValue>
@@ -240,9 +241,9 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
             {/* Externals: campos declarados por cada ERP (Plugin erp). */}
             {isEditMode && (
               <Card>
-                <CardHeader>
+                <CardHeader compact>
                   <CardTitle>
-                    <Stack direction="row" align="center" gap="field" iconSize="sm">
+                    <Stack direction="row" align="center" gap="field" iconSize="sm" iconTone="primary">
                       <Database />
                       <Text variant="eyebrow" tone="muted">
                         Identificadores nos ERPs
@@ -394,10 +395,10 @@ export const IAMUsersPage: React.FC = () => {
     }
   };
 
+  const fetchDataRef = useLatest(fetchData);
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial única
-  }, []);
+    fetchDataRef.current();
+  }, [fetchDataRef]);
 
   const openUserWindow = async (u: User | null) => {
     const result = await ui.windows.open<boolean>({
@@ -454,7 +455,7 @@ export const IAMUsersPage: React.FC = () => {
         </Button>
 
         {hasPermission("system:users:create") && (
-          <Show on="desktop">
+          <Show on="lgUp">
             <Button onClick={() => openUserWindow(null)}>
             <UserPlus />
             Novo Usuário
@@ -463,7 +464,7 @@ export const IAMUsersPage: React.FC = () => {
         )}
 
         {hasPermission("system:users:create") && (
-          <Show on="mobile">
+          <Show on="belowLg">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
               <MoreHorizontal />
@@ -562,7 +563,8 @@ export const IAMUsersPage: React.FC = () => {
             )}
             {hasPermission("system:users:update") && (
               <Button
-                variant={u.status === "active" ? "destructive" : "ghost"}
+                variant="ghost"
+                tone={u.status === "active" ? "destructive" : "success"}
                 size="icon"
                 aria-label={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
                 title={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}

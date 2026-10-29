@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLatest } from "@platform/ui/hooks/use-latest";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -161,9 +162,9 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
             name="permissions"
             render={({ field }) => (
               <Card>
-                <CardHeader>
+                <CardHeader compact>
                   <CardTitle>
-                    <Stack direction="row" align="center" gap="field" iconSize="sm">
+                    <Stack direction="row" align="center" gap="field" iconSize="sm" iconTone="primary">
                       <Shield />
                       <Text variant="eyebrow" tone="muted">
                         Módulos de Sistema
@@ -176,8 +177,8 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                   {catalog &&
                     Object.entries(catalog.system).map(([moduleName, perms]) => (
                       <Stack key={moduleName} gap="field">
-                        <Stack surface="muted">
-                          <Text variant="eyebrow">Módulo: {moduleName}</Text>
+                        <Stack surface="banner">
+                          <Text variant="eyebrow" weight="semibold">Módulo: {moduleName}</Text>
                         </Stack>
                         <Stack divided>
                           {perms.map((p: PermissionItem) => (
@@ -250,10 +251,10 @@ export const IAMRolesPage: React.FC = () => {
     }
   };
 
+  const fetchDataRef = useLatest(fetchData);
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial única
-  }, []);
+    fetchDataRef.current();
+  }, [fetchDataRef]);
 
   const openSheet = async (role: Role | null) => {
     const result = await ui.windows.open<true>({
@@ -313,7 +314,7 @@ export const IAMRolesPage: React.FC = () => {
         </Button>
 
         {hasPermission("system:roles:create") && (
-          <Show on="desktop">
+          <Show on="lgUp">
             <Button onClick={openCreateSheet}>
             <PlusCircle />
             Novo Grupo
@@ -322,7 +323,7 @@ export const IAMRolesPage: React.FC = () => {
         )}
 
         {hasPermission("system:roles:create") && (
-          <Show on="mobile">
+          <Show on="belowLg">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
               <MoreHorizontal />

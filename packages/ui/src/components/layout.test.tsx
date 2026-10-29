@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { KpiCard } from "./layout";
+import { CenteredNotice, CenteredScreen, KpiCard, Show, Stack } from "./layout";
 
 afterEach(cleanup);
 
@@ -71,5 +71,35 @@ describe("KpiCard com tendência", () => {
       />,
     );
     expect(screen.queryByText(/[▲▼]/)).toBeNull();
+  });
+});
+
+describe("primitivos de layout enxutos", () => {
+  it("Show nomeia o breakpoint real (lg)", () => {
+    render(
+      <>
+        <Show on="lgUp"><span>acima</span></Show>
+        <Show on="belowLg"><span>abaixo</span></Show>
+      </>,
+    );
+    expect(screen.getByText("acima").parentElement?.className).toContain("hidden lg:contents");
+    expect(screen.getByText("abaixo").parentElement?.className).toContain("contents lg:hidden");
+  });
+
+  it("surface=card já traz borda e padding do card", () => {
+    render(<Stack surface="card">x</Stack>);
+    const cls = screen.getByText("x").className;
+    expect(cls).toContain("border");
+    expect(cls).toContain("p-4");
+    expect(cls).toContain("bg-card");
+  });
+
+  it("CenteredScreen é sempre a tela cheia e CenteredNotice o bloco inline", () => {
+    render(<CenteredScreen>tela</CenteredScreen>);
+    expect(screen.getByText("tela").parentElement?.className).toContain("min-h-screen");
+    render(<CenteredNotice>aviso</CenteredNotice>);
+    const notice = screen.getByText("aviso");
+    expect(notice.tagName).toBe("MAIN");
+    expect(notice.className).not.toContain("min-h-screen");
   });
 });

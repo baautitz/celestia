@@ -9,6 +9,7 @@ import {
   FormControl,
   FormMessage,
 } from "../components/form";
+import { useLatest } from "../hooks/use-latest";
 import { Input } from "../components/input";
 import { MoneyInput } from "../components/money-input";
 import { Textarea } from "../components/textarea";
@@ -53,8 +54,10 @@ function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormF
 
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(false);
+  const fieldRef = useLatest(field);
 
   useEffect(() => {
+    const field = fieldRef.current;
     if (!isLookup) {
       const opts: Option[] = [];
       if ("options" in field && field.options) {
@@ -86,8 +89,7 @@ function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormF
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- `field` muda de identidade a cada render; o lookup depende só do nome
-  }, [field.name, fetchLookupOptions, isLookup]);
+  }, [field.name, fetchLookupOptions, isLookup, fieldRef]);
 
   return { options, loading };
 }
@@ -236,7 +238,7 @@ const SelectField: React.FC<FieldProps<FieldOf<"select">>> = ({ field, form }) =
             onValueChange={(val: string | null) => rhf.onChange(val ?? "")}
           >
             <FormControl>
-              <SelectTrigger className="w-full">
+              <SelectTrigger>
                 <SelectValue placeholder="Selecione uma opção" />
               </SelectTrigger>
             </FormControl>
@@ -275,7 +277,7 @@ const LookupSelectField: React.FC<FieldProps<FieldOf<"lookup_select">>> = ({ fie
               onValueChange={(val: string | null) => rhf.onChange(val ?? "")}
             >
               <FormControl>
-                <SelectTrigger className="w-full">
+                <SelectTrigger>
                   <SelectValue placeholder="Selecione uma opção" />
                 </SelectTrigger>
               </FormControl>

@@ -41,6 +41,23 @@ function runTest() {
       "",
     ].join("\n"),
   )
+  writeFileSync(
+    join(src, "gaps.tsx"),
+    [
+      'import { SidebarMenuButton } from "@platform/ui/components/sidebar"',
+      "export const A = () => <SidebarMenuButton size=\"lg\" />",
+      "export const B = () => <table />",
+      "export const C = () => <img />",
+      "export const D = () => <hr />",
+      "export const E = () => <dl />",
+      "export const F = (props: object) => <Card {...props} {...{ className: \"x\" }} />",
+      "const extra = { style: { color: \"red\" } }",
+      "export const G = () => <Card {...extra} />",
+      "",
+    ].join("\n"),
+  )
+  mkdirSync(join(root, "integrations/acme/scripts"), { recursive: true })
+  writeFileSync(join(root, "integrations/acme/scripts/tool.tsx"), 'import { toast } from "sonner"\nexport const a = toast\n')
   for (const [name, content] of Object.entries(cases)) writeFileSync(join(src, name), content)
 
   const run = () => spawnSync(process.execPath, [script, "--root", root], { encoding: "utf8" })
@@ -61,6 +78,8 @@ function runTest() {
   ]) {
     assert.match(out, new RegExp(`${path}:${line} `), `${path}:${line} nao citado`)
   }
+  for (const line of [2, 3, 4, 5, 6, 7, 9]) assert.match(out, new RegExp(`packages/web/src/gaps\\.tsx:${line} `), `gaps:${line} nao citado`)
+  assert.match(out, /integrations\/acme\/scripts\/tool\.tsx:1 /, "plugin fora de src")
   assert.match(out, /<div>/)
   assert.match(out, /className/)
   assert.match(out, /style/)

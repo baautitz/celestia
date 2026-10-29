@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { dateRangeTextError, maskDateRange, parseDateRange } from "../lib/date-input";
+import { useLatest } from "../hooks/use-latest";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
 import { FieldError } from "./field";
@@ -19,6 +20,11 @@ interface DateRangePickerProps {
   className?: string;
   disabled?: boolean;
 }
+
+const toText = (range: DateRange | undefined) =>
+  range?.from && range?.to
+    ? `${format(range.from, "dd/MM/yyyy")} - ${format(range.to, "dd/MM/yyyy")}`
+    : "";
 
 export function DateRangePicker({
   value,
@@ -58,25 +64,23 @@ export function DateRangePicker({
     setOpen(next);
   };
 
-  const toText = (range: DateRange | undefined) =>
-    range?.from && range?.to
-      ? `${format(range.from, "dd/MM/yyyy")} - ${format(range.to, "dd/MM/yyyy")}`
-      : "";
   const [text, setText] = React.useState(toText(value));
   const [touched, setTouched] = React.useState(false);
 
   // Mudança de `value` causada pela própria digitação não reescreve o texto (senão apagaria o que o usuário digita).
   const typed = React.useRef(false);
+  const valueRef = useLatest(value);
+  const fromTime = value?.from?.getTime();
+  const toTime = value?.to?.getTime();
 
   React.useEffect(() => {
     if (typed.current) {
       typed.current = false;
       return;
     }
-    setText(toText(value));
+    setText(toText(valueRef.current));
     setTouched(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- sincroniza só quando as datas mudam, não a cada novo objeto `value`
-  }, [value?.from?.getTime(), value?.to?.getTime()]);
+  }, [fromTime, toTime, valueRef]);
 
   const error = dateRangeTextError(text, touched);
 

@@ -6,9 +6,18 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 
 - Todo elemento vem de `@platform/ui/components/*` (shadcn/ui sobre Base UI). Nada de HTML cru estilizado.
 - Proibido criar componentes ou wrappers com `<div>` customizado sem aprovação explícita.
+  - Exceção: os primitivos de layout de `packages/ui/src/components/layout.tsx` (`Stack`, `Grid`, `Show`, `Text`, `Spin`, `IconBadge`, `KpiCard`, `BrandMark`, `AppHeader`, `AppMain`, `CenteredScreen`, `CenteredNotice`, `LoadingScreen`, `PageHeader`) envolvem `<div>` por dentro, com props tipadas. Telas e Plugins os compõem e não criam novos `<div>`; um primitivo novo precisa de aprovação.
 - Layout e tipografia fora de `packages/ui` usam `Stack`, `Grid`, `Show`, `Text`, `PageHeader`, `KpiCard` etc. de `@platform/ui/components/layout` (props tipadas). `pnpm check:ui` também inspeciona `integrations/*` e rejeita elementos HTML intrínsecos de layout/texto (`div`, `span`, `p`, `h1`–`h6`, `section`, `main`, ...), `className`/`style` em JSX e `Button` com `size` diferente de `"default"`/`"icon"`.
 - Espaçamento: `gap` e `padding` aceitam só tokens semânticos, nunca números. `gap`: `tight` (4px, rótulo ↔ valor), `field` (8px, rótulo ↔ controle, ícone ↔ texto), `group` (12px, itens de um grupo dentro de um card), `section` (16px, blocos da página e cards entre si; padrão do `Grid` e do `AppMain`). `padding`: `compact` (8px, linhas e pílulas) e `card` (16px, igual ao padding do `Card`). Página = `<Stack gap="section">`.
-- Bordas: `bordered` usa a mesma cor do `Card` (`foreground/10`), para que barras de filtro e cards fiquem iguais.
+- Bordas: `surface="card"` e `surface="muted"` do `Stack` já trazem borda (mesma cor do `Card`, `foreground/10`) e padding, para que barras de filtro e cards fiquem iguais. `Show` usa `on="lgUp"`/`"belowLg"` (breakpoint `lg`).
+- Props aprovadas de layout e primitivos:
+  - `CardHeader centered`: cabeçalho de card com título e descrição centralizados (telas de login e avisos).
+  - `CardHeader compact`: reduz o espaçamento inferior do cabeçalho quando o conteúdo vem logo abaixo.
+  - `Button tone="destructive" | "success"`: ação com semântica de perigo ou de confirmação sem trocar o `variant`.
+  - `Stack iconTone="primary"`: colore em `primary` o ícone filho direto (ex.: ícone ao lado de um título).
+  - `Stack surface="banner"`: faixa de título sem borda, com fundo suave.
+  - `Stack narrow`: limita a largura a `max-w-sm` para formulários e blocos estreitos.
+  - `CenteredNotice`: aviso centralizado dentro da área autenticada (ex.: acesso negado); `CenteredScreen` é para telas cheias fora dela.
 - Tema: somente claro (sem theme provider).
 - Fronteira: fora de `packages/ui`, `pnpm check:ui` proíbe importar `sonner`, `@base-ui/react/*` e `@/components/ui`, e `open=`/`onOpenChange=` declarativos em Dialog/Sheet/AlertDialog/Popover.
 
