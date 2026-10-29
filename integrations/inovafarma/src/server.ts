@@ -143,13 +143,21 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
           params.codigoEmpresa = Number(codigoEmpresa);
         }
 
+        // Como no relatório oficial do InovaFarma: vendas sem caixa aberto (CodigoAbertura nulo) ficam fora,
+        // e o valor que um PBM com financeiro (ex.: Farmácia Popular) reembolsa à loja entra no líquido.
+        // O ERP grava esse reembolso em TotalDesconto e deixa o item com Total = 0.
+        const reembolsoPbm = "ISNULL(pbm.DescontoUnitarioPBM * vp.Quantidade, 0)";
+
         const fromWhere = `
           FROM Venda v
           JOIN Venda_Produto vp ON vp.CodigoVenda = v.CodigoVenda
           JOIN Funcionario f ON f.CodigoFuncionario = vp.CodigoFuncionario
           JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
           LEFT JOIN Produto p ON p.CodigoProduto = vp.CodigoProduto
+          LEFT JOIN Venda_Produto_PBM pbm ON pbm.CodigoVendaID = vp.CodigoVendaID
+            AND EXISTS (SELECT 1 FROM Venda_PBM vpb WHERE vpb.CodigoVenda = v.CodigoVenda AND vpb.TemFinanceiro = 1)
           WHERE v.Eliminado = 0
+            AND v.CodigoAbertura IS NOT NULL
             AND v.DataVenda >= @dataInicio
             AND v.DataVenda <= @dataFim
             ${filtroEmpresa}
@@ -161,8 +169,8 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
             c.Nome AS nomeColaborador,
             COUNT(DISTINCT vp.CodigoVenda) AS quantidadeVendas,
             CAST(SUM(vp.Total + vp.TotalDesconto) AS float) AS totalBruto,
-            CAST(SUM(vp.TotalDesconto) AS float) AS totalDesconto,
-            CAST(SUM(vp.Total) AS float) AS totalLiquido,
+            CAST(SUM(vp.TotalDesconto - ${reembolsoPbm}) AS float) AS totalDesconto,
+            CAST(SUM(vp.Total + ${reembolsoPbm}) AS float) AS totalLiquido,
             CAST(SUM(vp.Quantidade * vp.PrecoCusto) AS float) AS totalCmv,
             COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN vp.CodigoVenda END) AS vendasComCadastro,
             ${Object.values(CATEGORIAS).map(({ coluna, filtro }) => {

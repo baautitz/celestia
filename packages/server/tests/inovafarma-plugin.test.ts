@@ -99,7 +99,11 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
           dataInicio: "2026-10-01 00:00:00",
           dataFim: "2026-10-31 23:59:59",
         });
+        // Como o relatório oficial: só vendas com caixa aberto, e reembolso de PBM com financeiro no líquido.
+        expect(sql).toContain("v.CodigoAbertura IS NOT NULL");
+        expect(sql).toContain("vpb.TemFinanceiro = 1");
         if (sql.includes("totalVendasGeral")) return [{ totalVendasGeral: 140, totalVendasComCadastro: 70 }];
+        expect(sql).toContain("SUM(vp.Total + ISNULL(pbm.DescontoUnitarioPBM * vp.Quantidade, 0)) AS float) AS totalLiquido");
         return [
           {
             codigoColaborador: 10,
