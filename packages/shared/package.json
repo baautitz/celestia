@@ -9,6 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@platform/core": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {
