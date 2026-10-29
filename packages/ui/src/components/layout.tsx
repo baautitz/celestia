@@ -3,6 +3,7 @@ import * as React from "react"
 import { cn } from "../lib/utils"
 import { Card, CardContent } from "./card"
 import { Skeleton } from "./skeleton"
+import { TrendLine, TrendTooltip, type Trend } from "./trend"
 
 /**
  * Primitivos de layout e tipografia. Telas e Plugins compõem a interface
@@ -218,6 +219,7 @@ function KpiCard({
   tone = "primary",
   highlight,
   loading,
+  trend,
 }: {
   label: string
   value: React.ReactNode
@@ -227,6 +229,8 @@ function KpiCard({
   highlight?: boolean
   /** Troca valor e dica por skeletons enquanto os dados carregam. */
   loading?: boolean
+  /** Comparação com um valor anterior: linha abaixo do valor e detalhe ao passar o mouse. */
+  trend?: Trend
 }) {
   return (
     <Card>
@@ -243,6 +247,11 @@ function KpiCard({
                 <Text variant="kpi" tone={highlight ? "success" : "default"}>
                   {value}
                 </Text>
+              )}
+              {trend && !loading && (
+                <TrendTooltip trend={trend} title={label}>
+                  <TrendLine trend={trend} className="cursor-help" />
+                </TrendTooltip>
               )}
             </Stack>
             <IconBadge tone={tone}>{icon}</IconBadge>

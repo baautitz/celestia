@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle, Package, Pill } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
@@ -9,14 +9,8 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { defineWebModule } from "@platform/ui/contracts/module";
 import { formatCurrency, formatDecimal, formatNumber, formatDate, formatPercent } from "@platform/ui/lib/format";
 import { apiFetch } from "@platform/ui/lib/api";
-
-interface ClosingPeriod {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status: "open" | "closed" | "cancelled";
-}
+import type { Trend } from "@platform/ui/components/trend";
+import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
 
 interface Loja {
   codigoEmpresa: number;
@@ -65,6 +59,51 @@ interface ResumoVendas {
   cadastroPercentGeral: number;
   totalColaboradores: number;
   categorias: CategoriaTotais;
+}
+
+interface RelatorioVendas {
+  resumo: ResumoVendas;
+  colaboradores: ColaboradorItem[];
+}
+
+/** Relatório do Período anterior, base das comparações dos KPIs e da tabela. */
+interface Anterior {
+  label: string;
+  resumo: ResumoVendas;
+  colaboradores: Map<number, ColaboradorItem>;
+}
+
+/** Colunas e KPIs em que subir é ruim (`down`) ou só acompanha as vendas (`neutral`). */
+const FAVORABLE = {
+  totalDesconto: "down",
+  totalCmv: "neutral",
+  cmvPercent: "down",
+} satisfies Partial<Record<keyof ColaboradorItem, Trend["favorable"]>>;
+const favorableByColumn: Partial<Record<string, Trend["favorable"]>> = FAVORABLE;
+
+const ticketMedio = (r: ResumoVendas) => (r.totalVendasGeral > 0 ? r.totalLiquidoGeral / r.totalVendasGeral : 0);
+
+/** Data local de hoje em `YYYY-MM-DD`. */
+function today(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** Compara cada coluna numérica com o mesmo Colaborador no Período anterior. */
+function withComparison(cols: DataTableColumn<ColaboradorItem>[], anterior: Anterior | null): DataTableColumn<ColaboradorItem>[] {
+  if (!anterior) return cols;
+  return cols.map((col) => {
+    const value = col.value;
+    if (!col.format || !value) return col;
+    return {
+      ...col,
+      compare: (r) => {
+        const previous = anterior.colaboradores.get(r.codigoColaborador);
+        return previous && { previous: Number(value(previous)), label: anterior.label, favorable: favorableByColumn[col.key] };
+      },
+    };
+  });
 }
 
 const columns: DataTableColumn<ColaboradorItem>[] = [
@@ -214,6 +253,7 @@ function VendasComissoesPage() {
   const [error, setError] = useState<string | null>(null);
   const [resumo, setResumo] = useState<ResumoVendas | null>(null);
   const [colaboradores, setColaboradores] = useState<ColaboradorItem[]>([]);
+  const [anterior, setAnterior] = useState<Anterior | null>(null);
 
   // Carrega lista de períodos de fechamento e filiais
   useEffect(() => {
@@ -257,28 +297,41 @@ function VendasComissoesPage() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({
-        dataInicio: selectedPeriod.startDate,
-        dataFim: selectedPeriod.endDate,
-      });
-      if (selectedLoja !== "all") {
-        params.append("codigoEmpresa", selectedLoja);
-      }
+      const fetchVendas = (dataInicio: string, dataFim: string) => {
+        const params = new URLSearchParams({ dataInicio, dataFim });
+        if (selectedLoja !== "all") {
+          params.append("codigoEmpresa", selectedLoja);
+        }
+        return apiFetch<RelatorioVendas>(`/api/m/inovafarma/relatorios/vendas-colaborador?${params.toString()}`);
+      };
+      const range = previousClosingPeriodRange(periods, selectedPeriod, today());
 
-      const data = await apiFetch<{ resumo: ResumoVendas; colaboradores: ColaboradorItem[] }>(
-        `/api/m/inovafarma/relatorios/vendas-colaborador?${params.toString()}`
-      );
+      // A comparação é opcional: se o anterior falhar, o relatório segue sem ela.
+      const [data, previous] = await Promise.all([
+        fetchVendas(selectedPeriod.startDate, selectedPeriod.endDate),
+        range ? fetchVendas(range.startDate, range.endDate).catch(() => null) : null,
+      ]);
 
       setResumo(data.resumo);
       setColaboradores(data.colaboradores || []);
+      setAnterior(
+        range && previous && previous.resumo.totalVendasGeral > 0
+          ? {
+              label: range.name,
+              resumo: previous.resumo,
+              colaboradores: new Map((previous.colaboradores || []).map((c) => [c.codigoColaborador, c])),
+            }
+          : null
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erro desconhecido ao carregar relatório.");
       setColaboradores([]);
       setResumo(null);
+      setAnterior(null);
     } finally {
       setLoading(false);
     }
-  }, [selectedPeriod, selectedLoja]);
+  }, [periods, selectedPeriod, selectedLoja]);
 
   useEffect(() => {
     if (selectedPeriodId) {
@@ -290,6 +343,17 @@ function VendasComissoesPage() {
     selectedLoja === "all"
       ? "Todas as Filiais"
       : lojas.find((l) => String(l.codigoEmpresa) === selectedLoja)?.nome || `Filial ${selectedLoja}`;
+
+  const tableColumns = useMemo(() => withComparison(columns, anterior), [anterior]);
+
+  const trend = (
+    pick: (r: ResumoVendas) => number,
+    format: Trend["format"],
+    favorable?: Trend["favorable"]
+  ): Trend | undefined =>
+    resumo && anterior
+      ? { current: pick(resumo), previous: pick(anterior.resumo), label: anterior.label, format, favorable }
+      : undefined;
 
   const selectedPeriodLabel = selectedPeriod
     ? `${selectedPeriod.name} (${formatDate(selectedPeriod.startDate)} a ${formatDate(selectedPeriod.endDate)})`
@@ -406,6 +470,7 @@ function VendasComissoesPage() {
         <KpiCard
           loading={loading}
           label="Qtd. Vendas"
+          trend={trend((r) => r.totalVendasGeral, "number")}
           value={resumo ? formatNumber(resumo.totalVendasGeral) : "-"}
           hint={resumo ? `${formatNumber(resumo.totalColaboradores)} colaboradores com venda` : "-"}
           icon={<Users />}
@@ -414,6 +479,7 @@ function VendasComissoesPage() {
         <KpiCard
           loading={loading}
           label="Total Bruto"
+          trend={trend((r) => r.totalBrutoGeral, "currency")}
           value={formatCurrency(resumo?.totalBrutoGeral)}
           icon={<TrendingUp />}
           tone="primary"
@@ -421,6 +487,7 @@ function VendasComissoesPage() {
         <KpiCard
           loading={loading}
           label="Descontos"
+          trend={trend((r) => r.totalDescontoGeral, "currency", FAVORABLE.totalDesconto)}
           value={formatCurrency(resumo?.totalDescontoGeral)}
           hint={
             resumo && resumo.totalBrutoGeral > 0
@@ -433,6 +500,7 @@ function VendasComissoesPage() {
         <KpiCard
           loading={loading}
           label="Total Líquido"
+          trend={trend((r) => r.totalLiquidoGeral, "currency")}
           value={formatCurrency(resumo?.totalLiquidoGeral)}
           icon={<DollarSign />}
           tone="success"
@@ -440,6 +508,7 @@ function VendasComissoesPage() {
         <KpiCard
           loading={loading}
           label="CMV (R$)"
+          trend={trend((r) => r.totalCmvGeral, "currency", FAVORABLE.totalCmv)}
           value={formatCurrency(resumo?.totalCmvGeral)}
           icon={<Package />}
           tone="primary"
@@ -447,6 +516,7 @@ function VendasComissoesPage() {
         <KpiCard
           loading={loading}
           label="CMV (%)"
+          trend={trend((r) => r.cmvPercentGeral, "percent", FAVORABLE.cmvPercent)}
           value={resumo ? formatPercent(resumo.cmvPercentGeral) : "-"}
           hint="do Total Líquido"
           icon={<Package />}
@@ -455,11 +525,8 @@ function VendasComissoesPage() {
         <KpiCard
           loading={loading}
           label="Ticket Médio"
-          value={
-            resumo && resumo.totalVendasGeral > 0
-              ? formatCurrency(resumo.totalLiquidoGeral / resumo.totalVendasGeral)
-              : "R$ 0,00"
-          }
+          trend={trend(ticketMedio, "currency")}
+          value={resumo ? formatCurrency(ticketMedio(resumo)) : "R$ 0,00"}
           hint="Média por cupom de venda"
           icon={<Award />}
           tone="warning"
@@ -467,6 +534,7 @@ function VendasComissoesPage() {
         <KpiCard
           loading={loading}
           label="Cadastros (%)"
+          trend={trend((r) => r.cadastroPercentGeral, "percent")}
           value={resumo ? formatPercent(resumo.cadastroPercentGeral) : "-"}
           hint="das vendas com cliente cadastrado"
           icon={<Users />}
@@ -477,6 +545,7 @@ function VendasComissoesPage() {
             key={key}
             loading={loading}
             label={label}
+            trend={trend((r) => r.categorias[key].valor, "currency")}
             value={formatCurrency(resumo?.categorias[key].valor)}
             hint={resumo ? `${formatNumber(resumo.categorias[key].quantidade)} un` : "-"}
             icon={<Pill />}
@@ -487,7 +556,7 @@ function VendasComissoesPage() {
 
       {/* Tabela de Colaboradores */}
       <DataTable
-        columns={columns}
+        columns={tableColumns}
         rows={colaboradores}
         getRowId={(r) => String(r.codigoColaborador)}
         loading={loading}
@@ -509,6 +578,9 @@ function VendasComissoesPage() {
         print={{
           orientation: "landscape",
           fileName: selectedPeriod ? `Desempenho de Vendas - ${selectedPeriod.name} - ${selectedLojaLabel}` : undefined,
+          description: selectedPeriod
+            ? `${selectedPeriod.name} · Vendas consolidadas de ${formatDate(selectedPeriod.startDate)} até ${formatDate(selectedPeriod.endDate)} (${selectedLojaLabel})`
+            : undefined,
         }}
       />
     </Stack>

@@ -41,7 +41,12 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 
 - `DataTable` de `@platform/ui/data-table/data-table`: desktop renderiza `<Table>`, mobile renderiza `<MobileCard>` via `useIsMobile()`.
 - Impressão: a prop opcional `print={{ orientation?, description? }}` liga o botão "Imprimir". Use em relatórios e registros (ex.: relatório InovaFarma, Audit Log), não em cadastros. O papel traz todas as linhas da busca e da ordenação atuais, sem paginação, sempre como tabela, com fundos, cabeçalho repetido por folha e rodapé "Emitido em" / "Página X de Y" (este só no Chrome/Edge). A escala reduz a tabela até caber na largura da folha A4. `orientation` padrão é `"portrait"`; use `"landscape"` para tabelas largas. `description` substitui a descrição no papel, por exemplo com os filtros ativos que a tela mostra fora da tabela. O botão fica desabilitado durante o carregamento, sem linhas ou com paginação no servidor.
+- Comparação: a prop opcional `compare` da coluna devolve `{ previous, label, favorable? }` (ex.: o mesmo Colaborador no Período de Fechamento anterior). Requer `value` numérico e `format` numérico. No desktop, a célula inteira abre um tooltip compartilhado pela tabela (atual, anterior e variação), que não captura o mouse. No `MobileCard`, aparece uma linha abaixo do valor (`▲ 8,1% · 381`). Na impressão, nada aparece. Valores em `percent` comparam em p.p.; os demais, em variação percentual. Sem base (anterior zero), a comparação some.
 - `rowActions` são filtradas pelas permissões do usuário; sem ação permitida, omitir o botão `...` e a coluna de ações. Nunca exibir slug técnico como fallback.
+
+## KPIs
+
+- `KpiCard` aceita `trend={{ current, previous, label, format, favorable? }}`: uma linha `▲ 12,2%` abaixo do valor e, ao passar o mouse, o mesmo detalhe do tooltip da tabela. `favorable` define a cor: `up` (padrão) pinta a alta de verde, `down` de vermelho (ex.: Descontos, CMV %) e `neutral` não pinta.
 
 ## Cabeçalho
 

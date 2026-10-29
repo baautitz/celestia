@@ -15,6 +15,14 @@ import {
   TableRow,
 } from "../components/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip";
+import {
+  SharedTrendTooltip,
+  TrendLine,
+  TrendTooltipTrigger,
+  useTrendTooltipHandle,
+  type Trend,
+  type TrendFormat,
+} from "../components/trend";
 import { useIsMobile } from "../hooks/use-mobile";
 import { cn } from "../lib/utils";
 import { formatCurrency, formatDate, formatDecimal, formatNumber, formatPercent } from "../lib/format";
@@ -22,8 +30,9 @@ import { formatCurrency, formatDate, formatDecimal, formatNumber, formatPercent 
 export type CellValue = string | number | boolean | null | undefined;
 export type DataTableFormat = "currency" | "date" | "decimal" | "number" | "percent";
 
-const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set(["currency", "decimal", "number", "percent"]);
-const isNumericColumn = (col: { format?: DataTableFormat }) => NUMERIC_FORMATS.has(col.format);
+const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set<TrendFormat>(["currency", "decimal", "number", "percent"]);
+const isNumericFormat = (format?: DataTableFormat): format is TrendFormat => NUMERIC_FORMATS.has(format);
+const isNumericColumn = (col: { format?: DataTableFormat }) => isNumericFormat(col.format);
 /** Colunas que não quebram linha na impressão; as demais quebram para a tabela encolher menos. */
 const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([...NUMERIC_FORMATS, "date"]);
 const wrapsInPrint = (col: { format?: DataTableFormat; nowrap?: boolean }) =>
@@ -66,6 +75,11 @@ export interface DataTableColumn<TRow> {
   skeletonClassName?: string;
   /** Papel no MobileCard; colunas sem papel viram campos. */
   mobileRole?: "primary" | "secondary" | "hidden";
+  /**
+   * Valor anterior da célula (ex.: o mesmo Colaborador no Período anterior); `undefined` = sem comparação.
+   * Tooltip no desktop, linha abaixo do valor no MobileCard e nada na impressão. Requer `value` numérico.
+   */
+  compare?: (row: TRow) => Pick<Trend, "previous" | "label" | "favorable"> | undefined;
 }
 
 export type DataTablePagination =
@@ -208,6 +222,13 @@ function columnCellClassName<TRow>(col: DataTableColumn<TRow>, row: TRow): strin
   );
 }
 
+function cellTrend<TRow>(col: DataTableColumn<TRow>, row: TRow): Trend | undefined {
+  const current = col.value?.(row);
+  const compared = col.compare?.(row);
+  if (!compared || typeof current !== "number" || !isNumericFormat(col.format)) return undefined;
+  return { ...compared, current, format: col.format };
+}
+
 function formatValue(value: CellValue, format?: DataTableFormat): string {
   if (value === undefined || value === null) return "-";
   if (typeof value === "boolean") return String(value);
@@ -251,6 +272,7 @@ export function DataTable<TRow>({
   const [clientPage, setClientPage] = useState(1);
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
   const [printing, setPrinting] = useState(false);
+  const trendTooltip = useTrendTooltipHandle();
   const endPrinting = useCallback(() => setPrinting(false), []);
   const headRefs = useRef(new Map<string, HTMLTableCellElement>());
   const [frozenLeft, setFrozenLeft] = useState<ReadonlyMap<string, number>>(new Map());
@@ -378,6 +400,17 @@ export function DataTable<TRow>({
   );
   const cellContent = (col: DataTableColumn<TRow>, row: TRow) =>
     col.render ? col.render(row) : text(col, row);
+  /** Comparação no MobileCard; a impressão usa só `cellContent`. */
+  const mobileCell = (col: DataTableColumn<TRow>, row: TRow) => {
+    const trend = cellTrend(col, row);
+    if (!trend) return cellContent(col, row);
+    return (
+      <span className="flex flex-col gap-0.5">
+        {cellContent(col, row)}
+        <TrendLine trend={trend} showPrevious />
+      </span>
+    );
+  };
   const boundaries = groupBoundaryKeys(columns);
 
   const footer = pagination && goTo && (
@@ -473,7 +506,7 @@ export function DataTable<TRow>({
                   key={getRowId(row)}
                   primary={text(primaryCol, row)}
                   secondary={secondaryCol ? text(secondaryCol, row) : undefined}
-                  fields={fieldCols.map((c) => ({ label: mobileLabel(c), value: cellContent(c, row) }))}
+                  fields={fieldCols.map((c) => ({ label: mobileLabel(c), value: mobileCell(c, row) }))}
                   actions={
                     renderExpanded ? (
                       <>
@@ -582,20 +615,32 @@ export function DataTable<TRow>({
                                 {expandButton(row)}
                               </TableCell>
                             )}
-                            {columns.map((col) => (
-                              <TableCell
-                                key={col.key}
-                                style={frozenStyle(col.key)}
-                                className={cn(
-                                  columnCellClassName(col, row),
-                                  boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
-                                  frozenClass(col.key),
-                                  col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
-                                )}
-                              >
-                                {cellContent(col, row)}
-                              </TableCell>
-                            ))}
+                            {columns.map((col) => {
+                              const trend = cellTrend(col, row);
+                              const cell = (
+                                <TableCell
+                                  key={col.key}
+                                  style={frozenStyle(col.key)}
+                                  className={cn(
+                                    columnCellClassName(col, row),
+                                    boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                                    frozenClass(col.key),
+                                    col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
+                                    trend && "cursor-help",
+                                  )}
+                                >
+                                  {cellContent(col, row)}
+                                </TableCell>
+                              );
+                              // A célula inteira é o gatilho do tooltip compartilhado da tabela.
+                              return trend ? (
+                                <TrendTooltipTrigger key={col.key} handle={trendTooltip} trend={trend} title={mobileLabel(col)}>
+                                  {cell}
+                                </TrendTooltipTrigger>
+                              ) : (
+                                cell
+                              );
+                            })}
                             {hasActions && <TableCell className="text-right">{rowActions?.(row)}</TableCell>}
                           </TableRow>
                           {expanded && (
@@ -612,6 +657,7 @@ export function DataTable<TRow>({
                 </TableBody>
               </Table>
             </div>
+            <SharedTrendTooltip handle={trendTooltip} />
             {footer}
           </>
         )}
