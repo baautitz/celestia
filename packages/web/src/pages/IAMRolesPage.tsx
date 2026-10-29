@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -250,9 +250,12 @@ export const IAMRolesPage: React.FC = () => {
     }
   };
 
+  const fetchDataRef = useRef(fetchData);
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial única
+    fetchDataRef.current = fetchData;
+  });
+  useEffect(() => {
+    fetchDataRef.current();
   }, []);
 
   const openSheet = async (role: Role | null) => {
