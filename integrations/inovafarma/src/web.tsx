@@ -499,7 +499,10 @@ function VendasComissoesPage() {
         pagination={{ pageSize: 20 }}
         striped
         frozenUntil="nomeColaborador"
-        print={{ orientation: "landscape" }}
+        print={{
+          orientation: "landscape",
+          fileName: selectedPeriod ? `Desempenho de Vendas - ${selectedPeriod.name} - ${selectedLojaLabel}` : undefined,
+        }}
       />
     </Stack>
   );
