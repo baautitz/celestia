@@ -504,6 +504,7 @@ function VendasComissoesPage() {
         }
         pagination={{ pageSize: 20 }}
         striped
+        bordered
         frozenUntil="nomeColaborador"
         print={{
           orientation: "landscape",
