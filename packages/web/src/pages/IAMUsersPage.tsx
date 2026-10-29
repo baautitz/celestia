@@ -200,7 +200,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
                   <FormLabel>Perfil de Acesso</FormLabel>
                   <Select value={field.value} onValueChange={(val: string | null) => val && field.onChange(val)}>
                     <FormControl>
-                      <SelectTrigger fullWidth>
+                      <SelectTrigger>
                         <SelectValue placeholder="Selecione o perfil">
                           {roleId ? getRoleName(roleId) : undefined}
                         </SelectValue>
@@ -460,7 +460,7 @@ export const IAMUsersPage: React.FC = () => {
         </Button>
 
         {hasPermission("system:users:create") && (
-          <Show on="desktop">
+          <Show on="lgUp">
             <Button onClick={() => openUserWindow(null)}>
             <UserPlus />
             Novo Usuário
@@ -469,7 +469,7 @@ export const IAMUsersPage: React.FC = () => {
         )}
 
         {hasPermission("system:users:create") && (
-          <Show on="mobile">
+          <Show on="belowLg">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
               <MoreHorizontal />

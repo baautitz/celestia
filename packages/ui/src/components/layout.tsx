@@ -27,23 +27,17 @@ const gaps = {
   section: "gap-4",
 } as const
 const paddings = {
-  none: "p-0",
   /** 8px: linhas de lista, pílulas. */
   compact: "p-2",
   /** 16px: igual ao padding do `Card`. */
   card: "p-4",
 } as const
-const aligns = { start: "items-start", center: "items-center", end: "items-end", stretch: "items-stretch" } as const
-const justifies = {
-  start: "justify-start",
-  center: "justify-center",
-  end: "justify-end",
-  between: "justify-between",
-} as const
+const aligns = { start: "items-start", center: "items-center", end: "items-end" } as const
+const justifies = { end: "justify-end", between: "justify-between" } as const
+/** `lgUp`: a partir do breakpoint `lg` (1024px); `belowLg`: abaixo dele. */
 const visibility = {
-  always: "",
-  desktop: "hidden lg:contents",
-  mobile: "contents lg:hidden",
+  lgUp: "hidden lg:contents",
+  belowLg: "contents lg:hidden",
 } as const
 
 type Gap = keyof typeof gaps
@@ -60,16 +54,17 @@ interface StackProps extends Omit<React.ComponentProps<"div">, "className" | "st
   iconSize?: "sm"
   /** Cor dos ícones filhos diretos. */
   iconTone?: "primary"
-  fullWidth?: boolean
   /** Altura de um controle de formulário (`h-8`), para alinhar com inputs e selects. */
   height?: "control"
   padding?: keyof typeof paddings
-  bordered?: boolean
+  /**
+   * `card`: borda + fundo do card + padding de 16px. `muted`: borda + fundo suave + padding de 8px.
+   * `banner`: faixa de título sem borda.
+   */
   surface?: "card" | "muted" | "banner"
   divided?: boolean
-  /** Largura máxima de leitura. */
-  maxWidth?: "sm" | "md"
-  as?: "div" | "section" | "header" | "main"
+  /** Largura máxima de leitura (`max-w-sm`). */
+  narrow?: boolean
 }
 
 function Stack({
@@ -82,18 +77,15 @@ function Stack({
   shrink = true,
   iconSize,
   iconTone,
-  fullWidth,
   height,
   padding,
-  bordered,
   surface,
   divided,
-  maxWidth,
-  as: Tag = "div",
+  narrow,
   ...props
 }: StackProps) {
   return (
-    <Tag
+    <div
       className={cn(
         "flex min-w-0 [&>svg]:shrink-0",
         iconSize === "sm" ? "[&>svg]:size-3.5" : "[&>svg:not([class*='size-'])]:size-4",
@@ -105,16 +97,14 @@ function Stack({
         wrap && "flex-wrap",
         grow && "flex-1",
         !shrink && "shrink-0",
-        fullWidth && "w-full",
         height === "control" && "h-8",
+        (surface === "card" || surface === "muted") && "border border-foreground/10",
+        surface === "card" && "bg-card p-4 text-card-foreground",
+        surface === "muted" && "bg-muted/30 p-2",
         padding !== undefined && paddings[padding],
-        bordered && "border border-foreground/10",
-        surface === "card" && "bg-card text-card-foreground",
-        surface === "muted" && "bg-muted/30",
         surface === "banner" && "bg-muted/60 py-0.5",
         divided && "divide-y divide-border/40",
-        maxWidth === "sm" && "max-w-sm",
-        maxWidth === "md" && "max-w-md"
+        narrow && "max-w-sm"
       )}
       {...props}
     />
@@ -140,8 +130,8 @@ function Grid({ columns, gap = "section", ...props }: GridProps) {
   )
 }
 
-/** Exibe o conteúdo apenas em desktop ou apenas em mobile, sem afetar o layout do pai. */
-function Show({ on, ...props }: Omit<React.ComponentProps<"div">, "className" | "style"> & { on: "desktop" | "mobile" }) {
+/** Exibe o conteúdo apenas a partir de `lg` (`lgUp`) ou apenas abaixo dele (`belowLg`), sem afetar o layout do pai. */
+function Show({ on, ...props }: Omit<React.ComponentProps<"div">, "className" | "style"> & { on: keyof typeof visibility }) {
   return <div className={visibility[on]} {...props} />
 }
 
@@ -299,13 +289,18 @@ function AppMain(props: Omit<React.ComponentProps<"main">, "className" | "style"
   return <main className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8" {...props} />
 }
 
-/** Tela central (login, carregamento, acesso negado). */
-function CenteredScreen({ children, fullHeight = true }: { children: React.ReactNode; fullHeight?: boolean }) {
+/** Tela central cheia (login). */
+function CenteredScreen({ children }: { children: React.ReactNode }) {
   return (
-    <main className={cn("flex items-center justify-center p-4", fullHeight ? "min-h-screen bg-muted/20" : "p-12")}>
-      {fullHeight ? <div className="w-full max-w-md">{children}</div> : children}
+    <main className="flex min-h-screen items-center justify-center bg-muted/20 p-4">
+      <div className="w-full max-w-md">{children}</div>
     </main>
   )
+}
+
+/** Aviso centralizado dentro da área autenticada (ex.: acesso negado). */
+function CenteredNotice({ children }: { children: React.ReactNode }) {
+  return <main className="flex items-center justify-center p-12">{children}</main>
 }
 
 /** Tela de carregamento da área autenticada. */
@@ -337,4 +332,4 @@ function PageHeader({ title, description }: { title: string; description?: React
   )
 }
 
-export { Stack, Grid, Show, Text, Spin, IconBadge, KpiCard, BrandMark, AppHeader, AppMain, CenteredScreen, LoadingScreen, PageHeader }
+export { Stack, Grid, Show, Text, Spin, IconBadge, KpiCard, BrandMark, AppHeader, AppMain, CenteredScreen, CenteredNotice, LoadingScreen, PageHeader }

@@ -202,12 +202,12 @@ export const AppLayout: React.FC = () => {
                 <ArrowLeft />
               </Button>
             )}
-            <Show on="desktop">
+            <Show on="lgUp">
               <Separator orientation="vertical" />
             </Show>
             <Breadcrumb>
               <BreadcrumbList>
-                <Show on="desktop">
+                <Show on="lgUp">
                   <BreadcrumbItem>
                     <BreadcrumbLink render={<Link to="/" />}>Início</BreadcrumbLink>
                   </BreadcrumbItem>
