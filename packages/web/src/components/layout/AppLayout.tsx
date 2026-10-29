@@ -87,7 +87,7 @@ export const AppLayout: React.FC = () => {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" render={<Link to="/" />}>
+              <SidebarMenuButton render={<Link to="/" />}>
                 <BrandMark>
                   <Building2 />
                 </BrandMark>
@@ -130,7 +130,7 @@ export const AppLayout: React.FC = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
-                      <SidebarMenuButton size="lg">
+                      <SidebarMenuButton>
                         <Avatar>
                           <AvatarFallback>{getInitials(user.fullname)}</AvatarFallback>
                         </Avatar>
