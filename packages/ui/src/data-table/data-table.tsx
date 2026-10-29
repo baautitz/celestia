@@ -30,8 +30,9 @@ import { formatCurrency, formatDate, formatDecimal, formatNumber, formatPercent 
 export type CellValue = string | number | boolean | null | undefined;
 export type DataTableFormat = "currency" | "date" | "decimal" | "number" | "percent";
 
-const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set(["currency", "decimal", "number", "percent"]);
-const isNumericColumn = (col: { format?: DataTableFormat }) => NUMERIC_FORMATS.has(col.format);
+const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set<TrendFormat>(["currency", "decimal", "number", "percent"]);
+const isNumericFormat = (format?: DataTableFormat): format is TrendFormat => NUMERIC_FORMATS.has(format);
+const isNumericColumn = (col: { format?: DataTableFormat }) => isNumericFormat(col.format);
 /** Colunas que não quebram linha na impressão; as demais quebram para a tabela encolher menos. */
 const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([...NUMERIC_FORMATS, "date"]);
 const wrapsInPrint = (col: { format?: DataTableFormat; nowrap?: boolean }) =>
@@ -224,8 +225,8 @@ function columnCellClassName<TRow>(col: DataTableColumn<TRow>, row: TRow): strin
 function cellTrend<TRow>(col: DataTableColumn<TRow>, row: TRow): Trend | undefined {
   const current = col.value?.(row);
   const compared = col.compare?.(row);
-  if (!compared || typeof current !== "number" || !isNumericColumn(col)) return undefined;
-  return { ...compared, current, format: (col.format ?? "number") as TrendFormat };
+  if (!compared || typeof current !== "number" || !isNumericFormat(col.format)) return undefined;
+  return { ...compared, current, format: col.format };
 }
 
 function formatValue(value: CellValue, format?: DataTableFormat): string {
