@@ -125,6 +125,16 @@ const FROZEN_CELL_CLASS =
   "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--muted)_30%,var(--background))]";
 const FROZEN_STRIPED_CELL_CLASS = "group-even/row:bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))]";
 
+/**
+ * Linhas de 2px no fim do cabeçalho fixo e da última coluna fixa. Sombra interna em vez de borda:
+ * com `border-collapse`, a borda de uma célula `sticky` fica para trás quando a tabela rola.
+ */
+const HEADER_EDGE_CLASS = "shadow-[inset_0_-2px_0_var(--border)]";
+const FROZEN_EDGE_CLASS = "shadow-[inset_-2px_0_0_var(--border)]";
+const FROZEN_HEADER_EDGE_CLASS = "shadow-[inset_-2px_-2px_0_var(--border)]";
+/** No papel nada rola: as mesmas linhas da tela, como bordas comuns. */
+const PRINT_LINE_COLOR = "border-border";
+
 function mobileLabel(col: { label: string; mobileLabel?: string; group?: string }): string {
   return col.mobileLabel ?? (col.group ? `${col.group} · ${col.label}` : col.label);
 }
@@ -274,10 +284,9 @@ export function DataTable<TRow>({
       : undefined;
   const frozenClass = (key: string, head = false) =>
     (frozenKeys.includes(key) || (key === EXPAND_KEY && frozenCount > 0)) &&
-    cn(
-      head ? FROZEN_HEAD_CLASS : cn(FROZEN_CELL_CLASS, striped && FROZEN_STRIPED_CELL_CLASS),
-      key === lastFrozenKey && "border-r border-border",
-    );
+    cn(head ? FROZEN_HEAD_CLASS : cn(FROZEN_CELL_CLASS, striped && FROZEN_STRIPED_CELL_CLASS));
+  /** Linha inferior do cabeçalho de colunas, que dobra como borda direita na última coluna fixa. */
+  const headerEdgeClass = (key: string) => (key === lastFrozenKey ? FROZEN_HEADER_EDGE_CLASS : HEADER_EDGE_CLASS);
   const setHeadRef = (key: string) => (el: HTMLTableCellElement | null) => {
     if (el) headRefs.current.set(key, el);
     else headRefs.current.delete(key);
@@ -493,15 +502,15 @@ export function DataTable<TRow>({
                     frozenKeys={frozenKeys}
                     frozenHead={(firstKey, lastKey) => ({
                       style: frozenStyle(firstKey, true),
-                      className: cn(frozenClass(firstKey, true), lastKey === lastFrozenKey && "border-r border-border"),
+                      className: cn(frozenClass(firstKey, true), lastKey === lastFrozenKey && FROZEN_EDGE_CLASS),
                     })}
                   />
-                  <TableRow className="bg-muted/40">
+                  <TableRow className="bg-muted/40 border-b-0!">
                     {renderExpanded && (
                       <TableHead
                         ref={setHeadRef(EXPAND_KEY)}
                         style={frozenStyle(EXPAND_KEY, true)}
-                        className={cn("w-12", frozenClass(EXPAND_KEY, true))}
+                        className={cn("w-12", frozenClass(EXPAND_KEY, true), HEADER_EDGE_CLASS)}
                       />
                     )}
                     {columns.map((col) => (
@@ -514,6 +523,7 @@ export function DataTable<TRow>({
                           isNumericColumn(col) && "text-right",
                           boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
                           frozenClass(col.key, true),
+                          headerEdgeClass(col.key),
                         )}
                         onClick={() => col.sortable && handleSort(col.key)}
                         aria-sort={col.sortable && sortKey === col.key ? (order === "asc" ? "ascending" : "descending") : undefined}
@@ -532,7 +542,7 @@ export function DataTable<TRow>({
                         )}
                       </TableHead>
                     ))}
-                    {hasActions && <TableHead className={actionsHeadClassName}>{actionsLabel}</TableHead>}
+                    {hasActions && <TableHead className={cn(actionsHeadClassName, HEADER_EDGE_CLASS)}>{actionsLabel}</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -580,6 +590,7 @@ export function DataTable<TRow>({
                                   columnCellClassName(col, row),
                                   boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
                                   frozenClass(col.key),
+                                  col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
                                 )}
                               >
                                 {cellContent(col, row)}
@@ -612,6 +623,8 @@ export function DataTable<TRow>({
           getRowId={getRowId}
           cellContent={cellContent}
           striped={striped}
+          bordered={bordered}
+          lastFrozenKey={lastFrozenKey}
           title={heading}
           fileName={print.fileName ?? heading}
           description={print.description ?? description}
@@ -638,6 +651,9 @@ interface PrintTableProps<TRow> {
   getRowId: (row: TRow) => string;
   cellContent: (col: DataTableColumn<TRow>, row: TRow) => React.ReactNode;
   striped: boolean;
+  bordered: boolean;
+  /** Última coluna fixa na tela; no papel vira uma divisória, para a leitura ficar igual. */
+  lastFrozenKey?: string;
   title?: string;
   fileName?: string;
   description?: string;
@@ -656,6 +672,8 @@ function PrintTable<TRow>({
   getRowId,
   cellContent,
   striped,
+  bordered,
+  lastFrozenKey,
   title,
   fileName,
   description,
@@ -663,6 +681,8 @@ function PrintTable<TRow>({
   onDone,
 }: PrintTableProps<TRow>) {
   const boundaries = groupBoundaryKeys(columns);
+  const frozenEdge = (key: string) => key === lastFrozenKey && cn("border-r-2", PRINT_LINE_COLOR);
+  const frozenKeys = columns.slice(0, columns.findIndex((c) => c.key === lastFrozenKey) + 1).map((c) => c.key);
   const tableRef = useRef<HTMLTableElement>(null);
   const printed = useRef(false);
   const [issuedAt] = useState(() => issuedAtLabel(new Date()));
@@ -723,12 +743,16 @@ function PrintTable<TRow>({
       <table
         ref={tableRef}
         aria-label={title ?? "Impressão"}
-        className="w-full caption-bottom text-[10px]"
+        className={cn("w-full caption-bottom text-[10px]", bordered && cn("border", PRINT_LINE_COLOR))}
         style={{ width: fit?.width, zoom: fit?.zoom ?? 1 }}
       >
         <TableHeader className="static">
-          <GroupHeaderRow columns={columns} />
-          <TableRow className="bg-muted/40">
+          <GroupHeaderRow
+            columns={columns}
+            frozenKeys={frozenKeys}
+            frozenHead={(_firstKey, lastKey) => ({ className: frozenEdge(lastKey) })}
+          />
+          <TableRow className={cn("bg-muted/40 border-b-2!", PRINT_LINE_COLOR)}>
             {columns.map((col) => (
               <TableHead
                 key={col.key}
@@ -737,6 +761,7 @@ function PrintTable<TRow>({
                   wrapsInPrint(col) && "whitespace-normal",
                   isNumericColumn(col) && "text-right",
                   boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                  frozenEdge(col.key),
                 )}
               >
                 {col.label}
@@ -755,6 +780,7 @@ function PrintTable<TRow>({
                     wrapsInPrint(col) && "whitespace-normal",
                     columnCellClassName(col, row),
                     boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                    frozenEdge(col.key),
                   )}
                 >
                   {cellContent(col, row)}
