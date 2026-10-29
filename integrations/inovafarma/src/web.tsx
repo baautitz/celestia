@@ -579,6 +579,9 @@ function VendasComissoesPage() {
         print={{
           orientation: "landscape",
           fileName: selectedPeriod ? `Desempenho de Vendas - ${selectedPeriod.name} - ${selectedLojaLabel}` : undefined,
+          description: selectedPeriod
+            ? `${selectedPeriod.name} · Vendas consolidadas de ${formatDate(selectedPeriod.startDate)} até ${formatDate(selectedPeriod.endDate)} (${selectedLojaLabel})`
+            : undefined,
         }}
       />
     </Stack>
