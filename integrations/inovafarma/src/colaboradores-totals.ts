@@ -26,3 +26,17 @@ export function colaboradoresTotals(resumo: TotaisGerais | null): Record<string,
     ...Object.fromEntries(categorias),
   };
 }
+
+type Favorable = "up" | "down" | "neutral";
+
+/** Comparação do Totalizador com o total do Período anterior, por `key` de coluna. */
+export function colaboradoresTotalsCompare(
+  anterior: { label: string; resumo: TotaisGerais } | null,
+  favorableByColumn: Partial<Record<string, Favorable>>,
+): Record<string, { previous: number; label: string; favorable: Favorable | undefined }> | undefined {
+  if (!anterior) return undefined;
+  const previous = colaboradoresTotals(anterior.resumo) ?? {};
+  return Object.fromEntries(
+    Object.entries(previous).map(([key, value]) => [key, { previous: value, label: anterior.label, favorable: favorableByColumn[key] }]),
+  );
+}

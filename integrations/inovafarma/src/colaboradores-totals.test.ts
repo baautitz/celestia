@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { colaboradoresTotals } from "./colaboradores-totals";
+import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 
 const categoria = (quantidade: number, valor: number) => ({ quantidade, valor });
 const resumo = {
@@ -45,5 +45,20 @@ describe("colaboradoresTotals", () => {
 
   it("não devolve totais enquanto o resumo não foi carregado", () => {
     expect(colaboradoresTotals(null)).toBeUndefined();
+  });
+});
+
+describe("colaboradoresTotalsCompare", () => {
+  const anterior = { label: "Setembro/2026", resumo: { ...resumo, totalBrutoGeral: 800, totalDescontoGeral: 120 } };
+
+  it("compara cada total com o do Período anterior, com a direção favorável da coluna", () => {
+    const compare = colaboradoresTotalsCompare(anterior, { totalDesconto: "down" })!;
+    expect(compare.totalBruto).toEqual({ previous: 800, label: "Setembro/2026", favorable: undefined });
+    expect(compare.totalDesconto).toEqual({ previous: 120, label: "Setembro/2026", favorable: "down" });
+    expect(compare["vitaminas-valor"]?.previous).toBe(100);
+  });
+
+  it("não compara sem Período anterior", () => {
+    expect(colaboradoresTotalsCompare(null, {})).toBeUndefined();
   });
 });

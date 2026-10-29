@@ -12,7 +12,7 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import type { Trend } from "@platform/ui/components/trend";
-import { colaboradoresTotals } from "./colaboradores-totals";
+import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
 
 interface Loja {
@@ -672,6 +672,7 @@ function VendasComissoesPage() {
         bordered
         frozenUntil="nomeColaborador"
         totals={colaboradoresTotals(resumo)}
+        totalsCompare={colaboradoresTotalsCompare(anterior, favorableByColumn)}
         print={{
           orientation: "landscape",
           fileName: selectedPeriod ? `Desempenho de Vendas - ${selectedPeriod.name} - ${selectedLojaLabel}` : undefined,

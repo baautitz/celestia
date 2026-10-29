@@ -569,4 +569,32 @@ describe("totalizador", () => {
     const footer = screen.getByRole("table", { name: "Vendas" }).querySelector("tfoot");
     expect(footer?.classList.contains("table-row-group")).toBe(true);
   });
+
+  it("compara o Totalizador com o anterior: tooltip no desktop e linha no celular, nada na impressão", async () => {
+    type Row = { id: string; nome: string; valor: number };
+    const data: Row[] = [{ id: "1", nome: "Ana", valor: 90 }];
+    const cols = [
+      { key: "nome", label: "Colaborador", value: (r: Row) => r.nome },
+      { key: "valor", label: "Valor (R$)", format: "decimal" as const, value: (r: Row) => r.valor },
+    ];
+    const totalsCompare = { valor: { previous: 100, label: "Setembro/2026" } };
+
+    setViewport(1280);
+    window.print = vi.fn();
+    const { unmount } = render(
+      <DataTable columns={cols} rows={data} getRowId={(r) => r.id} title="Vendas" print={{}} totals={{ valor: 150 }} totalsCompare={totalsCompare} />,
+    );
+    await userEvent.hover(within(screen.getByRole("table")).getByRole("cell", { name: "150,00" }));
+    expect(await screen.findByText("Setembro/2026")).toBeTruthy();
+    expect(screen.getByText("100,00")).toBeTruthy();
+    expect(screen.getByText("▲ 50,0%")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(within(screen.getByRole("table", { name: "Vendas" })).queryByText(/▲/)).toBeNull();
+    unmount();
+
+    setViewport(500);
+    render(<DataTable columns={cols} rows={data} getRowId={(r) => r.id} totals={{ valor: 150 }} totalsCompare={totalsCompare} />);
+    expect(screen.getByText("▲ 50,0% · 100")).toBeTruthy();
+  });
 });
