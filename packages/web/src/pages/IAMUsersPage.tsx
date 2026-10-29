@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -88,6 +88,10 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
     },
   });
   const [entries, setEntries] = useState<ErpExternalsEntry[]>([]);
+  const uiRef = useRef(ui);
+  useEffect(() => {
+    uiRef.current = ui;
+  });
   useEffect(() => {
     if (!user) return;
     api.erps
@@ -102,10 +106,9 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
         );
       })
       .catch((err: unknown) => {
-        ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao carregar os identificadores." });
+        uiRef.current.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao carregar os identificadores." });
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, form]);
   const roleId = form.watch("roleId");
   const getRoleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 
@@ -394,9 +397,12 @@ export const IAMUsersPage: React.FC = () => {
     }
   };
 
+  const fetchDataRef = useRef(fetchData);
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial única
+    fetchDataRef.current = fetchData;
+  });
+  useEffect(() => {
+    fetchDataRef.current();
   }, []);
 
   const openUserWindow = async (u: User | null) => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { parseLocalDate, toLocalISODate } from "../lib/utils";
 import type { FormFieldDef } from "@platform/shared";
 import type { UseFormReturn } from "react-hook-form";
@@ -53,8 +53,13 @@ function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormF
 
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(false);
+  const fieldRef = useRef(field);
+  useEffect(() => {
+    fieldRef.current = field;
+  });
 
   useEffect(() => {
+    const field = fieldRef.current;
     if (!isLookup) {
       const opts: Option[] = [];
       if ("options" in field && field.options) {
@@ -86,7 +91,6 @@ function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormF
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- `field` muda de identidade a cada render; o lookup depende só do nome
   }, [field.name, fetchLookupOptions, isLookup]);
 
   return { options, loading };
