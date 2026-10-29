@@ -43,8 +43,10 @@ export interface DataTableColumn<TRow> {
   label: string;
   /** Explicação exibida em tooltip ao passar o mouse sobre o cabeçalho. */
   tooltip?: string;
-  /** Rótulo do campo no MobileCard; padrão: `label`. */
+  /** Rótulo do campo no MobileCard; padrão: `label`, prefixado pelo `group`. */
   mobileLabel?: string;
+  /** Rótulo de um cabeçalho acima do `label`, mesclado entre colunas vizinhas do mesmo grupo. */
+  group?: string;
   /** Valor bruto da célula; usado para formato, busca, ordenação e título do MobileCard. */
   value?: (row: TRow) => CellValue;
   /** Conteúdo customizado (badges etc.); tem precedência sobre `value`/`format` na célula. */
@@ -104,6 +106,40 @@ export interface DataTableProps<TRow> {
   className?: string;
   /** Liga o botão "Imprimir": todas as linhas da busca/ordenação atuais, sem a paginação. */
   print?: DataTablePrintOptions;
+}
+
+function mobileLabel(col: { label: string; mobileLabel?: string; group?: string }): string {
+  return col.mobileLabel ?? (col.group ? `${col.group} · ${col.label}` : col.label);
+}
+
+/** Linha de cabeçalho com os grupos de colunas; não renderiza nada quando nenhuma coluna tem `group`. */
+function GroupHeaderRow({
+  columns,
+  leading = 0,
+  trailing = 0,
+}: {
+  columns: { key: string; group?: string }[];
+  leading?: number;
+  trailing?: number;
+}) {
+  if (!columns.some((c) => c.group)) return null;
+  const spans: { key: string; group?: string; span: number }[] = [];
+  for (const col of columns) {
+    const last = spans[spans.length - 1];
+    if (last && last.group === col.group) last.span++;
+    else spans.push({ key: col.key, group: col.group, span: 1 });
+  }
+  return (
+    <TableRow className="bg-muted/40">
+      {leading > 0 && <TableHead colSpan={leading} />}
+      {spans.map(({ key, group, span }) => (
+        <TableHead key={key} colSpan={span} className={cn("h-8", group && "text-center border-x border-border")}>
+          {group}
+        </TableHead>
+      ))}
+      {trailing > 0 && <TableHead colSpan={trailing} />}
+    </TableRow>
+  );
 }
 
 function columnCellClassName<TRow>(col: DataTableColumn<TRow>, row: TRow): string | undefined {
@@ -322,7 +358,7 @@ export function DataTable<TRow>({
                   primary=""
                   secondary=""
                   fields={fieldCols.map((c) => ({
-                    label: c.mobileLabel ?? c.label,
+                    label: mobileLabel(c),
                     value: <Skeleton className={c.skeletonClassName ?? "h-4 w-20"} />,
                   }))}
                 />
@@ -335,7 +371,7 @@ export function DataTable<TRow>({
                   key={getRowId(row)}
                   primary={text(primaryCol, row)}
                   secondary={secondaryCol ? text(secondaryCol, row) : undefined}
-                  fields={fieldCols.map((c) => ({ label: c.mobileLabel ?? c.label, value: cellContent(c, row) }))}
+                  fields={fieldCols.map((c) => ({ label: mobileLabel(c), value: cellContent(c, row) }))}
                   actions={
                     renderExpanded ? (
                       <>
@@ -357,6 +393,7 @@ export function DataTable<TRow>({
             <div className={bordered ? "border border-border" : undefined}>
               <Table>
                 <TableHeader>
+                  <GroupHeaderRow columns={columns} leading={renderExpanded ? 1 : 0} trailing={hasActions ? 1 : 0} />
                   <TableRow className="bg-muted/40">
                     {renderExpanded && <TableHead className="w-12" />}
                     {columns.map((col) => (
@@ -547,6 +584,7 @@ function PrintTable<TRow>({
         style={{ width: fit?.width, zoom: fit?.zoom ?? 1 }}
       >
         <TableHeader className="static">
+          <GroupHeaderRow columns={columns} />
           <TableRow className="bg-muted/40">
             {columns.map((col) => (
               <TableHead key={col.key} className={cn("h-8", wrapsInPrint(col) && "whitespace-normal", isNumericColumn(col) && "text-right")}>

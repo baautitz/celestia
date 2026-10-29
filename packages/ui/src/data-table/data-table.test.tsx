@@ -274,3 +274,39 @@ describe("impressão", () => {
     expect(screen.getByRole("button", { name: "Imprimir" }).hasAttribute("disabled")).toBe(true);
   });
 });
+
+describe("grupo de colunas", () => {
+  type Seller = { id: string; nome: string; qtd: number; valor: number };
+  const sellers: Seller[] = [{ id: "1", nome: "Ana", qtd: 3, valor: 90 }];
+  const groupedColumns = [
+    { key: "nome", label: "Colaborador", value: (r: Seller) => r.nome },
+    { key: "vit-qtd", label: "Qtde", group: "Vitaminas", format: "number" as const, value: (r: Seller) => r.qtd },
+    { key: "vit-valor", label: "Valor (R$)", group: "Vitaminas", format: "currency" as const, value: (r: Seller) => r.valor },
+  ];
+
+  const groupHeader = (table: HTMLElement) =>
+    within(table).getByRole("columnheader", { name: "Vitaminas" }) as HTMLTableCellElement;
+
+  it("mostra o rótulo do grupo sobre as colunas do grupo", () => {
+    setViewport(1280);
+    render(<DataTable columns={groupedColumns} rows={sellers} getRowId={(r) => r.id} />);
+    const table = screen.getByRole("table");
+    expect(groupHeader(table).colSpan).toBe(2);
+    expect(within(table).getByRole("columnheader", { name: "Qtde" })).toBeTruthy();
+  });
+
+  it("repete o grupo na tabela impressa", async () => {
+    setViewport(1280);
+    window.print = vi.fn();
+    render(<DataTable columns={groupedColumns} rows={sellers} getRowId={(r) => r.id} title="Vendas" print={{}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(groupHeader(screen.getByRole("table", { name: "Vendas" })).colSpan).toBe(2);
+  });
+
+  it("prefixa o rótulo com o grupo no celular", () => {
+    setViewport(500);
+    render(<DataTable columns={groupedColumns} rows={sellers} getRowId={(r) => r.id} />);
+    expect(screen.getByText("Vitaminas · Qtde")).toBeTruthy();
+    expect(screen.getByText("Vitaminas · Valor (R$)")).toBeTruthy();
+  });
+});
