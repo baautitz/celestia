@@ -14,7 +14,7 @@ import {
 import { FieldGroup, Field, FieldLabel, FieldError } from "@platform/ui/components/field";
 import { Input } from "@platform/ui/components/input";
 import { Button } from "@platform/ui/components/button";
-import { CenteredScreen } from "@platform/ui/components/layout";
+import { CenteredScreen, Stack } from "@platform/ui/components/layout";
 import { useUi } from "@platform/ui/imperative/provider";
 
 const loginSchema = z.object({
@@ -97,13 +97,11 @@ export const LoginPage: React.FC = () => {
                 )}
               </Field>
 
-              <Button
-                type="submit"
-                fullWidth
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Autenticando..." : "Entrar"}
-              </Button>
+              <Stack>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Autenticando..." : "Entrar"}
+                </Button>
+              </Stack>
             </FieldGroup>
           </form>
         </CardContent>

@@ -240,7 +240,7 @@ const SelectField: React.FC<FieldProps<FieldOf<"select">>> = ({ field, form }) =
             onValueChange={(val: string | null) => rhf.onChange(val ?? "")}
           >
             <FormControl>
-              <SelectTrigger className="w-full">
+              <SelectTrigger>
                 <SelectValue placeholder="Selecione uma opção" />
               </SelectTrigger>
             </FormControl>
@@ -279,7 +279,7 @@ const LookupSelectField: React.FC<FieldProps<FieldOf<"lookup_select">>> = ({ fie
               onValueChange={(val: string | null) => rhf.onChange(val ?? "")}
             >
               <FormControl>
-                <SelectTrigger className="w-full">
+                <SelectTrigger>
                   <SelectValue placeholder="Selecione uma opção" />
                 </SelectTrigger>
               </FormControl>
