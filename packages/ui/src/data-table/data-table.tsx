@@ -111,7 +111,18 @@ export interface DataTableProps<TRow> {
   print?: DataTablePrintOptions;
   /** Alterna o fundo das linhas, na tela e na impressão, para guiar a leitura de tabelas largas. */
   striped?: boolean;
+  /** `key` da última coluna presa à esquerda na rolagem horizontal; ela e as anteriores ficam fixas. Não afeta a impressão. */
+  frozenUntil?: string;
 }
+/** Chave da coluna do botão de expandir na medição das colunas fixas. */
+const EXPAND_KEY = "__expand";
+
+/** Fundos opacos (mistura sobre `--background`) para as células fixas não deixarem o conteúdo rolado aparecer por baixo. */
+const FROZEN_HEAD_CLASS = "bg-[color-mix(in_oklab,var(--muted)_40%,var(--background))]";
+const FROZEN_CELL_CLASS =
+  "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--muted)_30%,var(--background))]";
+const FROZEN_STRIPED_CELL_CLASS = "group-even/row:bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))]";
+
 function mobileLabel(col: { label: string; mobileLabel?: string; group?: string }): string {
   return col.mobileLabel ?? (col.group ? `${col.group} · ${col.label}` : col.label);
 }
@@ -121,27 +132,45 @@ function GroupHeaderRow({
   columns,
   leading = 0,
   trailing = 0,
+  frozenKeys = [],
+  frozenHead,
 }: {
   columns: { key: string; group?: string }[];
   leading?: number;
   trailing?: number;
+  /** Colunas fixas: um grupo não se mescla por cima da fronteira entre fixas e roláveis. */
+  frozenKeys?: readonly string[];
+  /** Estilo e classes de uma célula fixa, pela chave da primeira e da última coluna que ela cobre. */
+  frozenHead?: (firstKey: string, lastKey: string) => { style?: React.CSSProperties; className?: string | false };
 }) {
   if (!columns.some((c) => c.group)) return null;
   const boundaries = groupBoundaryKeys(columns);
-  const spans: { key: string; group?: string; span: number }[] = [];
+  const spans: { key: string; lastKey: string; group?: string; frozen: boolean; span: number }[] = [];
   for (const col of columns) {
     const last = spans[spans.length - 1];
-    if (last && last.group === col.group) last.span++;
-    else spans.push({ key: col.key, group: col.group, span: 1 });
+    const frozen = frozenKeys.includes(col.key);
+    if (last && last.group === col.group && last.frozen === frozen) {
+      last.span++;
+      last.lastKey = col.key;
+    } else spans.push({ key: col.key, lastKey: col.key, group: col.group, frozen, span: 1 });
   }
+  const leadingHead = frozenKeys.length > 0 ? frozenHead?.(EXPAND_KEY, EXPAND_KEY) : undefined;
   return (
     <TableRow className="bg-muted/40">
-      {leading > 0 && <TableHead colSpan={leading} />}
-      {spans.map(({ key, group, span }) => (
-        <TableHead key={key} colSpan={span} className={cn("h-8", group && "text-center", boundaries.has(key) && GROUP_BOUNDARY_CLASS)}>
-          {group}
-        </TableHead>
-      ))}
+      {leading > 0 && <TableHead colSpan={leading} style={leadingHead?.style} className={cn(leadingHead?.className)} />}
+      {spans.map(({ key, lastKey, group, frozen, span }) => {
+        const head = frozen ? frozenHead?.(key, lastKey) : undefined;
+        return (
+          <TableHead
+            key={key}
+            colSpan={span}
+            style={head?.style}
+            className={cn("h-8", group && "text-center", boundaries.has(key) && GROUP_BOUNDARY_CLASS, head?.className)}
+          >
+            {group}
+          </TableHead>
+        );
+      })}
       {trailing > 0 && <TableHead colSpan={trailing} />}
     </TableRow>
   );
@@ -201,6 +230,7 @@ export function DataTable<TRow>({
   className,
   print,
   striped = false,
+  frozenUntil,
 }: DataTableProps<TRow>) {
   const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
@@ -210,6 +240,46 @@ export function DataTable<TRow>({
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
   const [printing, setPrinting] = useState(false);
   const endPrinting = useCallback(() => setPrinting(false), []);
+  const headRefs = useRef(new Map<string, HTMLTableCellElement>());
+  const [frozenLeft, setFrozenLeft] = useState<ReadonlyMap<string, number>>(new Map());
+
+  const frozenCount = columns.findIndex((c) => c.key === frozenUntil) + 1;
+  const frozenKeys = columns.slice(0, frozenCount).map((c) => c.key);
+  const lastFrozenKey = frozenKeys[frozenKeys.length - 1];
+  const frozenSignature = frozenKeys.join("|");
+
+  // Cada coluna fixa fica à esquerda da soma das larguras das fixas anteriores (e do botão de expandir).
+  useLayoutEffect(() => {
+    const measure = () => {
+      let left = headRefs.current.get(EXPAND_KEY)?.offsetWidth ?? 0;
+      const next = new Map<string, number>();
+      for (const key of frozenSignature ? frozenSignature.split("|") : []) {
+        next.set(key, left);
+        left += headRefs.current.get(key)?.offsetWidth ?? 0;
+      }
+      setFrozenLeft(next);
+    };
+    measure();
+    if (!frozenSignature || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    headRefs.current.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [frozenSignature, rows]);
+
+  const frozenStyle = (key: string, head = false): React.CSSProperties | undefined =>
+    frozenKeys.includes(key) || (key === EXPAND_KEY && frozenCount > 0)
+      ? { position: "sticky", left: frozenLeft.get(key) ?? 0, zIndex: head ? 20 : 1 }
+      : undefined;
+  const frozenClass = (key: string, head = false) =>
+    (frozenKeys.includes(key) || (key === EXPAND_KEY && frozenCount > 0)) &&
+    cn(
+      head ? FROZEN_HEAD_CLASS : cn(FROZEN_CELL_CLASS, striped && FROZEN_STRIPED_CELL_CLASS),
+      key === lastFrozenKey && "border-r border-border",
+    );
+  const setHeadRef = (key: string) => (el: HTMLTableCellElement | null) => {
+    if (el) headRefs.current.set(key, el);
+    else headRefs.current.delete(key);
+  };
 
   const toggleExpanded = (id: string) =>
     setExpandedIds((prev) => {
@@ -414,16 +484,34 @@ export function DataTable<TRow>({
             <div className={bordered ? "border border-border" : undefined}>
               <Table>
                 <TableHeader>
-                  <GroupHeaderRow columns={columns} leading={renderExpanded ? 1 : 0} trailing={hasActions ? 1 : 0} />
+                  <GroupHeaderRow
+                    columns={columns}
+                    leading={renderExpanded ? 1 : 0}
+                    trailing={hasActions ? 1 : 0}
+                    frozenKeys={frozenKeys}
+                    frozenHead={(firstKey, lastKey) => ({
+                      style: frozenStyle(firstKey, true),
+                      className: cn(frozenClass(firstKey, true), lastKey === lastFrozenKey && "border-r border-border"),
+                    })}
+                  />
                   <TableRow className="bg-muted/40">
-                    {renderExpanded && <TableHead className="w-12" />}
+                    {renderExpanded && (
+                      <TableHead
+                        ref={setHeadRef(EXPAND_KEY)}
+                        style={frozenStyle(EXPAND_KEY, true)}
+                        className={cn("w-12", frozenClass(EXPAND_KEY, true))}
+                      />
+                    )}
                     {columns.map((col) => (
                       <TableHead
                         key={col.key}
+                        ref={setHeadRef(col.key)}
+                        style={frozenStyle(col.key, true)}
                         className={cn(
                           col.sortable && "cursor-pointer select-none",
                           isNumericColumn(col) && "text-right",
                           boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                          frozenClass(col.key, true),
                         )}
                         onClick={() => col.sortable && handleSort(col.key)}
                         aria-sort={col.sortable && sortKey === col.key ? (order === "asc" ? "ascending" : "descending") : undefined}
@@ -476,12 +564,21 @@ export function DataTable<TRow>({
                       const expanded = renderExpanded !== undefined && expandedIds.has(getRowId(row));
                       return (
                         <React.Fragment key={getRowId(row)}>
-                          <TableRow className={cn("hover:bg-muted/30", striped && "even:bg-muted/20")}>
-                            {renderExpanded && <TableCell>{expandButton(row)}</TableCell>}
+                          <TableRow className={cn("group/row hover:bg-muted/30", striped && "even:bg-muted/20")}>
+                            {renderExpanded && (
+                              <TableCell style={frozenStyle(EXPAND_KEY)} className={cn(frozenClass(EXPAND_KEY))}>
+                                {expandButton(row)}
+                              </TableCell>
+                            )}
                             {columns.map((col) => (
                               <TableCell
                                 key={col.key}
-                                className={cn(columnCellClassName(col, row), boundaries.has(col.key) && GROUP_BOUNDARY_CLASS)}
+                                style={frozenStyle(col.key)}
+                                className={cn(
+                                  columnCellClassName(col, row),
+                                  boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                                  frozenClass(col.key),
+                                )}
                               >
                                 {cellContent(col, row)}
                               </TableCell>

@@ -323,3 +323,28 @@ describe("grupo de colunas", () => {
   });
 });
 
+describe("colunas fixas", () => {
+  type Seller = { id: string; codigo: number; nome: string; total: number };
+  const sellers: Seller[] = [{ id: "1", codigo: 7, nome: "Ana", total: 90 }];
+  const freezeColumns = [
+    { key: "codigo", label: "Cód.", value: (r: Seller) => r.codigo },
+    { key: "nome", label: "Colaborador", value: (r: Seller) => r.nome },
+    { key: "total", label: "Total", format: "number" as const, value: (r: Seller) => r.total },
+  ];
+
+  const isFrozen = (name: string) => screen.getByRole("cell", { name }).style.position === "sticky";
+
+  it("não fixa colunas sem frozenUntil", () => {
+    setViewport(1280);
+    render(<DataTable columns={freezeColumns} rows={sellers} getRowId={(r) => r.id} />);
+    expect([isFrozen("7"), isFrozen("Ana"), isFrozen("90")]).toEqual([false, false, false]);
+  });
+
+  it("fixa as colunas até a coluna informada, com o cabeçalho", () => {
+    setViewport(1280);
+    render(<DataTable columns={freezeColumns} rows={sellers} getRowId={(r) => r.id} frozenUntil="nome" />);
+    expect([isFrozen("7"), isFrozen("Ana"), isFrozen("90")]).toEqual([true, true, false]);
+    expect(screen.getByRole("columnheader", { name: "Colaborador" }).style.position).toBe("sticky");
+    expect(screen.getByRole("columnheader", { name: "Total" }).style.position).toBe("");
+  });
+});
