@@ -1,6 +1,8 @@
 # Traefik SÓ PARA DESENVOLVIMENTO (ver docker-compose.cert.yaml e docs/conventions/device-certificates.md).
 # Reproduz o que o Traefik de produção faz no endereço `acesso.`: exige um certificado de cliente assinado pela CA
-# do Celestia, repassa o certificado ao app em X-Forwarded-Tls-Client-Cert e acrescenta o segredo do proxy.
+# do Celestia, repassa o certificado à autoridade certificadora (services/ca) em X-Forwarded-Tls-Client-Cert e
+# acrescenta o segredo do proxy. Só a rota /verify é exposta: a API da CA é interna e fala só com o backend.
+# `*.localhost` aponta para o próprio computador, então https://acesso.localhost:8443 funciona sem mexer em /etc/hosts.
 # O certificado do site é o padrão (autoassinado) do Traefik: o navegador avisa uma vez, é só continuar.
 tls:
   options:
@@ -16,26 +18,26 @@ http:
     client-cert:
       passTLSClientCert:
         pem: true
-    # O app só aceita o certificado repassado se vier com este segredo. Sobrescreve o que o cliente mandar.
+    # A CA só aceita o certificado repassado se vier com este segredo. Sobrescreve o que o cliente mandar.
     proxy-secret:
       headers:
         customRequestHeaders:
-          X-Celestia-Proxy-Secret: '{{ env "PROXY_SHARED_SECRET" }}'
+          X-Celestia-Proxy-Secret: '{{ env "CA_PROXY_SECRET" }}'
 
   routers:
     acesso:
-      rule: "Host(`localhost`)"
+      rule: "Host(`acesso.localhost`) && Path(`/verify`)"
       entryPoints:
         - websecure
         - websecure6
-      service: app
+      service: ca
       middlewares:
         - client-cert
         - proxy-secret
       tls: {}
 
   services:
-    app:
+    ca:
       loadBalancer:
         servers:
           - url: '{{ env "CERT_UPSTREAM" }}'

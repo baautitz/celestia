@@ -1,14 +1,15 @@
 # Traefik SÓ PARA DESENVOLVIMENTO: testa o login por certificado de Dispositivo de verdade, no navegador.
 # Em produção o Traefik é o do Dokploy, configurado separadamente (ver docs/conventions/device-certificates.md).
 #
-# Uso (com CLIENT_CERT_SOURCE=header e PROXY_SHARED_SECRET no .env, e a CA criada com `pnpm create-ca`):
-#   docker compose -f docker-compose.cert.yaml up          # sobe o Traefik em https://localhost:8443
-#   pnpm dev:server && pnpm dev:web                         # a API e o Vite, como sempre
-# O banco continua sendo o do docker-compose.yml (`docker compose up -d postgres`); este arquivo só sobe o Traefik.
+# Uso (com CA_CERT_SOURCE=header, CA_PROXY_SECRET e CA_PUBLIC_URL=https://acesso.localhost:8443 no .env, e a CA criada
+# com `pnpm create-ca`):
+#   docker compose -f docker-compose.cert.yaml up          # sobe o Traefik em https://acesso.localhost:8443
+#   pnpm dev                                               # backend, autoridade certificadora e Vite, como sempre
+# O app continua em http://localhost:5173: só a leitura do certificado passa pelo Traefik, que exige o certificado do
+# Dispositivo (instale o .pfx no navegador). O banco continua sendo o do docker-compose.yml.
 #
-# O Traefik usa a rede do host (só Linux) para alcançar o Vite em localhost:5173 sem expor o Vite na rede.
-# Escuta nos dois loopbacks (IPv4 e IPv6) porque o navegador resolve `localhost` para qualquer um dos dois, e o Vite
-# costuma escutar só em IPv6 (::1).
+# O Traefik usa a rede do host (só Linux) para alcançar a CA em localhost:3001 sem expô-la na rede.
+# Escuta nos dois loopbacks (IPv4 e IPv6) porque o navegador resolve `acesso.localhost` para qualquer um dos dois.
 services:
   traefik:
     image: traefik:v3.1
@@ -21,8 +22,8 @@ services:
       - --providers.file.watch=true
       - --log.level=INFO
     environment:
-      PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:?defina PROXY_SHARED_SECRET no .env (mínimo 32 caracteres)}
-      CERT_UPSTREAM: ${CERT_UPSTREAM:-http://localhost:5173}
+      CA_PROXY_SECRET: ${CA_PROXY_SECRET:?defina CA_PROXY_SECRET no .env (mínimo 32 caracteres)}
+      CERT_UPSTREAM: ${CERT_UPSTREAM:-http://localhost:3001}
     volumes:
       - ./dev/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
       # Só o certificado público da CA entra no Traefik; a chave fica onde o app a lê.
