@@ -30,6 +30,9 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
+          "system:devices:read",
+          "system:devices:create",
+          "system:devices:revoke",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -101,6 +104,9 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
+          "system:devices:read",
+          "system:devices:create",
+          "system:devices:revoke",
           "system:audit:read",
           "closing_period:period:read",
           "closing_period:period:update",
@@ -142,6 +148,9 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
+          "system:devices:read",
+          "system:devices:create",
+          "system:devices:revoke",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -181,6 +190,9 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
+          "system:devices:read",
+          "system:devices:create",
+          "system:devices:revoke",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -239,6 +251,9 @@
         "system:roles:create",
         "system:roles:read",
         "system:roles:update",
+        "system:devices:read",
+        "system:devices:create",
+        "system:devices:revoke",
         "system:erps:manage",
         "system:audit:read",
         "closing_period:period:read",
@@ -269,6 +284,9 @@
         "system:roles:create",
         "system:roles:read",
         "system:roles:update",
+        "system:devices:read",
+        "system:devices:create",
+        "system:devices:revoke",
         "system:audit:read",
         "closing_period:period:read",
         "closing_period:period:update",
@@ -350,6 +368,26 @@
             "label": "Editar Permissões do Grupo",
             "description": "Permite alterar quais permissões do sistema pertencem a cada grupo.",
             "module": "roles"
+          }
+        ],
+        "devices": [
+          {
+            "key": "system:devices:read",
+            "label": "Visualizar Dispositivos",
+            "description": "Permite listar os Dispositivos homologados e ver o estado de cada certificado.",
+            "module": "devices"
+          },
+          {
+            "key": "system:devices:create",
+            "label": "Emitir Dispositivos",
+            "description": "Permite homologar um computador ou celular, emitindo o certificado que ele usa para acessar o sistema.",
+            "module": "devices"
+          },
+          {
+            "key": "system:devices:revoke",
+            "label": "Revogar Dispositivos",
+            "description": "Permite revogar o certificado de um Dispositivo, que perde o acesso ao sistema.",
+            "module": "devices"
           }
         ],
         "audit": [
@@ -493,6 +531,26 @@
             "label": "Editar Permissões do Grupo",
             "description": "Permite alterar quais permissões do sistema pertencem a cada grupo.",
             "module": "roles"
+          }
+        ],
+        "devices": [
+          {
+            "key": "system:devices:read",
+            "label": "Visualizar Dispositivos",
+            "description": "Permite listar os Dispositivos homologados e ver o estado de cada certificado.",
+            "module": "devices"
+          },
+          {
+            "key": "system:devices:create",
+            "label": "Emitir Dispositivos",
+            "description": "Permite homologar um computador ou celular, emitindo o certificado que ele usa para acessar o sistema.",
+            "module": "devices"
+          },
+          {
+            "key": "system:devices:revoke",
+            "label": "Revogar Dispositivos",
+            "description": "Permite revogar o certificado de um Dispositivo, que perde o acesso ao sistema.",
+            "module": "devices"
           }
         ],
         "audit": [
@@ -688,6 +746,9 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
+          "system:devices:read",
+          "system:devices:create",
+          "system:devices:revoke",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -746,6 +807,9 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
+          "system:devices:read",
+          "system:devices:create",
+          "system:devices:revoke",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -1301,6 +1365,9 @@
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
+          "system:devices:read",
+          "system:devices:create",
+          "system:devices:revoke",
           "system:erps:manage",
           "system:audit:read",
           "closing_period:period:read",
@@ -2000,7 +2067,7 @@
   "iam.grants.users.update.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:devices:read, system:devices:create, system:devices:revoke, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close e mais 2."
     }
   },
   "iam.grants.users.update.ok_subset_role": {
@@ -2019,7 +2086,7 @@
   "iam.grants.users.create.403_stronger_role": {
     "status": 403,
     "body": {
-      "error": "Você não pode conceder permissões que não possui: system:users:read, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close, closing_period:period:reopen, closing_period:period:cancel."
+      "error": "Você não pode conceder permissões que não possui: system:users:read, system:devices:read, system:devices:create, system:devices:revoke, system:erps:manage, system:audit:read, closing_period:period:read, closing_period:period:update, closing_period:period:create, closing_period:period:close e mais 2."
     }
   },
   "iam.grants.users.create.ok_subset_role": {

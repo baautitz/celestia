@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { createPlatformApp } from "../src/index.js";
 import { MemoryDeviceStore } from "../src/iam/device-store.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
+import { AuditLog } from "../src/audit/audit-log.js";
+import { MemoryAuditStore } from "../src/audit/audit-store.js";
 import { upsertAdminUser } from "../src/cli/create-admin.js";
 import { DEFAULT_ADMIN_ROLE_ID } from "../src/iam/initial-roles.js";
 import { createSeededUserStore, TEST_PASSWORD, withAuth } from "./helpers/fixtures.js";
@@ -162,5 +164,47 @@ describe("acesso sem certificado: quem altera e o que acontece com as sessões",
     await store.updateUser(created.id, { allowWithoutCertificate: false });
     await upsertAdminUser(store, { username: "primeiro", fullname: "Primeiro Admin", password: TEST_PASSWORD, force: true });
     expect((await store.findById(created.id))?.allowWithoutCertificate).toBe(true);
+  });
+});
+
+describe("Audit Log do acesso por certificado", () => {
+  it("registra o login negado por falta de certificado, e só depois da senha correta", async () => {
+    const userStore = createSeededUserStore();
+    await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
+    const user = await userStore.createUser({ fullname: "Com Cert", username: "com.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
+    const auditLog = new AuditLog(new MemoryAuditStore());
+    const app = createPlatformApp({ userStore, auditLog });
+    const login = (password: string) =>
+      app.request("/api/auth/login", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ username: "com.cert", password }) });
+
+    await login("SenhaErrada@1");
+    expect(await auditLog.list({ plugin: "iam" })).toEqual([]);
+
+    expect((await login(TEST_PASSWORD)).status).toBe(403);
+    const [entry] = await auditLog.list({ plugin: "iam" });
+    expect(entry).toMatchObject({ action: "deny_login_without_certificate", actorId: user.id, targetId: user.id });
+    expect(entry?.summary).toBe('Negou o login de "com.cert": o acesso exige o certificado de um Dispositivo ativo.');
+  });
+
+  it("registra quando a opção de acesso sem certificado muda, e só quando muda", async () => {
+    const userStore = createSeededUserStore({ admin: true });
+    await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
+    const user = await userStore.createUser({ fullname: "Alvo Teste", username: "alvo", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
+    const auditLog = new AuditLog(new MemoryAuditStore());
+    const admin = withAuth(createPlatformApp({ userStore, auditLog }), "test.root");
+    const put = (allow: boolean) =>
+      admin.request(`/api/iam/users/${user.id}`, { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify({ allowWithoutCertificate: allow }) });
+
+    await put(false);
+    expect(await auditLog.list({ plugin: "iam" })).toEqual([]);
+
+    await put(true);
+    await put(false);
+    const entries = await auditLog.list({ plugin: "iam" });
+    expect(entries.map((e) => e.summary).sort()).toEqual([
+      'Deixou de permitir o acesso sem certificado de "alvo".',
+      'Permitiu o acesso sem certificado de "alvo".',
+    ]);
+    expect(entries.every((e) => e.actorName === "Test Root" && e.targetId === user.id)).toBe(true);
   });
 });

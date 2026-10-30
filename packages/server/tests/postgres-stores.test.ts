@@ -45,8 +45,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a migration inicial e a de Dispositivos; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 2 : 1);
+        // O iam tem a inicial, a de Dispositivos e a das permissões do Gestor; os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 3 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -73,7 +73,9 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
     it("semeia os Roles iniciais gestor e operador e cria o primeiro Administrator na Role gestor", async () => {
       const store = new PostgresUserStore(db);
       const roles = await store.listRoles();
-      expect(roles).toEqual([...INITIAL_ROLES].sort((a, b) => a.name.localeCompare(b.name)));
+      // A ordem das chaves não importa: migrations posteriores acrescentam permissões ao fim da lista.
+      const sortKeys = (list: readonly { permissions: string[] }[]) => list.map((r) => ({ ...r, permissions: [...r.permissions].sort() }));
+      expect(sortKeys(roles)).toEqual(sortKeys([...INITIAL_ROLES].sort((a, b) => a.name.localeCompare(b.name))));
       expect(roles.find((r) => r.id === "role_admin")).toBeUndefined();
       expect(INITIAL_ROLES.flatMap((r) => r.permissions)).not.toContain("system:roles:delete");
       expect(roles.flatMap((r) => r.permissions)).not.toContain("system:roles:delete");

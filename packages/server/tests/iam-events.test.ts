@@ -1,3 +1,6 @@
+import { MemoryDeviceStore } from "../src/iam/device-store.js";
+import { AuditLog } from "../src/audit/audit-log.js";
+import { MemoryAuditStore } from "../src/audit/audit-store.js";
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { loadModules } from "@platform/core/loader";
@@ -14,6 +17,9 @@ async function boot() {
   const tokenService = new TokenService();
   const mod = createIamModule({
     userStore,
+    deviceStore: new MemoryDeviceStore(),
+    getClientCertificateFingerprint: () => undefined,
+    auditLog: new AuditLog(new MemoryAuditStore()),
     tokenService,
     auth: createAuthMiddleware(tokenService, (p) => p),
     withAdminBypass: (p) => p,
@@ -35,7 +41,7 @@ describe("módulo iam: permissões declaradas", () => {
     const { mod, result } = await boot();
     const keys = (mod.permissions?.items ?? []).map((i) => i.key);
     expect(keys).toEqual(
-      expect.arrayContaining(["system:users:create", "system:users:reset_password", "system:roles:read", "system:roles:update"]),
+      expect.arrayContaining(["system:users:create", "system:users:reset_password", "system:roles:read", "system:roles:update", "system:devices:read", "system:devices:create", "system:devices:revoke"]),
     );
     expect(keys).not.toContain("system:roles:delete");
     expect(result.registry.allKeys().has("system:users:create")).toBe(true);
