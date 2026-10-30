@@ -56,6 +56,7 @@ const userSchema = z.object({
   email: z.string().min(1, "Informe o e-mail.").email("E-mail inválido."),
   roleId: z.string().min(1),
   isAdmin: z.boolean(),
+  allowWithoutCertificate: z.boolean(),
   password: z.string(),
   externals: z.record(z.record(z.string())),
 });
@@ -84,6 +85,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
       email: user?.email ?? "",
       roleId: user?.roleId ?? (roles[0]?.id || "role_operador"),
       isAdmin: user?.isAdmin === true,
+      allowWithoutCertificate: user?.allowWithoutCertificate === true,
       password: "",
       externals: {},
     },
@@ -117,7 +119,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
           fullname: v.fullname.trim(),
           email: v.email.trim(),
           roleId: v.roleId,
-          ...(currentUser?.isAdmin ? { isAdmin: v.isAdmin } : {}),
+          ...(currentUser?.isAdmin ? { isAdmin: v.isAdmin, allowWithoutCertificate: v.allowWithoutCertificate } : {}),
         });
         for (const entry of entries) {
           await api.erps.saveExternals(user.id, entry.erpId, v.externals[entry.erpId] ?? {});
@@ -130,6 +132,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
           email: v.email.trim(),
           password: v.password,
           roleId: v.roleId,
+          ...(currentUser?.isAdmin && v.allowWithoutCertificate ? { allowWithoutCertificate: true } : {}),
         });
         ui.feedback.notify({ type: "success", title: "Usuário cadastrado com sucesso!" });
       }
@@ -233,6 +236,22 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
                       disabled={user?.id === currentUser.sub}
                       onCheckedChange={(checked: boolean) => field.onChange(checked)}
                     />
+                  </Field>
+                )}
+              />
+            )}
+
+            {currentUser?.isAdmin && (
+              <FormField
+                control={form.control}
+                name="allowWithoutCertificate"
+                render={({ field }) => (
+                  <Field orientation="horizontal">
+                    <FieldContent>
+                      <FieldLabel htmlFor="u-no-cert">Permitir acesso sem certificado</FieldLabel>
+                      <FieldDescription>Entra só com a senha, sem o certificado de um Dispositivo homologado.</FieldDescription>
+                    </FieldContent>
+                    <Switch id="u-no-cert" checked={field.value} onCheckedChange={(checked: boolean) => field.onChange(checked)} />
                   </Field>
                 )}
               />
@@ -523,6 +542,17 @@ export const IAMUsersPage: React.FC = () => {
             value: (u) => getRoleName(u.roleId),
             render: (u) => <Badge variant="secondary">{getRoleName(u.roleId)}</Badge>,
             skeletonClassName: "h-5 w-24",
+          },
+          {
+            key: "access",
+            label: "Acesso",
+            value: (u) => (u.allowWithoutCertificate ? "Sem certificado" : "Com certificado"),
+            render: (u) => (
+              <Badge variant={u.allowWithoutCertificate ? "default" : "secondary"}>
+                {u.allowWithoutCertificate ? "Sem certificado" : "Com certificado"}
+              </Badge>
+            ),
+            skeletonClassName: "h-5 w-28",
           },
           {
             key: "status",
