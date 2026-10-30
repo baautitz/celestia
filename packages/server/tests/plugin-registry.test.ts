@@ -2,9 +2,8 @@ import { describe, it, expect } from "vitest";
 import { defineModule } from "@platform/core/module";
 import { definePermissions } from "@platform/core/permissions";
 import { createPlatformApp } from "../src/index.js";
-import { MemoryUserStore } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
-import { TEST_PASSWORD } from "./helpers/fixtures.js";
+import { TEST_PASSWORD, TestUserStore } from "./helpers/fixtures.js";
 
 const extra = defineModule({
   id: "vendas",
@@ -24,7 +23,7 @@ const implicit = defineModule({
 });
 
 function boot() {
-  const userStore = new MemoryUserStore({
+  const userStore = new TestUserStore({
     roles: [{ id: "r", name: "R", permissions: [] }],
     users: [
       { id: "u1", username: "chefe", fullname: "x", passwordHash: PasswordService.hash(TEST_PASSWORD), roleId: "r", status: "active", createdAt: new Date().toISOString() },

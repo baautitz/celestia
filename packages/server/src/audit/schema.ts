@@ -1,6 +1,6 @@
 import { index, integer, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
-/** Schema Postgres do Module `audit` (ADR 0004). */
+/** Schema Postgres do Module `audit`. */
 export const auditSchema = pgSchema("audit");
 
 export const auditLogEntries = auditSchema.table(

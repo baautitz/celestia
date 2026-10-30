@@ -1,8 +1,25 @@
-import type { Role, User } from "@platform/shared";
+import type { CreateUserInput, Role, User } from "@platform/shared";
 import { CLOSING_PERIOD_PERMISSIONS } from "../../src/closing-period/closing-period-permissions.js";
 import { PasswordService } from "../../src/iam/password-service.js";
 import { SYSTEM_PERMISSIONS } from "../../src/iam/system-permissions.js";
 import { MemoryUserStore } from "../../src/iam/user-store.js";
+
+/**
+ * Store dos testes: Usuários nascem com acesso sem certificado, porque a maioria dos testes faz login só com senha.
+ * Quem testa a exigência de certificado passa `allowWithoutCertificate: false` de forma explícita.
+ */
+export class TestUserStore extends MemoryUserStore {
+  constructor(initialData?: { users?: User[]; roles?: Role[] }) {
+    super({
+      ...initialData,
+      users: initialData?.users?.map((u) => ({ ...u, allowWithoutCertificate: u.allowWithoutCertificate ?? true })),
+    });
+  }
+
+  override createUser(input: CreateUserInput): Promise<User> {
+    return super.createUser({ allowWithoutCertificate: true, ...input });
+  }
+}
 
 export const TEST_PASSWORD = "Senha@123";
 
@@ -39,16 +56,17 @@ function user(id: string, fullname: string, username: string, email: string, rol
     passwordHash: PasswordService.hash(TEST_PASSWORD),
     roleId,
     status: "active",
+    allowWithoutCertificate: true,
     createdAt: new Date().toISOString(),
   };
 }
 
 /** `admin: true` acrescenta `test.root` (isAdmin) para testes que só precisam de acesso total. */
-export function createSeededUserStore(opts: { admin?: boolean } = {}): MemoryUserStore {
+export function createSeededUserStore(opts: { admin?: boolean } = {}): TestUserStore {
   const root: User[] = opts.admin
     ? [{ ...user("usr_9000", "Test Root", "test.root", "root@farmacia.com.br", "role_colaborador"), isAdmin: true }]
     : [];
-  return new MemoryUserStore({
+  return new TestUserStore({
     roles,
     users: [
       user("usr_1001", "Carlos Oliveira", "carlos.admin", "carlos@farmacia.com.br", "role_admin"),

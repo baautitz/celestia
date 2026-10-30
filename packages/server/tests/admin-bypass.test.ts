@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createPlatformApp } from "../src/index.js";
-import { MemoryUserStore } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
-import { TEST_PASSWORD } from "./helpers/fixtures.js";
+import { TEST_PASSWORD, TestUserStore } from "./helpers/fixtures.js";
 
 describe("Flag isAdmin (bypass de permissões)", () => {
   let app: ReturnType<typeof createPlatformApp>;
-  let store: MemoryUserStore;
+  let store: TestUserStore;
 
   async function login(username: string) {
     const res = await app.request("/api/auth/login", {
@@ -24,7 +23,7 @@ describe("Flag isAdmin (bypass de permissões)", () => {
     // Os dois usuários têm um grupo SEM nenhuma permissão; só um deles é admin.
     const hash = PasswordService.hash(TEST_PASSWORD);
     const base = { fullname: "x", passwordHash: hash, roleId: "role_vazio", status: "active" as const, createdAt: new Date().toISOString() };
-    store = new MemoryUserStore({
+    store = new TestUserStore({
       roles: [
         { id: "role_vazio", name: "Vazio", permissions: [] },
         { id: "role_gestor", name: "Gestor", permissions: ["system:users:update"] },

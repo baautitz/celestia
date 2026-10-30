@@ -11,6 +11,8 @@ export interface User {
   status: "active" | "inactive";
   /** Administrador: ignora a matriz de permissões (acesso total). Alterado pelo CLI create-admin ou por outro administrador. */
   isAdmin?: boolean;
+  /** Acesso sem certificado: dispensa o certificado de Dispositivo no login. Padrão: desligado (certificado obrigatório). */
+  allowWithoutCertificate?: boolean;
   /** Interno (como passwordHash): só em findById; nunca em respostas da API. Invalida refresh tokens antigos. */
   sessionVersion?: number;
   createdAt: string;
@@ -52,6 +54,8 @@ export interface JWTRefreshPayload {
   type: "refresh";
   /** Versão de sessão do usuário na emissão; o refresh só vale enquanto for igual à atual. */
   ver: number;
+  /** Dispositivo cujo certificado abriu a sessão; ausente quando o Usuário entra sem certificado. */
+  deviceId?: string;
   iat?: number;
   exp?: number;
 }
@@ -70,6 +74,15 @@ export interface AuthTokens {
 }
 
 /**
+ * Resposta do login quando o usuário exige o certificado de um Dispositivo: o navegador segue `verifyUrl`
+ * (a autoridade certificadora, onde ele apresenta o certificado) e volta ao app pelo callback.
+ */
+export interface LoginCertificateRequired {
+  certificateRequired: true;
+  verifyUrl: string;
+}
+
+/**
  * Inputs para endpoints de autenticação e gestão de usuários.
  */
 export interface LoginInput {
@@ -83,6 +96,7 @@ export interface CreateUserInput {
   password: string;
   roleId: string;
   email?: string;
+  allowWithoutCertificate?: boolean;
 }
 
 export interface UpdateUserInput {
@@ -92,6 +106,7 @@ export interface UpdateUserInput {
   email?: string;
   /** Promove ou rebaixa Administrator; aplicado na mesma transação da checagem do último admin ativo. */
   isAdmin?: boolean;
+  allowWithoutCertificate?: boolean;
 }
 
 export interface ResetPasswordInput {
@@ -127,4 +142,37 @@ export interface PermissionItem {
  */
 export interface PermissionCatalog {
   system: Record<string, PermissionItem[]>; // Agrupado por módulo
+}
+
+/**
+ * Dispositivo (computador ou celular) homologado, com o certificado que o Celestia emitiu para ele.
+ * A chave privada nunca é guardada: só o fingerprint e os metadados do certificado.
+ */
+export interface Device {
+  id: string;
+  name: string;
+  status: "active" | "revoked";
+  /** SHA-256 do certificado em DER, hexadecimal minúsculo. */
+  fingerprint: string;
+  serial: string;
+  notAfter: string;
+  createdAt: string;
+  createdBy?: string;
+  revokedAt?: string;
+  revokedBy?: string;
+}
+
+export interface CreateDeviceInput {
+  name: string;
+  fingerprint: string;
+  serial: string;
+  notAfter: string;
+  createdBy?: string;
+}
+
+/** Resposta da emissão: o .pfx (base64) e a senha só existem nesta resposta e não são guardados. */
+export interface IssuedDevice {
+  device: Device;
+  pfx: string;
+  password: string;
 }

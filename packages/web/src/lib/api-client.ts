@@ -1,6 +1,7 @@
 import type {
   JWTAccessPayload,
   AuthTokens,
+  LoginCertificateRequired,
   User,
   Role,
   PermissionCatalog,
@@ -11,14 +12,25 @@ import type {
   ErpInput,
   AuditLogEntry,
   AuditLogFilter,
+  Device,
+  IssuedDevice,
 } from "@platform/shared";
 
 class ApiClient {
   private accessToken: string | null = null;
   private refreshPromise: Promise<string | null> | null = null;
+  private sessionExpiredHandler: (() => void) | null = null;
+  // Evita avisar mais de uma vez por sessão encerrada, mesmo com várias requisições falhando em sequência.
+  private sessionExpiredNotified = false;
 
   setAccessToken(token: string | null) {
     this.accessToken = token;
+    if (token) this.sessionExpiredNotified = false;
+  }
+
+  /** Chamado quando o servidor recusa renovar a sessão (ex.: o Dispositivo foi revogado); o cliente deve sair. */
+  onSessionExpired(handler: (() => void) | null) {
+    this.sessionExpiredHandler = handler;
   }
 
   getAccessToken(): string | null {
@@ -36,6 +48,7 @@ class ApiClient {
       headers.set("Authorization", `Bearer ${this.accessToken}`);
     }
 
+    const sentToken = this.accessToken;
     let response = await fetch(path, {
       ...options,
       headers,
@@ -44,7 +57,8 @@ class ApiClient {
 
     // Interceptor: Se receber 401 e não for rota de login/refresh, tenta renovar silenciosamente
     if (response.status === 401 && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/refresh")) {
-      const newToken = await this.silentRefresh();
+      // Se um login terminou enquanto esta requisição estava no ar, o 401 é do token antigo: basta repetir com o novo.
+      const newToken = this.accessToken && this.accessToken !== sentToken ? this.accessToken : await this.silentRefresh();
       if (newToken) {
         headers.set("Authorization", `Bearer ${newToken}`);
         response = await fetch(path, {
@@ -75,6 +89,8 @@ class ApiClient {
     }
 
     this.refreshPromise = (async () => {
+      // O token de quando a renovação começou: se mudar enquanto ela espera, um login terminou no meio do caminho.
+      const tokenAtStart = this.accessToken;
       try {
         const res = await fetch("/api/auth/refresh", {
           method: "POST",
@@ -84,7 +100,14 @@ class ApiClient {
         });
 
         if (!res.ok) {
+          // Uma renovação recusada que chega depois de um login (ex.: a restauração da sessão ao abrir a página, sem
+          // cookie) não pode apagar a sessão nova nem avisar que ela acabou.
+          if (this.accessToken !== tokenAtStart) return this.accessToken;
           this.setAccessToken(null);
+          if (!this.sessionExpiredNotified) {
+            this.sessionExpiredNotified = true;
+            this.sessionExpiredHandler?.();
+          }
           return null;
         }
 
@@ -103,19 +126,31 @@ class ApiClient {
     return this.refreshPromise;
   }
 
+  private acceptTokens(tokens: AuthTokens): AuthTokens {
+    const token = tokens.accessToken || tokens.access_token || "";
+    this.setAccessToken(token);
+    return { ...tokens, accessToken: token };
+  }
+
   // ─── AUTHENTICATION & IAM ENDPOINTS ─────────────────────────────────────
   auth = {
-    login: async (username: string, password: string): Promise<AuthTokens> => {
-      const tokens = await this.request<AuthTokens>("/api/auth/login", {
+    /** Quem exige certificado recebe o endereço da autoridade certificadora em vez dos tokens. */
+    login: async (username: string, password: string): Promise<AuthTokens | LoginCertificateRequired> => {
+      const result = await this.request<AuthTokens | LoginCertificateRequired>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ username, password }),
       });
-      const token = tokens.accessToken || tokens.access_token || "";
-      this.setAccessToken(token);
-      return {
-        ...tokens,
-        accessToken: token,
-      };
+      if ("certificateRequired" in result) return result;
+      return this.acceptTokens(result);
+    },
+
+    /** Segundo passo do login por certificado: troca o código que a autoridade devolveu ao navegador. */
+    loginWithCertificate: async (challengeId: string, code?: string): Promise<AuthTokens> => {
+      const tokens = await this.request<AuthTokens>("/api/auth/login/certificate", {
+        method: "POST",
+        body: JSON.stringify({ challengeId, code }),
+      });
+      return this.acceptTokens(tokens);
     },
 
     me: async (): Promise<JWTAccessPayload> => {
@@ -143,6 +178,7 @@ class ApiClient {
       email: string;
       password: string;
       roleId: string;
+      allowWithoutCertificate?: boolean;
     }): Promise<User> => {
       return this.request<User>("/api/iam/users", {
         method: "POST",
@@ -168,6 +204,21 @@ class ApiClient {
       return this.request<{ success: boolean }>(`/api/iam/users/${id}`, {
         method: "DELETE",
       });
+    },
+
+    listDevices: async (): Promise<Device[]> => {
+      return this.request<Device[]>("/api/iam/devices");
+    },
+
+    issueDevice: async (input: { name: string }): Promise<IssuedDevice> => {
+      return this.request<IssuedDevice>("/api/iam/devices", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    revokeDevice: async (id: string): Promise<Device> => {
+      return this.request<Device>(`/api/iam/devices/${id}/revoke`, { method: "POST" });
     },
 
     listRoles: async (): Promise<Role[]> => {

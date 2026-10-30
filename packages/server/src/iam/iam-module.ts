@@ -6,12 +6,15 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { defineModule, type ModuleDef } from "@platform/core/module";
-import type { JWTAccessPayload, PermissionItem } from "@platform/shared";
+import type { JWTAccessPayload, PermissionItem, User } from "@platform/shared";
 import { grantDeniedMessage, missingGrants } from "./can-grant.js";
 import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
 import type { TokenService } from "./token-service.js";
 import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
+import { CertificateAuthorityUnavailableError, DeviceNotFoundError, type CertificateAuthorityClient } from "./certificate-authority-client.js";
+import type { AuditLog } from "../audit/audit-log.js";
+import { DEVICE_AUDIT_TARGET, IAM_AUDIT_PLUGIN, USER_AUDIT_TARGET, declareIamAudit } from "./iam-audit.js";
 import { LoginRateLimiter } from "./login-rate-limiter.js";
 import { PasswordService, PasswordPolicySchema } from "./password-service.js";
 
@@ -25,6 +28,9 @@ export interface IamModuleDeps {
   tokenService: TokenService;
   auth: MiddlewareHandler;
   withAdminBypass: (payload: JWTAccessPayload) => JWTAccessPayload;
+  /** Autoridade certificadora: dona dos Dispositivos e do certificado que cada um apresenta. */
+  certificateAuthority: CertificateAuthorityClient;
+  auditLog: AuditLog;
   /** Limite de tentativas de login; por padrão 5 falhas por username e 20 por IP a cada 15 min. */
   loginRateLimiter?: LoginRateLimiter;
 }
@@ -51,6 +57,8 @@ function clientIp(c: Context): string | undefined {
 
 const LAST_ADMIN = LAST_ADMIN_MESSAGE;
 const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
+const CERTIFICATE_REQUIRED = "Dispositivo não autorizado.";
+const CERTIFICATE_EXEMPTION_ADMIN_ONLY = "Somente administradores podem alterar o acesso sem certificado.";
 const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
 
 /**
@@ -58,9 +66,18 @@ const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total
  *
  * Eventos (before/after; o payload nunca carrega senha nem passwordHash):
  * iam.login, iam.user.create, iam.user.update, iam.user.delete, iam.user.reset_password,
- * iam.role.create, iam.role.update. Um `before` que cancela responde 409 com o motivo.
+ * iam.role.create, iam.role.update, iam.device.create, iam.device.revoke. Um `before` que cancela responde 409 com o motivo.
  */
-export function createIamModule({ userStore, extraPermissions = [], tokenService, auth, withAdminBypass, loginRateLimiter = new LoginRateLimiter() }: IamModuleDeps): ModuleDef {
+export function createIamModule({
+  userStore,
+  certificateAuthority,
+  auditLog,
+  extraPermissions = [],
+  tokenService,
+  auth,
+  withAdminBypass,
+  loginRateLimiter = new LoginRateLimiter(),
+}: IamModuleDeps): ModuleDef {
   return defineModule({
     id: "iam",
     version: "1.0.0",
@@ -68,8 +85,45 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
     permissions: IAM_PERMISSIONS,
     migrations: IAM_MIGRATIONS,
     register({ routes, events, permissions }) {
+      declareIamAudit(auditLog);
       permissions.registerProvider(() => extraPermissions.map((p) => ({ ...p, module: p.module ?? "system" })));
       const cancelled = (c: Context, reason: string) => c.json({ error: reason }, 409);
+      const P = IAM_PERMISSIONS.keys;
+      const recordIamAudit = (actor: { id: string; name: string }, action: string, target: { type: string; id: string }, attributes: Record<string, unknown>) =>
+        auditLog.record({ plugin: IAM_AUDIT_PLUGIN, action, actor, target, attributes });
+      const requestActor = (c: Context) => {
+        const caller = getAuthenticatedUser(c);
+        return { id: caller.sub, name: caller.fullname };
+      };
+
+      const completeLogin = async (c: Context, user: User, usedDevice?: { id: string; name: string }) => {
+        loginRateLimiter.recordSuccess(user.username);
+        const role = await userStore.getRole(user.roleId);
+        let tokens: { accessToken: string; refreshToken: string; payload: JWTAccessPayload } | undefined;
+        const ran = await events.run("iam.login", { userId: user.id, username: user.username }, async () => {
+          const access = await tokenService.generateAccessToken(user, role || undefined);
+          const refresh = await tokenService.generateRefreshToken(user, usedDevice?.id);
+          tokens = { accessToken: access.token, refreshToken: refresh.token, payload: access.payload };
+        });
+        if (ran.cancelled) return cancelled(c, ran.reason);
+        if (!tokens) return c.json({ error: "Credenciais inválidas." }, 401);
+        const { accessToken, refreshToken, payload } = tokens;
+        if (usedDevice) {
+          await recordIamAudit({ id: user.id, name: user.fullname }, "login_with_device", { type: DEVICE_AUDIT_TARGET, id: usedDevice.id }, { username: user.username, deviceName: usedDevice.name });
+        }
+
+        setCookie(c, "refresh_token", refreshToken, refreshCookie());
+
+        return c.json({
+          accessToken,
+          refreshToken,
+          expiresIn: 300,
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          expires_in: 300,
+          user: withAdminBypass(payload),
+        });
+      };
 
       routes.post(
         "/auth/login",
@@ -90,30 +144,44 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
             loginRateLimiter.recordFailure(username, ip);
             return c.json({ error: "Credenciais inválidas." }, 401);
           }
-          loginRateLimiter.recordSuccess(username);
 
-          const role = await userStore.getRole(user.roleId);
-          let tokens: { accessToken: string; refreshToken: string; payload: JWTAccessPayload } | undefined;
-          const ran = await events.run("iam.login", { userId: user.id, username: user.username }, async () => {
-            const access = await tokenService.generateAccessToken(user, role || undefined);
-            const refresh = await tokenService.generateRefreshToken(user);
-            tokens = { accessToken: access.token, refreshToken: refresh.token, payload: access.payload };
-          });
-          if (ran.cancelled) return cancelled(c, ran.reason);
-          if (!tokens) return c.json({ error: "Credenciais inválidas." }, 401);
-          const { accessToken, refreshToken, payload } = tokens;
+          // Sem a opção de acesso sem certificado, o certificado de um Dispositivo ativo é obrigatório. Só se pede
+          // depois da senha, para não revelar a exigência a quem não a conhece: o navegador vai à CA ler o certificado
+          // e volta pelo callback, que termina o login em /auth/login/certificate.
+          if (!user.allowWithoutCertificate) {
+            try {
+              const { verifyUrl } = await certificateAuthority.createChallenge(user.id);
+              return c.json({ certificateRequired: true, verifyUrl });
+            } catch (err: unknown) {
+              if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
+              throw err;
+            }
+          }
+          return completeLogin(c, user);
+        },
+      );
 
-          setCookie(c, "refresh_token", refreshToken, refreshCookie());
-
-          return c.json({
-            accessToken,
-            refreshToken,
-            expiresIn: 300,
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            expires_in: 300,
-            user: withAdminBypass(payload),
-          });
+      // Segundo passo do login por certificado: troca o código que a CA devolveu ao navegador pelo Dispositivo.
+      routes.post(
+        "/auth/login/certificate",
+        zValidator("json", z.object({ challengeId: z.string().min(1), code: z.string().optional() })),
+        async (c) => {
+          const { challengeId, code } = c.req.valid("json");
+          let exchange: Awaited<ReturnType<CertificateAuthorityClient["exchangeChallenge"]>>;
+          try {
+            exchange = await certificateAuthority.exchangeChallenge({ challengeId, code });
+          } catch (err: unknown) {
+            if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
+            throw err;
+          }
+          const user = exchange.userId ? await userStore.findById(exchange.userId) : null;
+          if (!exchange.granted || !user || user.status === "inactive") {
+            if (user) {
+              await recordIamAudit({ id: user.id, name: user.fullname }, "deny_login_without_certificate", { type: USER_AUDIT_TARGET, id: user.id }, { username: user.username });
+            }
+            return c.json({ error: CERTIFICATE_REQUIRED }, 403);
+          }
+          return completeLogin(c, user, { id: exchange.deviceId, name: exchange.deviceName });
         },
       );
 
@@ -137,12 +205,21 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
               return c.json({ error: "Usuário não encontrado ou inativo." }, 401);
             }
 
+            // A sessão continua enquanto o Dispositivo que a abriu seguir ativo; o certificado não é pedido de novo.
+            // Quem exige certificado e tem uma sessão sem Dispositivo não renova (falha fechado).
+            if (refreshPayload.deviceId) {
+              const device = await certificateAuthority.getDevice(refreshPayload.deviceId);
+              if (!device || device.status !== "active") return c.json({ error: CERTIFICATE_REQUIRED }, 401);
+            } else if (!user.allowWithoutCertificate) {
+              return c.json({ error: CERTIFICATE_REQUIRED }, 401);
+            }
+
             const role = await userStore.getRole(user.roleId);
             const { token: newAccessToken, payload: userPayload } = await tokenService.generateAccessToken(
               user,
               role || undefined,
             );
-            const { token: newRefreshToken } = await tokenService.generateRefreshToken(user);
+            const { token: newRefreshToken } = await tokenService.generateRefreshToken(user, refreshPayload.deviceId);
 
             setCookie(c, "refresh_token", newRefreshToken, refreshCookie());
 
@@ -155,7 +232,9 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
               expires_in: 300,
               user: withAdminBypass(userPayload),
             });
-          } catch {
+          } catch (err: unknown) {
+            // Com a CA fora do ar, quem exige certificado não renova (falha fechado), mas sem confundir com token inválido.
+            if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
             return c.json({ error: "Refresh token inválido ou expirado." }, 401);
           }
         },
@@ -178,7 +257,6 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
       routes.get("/auth/me", auth, async (c) => c.json(c.get("user")));
 
       // ───────── Users e Roles ─────────
-      const P = IAM_PERMISSIONS.keys;
       const actorOf = (c: Context): string => getAuthenticatedUser(c).sub;
       const failure = (err: unknown, fallback: string): string => (err instanceof Error ? err.message : fallback);
 
@@ -204,6 +282,60 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
         return c.json({ system: grouped });
       });
 
+      const auditExemption = (c: Context, target: { id: string; username: string }, allowWithoutCertificate: boolean) =>
+        recordIamAudit(requestActor(c), "change_certificate_exemption", { type: USER_AUDIT_TARGET, id: target.id }, { username: target.username, allowWithoutCertificate });
+
+      // ───────── Dispositivos ─────────
+      const DeviceBody = z.object({ name: z.string().trim().min(1).max(100) });
+      const auditDevice = (c: Context, action: "issue_device" | "revoke_device", device: { id: string; name: string }) =>
+        recordIamAudit(requestActor(c), action, { type: DEVICE_AUDIT_TARGET, id: device.id }, { name: device.name });
+
+      const unavailable = (c: Context, err: unknown) => {
+        if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
+        throw err;
+      };
+
+      routes.get("/iam/devices", auth, requirePermission(P["devices:read"]), async (c) => {
+        try {
+          return c.json(await certificateAuthority.listDevices());
+        } catch (err: unknown) {
+          return unavailable(c, err);
+        }
+      });
+
+      routes.post("/iam/devices", auth, requirePermission(P["devices:create"]), zValidator("json", DeviceBody), async (c) => {
+        const { name } = c.req.valid("json");
+        const actor = getAuthenticatedUser(c);
+        try {
+          // O .pfx e a senha só existem nesta resposta: a CA não guarda nada além do fingerprint e dos metadados.
+          const ran = await events.run("iam.device.create", { actorId: actor.sub, name }, () =>
+            certificateAuthority.issueDevice({ name, createdBy: actor.sub }),
+          );
+          if (ran.cancelled) return cancelled(c, ran.reason);
+          await auditDevice(c, "issue_device", ran.result.device);
+          return c.json(ran.result, 201);
+        } catch (err: unknown) {
+          return unavailable(c, err);
+        }
+      });
+
+      routes.post("/iam/devices/:id/revoke", auth, requirePermission(P["devices:revoke"]), async (c) => {
+        const id = c.req.param("id");
+        const actor = getAuthenticatedUser(c);
+        try {
+          const before = await certificateAuthority.getDevice(id);
+          const ran = await events.run("iam.device.revoke", { actorId: actor.sub, deviceId: id }, () => certificateAuthority.revokeDevice(id, actor.sub));
+          if (ran.cancelled) return cancelled(c, ran.reason);
+          // Só registra a primeira revogação; repetir o pedido não duplica a entrada.
+          if (before?.status === "active") await auditDevice(c, "revoke_device", ran.result);
+          return c.json(ran.result);
+        } catch (err: unknown) {
+          if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
+          if (err instanceof CertificateAuthorityUnavailableError) return unavailable(c, err);
+          return c.json({ error: failure(err, "Erro ao revogar o Dispositivo.") }, 400);
+        }
+      });
+
       routes.get("/iam/users", auth, requirePermission(P["users:read"]), async (c) => c.json(await userStore.listUsers()));
 
       routes.post(
@@ -218,10 +350,14 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
             password: PasswordPolicySchema,
             roleId: z.string(),
             email: z.string().email().optional(),
+            allowWithoutCertificate: z.boolean().optional(),
           }),
         ),
         async (c) => {
           const body = c.req.valid("json");
+          if (body.allowWithoutCertificate && !getAuthenticatedUser(c).isAdmin) {
+            return c.json({ error: CERTIFICATE_EXEMPTION_ADMIN_ONLY }, 403);
+          }
           const targetRole = await userStore.getRole(body.roleId);
           if (targetRole) {
             const denied = grantViolation(c, targetRole.permissions);
@@ -234,6 +370,7 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
               () => userStore.createUser(body),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
+            if (body.allowWithoutCertificate) await auditExemption(c, { id: ran.result.id, username: ran.result.username }, true);
             return c.json(ran.result, 201);
           } catch (err: unknown) {
             return c.json({ error: failure(err, "Erro ao criar usuário.") }, 400);
@@ -253,12 +390,17 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
             status: z.enum(["active", "inactive"]).optional(),
             email: z.string().email().optional(),
             isAdmin: z.boolean().optional(),
+            allowWithoutCertificate: z.boolean().optional(),
           }),
         ),
         async (c) => {
           const id = c.req.param("id");
           const { isAdmin, ...body } = c.req.valid("json");
           const caller = getAuthenticatedUser(c);
+          // Isentar do certificado é tão sensível quanto o flag de administrador: só administrador altera.
+          if (body.allowWithoutCertificate !== undefined && !caller.isAdmin) {
+            return c.json({ error: CERTIFICATE_EXEMPTION_ADMIN_ONLY }, 403);
+          }
           // Único caminho pela API para o flag de administrador: só quem já é admin altera, e ninguém se rebaixa.
           if (isAdmin !== undefined) {
             if (!caller.isAdmin) {
@@ -280,6 +422,7 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
               if (denied) return denied;
             }
           }
+          const previous = await userStore.findById(id);
           try {
             const ran = await events.run(
               "iam.user.update",
@@ -287,6 +430,9 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
               () => userStore.updateUser(id, { ...body, isAdmin }),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
+            if (body.allowWithoutCertificate !== undefined && body.allowWithoutCertificate !== (previous?.allowWithoutCertificate ?? false)) {
+              await auditExemption(c, { id, username: ran.result.username }, body.allowWithoutCertificate);
+            }
             return c.json(ran.result);
           } catch (err: unknown) {
             if (err instanceof LastAdminError) return c.json({ error: LAST_ADMIN }, 409);

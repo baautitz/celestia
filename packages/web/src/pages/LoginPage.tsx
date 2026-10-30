@@ -49,7 +49,12 @@ export const LoginPage: React.FC = () => {
 
   const onSubmit = async (values: LoginFormValues) => {
     try {
-      await login(values.username, values.password);
+      const { certificateUrl } = await login(values.username, values.password);
+      if (certificateUrl) {
+        // Quem exige certificado segue para a autoridade certificadora, onde o navegador o apresenta; o login termina no callback.
+        window.location.assign(certificateUrl);
+        return;
+      }
       ui.feedback.notify({ type: "success", title: "Login efetuado com sucesso!" });
       navigate("/", { replace: true });
     } catch (err: unknown) {

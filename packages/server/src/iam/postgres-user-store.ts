@@ -21,6 +21,7 @@ function toUser(row: UserRow, withHash = false): User {
     roleId: row.roleId,
     status: row.status,
     isAdmin: row.isAdmin,
+    allowWithoutCertificate: row.allowWithoutCertificate,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt?.toISOString(),
   };
@@ -74,6 +75,7 @@ export class PostgresUserStore implements UserStore {
         email: input.email,
         passwordHash: PasswordService.hash(input.password),
         roleId: input.roleId,
+        allowWithoutCertificate: input.allowWithoutCertificate ?? false,
       })
       .returning();
     return toUser(row!);
@@ -89,7 +91,9 @@ export class PostgresUserStore implements UserStore {
       const status = input.status ?? user.status;
       const isAdmin = input.isAdmin ?? user.isAdmin;
       await this.assertAdminRemains(tx, user, { isAdmin, status });
-      const revoke = (input.roleId !== undefined && input.roleId !== user.roleId) || (input.status === "inactive" && user.status !== "inactive");
+      const revoke = (input.roleId !== undefined && input.roleId !== user.roleId) || (input.status === "inactive" && user.status !== "inactive") ||
+        // Mudar a regra de certificado encerra as sessões abertas sob a regra anterior.
+        (input.allowWithoutCertificate !== undefined && input.allowWithoutCertificate !== user.allowWithoutCertificate);
 
       const [row] = await tx
         .update(users)
@@ -99,6 +103,7 @@ export class PostgresUserStore implements UserStore {
           email: input.email || user.email,
           status,
           ...(input.isAdmin !== undefined ? { isAdmin: input.isAdmin } : {}),
+          ...(input.allowWithoutCertificate !== undefined ? { allowWithoutCertificate: input.allowWithoutCertificate } : {}),
           ...(revoke ? { sessionVersion: sql`${users.sessionVersion} + 1` } : {}),
           updatedAt: new Date(),
         })

@@ -1,7 +1,7 @@
+import { TestUserStore } from "./helpers/fixtures.js";
 import { describe, it, expect } from "vitest";
 import { createPlatform } from "../src/index.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "../src/plugins.js";
-import { MemoryUserStore } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import type { ErpClient, ErpClientRegistry } from "../src/erp/erp-client.js";
 
@@ -16,7 +16,7 @@ async function boot(
   permissions: string[],
   erpClients: ErpClientRegistry = {}
 ) {
-  const userStore = new MemoryUserStore({
+  const userStore = new TestUserStore({
     roles: [{ id: "r", name: "R", permissions }],
     users: [
       {

@@ -1,6 +1,6 @@
 import { boolean, integer, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
-/** Schema Postgres do Module `iam` (ADR 0004). */
+/** Schema Postgres do Module `iam`. */
 export const iamSchema = pgSchema("iam");
 
 export const roles = iamSchema.table("roles", {
@@ -21,6 +21,7 @@ export const users = iamSchema.table("users", {
     .references(() => roles.id),
   status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
   isAdmin: boolean("is_admin").notNull().default(false),
+  allowWithoutCertificate: boolean("allow_without_certificate").notNull().default(false),
   sessionVersion: integer("session_version").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at"),

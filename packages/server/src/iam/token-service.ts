@@ -72,7 +72,7 @@ export class TokenService {
   /**
    * Gera o Refresh Token (JWT de 7 dias).
    */
-  async generateRefreshToken(user: User): Promise<{ token: string; payload: JWTRefreshPayload }> {
+  async generateRefreshToken(user: User, deviceId?: string): Promise<{ token: string; payload: JWTRefreshPayload }> {
     const now = Math.floor(Date.now() / 1000);
     const exp = now + this.refreshTtl;
 
@@ -81,6 +81,7 @@ export class TokenService {
       tokenId: randomUUID(),
       type: "refresh",
       ver: user.sessionVersion ?? 0,
+      ...(deviceId ? { deviceId } : {}),
       iat: now,
       exp,
     };
@@ -125,6 +126,14 @@ export class TokenService {
     if (typeof claims.sub !== "string" || !claims.sub || claims.type !== "refresh" || typeof claims.ver !== "number" || typeof claims.tokenId !== "string") {
       throw new Error("Token de renovação inválido.");
     }
-    return { sub: claims.sub, tokenId: claims.tokenId, type: "refresh", ver: claims.ver, iat: claims.iat, exp: claims.exp };
+    return {
+      sub: claims.sub,
+      tokenId: claims.tokenId,
+      type: "refresh",
+      ver: claims.ver,
+      ...(typeof claims.deviceId === "string" ? { deviceId: claims.deviceId } : {}),
+      iat: claims.iat,
+      exp: claims.exp,
+    };
   }
 }

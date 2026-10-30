@@ -43,7 +43,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        expect(item.applied).toHaveLength(1);
+        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -69,7 +70,9 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
     it("semeia os Roles iniciais gestor e operador e cria o primeiro Administrator na Role gestor", async () => {
       const store = new PostgresUserStore(db);
       const roles = await store.listRoles();
-      expect(roles).toEqual([...INITIAL_ROLES].sort((a, b) => a.name.localeCompare(b.name)));
+      // A ordem das chaves não importa: migrations posteriores acrescentam permissões ao fim da lista.
+      const sortKeys = (list: readonly { permissions: string[] }[]) => list.map((r) => ({ ...r, permissions: [...r.permissions].sort() }));
+      expect(sortKeys(roles)).toEqual(sortKeys([...INITIAL_ROLES].sort((a, b) => a.name.localeCompare(b.name))));
       expect(roles.find((r) => r.id === "role_admin")).toBeUndefined();
       expect(INITIAL_ROLES.flatMap((r) => r.permissions)).not.toContain("system:roles:delete");
       expect(roles.flatMap((r) => r.permissions)).not.toContain("system:roles:delete");
@@ -133,6 +136,23 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
           store.createUser({ fullname: "B", username: "b", password: "Abcdef1!", roleId: "nope" }),
         ).rejects.toThrow(/não encontrada/);
         await expect(store.deleteRole("r1")).rejects.toThrow(/usuários vinculados/);
+      });
+      it("a opção de acesso sem certificado nasce desligada, persiste e encerra as sessões ao mudar", async () => {
+        const store = new PostgresUserStore(db);
+        await store.createRole({ id: "r1", name: "Op", permissions: [] });
+        const comum = await store.createUser({ fullname: "Ana", username: "ana", password: "Abcdef1!", roleId: "r1" });
+        const isento = await store.createUser({ fullname: "Bia", username: "bia", password: "Abcdef1!", roleId: "r1", allowWithoutCertificate: true });
+        expect(comum.allowWithoutCertificate).toBe(false);
+        expect(isento.allowWithoutCertificate).toBe(true);
+
+        const before = (await store.findById(isento.id))?.sessionVersion;
+        await store.updateUser(isento.id, { allowWithoutCertificate: false });
+        const after = await store.findById(isento.id);
+        expect(after?.allowWithoutCertificate).toBe(false);
+        expect(after?.sessionVersion).toBe((before ?? 0) + 1);
+
+        await store.updateUser(isento.id, { allowWithoutCertificate: false });
+        expect((await store.findById(isento.id))?.sessionVersion).toBe((before ?? 0) + 1);
       });
       it("setAdmin e syncOrphanPermissions persistem", async () => {
         const store = new PostgresUserStore(db);
