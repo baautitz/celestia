@@ -18,6 +18,7 @@ import { createAuditModule } from "./audit/audit-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { MemoryDeviceStore, type DeviceStore } from "./iam/device-store.js";
+import type { DeviceCertificateAuthority } from "./iam/device-certificate-authority.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
@@ -32,6 +33,8 @@ export interface CreatePlatformAppOptions {
   clientFactory?: ErpClientFactory;
   userStore?: UserStore;
   deviceStore?: DeviceStore;
+  /** CA que emite os certificados dos Dispositivos; sem ela a emissão responde 503. */
+  deviceCertificateAuthority?: DeviceCertificateAuthority;
   /** Fingerprint do certificado de cliente da conexão. Em produção vem do socket TLS; nos testes é injetado. */
   clientCertificateFingerprint?: (c: Context) => string | undefined;
   tokenService?: TokenService;
@@ -94,7 +97,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   // Base System: iam e audit. Plugins: closing_period e erp (ADR 0003). Todos compartilham o registro de Permissions.
   const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
   const entries: ModuleEntry[] = [
-    { tier: "base", def: createIamModule({ userStore, deviceStore, getClientCertificateFingerprint: clientCertificateFingerprint, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
+    { tier: "base", def: createIamModule({ userStore, deviceStore, deviceCertificateAuthority: options?.deviceCertificateAuthority, auditLog, getClientCertificateFingerprint: clientCertificateFingerprint, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
     { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auditLog, auth }) },
     {

@@ -12,7 +12,10 @@ import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
 import type { TokenService } from "./token-service.js";
 import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
-import type { DeviceStore } from "./device-store.js";
+import { DeviceNotFoundError, type DeviceStore } from "./device-store.js";
+import type { DeviceCertificateAuthority } from "./device-certificate-authority.js";
+import type { AuditLog } from "../audit/audit-log.js";
+import { DEVICE_AUDIT_TARGET, IAM_AUDIT_PLUGIN, USER_AUDIT_TARGET, declareIamAudit } from "./iam-audit.js";
 import { LoginRateLimiter } from "./login-rate-limiter.js";
 import { PasswordService, PasswordPolicySchema } from "./password-service.js";
 
@@ -27,6 +30,9 @@ export interface IamModuleDeps {
   auth: MiddlewareHandler;
   withAdminBypass: (payload: JWTAccessPayload) => JWTAccessPayload;
   deviceStore: DeviceStore;
+  /** CA que emite os certificados dos Dispositivos; sem ela a emissão responde 503. */
+  deviceCertificateAuthority?: DeviceCertificateAuthority;
+  auditLog: AuditLog;
   /**
    * Fingerprint (SHA-256 do DER, hexadecimal) do certificado de cliente da conexão, ou `undefined` se não houve.
    * Em produção lê o socket TLS; os testes injetam um valor fixo.
@@ -72,6 +78,8 @@ const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total
 export function createIamModule({
   userStore,
   deviceStore,
+  deviceCertificateAuthority,
+  auditLog,
   getClientCertificateFingerprint,
   extraPermissions = [],
   tokenService,
@@ -86,6 +94,7 @@ export function createIamModule({
     permissions: IAM_PERMISSIONS,
     migrations: IAM_MIGRATIONS,
     register({ routes, events, permissions }) {
+      declareIamAudit(auditLog);
       permissions.registerProvider(() => extraPermissions.map((p) => ({ ...p, module: p.module ?? "system" })));
       const cancelled = (c: Context, reason: string) => c.json({ error: reason }, 409);
 
@@ -115,7 +124,16 @@ export function createIamModule({
           if (!user.allowWithoutCertificate) {
             const fingerprint = getClientCertificateFingerprint(c)?.toLowerCase();
             const device = fingerprint ? await deviceStore.findActiveByFingerprint(fingerprint) : null;
-            if (!device) return c.json({ error: CERTIFICATE_REQUIRED }, 403);
+            if (!device) {
+              await auditLog.record({
+                plugin: IAM_AUDIT_PLUGIN,
+                action: "deny_login_without_certificate",
+                actor: { id: user.id, name: user.fullname },
+                target: { type: USER_AUDIT_TARGET, id: user.id },
+                attributes: { username: user.username },
+              });
+              return c.json({ error: CERTIFICATE_REQUIRED }, 403);
+            }
             deviceId = device.id;
           }
           loginRateLimiter.recordSuccess(username);
@@ -241,6 +259,74 @@ export function createIamModule({
         return c.json({ system: grouped });
       });
 
+      const auditExemption = (c: Context, target: { id: string; username: string }, allowWithoutCertificate: boolean) => {
+        const actor = getAuthenticatedUser(c);
+        return auditLog.record({
+          plugin: IAM_AUDIT_PLUGIN,
+          action: "change_certificate_exemption",
+          actor: { id: actor.sub, name: actor.fullname },
+          target: { type: USER_AUDIT_TARGET, id: target.id },
+          attributes: { username: target.username, allowWithoutCertificate },
+        });
+      };
+
+      // ───────── Dispositivos ─────────
+      const D = IAM_PERMISSIONS.keys;
+      const DeviceBody = z.object({ name: z.string().trim().min(1).max(100), type: z.enum(["computer", "phone"]) });
+      const auditDevice = (c: Context, action: "issue_device" | "revoke_device", device: { id: string; name: string; type: "computer" | "phone" }) => {
+        const actor = getAuthenticatedUser(c);
+        return auditLog.record({
+          plugin: IAM_AUDIT_PLUGIN,
+          action,
+          actor: { id: actor.sub, name: actor.fullname },
+          target: { type: DEVICE_AUDIT_TARGET, id: device.id },
+          attributes: { name: device.name, type: device.type },
+        });
+      };
+
+      routes.get("/iam/devices", auth, requirePermission(D["devices:read"]), async (c) => c.json(await deviceStore.list()));
+
+      routes.post("/iam/devices", auth, requirePermission(D["devices:create"]), zValidator("json", DeviceBody), async (c) => {
+        if (!deviceCertificateAuthority) {
+          return c.json({ error: "A autoridade certificadora não está configurada neste servidor." }, 503);
+        }
+        const { name, type } = c.req.valid("json");
+        const actor = getAuthenticatedUser(c);
+        // O .pfx e a senha só existem nesta resposta: nada além do fingerprint e dos metadados é gravado.
+        const ran = await events.run("iam.device.create", { actorId: actor.sub, name, type }, async () => {
+          const issued = await deviceCertificateAuthority.issue({ name });
+          const device = await deviceStore.create({
+            name,
+            type,
+            fingerprint: issued.fingerprint,
+            serial: issued.serial,
+            notAfter: issued.notAfter.toISOString(),
+            createdBy: actor.sub,
+          });
+          return { device, issued };
+        });
+        if (ran.cancelled) return cancelled(c, ran.reason);
+        const { device, issued } = ran.result;
+        await auditDevice(c, "issue_device", device);
+        return c.json({ device, pfx: Buffer.from(issued.pfx).toString("base64"), password: issued.password }, 201);
+      });
+
+      routes.post("/iam/devices/:id/revoke", auth, requirePermission(D["devices:revoke"]), async (c) => {
+        const id = c.req.param("id");
+        const actor = getAuthenticatedUser(c);
+        try {
+          const before = await deviceStore.findById(id);
+          const ran = await events.run("iam.device.revoke", { actorId: actor.sub, deviceId: id }, () => deviceStore.revoke(id, actor.sub));
+          if (ran.cancelled) return cancelled(c, ran.reason);
+          // Só registra a primeira revogação; repetir o pedido não duplica a entrada.
+          if (before?.status === "active") await auditDevice(c, "revoke_device", ran.result);
+          return c.json(ran.result);
+        } catch (err: unknown) {
+          if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
+          return c.json({ error: failure(err, "Erro ao revogar o Dispositivo.") }, 400);
+        }
+      });
+
       routes.get("/iam/users", auth, requirePermission(P["users:read"]), async (c) => c.json(await userStore.listUsers()));
 
       routes.post(
@@ -275,6 +361,7 @@ export function createIamModule({
               () => userStore.createUser(body),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
+            if (body.allowWithoutCertificate) await auditExemption(c, { id: ran.result.id, username: ran.result.username }, true);
             return c.json(ran.result, 201);
           } catch (err: unknown) {
             return c.json({ error: failure(err, "Erro ao criar usuário.") }, 400);
@@ -326,6 +413,7 @@ export function createIamModule({
               if (denied) return denied;
             }
           }
+          const previous = await userStore.findById(id);
           try {
             const ran = await events.run(
               "iam.user.update",
@@ -333,6 +421,9 @@ export function createIamModule({
               () => userStore.updateUser(id, { ...body, isAdmin }),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
+            if (body.allowWithoutCertificate !== undefined && body.allowWithoutCertificate !== (previous?.allowWithoutCertificate ?? false)) {
+              await auditExemption(c, { id, username: ran.result.username }, body.allowWithoutCertificate);
+            }
             return c.json(ran.result);
           } catch (err: unknown) {
             if (err instanceof LastAdminError) return c.json({ error: LAST_ADMIN }, 409);
