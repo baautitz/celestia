@@ -19,7 +19,7 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { MemoryDeviceStore, type DeviceStore } from "./iam/device-store.js";
 import { DeviceCertificateAuthority } from "./iam/device-certificate-authority.js";
-import { clientCertificateReader, loadServerSecurity, serveSecure, watchServerCertificate } from "./boot/tls.js";
+import { clientCertificateReader, loadServerSecurity } from "./boot/client-certificate.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
@@ -36,7 +36,7 @@ export interface CreatePlatformAppOptions {
   deviceStore?: DeviceStore;
   /** CA que emite os certificados dos Dispositivos; sem ela a emissão responde 503. */
   deviceCertificateAuthority?: DeviceCertificateAuthority;
-  /** Fingerprint do certificado de cliente da conexão. Em produção vem do socket TLS; nos testes é injetado. */
+  /** Fingerprint do certificado de cliente da conexão. Em produção vem do header que o proxy repassa; no desenvolvimento, de uma simulação; nos testes é injetado. */
   clientCertificateFingerprint?: (c: Context) => string | undefined | Promise<string | undefined>;
   tokenService?: TokenService;
   closingPeriodStore?: ClosingPeriodStore;
@@ -155,7 +155,7 @@ const isMain =
 
 if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
   void (async () => {
-    // Falha antes de qualquer outra coisa: em produção, sem TLS e sem CA o servidor não sobe.
+    // Falha antes de qualquer outra coisa: em produção, sem a fonte do certificado e a CA o servidor não sobe.
     const security = loadServerSecurity();
     let userStore: UserStore | undefined;
     let deviceStore: DeviceStore | undefined;
@@ -210,19 +210,11 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     await platform.start(); // falha de Module do Base System derruba o boot
     const app = platform.app;
     const port = Number(process.env.PORT) || 3000;
-    if (security.tls && security.ca) {
-      const server = serveSecure(app.fetch, { port, tls: security.tls, deviceCaCertificate: security.ca.certificatePem });
-      // Renovação do certificado do site (ex.: Let's Encrypt) sem reiniciar.
-      watchServerCertificate(server, { certFile: security.tls.certFile, keyFile: security.tls.keyFile });
-      console.log(`🚀 Plataforma Celestia Backend rodando em https://localhost:${port} (certificado de Dispositivo habilitado)`);
-    } else {
-      const notes = {
-        socket: "sem TLS: nenhum certificado de Dispositivo é aceito",
-        header: "atrás do proxy: o certificado vem do header repassado por ele",
-        mock: `⚠️  CERTIFICADO SIMULADO (só desenvolvimento): ${security.mock?.deviceName ? `toda requisição vale como o Dispositivo "${security.mock.deviceName}"` : "ninguém apresenta certificado"}`,
-      } as const;
-      console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port} (${notes[security.source]})`);
-      serve({ fetch: app.fetch, port });
-    }
+    const notes = {
+      header: "atrás do proxy: o certificado vem do header repassado por ele",
+      mock: `⚠️  CERTIFICADO SIMULADO (só desenvolvimento): ${security.mock?.deviceName ? `toda requisição vale como o Dispositivo "${security.mock.deviceName}"` : "ninguém apresenta certificado"}`,
+    } as const;
+    console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port} (${notes[security.source]})`);
+    serve({ fetch: app.fetch, port });
   })();
 }

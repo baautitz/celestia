@@ -35,7 +35,7 @@ export interface IamModuleDeps {
   auditLog: AuditLog;
   /**
    * Fingerprint (SHA-256 do DER, hexadecimal) do certificado de cliente da conexão, ou `undefined` se não houve.
-   * Em produção lê o socket TLS; os testes injetam um valor fixo.
+   * Em produção lê o header repassado pelo proxy; no desenvolvimento vem de uma simulação; os testes injetam um valor fixo.
    */
   getClientCertificateFingerprint: (c: Context) => string | undefined | Promise<string | undefined>;
   /** Limite de tentativas de login; por padrão 5 falhas por username e 20 por IP a cada 15 min. */
