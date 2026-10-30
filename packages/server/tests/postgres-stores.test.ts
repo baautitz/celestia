@@ -45,7 +45,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        expect(item.applied).toHaveLength(1);
+        // O iam tem a migration inicial e a de Dispositivos; os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 2 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 

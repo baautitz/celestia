@@ -16,27 +16,12 @@ CREATE TABLE "iam"."users" (
 	"role_id" text NOT NULL,
 	"status" text DEFAULT 'active' NOT NULL,
 	"is_admin" boolean DEFAULT false NOT NULL,
-	"allow_without_certificate" boolean DEFAULT false NOT NULL,
 	"session_version" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp
 );
 --> statement-breakpoint
 ALTER TABLE "iam"."users" ADD CONSTRAINT "users_role_id_roles_id_fkey" FOREIGN KEY ("role_id") REFERENCES "iam"."roles"("id");
---> statement-breakpoint
-CREATE TABLE "iam"."devices" (
-	"id" text PRIMARY KEY,
-	"name" text NOT NULL,
-	"type" text NOT NULL,
-	"status" text DEFAULT 'active' NOT NULL,
-	"fingerprint" text NOT NULL UNIQUE,
-	"serial" text NOT NULL,
-	"not_after" timestamp NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"created_by" text,
-	"revoked_at" timestamp,
-	"revoked_by" text
-);
 --> statement-breakpoint
 INSERT INTO "iam"."roles" ("id", "name", "description", "permissions") VALUES
 	(

@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "494ea495-99b1-4fe7-98b5-ec8bbcb6795f",
+  "id": "0960e3c4-dd46-4e67-bc08-aae47ef1bb5d",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -9,12 +9,6 @@
     {
       "name": "iam",
       "entityType": "schemas"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "devices",
-      "entityType": "tables",
-      "schema": "iam"
     },
     {
       "isRlsEnabled": false,
@@ -27,149 +21,6 @@
       "name": "users",
       "entityType": "tables",
       "schema": "iam"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "type",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "'active'",
-      "generated": null,
-      "identity": null,
-      "name": "status",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "fingerprint",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "serial",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "not_after",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_by",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "revoked_at",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "revoked_by",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "devices"
     },
     {
       "type": "text",
@@ -328,19 +179,6 @@
       "table": "users"
     },
     {
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "false",
-      "generated": null,
-      "identity": null,
-      "name": "allow_without_certificate",
-      "entityType": "columns",
-      "schema": "iam",
-      "table": "users"
-    },
-    {
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -401,16 +239,6 @@
         "id"
       ],
       "nameExplicit": false,
-      "name": "devices_pkey",
-      "schema": "iam",
-      "table": "devices",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
       "name": "roles_pkey",
       "schema": "iam",
       "table": "roles",
@@ -425,17 +253,6 @@
       "schema": "iam",
       "table": "users",
       "entityType": "pks"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "fingerprint"
-      ],
-      "nullsNotDistinct": false,
-      "name": "devices_fingerprint_key",
-      "schema": "iam",
-      "table": "devices",
-      "entityType": "uniques"
     },
     {
       "nameExplicit": false,
