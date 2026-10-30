@@ -135,8 +135,6 @@ export interface PermissionCatalog {
   system: Record<string, PermissionItem[]>; // Agrupado por módulo
 }
 
-export type DeviceType = "computer" | "phone";
-
 /**
  * Dispositivo (computador ou celular) homologado, com o certificado que o Celestia emitiu para ele.
  * A chave privada nunca é guardada: só o fingerprint e os metadados do certificado.
@@ -144,7 +142,6 @@ export type DeviceType = "computer" | "phone";
 export interface Device {
   id: string;
   name: string;
-  type: DeviceType;
   status: "active" | "revoked";
   /** SHA-256 do certificado em DER, hexadecimal minúsculo. */
   fingerprint: string;
@@ -158,9 +155,15 @@ export interface Device {
 
 export interface CreateDeviceInput {
   name: string;
-  type: DeviceType;
   fingerprint: string;
   serial: string;
   notAfter: string;
   createdBy?: string;
+}
+
+/** Resposta da emissão: o .pfx (base64) e a senha só existem nesta resposta e não são guardados. */
+export interface IssuedDevice {
+  device: Device;
+  pfx: string;
+  password: string;
 }

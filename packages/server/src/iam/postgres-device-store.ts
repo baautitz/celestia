@@ -11,7 +11,6 @@ function toDevice(row: DeviceRow): Device {
   return {
     id: row.id,
     name: row.name,
-    type: row.type,
     status: row.status,
     fingerprint: row.fingerprint,
     serial: row.serial,
@@ -32,7 +31,6 @@ export class PostgresDeviceStore implements DeviceStore {
       .values({
         id: randomUUID(),
         name: input.name,
-        type: input.type,
         fingerprint: input.fingerprint,
         serial: input.serial,
         notAfter: new Date(input.notAfter),

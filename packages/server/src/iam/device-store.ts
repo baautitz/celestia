@@ -36,7 +36,6 @@ export class MemoryDeviceStore implements DeviceStore {
     const device: Device = {
       id: randomUUID(),
       name: input.name,
-      type: input.type,
       status: "active",
       fingerprint: input.fingerprint,
       serial: input.serial,

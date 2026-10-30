@@ -45,8 +45,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial, a de Dispositivos e a das permissões do Gestor; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 3 : 1);
+        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor e remover o tipo); os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 4 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -171,7 +171,6 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
     describe("Dispositivos", () => {
       const input = (n: number) => ({
         name: `Caixa ${n}`,
-        type: "computer" as const,
         fingerprint: n.toString(16).padStart(64, "0"),
         serial: `0${n}`,
         notAfter: "2036-01-01T00:00:00.000Z",

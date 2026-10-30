@@ -13,7 +13,7 @@ import { authHeader, createSeededUserStore, TEST_PASSWORD } from "./helpers/fixt
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 interface Issued {
-  device: { id: string; name: string; type: string; status: string; fingerprint: string };
+  device: { id: string; name: string; status: string; fingerprint: string };
   pfx: string;
   password: string;
 }
@@ -50,7 +50,7 @@ async function setup(options: { withCa?: boolean } = {}) {
       return app.request(path, { ...init, headers: { ...init.headers, ...(await tokens.get(username)) } });
     },
   });
-  const issue = async (username: string, body: object = { name: "Caixa 1", type: "computer" }) =>
+  const issue = async (username: string, body: object = { name: "Caixa 1" }) =>
     as(username).request("/api/iam/devices", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) });
   return { app, as, issue, auditLog, deviceStore };
 }
@@ -62,7 +62,7 @@ describe("Dispositivos (/api/iam/devices)", () => {
     expect(res.status).toBe(201);
     const issued = (await res.json()) as Issued;
 
-    expect(issued.device).toMatchObject({ name: "Caixa 1", type: "computer", status: "active" });
+    expect(issued.device).toMatchObject({ name: "Caixa 1", status: "active" });
     expect(issued.device.fingerprint).toMatch(/^[0-9a-f]{64}$/);
 
     // O .pfx devolvido abre com a senha devolvida (verificado pelo openssl, independente da nossa implementação).
@@ -93,15 +93,14 @@ describe("Dispositivos (/api/iam/devices)", () => {
     expect(revoke.status).toBe(403);
   });
 
-  it("valida nome e tipo", async () => {
+  it("valida o nome", async () => {
     const { issue } = await setup();
-    expect((await issue("gestor.disp", { name: "", type: "computer" })).status).toBe(400);
-    expect((await issue("gestor.disp", { name: "Caixa", type: "tablet" })).status).toBe(400);
+    expect((await issue("gestor.disp", { name: "" })).status).toBe(400);
   });
 
   it("responde 503 quando a CA não está configurada", async () => {
     const { as } = await setup({ withCa: false });
-    const res = await as("gestor.disp").request("/api/iam/devices", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name: "Caixa", type: "computer" }) });
+    const res = await as("gestor.disp").request("/api/iam/devices", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name: "Caixa" }) });
     expect(res.status).toBe(503);
   });
 
@@ -130,7 +129,7 @@ describe("Dispositivos (/api/iam/devices)", () => {
     expect(entries.map((e) => e.action).sort()).toEqual(["issue_device", "revoke_device"]);
     const issueEntry = entries.find((e) => e.action === "issue_device")!;
     expect(issueEntry).toMatchObject({ actorName: "Gestor de Dispositivos", targetType: "device", targetId: created.device.id });
-    expect(issueEntry.summary).toBe('Emitiu o certificado do Dispositivo "Caixa 1" (computador).');
+    expect(issueEntry.summary).toBe('Emitiu o certificado do Dispositivo "Caixa 1".');
     const serialized = JSON.stringify(entries);
     expect(serialized).not.toContain(created.password);
     expect(serialized).not.toContain(created.pfx);

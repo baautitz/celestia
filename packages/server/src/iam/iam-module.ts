@@ -272,15 +272,15 @@ export function createIamModule({
 
       // ───────── Dispositivos ─────────
       const D = IAM_PERMISSIONS.keys;
-      const DeviceBody = z.object({ name: z.string().trim().min(1).max(100), type: z.enum(["computer", "phone"]) });
-      const auditDevice = (c: Context, action: "issue_device" | "revoke_device", device: { id: string; name: string; type: "computer" | "phone" }) => {
+      const DeviceBody = z.object({ name: z.string().trim().min(1).max(100) });
+      const auditDevice = (c: Context, action: "issue_device" | "revoke_device", device: { id: string; name: string }) => {
         const actor = getAuthenticatedUser(c);
         return auditLog.record({
           plugin: IAM_AUDIT_PLUGIN,
           action,
           actor: { id: actor.sub, name: actor.fullname },
           target: { type: DEVICE_AUDIT_TARGET, id: device.id },
-          attributes: { name: device.name, type: device.type },
+          attributes: { name: device.name },
         });
       };
 
@@ -290,14 +290,13 @@ export function createIamModule({
         if (!deviceCertificateAuthority) {
           return c.json({ error: "A autoridade certificadora não está configurada neste servidor." }, 503);
         }
-        const { name, type } = c.req.valid("json");
+        const { name } = c.req.valid("json");
         const actor = getAuthenticatedUser(c);
         // O .pfx e a senha só existem nesta resposta: nada além do fingerprint e dos metadados é gravado.
-        const ran = await events.run("iam.device.create", { actorId: actor.sub, name, type }, async () => {
+        const ran = await events.run("iam.device.create", { actorId: actor.sub, name }, async () => {
           const issued = await deviceCertificateAuthority.issue({ name });
           const device = await deviceStore.create({
             name,
-            type,
             fingerprint: issued.fingerprint,
             serial: issued.serial,
             notAfter: issued.notAfter.toISOString(),

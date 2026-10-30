@@ -26,7 +26,6 @@ async function setup() {
   const deviceStore = new MemoryDeviceStore();
   const device = await deviceStore.create({
     name: "Caixa 1",
-    type: "computer",
     fingerprint: FINGERPRINT,
     serial: "01",
     notAfter: "2036-01-01T00:00:00.000Z",

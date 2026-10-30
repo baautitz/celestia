@@ -5,16 +5,15 @@ export const IAM_AUDIT_PLUGIN = "iam";
 export const DEVICE_AUDIT_TARGET = "device";
 export const USER_AUDIT_TARGET = "user";
 
-const DEVICE_TYPE_LABEL = { computer: "computador", phone: "celular" } as const;
-const Device = z.object({ name: z.string(), type: z.enum(["computer", "phone"]) });
+const Device = z.object({ name: z.string() });
 
 /** Declara no Audit Log as ações do `iam` ligadas a Dispositivos e ao acesso sem certificado (ADR 0001). */
 export function declareIamAudit(auditLog: AuditLog): void {
   const declare = <S extends z.ZodTypeAny>(action: string, schema: S, summary: (a: z.infer<S>) => string): void =>
     auditLog.declareAction({ plugin: IAM_AUDIT_PLUGIN, action, schemaVersion: 1, schema, summary });
 
-  declare("issue_device", Device, (a) => `Emitiu o certificado do Dispositivo "${a.name}" (${DEVICE_TYPE_LABEL[a.type]}).`);
-  declare("revoke_device", Device, (a) => `Revogou o Dispositivo "${a.name}" (${DEVICE_TYPE_LABEL[a.type]}).`);
+  declare("issue_device", Device, (a) => `Emitiu o certificado do Dispositivo "${a.name}".`);
+  declare("revoke_device", Device, (a) => `Revogou o Dispositivo "${a.name}".`);
   declare(
     "deny_login_without_certificate",
     z.object({ username: z.string() }),

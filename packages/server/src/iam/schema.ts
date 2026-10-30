@@ -31,7 +31,6 @@ export const users = iamSchema.table("users", {
 export const devices = iamSchema.table("devices", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  type: text("type", { enum: ["computer", "phone"] }).notNull(),
   status: text("status", { enum: ["active", "revoked"] }).notNull().default("active"),
   fingerprint: text("fingerprint").notNull().unique(),
   serial: text("serial").notNull(),

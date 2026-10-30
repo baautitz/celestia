@@ -3,7 +3,6 @@ import { MemoryDeviceStore, DeviceNotFoundError, DuplicateDeviceFingerprintError
 
 const input = (n: number) => ({
   name: `Caixa ${n}`,
-  type: "computer" as const,
   fingerprint: n.toString(16).padStart(64, "0"),
   serial: `0${n}`,
   notAfter: "2036-01-01T00:00:00.000Z",

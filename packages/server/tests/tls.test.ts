@@ -111,7 +111,7 @@ describe("mTLS num servidor HTTPS real", () => {
     });
     const deviceStore = new MemoryDeviceStore();
     const issued = await ca.issue({ name: "Caixa 1" });
-    const device = await deviceStore.create({ name: "Caixa 1", type: "computer", fingerprint: issued.fingerprint, serial: issued.serial, notAfter: issued.notAfter.toISOString() });
+    const device = await deviceStore.create({ name: "Caixa 1", fingerprint: issued.fingerprint, serial: issued.serial, notAfter: issued.notAfter.toISOString() });
     const app = createPlatformApp({ userStore, deviceStore, clientCertificateFingerprint: createClientCertificateReader() });
     const security = loadServerSecurity({ TLS_CERT_FILE: site.certFile, TLS_KEY_FILE: site.keyFile, DEVICE_CA_CERT_FILE: caFiles.certFile, DEVICE_CA_KEY_FILE: caFiles.keyFile });
     const server = serveSecure(app.fetch, { port: 0, tls: security.tls!, deviceCaCertificate: security.ca!.certificatePem });
