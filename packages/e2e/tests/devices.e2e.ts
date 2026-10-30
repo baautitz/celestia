@@ -3,6 +3,7 @@ import { loginAsAdmin, openMenu } from "./helpers";
 
 test("emite um Dispositivo, mostra a senha do certificado e o revoga", async ({ page }) => {
   const name = `Caixa ${Date.now().toString(36)}`;
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await loginAsAdmin(page);
   await openMenu(page, "Dispositivos");
 
@@ -17,6 +18,10 @@ test("emite um Dispositivo, mostra a senha do certificado e o revoga", async ({ 
   await expect(page.getByText("Dispositivo emitido com sucesso.")).toBeVisible();
   const issued = page.getByRole("dialog", { name: "Certificado emitido" });
   await expect(issued.getByText(/A senha aparece só agora/)).toBeVisible();
+  await issued.getByRole("button", { name: "Copiar senha" }).click();
+  await expect(page.getByText("Senha copiada com sucesso.")).toBeVisible();
+  const shown = await issued.locator("[data-slot=text], span, p").filter({ hasText: /^[A-Za-z0-9_-]{20,}$/ }).first().innerText();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(shown);
   const download = page.waitForEvent("download");
   await issued.getByRole("button", { name: "Baixar certificado" }).click();
   expect((await download).suggestedFilename()).toBe(`${name.replace(/ /g, "-")}.pfx`);

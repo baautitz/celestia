@@ -6,8 +6,9 @@ const { serve } = await import("@hono/node-server");
 const { createPlatformApp } = await import("../server/src/index.ts");
 const { MemoryUserStore } = await import("../server/src/iam/user-store.ts");
 const { PasswordService } = await import("../server/src/iam/password-service.ts");
-const { DeviceCertificateAuthority } = await import("../server/src/iam/device-certificate-authority.ts");
-const { ADMIN_USERNAME, ADMIN_PASSWORD } = await import("./tests/credentials.ts");
+const { createCaApp, createMockCertificateReader, DeviceCertificateAuthority, MemoryDeviceStore } = await import("../../services/ca/src/index.ts");
+const { HttpCertificateAuthorityClient } = await import("../server/src/iam/certificate-authority-client.ts");
+const { ADMIN_USERNAME, ADMIN_PASSWORD, CERT_USERNAME, CERT_PASSWORD, CERT_DEVICE_NAME } = await import("./tests/credentials.ts");
 
 const store = new MemoryUserStore({
   roles: [
@@ -26,12 +27,42 @@ const store = new MemoryUserStore({
       allowWithoutCertificate: true,
       createdAt: new Date().toISOString(),
     },
+    {
+      id: "usr_e2e_cert",
+      username: CERT_USERNAME,
+      fullname: "Usuário com Certificado E2E",
+      passwordHash: PasswordService.hash(CERT_PASSWORD),
+      roleId: "role_operadores",
+      status: "active",
+      // Exige o certificado de um Dispositivo ativo.
+      allowWithoutCertificate: false,
+      createdAt: new Date().toISOString(),
+    },
   ],
 });
 await store.setAdmin("usr_e2e_admin", true);
 
 const port = Number(process.env.E2E_API_PORT) || 3100;
-// CA só em memória: o e2e emite e revoga Dispositivos sem tocar em arquivo.
-const deviceCertificateAuthority = new DeviceCertificateAuthority(await DeviceCertificateAuthority.create({ commonName: "Celestia CA (e2e)" }));
-serve({ fetch: createPlatformApp({ userStore: store, deviceCertificateAuthority }).fetch, port });
-console.log(`Backend E2E em http://localhost:${port}`);
+// Autoridade certificadora só em memória. Atende por HTTP de verdade (a leitura do certificado redireciona o navegador)
+// e o backend a chama direto, sem rede. A leitura apresenta o Dispositivo CERT_DEVICE_NAME, como o proxy faria.
+const sharedSecret = "chave-em-comum-do-e2e-com-mais-de-32-caracteres";
+const caPort = Number(process.env.E2E_CA_PORT) || 3101;
+const webPort = Number(process.env.E2E_WEB_PORT) || 5174;
+const deviceStore = new MemoryDeviceStore();
+const caApp = createCaApp({
+  deviceStore,
+  authority: new DeviceCertificateAuthority(await DeviceCertificateAuthority.create({ commonName: "Celestia CA (e2e)" })),
+  sharedSecret,
+  publicUrl: `http://localhost:${caPort}`,
+  callbackUrl: `http://localhost:${webPort}/login/certificado`,
+  readCertificate: createMockCertificateReader({ deviceStore, deviceName: CERT_DEVICE_NAME }),
+});
+const certificateAuthority = new HttpCertificateAuthorityClient({
+  baseUrl: "http://ca.e2e",
+  secret: sharedSecret,
+  fetch: (input, init) => Promise.resolve(caApp.request(String(input), init)),
+});
+await certificateAuthority.issueDevice({ name: CERT_DEVICE_NAME });
+serve({ fetch: caApp.fetch, port: caPort });
+serve({ fetch: createPlatformApp({ userStore: store, certificateAuthority }).fetch, port });
+console.log(`Backend E2E em http://localhost:${port} (autoridade certificadora em http://localhost:${caPort})`);
