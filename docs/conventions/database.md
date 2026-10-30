@@ -1,6 +1,6 @@
 # Banco de Dados, Migrations e Bootstrap
 
-Regras para schemas Postgres, migrations por **Module**, **Roles** iniciais e criação do primeiro **Administrator** (ver [ADR 0004](../adr/0004-sem-compatibilidade-banco-reconstruido.md) e [Server Glossary](../../packages/server/GLOSSARY.md)).
+Regras para schemas Postgres, migrations por **Module**, **Roles** iniciais e criação do primeiro **Administrator** (ver [Server Glossary](../../packages/server/GLOSSARY.md)).
 
 ---
 
@@ -16,19 +16,19 @@ Cada **Module** com persistência em Postgres declara:
 2. Sua própria pasta `src/<module>/migrations/` referenciada no `defineModule({ ..., migrations })`.
 3. Uma tabela de controle isolada em `drizzle.__migrations_<moduleId>`, gerenciada por `runModuleMigrations` (`@platform/core/migrations`).
 
-Enquanto o [ADR 0004](../adr/0004-sem-compatibilidade-banco-reconstruido.md) estiver em vigor, as migrations de cada Module são regeneradas do zero (uma migration inicial com nome descritivo por Module, p.ex. `<timestamp>_create_iam_tables`).
+As migrations só evoluem para a frente: uma migration já aplicada nunca é editada. Toda mudança de schema vira uma migration nova, com nome descritivo (p.ex. `<timestamp>_add_devices_and_certificate_exemption`). A primeira de cada Module cria as tabelas (`<timestamp>_create_<descricao>`).
 
-Para regenerar a migration de um Module a partir do seu `schema.ts`:
+Para gerar a migration de uma mudança a partir do `schema.ts` do Module (o `drizzle-kit` compara com o último `snapshot.json`):
 
 ```bash
 pnpm --filter @platform/server exec drizzle-kit generate \
   --dialect postgresql \
   --schema ./src/<module>/schema.ts \
   --out ./src/<module>/migrations \
-  --name create_<descricao>
+  --name <descricao_da_mudanca>
 ```
 
-> **Atenção**: garanta `CREATE SCHEMA IF NOT EXISTS "<schema>";` no `migration.sql` gerado, pois `runModuleMigrations` cria o schema antes de invocar o migrator do Drizzle.
+> **Atenção**: na primeira migration de um Module, garanta `CREATE SCHEMA IF NOT EXISTS "<schema>";` no `migration.sql` gerado, pois `runModuleMigrations` cria o schema antes de invocar o migrator do Drizzle. Quando a mudança precisar acertar dados já existentes (p.ex. um `UPDATE` para uma coluna nova), acrescente o SQL à mão na migration gerada.
 
 ---
 

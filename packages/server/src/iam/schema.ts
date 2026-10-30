@@ -1,6 +1,6 @@
 import { boolean, integer, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
-/** Schema Postgres do Module `iam` (ADR 0004). */
+/** Schema Postgres do Module `iam`. */
 export const iamSchema = pgSchema("iam");
 
 export const roles = iamSchema.table("roles", {

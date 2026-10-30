@@ -1,6 +1,6 @@
 import { integer, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
-/** Um schema Postgres por Module (ADR 0004). */
+/** Um schema Postgres por Module. */
 export const closingPeriodSchema = pgSchema("closing_period");
 
 export const periods = closingPeriodSchema.table("periods", {

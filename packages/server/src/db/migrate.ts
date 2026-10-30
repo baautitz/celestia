@@ -3,7 +3,7 @@ import { migrationPlan } from "../boot/compose.js";
 import { createPlatform } from "../index.js";
 import { db, pool } from "./client.js";
 
-// Cada Module tem a própria pasta de migrations, o próprio schema Postgres e a própria tabela de controle (ADR 0004).
+// Cada Module tem a própria pasta de migrations, o próprio schema Postgres e a própria tabela de controle.
 // O boot só verifica (assertMigrationsUpToDate); aplicar é sempre explícito, por este comando.
 async function run(): Promise<void> {
   const plan = migrationPlan(createPlatform().modules);
