@@ -37,7 +37,7 @@ export interface IamModuleDeps {
    * Fingerprint (SHA-256 do DER, hexadecimal) do certificado de cliente da conexão, ou `undefined` se não houve.
    * Em produção lê o socket TLS; os testes injetam um valor fixo.
    */
-  getClientCertificateFingerprint: (c: Context) => string | undefined;
+  getClientCertificateFingerprint: (c: Context) => string | undefined | Promise<string | undefined>;
   /** Limite de tentativas de login; por padrão 5 falhas por username e 20 por IP a cada 15 min. */
   loginRateLimiter?: LoginRateLimiter;
 }
@@ -129,7 +129,7 @@ export function createIamModule({
           // depois da senha, para não revelar a exigência a quem não a conhece, e a mensagem não distingue o motivo.
           let usedDevice: { id: string; name: string } | undefined;
           if (!user.allowWithoutCertificate) {
-            const fingerprint = getClientCertificateFingerprint(c)?.toLowerCase();
+            const fingerprint = (await getClientCertificateFingerprint(c))?.toLowerCase();
             const device = fingerprint ? await deviceStore.findActiveByFingerprint(fingerprint) : null;
             if (!device) {
               await recordIamAudit({ id: user.id, name: user.fullname }, "deny_login_without_certificate", { type: USER_AUDIT_TARGET, id: user.id }, { username: user.username });

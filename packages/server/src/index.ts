@@ -19,7 +19,7 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { MemoryDeviceStore, type DeviceStore } from "./iam/device-store.js";
 import { DeviceCertificateAuthority } from "./iam/device-certificate-authority.js";
-import { createClientCertificateReader, loadServerSecurity, serveSecure, watchServerCertificate } from "./boot/tls.js";
+import { clientCertificateReader, loadServerSecurity, serveSecure, watchServerCertificate } from "./boot/tls.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
@@ -37,7 +37,7 @@ export interface CreatePlatformAppOptions {
   /** CA que emite os certificados dos Dispositivos; sem ela a emissão responde 503. */
   deviceCertificateAuthority?: DeviceCertificateAuthority;
   /** Fingerprint do certificado de cliente da conexão. Em produção vem do socket TLS; nos testes é injetado. */
-  clientCertificateFingerprint?: (c: Context) => string | undefined;
+  clientCertificateFingerprint?: (c: Context) => string | undefined | Promise<string | undefined>;
   tokenService?: TokenService;
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
@@ -191,11 +191,13 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       }
     }
 
+    // A simulação do certificado consulta a mesma store de Dispositivos que a plataforma usa.
+    const devices = deviceStore ?? new MemoryDeviceStore();
     const platform = createPlatform({
       userStore,
-      deviceStore,
+      deviceStore: devices,
       deviceCertificateAuthority: security.ca ? new DeviceCertificateAuthority(security.ca) : undefined,
-      clientCertificateFingerprint: createClientCertificateReader(),
+      clientCertificateFingerprint: clientCertificateReader(security, devices),
       erpStore, erpExternalsStore, closingPeriodStore,
       erpClients,
       auditLog,
@@ -214,7 +216,12 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       watchServerCertificate(server, { certFile: security.tls.certFile, keyFile: security.tls.keyFile });
       console.log(`🚀 Plataforma Celestia Backend rodando em https://localhost:${port} (certificado de Dispositivo habilitado)`);
     } else {
-      console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port} (sem TLS: nenhum certificado de Dispositivo é aceito)`);
+      const notes = {
+        socket: "sem TLS: nenhum certificado de Dispositivo é aceito",
+        header: "atrás do proxy: o certificado vem do header repassado por ele",
+        mock: `⚠️  CERTIFICADO SIMULADO (só desenvolvimento): ${security.mock?.deviceName ? `toda requisição vale como o Dispositivo "${security.mock.deviceName}"` : "ninguém apresenta certificado"}`,
+      } as const;
+      console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port} (${notes[security.source]})`);
       serve({ fetch: app.fetch, port });
     }
   })();

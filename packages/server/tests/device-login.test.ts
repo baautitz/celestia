@@ -82,6 +82,17 @@ describe("login e refresh com certificado de Dispositivo", () => {
     expect((await login("sem.cert")).status).toBe(200);
   });
 
+  it("aceita um leitor de certificado assíncrono", async () => {
+    const { presented, deviceStore } = await setup();
+    void presented;
+    const userStore = createSeededUserStore();
+    await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
+    await userStore.createUser({ fullname: "Com Cert", username: "com.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
+    const app = createPlatformApp({ userStore, deviceStore, clientCertificateFingerprint: async () => FINGERPRINT });
+    const res = await app.request("/api/auth/login", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ username: "com.cert", password: TEST_PASSWORD }) });
+    expect(res.status).toBe(200);
+  });
+
   it("renova a sessão sem pedir o certificado de novo enquanto o Dispositivo estiver ativo", async () => {
     const { login, refresh, refreshTokenOf, presented } = await setup();
     presented.fingerprint = FINGERPRINT;

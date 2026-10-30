@@ -42,7 +42,7 @@ describe("configuração de TLS e da CA (falha fechado)", () => {
   });
 
   it("fora de produção, sem nada configurado, segue em HTTP puro", () => {
-    expect(loadServerSecurity({ NODE_ENV: "development" }, read)).toEqual({ tls: undefined, ca: undefined });
+    expect(loadServerSecurity({ NODE_ENV: "development" }, read)).toMatchObject({ source: "socket", tls: undefined, ca: undefined });
   });
 
   it("fora de produção, configuração pela metade é erro, não HTTP silencioso", () => {
@@ -58,6 +58,59 @@ describe("configuração de TLS e da CA (falha fechado)", () => {
   it("devolve os caminhos do certificado do site, para a recarga", () => {
     const security = loadServerSecurity({ NODE_ENV: "production", ...files }, read);
     expect(security.tls).toMatchObject({ certFile: "a.crt", keyFile: "a.key" });
+  });
+
+  describe("fonte do certificado: simulação para desenvolvimento", () => {
+    it("liga com o nome do Dispositivo a simular, sem TLS nem proxy", () => {
+      const security = loadServerSecurity({ CLIENT_CERT_SOURCE: "mock", DEV_CLIENT_CERT_DEVICE: "Caixa 1" }, read);
+      expect(security).toMatchObject({ source: "mock", mock: { deviceName: "Caixa 1" } });
+      expect(security.tls).toBeUndefined();
+    });
+
+    it("sem o nome, ninguém apresenta certificado", () => {
+      expect(loadServerSecurity({ CLIENT_CERT_SOURCE: "mock" }, read).mock).toEqual({ deviceName: undefined });
+    });
+
+    it("nunca vale em produção: o servidor não sobe", () => {
+      expect(() => loadServerSecurity({ NODE_ENV: "production", CLIENT_CERT_SOURCE: "mock", DEV_CLIENT_CERT_DEVICE: "Caixa 1" }, read)).toThrow(/produção/);
+    });
+  });
+
+  describe("fonte do certificado: header repassado pelo proxy", () => {
+    const proxySecret = "segredo-do-proxy-com-mais-de-32-caracteres";
+    const header = { CLIENT_CERT_SOURCE: "header", PROXY_SHARED_SECRET: proxySecret, DEVICE_CA_CERT_FILE: "ca.crt", DEVICE_CA_KEY_FILE: "ca.key" };
+
+    it("por padrão a fonte é o socket TLS, inclusive com a variável em branco (como no .env.example)", () => {
+      expect(loadServerSecurity({ NODE_ENV: "production", ...files }, read).source).toBe("socket");
+      expect(loadServerSecurity({ NODE_ENV: "production", ...files, CLIENT_CERT_SOURCE: "" }, read).source).toBe("socket");
+    });
+
+    it("não exige TLS no Node, porque o proxy termina o TLS, mas exige a CA e o segredo em produção", () => {
+      const security = loadServerSecurity({ NODE_ENV: "production", ...header }, read);
+      expect(security).toMatchObject({ source: "header", proxy: { secret: proxySecret } });
+      expect(security.tls).toBeUndefined();
+      expect(security.ca).toBeDefined();
+      expect(() => loadServerSecurity({ NODE_ENV: "production", CLIENT_CERT_SOURCE: "header" }, read)).toThrow(/PROXY_SHARED_SECRET.*DEVICE_CA_CERT_FILE.*DEVICE_CA_KEY_FILE/s);
+      expect(() => loadServerSecurity({ NODE_ENV: "production", ...header, DEVICE_CA_KEY_FILE: undefined }, read)).toThrow(/DEVICE_CA_KEY_FILE/);
+    });
+
+    it("exige o segredo do proxy até fora de produção: sem ele o header seria aceito de qualquer um", () => {
+      expect(() => loadServerSecurity({ CLIENT_CERT_SOURCE: "header" }, read)).toThrow(/PROXY_SHARED_SECRET/);
+      expect(() => loadServerSecurity({ ...header, PROXY_SHARED_SECRET: "curto" }, read)).toThrow(/32/);
+    });
+
+    it("recusa TLS configurado no Node junto com a fonte por header, para ninguém achar que o Node termina o TLS", () => {
+      expect(() => loadServerSecurity({ ...header, TLS_CERT_FILE: "a.crt", TLS_KEY_FILE: "a.key" }, read)).toThrow(/TLS_CERT_FILE.*proxy/s);
+    });
+
+    it("recusa uma fonte desconhecida", () => {
+      expect(() => loadServerSecurity({ CLIENT_CERT_SOURCE: "cabeçalho" }, read)).toThrow(/CLIENT_CERT_SOURCE/);
+    });
+
+    it("repassa os nomes de header configurados", () => {
+      const security = loadServerSecurity({ ...header, CLIENT_CERT_HEADER: "x-ssl-client-cert", PROXY_SECRET_HEADER: "x-edge-secret" }, read);
+      expect(security.proxy).toEqual({ secret: proxySecret, certificateHeader: "x-ssl-client-cert", secretHeader: "x-edge-secret" });
+    });
   });
 
   it("recusa arquivo que não existe, dizendo qual", () => {
