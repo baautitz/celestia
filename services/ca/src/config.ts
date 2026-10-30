@@ -79,7 +79,7 @@ export function loadCaConfig(env: Env = process.env, read: ReadFile = readFileSy
   if (sharedSecret.length < MIN_SHARED_SECRET_LENGTH) {
     throw new Error(`CA_SHARED_SECRET precisa ter ao menos ${MIN_SHARED_SECRET_LENGTH} caracteres.`);
   }
-  const publicUrl = requireUrl(env, "CA_PUBLIC_URL", production ? undefined : `http://localhost:${port}`);
+  const publicUrl = requireUrl(env, "CA_PUBLIC_URL", production ? undefined : `http://acesso.localhost:${port}`);
   const callbackUrl = requireUrl(env, "APP_CALLBACK_URL", production ? undefined : "http://localhost:5173/login/certificado");
   const authority = loadAuthority(env, read);
   if (production && !authority) {

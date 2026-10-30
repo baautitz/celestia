@@ -72,7 +72,7 @@ describe("desenvolvimento", () => {
   const dev = { CA_SHARED_SECRET: shared };
 
   it("usa endereços locais por padrão", () => {
-    expect(loadCaConfig(dev, read)).toMatchObject({ port: 3001, publicUrl: "http://localhost:3001", callbackUrl: "http://localhost:5173/login/certificado" });
+    expect(loadCaConfig(dev, read)).toMatchObject({ port: 3001, publicUrl: "http://acesso.localhost:3001", callbackUrl: "http://localhost:5173/login/certificado" });
   });
 
   it("a simulação liga com o nome do Dispositivo a simular", () => {

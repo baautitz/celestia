@@ -23,7 +23,7 @@ O login tem dois passos:
 | backend e CA | `CA_SHARED_SECRET` | Chave em comum (mín. 32 caracteres). Obrigatória nos dois, em qualquer ambiente. |
 | backend | `CA_URL` | Endereço interno da CA. Obrigatório em produção; em dev, `http://localhost:3001`. |
 | CA | `CA_PORT` | Porta (padrão 3001). |
-| CA | `CA_PUBLIC_URL` | Endereço público da CA, com mTLS (`https://acesso.<domínio>`). Obrigatório em produção. |
+| CA | `CA_PUBLIC_URL` | Endereço público da CA, com mTLS (`https://acesso.<domínio>`). Obrigatório em produção; em dev, `http://acesso.localhost:3001`. |
 | CA | `APP_CALLBACK_URL` | Callback do app (`https://app.<domínio>/login/certificado`). Obrigatório em produção; em dev, `http://localhost:5173/login/certificado`. |
 | CA | `CA_CERT_SOURCE` | `header` (produção) ou `mock` (só desenvolvimento). |
 | CA | `CA_PROXY_SECRET` | Fonte `header`: segredo (mín. 32 caracteres) que o Traefik acrescenta; sem ele o certificado repassado é ignorado. |
@@ -60,7 +60,7 @@ CA_CERT_SOURCE=mock
 CA_MOCK_DEVICE=Caixa 1     # nome de um Dispositivo ativo; sem ele, ninguém apresenta certificado
 ```
 
-A CA trata toda leitura como vinda desse Dispositivo (e avisa no boot), sem Traefik nem janela do navegador. Quem exige certificado faz o fluxo completo (senha, ida à CA em `http://localhost:3001`, volta ao app), só que sem a janela. Emita o Dispositivo pela tela uma vez (entrando com o administrador, que tem a isenção). Trocar `CA_MOCK_DEVICE` por um nome inexistente mostra a negação.
+A CA trata toda leitura como vinda desse Dispositivo (e avisa no boot), sem Traefik nem janela do navegador. Quem exige certificado faz o fluxo completo (senha, ida à CA em `http://acesso.localhost:3001`, volta ao app), só que sem a janela. `*.localhost` aponta para o próprio computador (sem mexer em `/etc/hosts`), então o fluxo já cruza dois endereços, como em produção. Emita o Dispositivo pela tela uma vez (entrando com o administrador, que tem a isenção). Trocar `CA_MOCK_DEVICE` por um nome inexistente mostra a negação.
 
 **Testar o certificado de verdade, com a janela do Chrome.** `*.localhost` aponta para o próprio computador, então `acesso.localhost` funciona sem mexer em `/etc/hosts`. No `.env`:
 
