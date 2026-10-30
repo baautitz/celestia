@@ -11,6 +11,7 @@
     "dev": "tsx watch --env-file=../../.env src/index.ts",
     "db:migrate": "tsx --env-file=../../.env src/db/migrate.ts",
     "create-admin": "tsx --env-file=../../.env src/cli/create-admin.ts",
+    "create-ca": "tsx --env-file=../../.env src/cli/create-ca.ts",
     "erp:query": "tsx --env-file=../../.env src/cli/erp-query.ts",
     "lint": "eslint ."
   },
