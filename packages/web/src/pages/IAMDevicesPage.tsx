@@ -15,7 +15,7 @@ import { DataTable } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { useWindow, WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { formatDate } from "@platform/ui/lib/format";
-import { CheckCircle2, Ban, Download, MoreHorizontal, MonitorSmartphone, RefreshCw } from "lucide-react";
+import { CheckCircle2, Ban, Copy, Download, MoreHorizontal, MonitorSmartphone, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
@@ -87,6 +87,15 @@ const IssueDeviceWindow: React.FC = () => {
 
 const CertificateIssuedWindow: React.FC<{ issued: IssuedDevice }> = ({ issued }) => {
   const { resolve } = useWindow<boolean>();
+  const ui = useUi();
+  const copyPassword = async () => {
+    try {
+      await navigator.clipboard.writeText(issued.password);
+      ui.feedback.notify({ type: "success", title: "Senha copiada com sucesso." });
+    } catch {
+      ui.feedback.notify({ type: "error", title: "Falha ao copiar a senha. Selecione e copie manualmente." });
+    }
+  };
   return (
     <>
       <Stack gap="section">
@@ -98,9 +107,14 @@ const CertificateIssuedWindow: React.FC<{ issued: IssuedDevice }> = ({ issued })
           <Text variant="eyebrow" tone="muted">
             Senha do certificado
           </Text>
-          <Text variant="mono" weight="semibold">
-            {issued.password}
-          </Text>
+          <Stack direction="row" align="center" gap="field">
+            <Text variant="mono" weight="semibold">
+              {issued.password}
+            </Text>
+            <Button variant="outline" size="icon" aria-label="Copiar senha" onClick={copyPassword}>
+              <Copy />
+            </Button>
+          </Stack>
         </Stack>
       </Stack>
       <WindowActions>

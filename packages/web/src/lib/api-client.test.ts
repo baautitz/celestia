@@ -19,7 +19,7 @@ describe("sessão encerrada pelo servidor", () => {
   it("avisa quando a renovação é recusada (ex.: o Dispositivo foi revogado)", async () => {
     const expired = vi.fn();
     api.onSessionExpired(expired);
-    fetchMock.mockImplementation(async (path) => (path === "/api/auth/refresh" ? json(401, { error: "Este acesso exige um Dispositivo homologado. Fale com um administrador." }) : json(401, { error: "Não autorizado" })));
+    fetchMock.mockImplementation(async (path) => (path === "/api/auth/refresh" ? json(401, { error: "Dispositivo não autorizado." }) : json(401, { error: "Não autorizado" })));
 
     await expect(api.iam.listDevices()).rejects.toThrow();
 
@@ -65,6 +65,31 @@ describe("sessão encerrada pelo servidor", () => {
 
     await expect(api.iam.listDevices()).rejects.toThrow();
 
+    expect(expired).not.toHaveBeenCalled();
+  });
+
+  it("uma renovação recusada que chega depois de um login não apaga a sessão nova", async () => {
+    const expired = vi.fn();
+    api.onSessionExpired(expired);
+    api.setAccessToken(null);
+    let refuse!: () => void;
+    fetchMock.mockImplementation(async (path) => {
+      if (path === "/api/auth/refresh") {
+        await new Promise<void>((resolve) => (refuse = resolve));
+        return json(401, { error: "Refresh token não fornecido." });
+      }
+      return json(401, { error: "Não autorizado" });
+    });
+
+    // Ao abrir a página, a restauração da sessão tenta renovar sem cookie...
+    const restoring = api.iam.listDevices().catch(() => undefined);
+    await vi.waitFor(() => expect(typeof refuse).toBe("function"));
+    // ...e, enquanto espera, o usuário termina o login (volta da autoridade certificadora).
+    api.setAccessToken("sessao-nova");
+    refuse();
+    await restoring;
+
+    expect(api.getAccessToken()).toBe("sessao-nova");
     expect(expired).not.toHaveBeenCalled();
   });
 });

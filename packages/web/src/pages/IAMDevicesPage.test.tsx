@@ -88,6 +88,20 @@ describe("IAMDevicesPage", () => {
     expect(api.iam.listDevices.mock.calls.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("copia a senha do certificado para a área de transferência", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    api.iam.issueDevice.mockResolvedValue({ device: { ...active, id: "d3", name: "Caixa 2" }, pfx: "AAEC", password: "SenhaDoPfx-123" });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Novo Dispositivo" }));
+    fireEvent.change(await screen.findByLabelText("Nome do Dispositivo"), { target: { value: "Caixa 2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Emitir certificado" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Copiar senha" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("SenhaDoPfx-123"));
+  });
+
   it("pede o nome antes de emitir", async () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Novo Dispositivo" }));

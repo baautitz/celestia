@@ -1,12 +1,15 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import type { JWTAccessPayload } from "@platform/shared";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import type { AuthTokens, JWTAccessPayload } from "@platform/shared";
 import { api } from "@/lib/api-client";
 
 interface AuthContextType {
   user: JWTAccessPayload | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  /** `certificateUrl` vem quando o usuário exige certificado: o navegador deve ir até lá para apresentá-lo. */
+  login: (username: string, password: string) => Promise<{ certificateUrl?: string }>;
+  /** Termina o login por certificado com o código que a autoridade certificadora devolveu ao navegador. */
+  loginWithCertificate: (challengeId: string, code?: string) => Promise<void>;
   logout: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (...permissions: string[]) => boolean;
@@ -19,12 +22,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<JWTAccessPayload | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Conta os logins concluídos: uma restauração de sessão que começou antes de um login não pode desfazê-lo ao falhar.
+  const signIns = useRef(0);
+
   const refreshUser = async () => {
+    const startedAt = signIns.current;
     try {
       const res = await api.auth.me();
-      setUser(res);
+      if (startedAt === signIns.current) setUser(res);
     } catch {
-      setUser(null);
+      if (startedAt === signIns.current) setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -40,13 +47,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => api.onSessionExpired(null);
   }, []);
 
-  const login = async (username: string, password: string) => {
-    const tokens = await api.auth.login(username, password);
+  const signIn = async (tokens: AuthTokens) => {
+    signIns.current += 1;
     if (tokens.user) {
       setUser(tokens.user);
     } else {
       await refreshUser();
     }
+  };
+
+  const login = async (username: string, password: string) => {
+    const result = await api.auth.login(username, password);
+    if ("certificateRequired" in result) return { certificateUrl: result.verifyUrl };
+    await signIn(result);
+    return {};
+  };
+
+  const loginWithCertificate = async (challengeId: string, code?: string) => {
+    await signIn(await api.auth.loginWithCertificate(challengeId, code));
   };
 
   const logout = async () => {
@@ -76,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         isLoading,
         login,
+        loginWithCertificate,
         logout,
         hasPermission,
         hasAnyPermission,
