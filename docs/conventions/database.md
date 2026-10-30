@@ -53,7 +53,7 @@ Todo banco recém-migrado já sobe com dois **Roles** iniciais semeados de forma
 
 | ID (`roles.id`) | Nome       | Descrição                                                                 | Permissões iniciais |
 | --------------- | ---------- | ------------------------------------------------------------------------- | ------------------- |
-| `gestor`        | `Gestor`   | Gestão de usuários, perfis, ERPs, períodos de fechamento e consulta de auditoria. | Todas as permissões de `iam`, `audit`, `erp` e `closing_period` (`system:users:*`, `system:roles:*`, `system:audit:read`, `system:erps:manage`, `closing_period:period:*`). |
+| `gestor`        | `Gestor`   | Gestão de usuários, perfis, ERPs, períodos de fechamento e consulta de auditoria. | Todas as permissões de `iam`, `audit`, `erp` e `closing_period` (`system:users:*`, `system:roles:*`, `system:devices:*`, `system:audit:read`, `system:erps:manage`, `closing_period:period:*`). |
 | `operador`      | `Operador` | Operação de períodos de fechamento.                                       | `closing_period:period:read`, `closing_period:period:create`, `closing_period:period:update`, `closing_period:period:close`. |
 
 Se um build de cliente não incluir algum Plugin, a poda de permissões órfãs no boot (`syncOrphanPermissions`) remove automaticamente das Roles as chaves de Plugins ausentes.
