@@ -6,7 +6,9 @@
 #   pnpm dev:server && pnpm dev:web                         # a API e o Vite, como sempre
 # O banco continua sendo o do docker-compose.yml (`docker compose up -d postgres`); este arquivo só sobe o Traefik.
 #
-# O Traefik usa a rede do host (só Linux) para alcançar o Vite em 127.0.0.1:5173 sem expor o Vite na rede.
+# O Traefik usa a rede do host (só Linux) para alcançar o Vite em localhost:5173 sem expor o Vite na rede.
+# Escuta nos dois loopbacks (IPv4 e IPv6) porque o navegador resolve `localhost` para qualquer um dos dois, e o Vite
+# costuma escutar só em IPv6 (::1).
 services:
   traefik:
     image: traefik:v3.1
@@ -14,12 +16,13 @@ services:
     network_mode: host
     command:
       - --entrypoints.websecure.address=127.0.0.1:8443
+      - --entrypoints.websecure6.address=[::1]:8443
       - --providers.file.filename=/etc/traefik/dynamic.yml
       - --providers.file.watch=true
       - --log.level=INFO
     environment:
       PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:?defina PROXY_SHARED_SECRET no .env (mínimo 32 caracteres)}
-      CERT_UPSTREAM: ${CERT_UPSTREAM:-http://127.0.0.1:5173}
+      CERT_UPSTREAM: ${CERT_UPSTREAM:-http://localhost:5173}
     volumes:
       - ./dev/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
       # Só o certificado público da CA entra no Traefik; a chave fica onde o app a lê.

@@ -27,6 +27,7 @@ http:
       rule: "Host(`localhost`)"
       entryPoints:
         - websecure
+        - websecure6
       service: app
       middlewares:
         - client-cert
