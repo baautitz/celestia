@@ -18,7 +18,8 @@ import { createAuditModule } from "./audit/audit-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { MemoryDeviceStore, type DeviceStore } from "./iam/device-store.js";
-import type { DeviceCertificateAuthority } from "./iam/device-certificate-authority.js";
+import { DeviceCertificateAuthority } from "./iam/device-certificate-authority.js";
+import { createClientCertificateReader, loadServerSecurity, serveSecure, watchServerCertificate } from "./boot/tls.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
@@ -154,7 +155,10 @@ const isMain =
 
 if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
   void (async () => {
+    // Falha antes de qualquer outra coisa: em produção, sem TLS e sem CA o servidor não sobe.
+    const security = loadServerSecurity();
     let userStore: UserStore | undefined;
+    let deviceStore: DeviceStore | undefined;
     const erpClients: ErpClientRegistry = {};
     let erpStore: ErpStore | undefined;
     let erpExternalsStore: ErpExternalsStore | undefined;
@@ -168,6 +172,8 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
         import("./closing-period/postgres-closing-period-store.js"),
       ]);
       userStore = new PostgresUserStore(db);
+      const { PostgresDeviceStore } = await import("./iam/postgres-device-store.js");
+      deviceStore = new PostgresDeviceStore(db);
       erpStore = new PostgresErpStore(db);
       const { PostgresErpExternalsStore } = await import("./erp/postgres-erp-externals-store.js");
       erpExternalsStore = new PostgresErpExternalsStore(db);
@@ -185,7 +191,15 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       }
     }
 
-    const platform = createPlatform({ userStore, erpStore, erpExternalsStore, closingPeriodStore, erpClients, auditLog });
+    const platform = createPlatform({
+      userStore,
+      deviceStore,
+      deviceCertificateAuthority: security.ca ? new DeviceCertificateAuthority(security.ca) : undefined,
+      clientCertificateFingerprint: createClientCertificateReader(),
+      erpStore, erpExternalsStore, closingPeriodStore,
+      erpClients,
+      auditLog,
+    });
     if (process.env.POSTGRES_HOST) {
       // Verifica (sem aplicar) que as migrations dos Modules estão em dia; a mensagem nomeia o Module.
       const { db } = await import("./db/client.js");
@@ -194,7 +208,15 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     await platform.start(); // falha de Module do Base System derruba o boot
     const app = platform.app;
     const port = Number(process.env.PORT) || 3000;
-    console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
-    serve({ fetch: app.fetch, port });
+    if (security.tls) {
+      if (!security.ca) throw new Error("O TLS exige a CA dos Dispositivos: defina DEVICE_CA_CERT_FILE e DEVICE_CA_KEY_FILE.");
+      const server = serveSecure(app.fetch, { port, tls: security.tls, deviceCaCertificate: security.ca.certificatePem });
+      // Renovação do certificado do site (ex.: Let's Encrypt) sem reiniciar.
+      watchServerCertificate(server, { certFile: process.env.TLS_CERT_FILE!, keyFile: process.env.TLS_KEY_FILE! });
+      console.log(`🚀 Plataforma Celestia Backend rodando em https://localhost:${port} (certificado de Dispositivo habilitado)`);
+    } else {
+      console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port} (sem TLS: nenhum certificado de Dispositivo é aceito)`);
+      serve({ fetch: app.fetch, port });
+    }
   })();
 }
