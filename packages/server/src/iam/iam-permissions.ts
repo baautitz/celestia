@@ -10,4 +10,7 @@ export const IAM_PERMISSIONS = definePermissions("system", {
   "roles:create": { label: "Criar Grupos de Acesso", description: "Permite criar novos perfis/cargos de permissão." },
   "roles:read": { label: "Visualizar Grupos e Catálogo", description: "Permite listar perfis de acesso e inspecionar o catálogo de permissões." },
   "roles:update": { label: "Editar Permissões do Grupo", description: "Permite alterar quais permissões do sistema pertencem a cada grupo." },
+  "devices:read": { label: "Visualizar Dispositivos", description: "Permite listar os Dispositivos homologados e ver o estado de cada certificado." },
+  "devices:create": { label: "Emitir Dispositivos", description: "Permite homologar um computador ou celular, emitindo o certificado que ele usa para acessar o sistema." },
+  "devices:revoke": { label: "Revogar Dispositivos", description: "Permite revogar o certificado de um Dispositivo, que perde o acesso ao sistema." },
 });
