@@ -97,6 +97,7 @@ export class MemoryUserStore implements UserStore {
       passwordHash: PasswordService.hash(input.password),
       roleId: input.roleId,
       status: "active",
+      allowWithoutCertificate: input.allowWithoutCertificate ?? false,
       sessionVersion: 0,
       createdAt: new Date().toISOString(),
     };
@@ -120,11 +121,14 @@ export class MemoryUserStore implements UserStore {
 
     if (input.roleId && input.roleId !== user.roleId) this.revoke(user);
     if (input.status === "inactive" && user.status !== "inactive") this.revoke(user);
+    // Mudar a regra de certificado encerra as sessões abertas sob a regra anterior.
+    if (input.allowWithoutCertificate !== undefined && input.allowWithoutCertificate !== (user.allowWithoutCertificate ?? false)) this.revoke(user);
     if (input.roleId) user.roleId = input.roleId;
     if (input.fullname) user.fullname = input.fullname;
     if (input.email) user.email = input.email;
     if (input.status) user.status = input.status;
     if (input.isAdmin !== undefined) user.isAdmin = input.isAdmin;
+    if (input.allowWithoutCertificate !== undefined) user.allowWithoutCertificate = input.allowWithoutCertificate;
     user.updatedAt = new Date().toISOString();
 
     this.users.set(id, user);

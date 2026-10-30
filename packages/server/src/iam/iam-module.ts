@@ -12,6 +12,7 @@ import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
 import type { TokenService } from "./token-service.js";
 import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
+import type { DeviceStore } from "./device-store.js";
 import { LoginRateLimiter } from "./login-rate-limiter.js";
 import { PasswordService, PasswordPolicySchema } from "./password-service.js";
 
@@ -25,6 +26,12 @@ export interface IamModuleDeps {
   tokenService: TokenService;
   auth: MiddlewareHandler;
   withAdminBypass: (payload: JWTAccessPayload) => JWTAccessPayload;
+  deviceStore: DeviceStore;
+  /**
+   * Fingerprint (SHA-256 do DER, hexadecimal) do certificado de cliente da conexão, ou `undefined` se não houve.
+   * Em produção lê o socket TLS; os testes injetam um valor fixo.
+   */
+  getClientCertificateFingerprint: (c: Context) => string | undefined;
   /** Limite de tentativas de login; por padrão 5 falhas por username e 20 por IP a cada 15 min. */
   loginRateLimiter?: LoginRateLimiter;
 }
@@ -51,6 +58,8 @@ function clientIp(c: Context): string | undefined {
 
 const LAST_ADMIN = LAST_ADMIN_MESSAGE;
 const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
+const CERTIFICATE_REQUIRED = "Este acesso exige um Dispositivo homologado. Fale com um administrador.";
+const CERTIFICATE_EXEMPTION_ADMIN_ONLY = "Somente administradores podem alterar o acesso sem certificado.";
 const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
 
 /**
@@ -60,7 +69,16 @@ const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total
  * iam.login, iam.user.create, iam.user.update, iam.user.delete, iam.user.reset_password,
  * iam.role.create, iam.role.update. Um `before` que cancela responde 409 com o motivo.
  */
-export function createIamModule({ userStore, extraPermissions = [], tokenService, auth, withAdminBypass, loginRateLimiter = new LoginRateLimiter() }: IamModuleDeps): ModuleDef {
+export function createIamModule({
+  userStore,
+  deviceStore,
+  getClientCertificateFingerprint,
+  extraPermissions = [],
+  tokenService,
+  auth,
+  withAdminBypass,
+  loginRateLimiter = new LoginRateLimiter(),
+}: IamModuleDeps): ModuleDef {
   return defineModule({
     id: "iam",
     version: "1.0.0",
@@ -90,13 +108,23 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
             loginRateLimiter.recordFailure(username, ip);
             return c.json({ error: "Credenciais inválidas." }, 401);
           }
+
+          // Sem a opção de acesso sem certificado, o certificado de um Dispositivo ativo é obrigatório. Só se avalia
+          // depois da senha, para não revelar a exigência a quem não a conhece, e a mensagem não distingue o motivo.
+          let deviceId: string | undefined;
+          if (!user.allowWithoutCertificate) {
+            const fingerprint = getClientCertificateFingerprint(c)?.toLowerCase();
+            const device = fingerprint ? await deviceStore.findActiveByFingerprint(fingerprint) : null;
+            if (!device) return c.json({ error: CERTIFICATE_REQUIRED }, 403);
+            deviceId = device.id;
+          }
           loginRateLimiter.recordSuccess(username);
 
           const role = await userStore.getRole(user.roleId);
           let tokens: { accessToken: string; refreshToken: string; payload: JWTAccessPayload } | undefined;
           const ran = await events.run("iam.login", { userId: user.id, username: user.username }, async () => {
             const access = await tokenService.generateAccessToken(user, role || undefined);
-            const refresh = await tokenService.generateRefreshToken(user);
+            const refresh = await tokenService.generateRefreshToken(user, deviceId);
             tokens = { accessToken: access.token, refreshToken: refresh.token, payload: access.payload };
           });
           if (ran.cancelled) return cancelled(c, ran.reason);
@@ -137,12 +165,21 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
               return c.json({ error: "Usuário não encontrado ou inativo." }, 401);
             }
 
+            // A sessão continua enquanto o Dispositivo que a abriu seguir ativo; o certificado não é pedido de novo.
+            // Quem exige certificado e tem uma sessão sem Dispositivo não renova (falha fechado).
+            if (refreshPayload.deviceId) {
+              const device = await deviceStore.findById(refreshPayload.deviceId);
+              if (!device || device.status !== "active") return c.json({ error: CERTIFICATE_REQUIRED }, 401);
+            } else if (!user.allowWithoutCertificate) {
+              return c.json({ error: CERTIFICATE_REQUIRED }, 401);
+            }
+
             const role = await userStore.getRole(user.roleId);
             const { token: newAccessToken, payload: userPayload } = await tokenService.generateAccessToken(
               user,
               role || undefined,
             );
-            const { token: newRefreshToken } = await tokenService.generateRefreshToken(user);
+            const { token: newRefreshToken } = await tokenService.generateRefreshToken(user, refreshPayload.deviceId);
 
             setCookie(c, "refresh_token", newRefreshToken, refreshCookie());
 
@@ -218,10 +255,14 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
             password: PasswordPolicySchema,
             roleId: z.string(),
             email: z.string().email().optional(),
+            allowWithoutCertificate: z.boolean().optional(),
           }),
         ),
         async (c) => {
           const body = c.req.valid("json");
+          if (body.allowWithoutCertificate && !getAuthenticatedUser(c).isAdmin) {
+            return c.json({ error: CERTIFICATE_EXEMPTION_ADMIN_ONLY }, 403);
+          }
           const targetRole = await userStore.getRole(body.roleId);
           if (targetRole) {
             const denied = grantViolation(c, targetRole.permissions);
@@ -253,12 +294,17 @@ export function createIamModule({ userStore, extraPermissions = [], tokenService
             status: z.enum(["active", "inactive"]).optional(),
             email: z.string().email().optional(),
             isAdmin: z.boolean().optional(),
+            allowWithoutCertificate: z.boolean().optional(),
           }),
         ),
         async (c) => {
           const id = c.req.param("id");
           const { isAdmin, ...body } = c.req.valid("json");
           const caller = getAuthenticatedUser(c);
+          // Isentar do certificado é tão sensível quanto o flag de administrador: só administrador altera.
+          if (body.allowWithoutCertificate !== undefined && !caller.isAdmin) {
+            return c.json({ error: CERTIFICATE_EXEMPTION_ADMIN_ONLY }, 403);
+          }
           // Único caminho pela API para o flag de administrador: só quem já é admin altera, e ninguém se rebaixa.
           if (isAdmin !== undefined) {
             if (!caller.isAdmin) {

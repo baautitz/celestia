@@ -44,7 +44,7 @@ export async function upsertAdminUser(store: UserStore, input: UpsertAdminInput)
 
   const existing = await store.findByUsername(username);
   if (existing && input.force) {
-    await store.updateUser(existing.id, { fullname, email, roleId: DEFAULT_ADMIN_ROLE_ID, status: "active", isAdmin: true });
+    await store.updateUser(existing.id, { fullname, email, roleId: DEFAULT_ADMIN_ROLE_ID, status: "active", isAdmin: true, allowWithoutCertificate: true });
     await store.resetPassword(existing.id, PasswordService.hash(input.password));
     return { id: existing.id, username: existing.username, created: false };
   }
@@ -58,6 +58,8 @@ export async function upsertAdminUser(store: UserStore, input: UpsertAdminInput)
     email,
     password: input.password,
     roleId: DEFAULT_ADMIN_ROLE_ID,
+    // O primeiro Administrator nasce sem Dispositivo, então precisa entrar sem certificado para emitir o primeiro.
+    allowWithoutCertificate: true,
   });
   await store.setAdmin(user.id, true);
   return { id: user.id, username: user.username, created: true };

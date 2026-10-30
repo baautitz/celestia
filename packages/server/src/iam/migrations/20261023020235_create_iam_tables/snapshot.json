@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "2e43a052-2d4b-4da8-94b7-7c8f75cdc9f2",
+  "id": "494ea495-99b1-4fe7-98b5-ec8bbcb6795f",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -323,6 +323,19 @@
       "generated": null,
       "identity": null,
       "name": "is_admin",
+      "entityType": "columns",
+      "schema": "iam",
+      "table": "users"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "allow_without_certificate",
       "entityType": "columns",
       "schema": "iam",
       "table": "users"

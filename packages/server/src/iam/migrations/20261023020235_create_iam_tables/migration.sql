@@ -16,6 +16,7 @@ CREATE TABLE "iam"."users" (
 	"role_id" text NOT NULL,
 	"status" text DEFAULT 'active' NOT NULL,
 	"is_admin" boolean DEFAULT false NOT NULL,
+	"allow_without_certificate" boolean DEFAULT false NOT NULL,
 	"session_version" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp

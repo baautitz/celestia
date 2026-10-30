@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
@@ -17,6 +17,7 @@ import { MemoryAuditStore } from "./audit/audit-store.js";
 import { createAuditModule } from "./audit/audit-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
+import { MemoryDeviceStore, type DeviceStore } from "./iam/device-store.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
@@ -30,6 +31,9 @@ export interface CreatePlatformAppOptions {
   erpExternalsStore?: ErpExternalsStore;
   clientFactory?: ErpClientFactory;
   userStore?: UserStore;
+  deviceStore?: DeviceStore;
+  /** Fingerprint do certificado de cliente da conexão. Em produção vem do socket TLS; nos testes é injetado. */
+  clientCertificateFingerprint?: (c: Context) => string | undefined;
   tokenService?: TokenService;
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
@@ -65,6 +69,9 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   const allDrivers = { ...ERP_DRIVERS, ...extraDrivers };
   const clientFactory = options?.clientFactory || createErpClientFactory(allDrivers);
   const userStore = options?.userStore || new MemoryUserStore();
+  const deviceStore = options?.deviceStore || new MemoryDeviceStore();
+  // Sem leitor de certificado configurado ninguém apresenta certificado: quem exige é negado (falha fechado).
+  const clientCertificateFingerprint = options?.clientCertificateFingerprint ?? (() => undefined);
   const tokenService = options?.tokenService || new TokenService();
   const closingPeriodStore = options?.closingPeriodStore || new MemoryClosingPeriodStore();
 
@@ -87,7 +94,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   // Base System: iam e audit. Plugins: closing_period e erp (ADR 0003). Todos compartilham o registro de Permissions.
   const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
   const entries: ModuleEntry[] = [
-    { tier: "base", def: createIamModule({ userStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
+    { tier: "base", def: createIamModule({ userStore, deviceStore, getClientCertificateFingerprint: clientCertificateFingerprint, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
     { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auditLog, auth }) },
     {

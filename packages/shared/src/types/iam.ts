@@ -11,6 +11,8 @@ export interface User {
   status: "active" | "inactive";
   /** Administrador: ignora a matriz de permissões (acesso total). Alterado pelo CLI create-admin ou por outro administrador. */
   isAdmin?: boolean;
+  /** Acesso sem certificado: dispensa o certificado de Dispositivo no login. Padrão: desligado (certificado obrigatório). */
+  allowWithoutCertificate?: boolean;
   /** Interno (como passwordHash): só em findById; nunca em respostas da API. Invalida refresh tokens antigos. */
   sessionVersion?: number;
   createdAt: string;
@@ -52,6 +54,8 @@ export interface JWTRefreshPayload {
   type: "refresh";
   /** Versão de sessão do usuário na emissão; o refresh só vale enquanto for igual à atual. */
   ver: number;
+  /** Dispositivo cujo certificado abriu a sessão; ausente quando o Usuário entra sem certificado. */
+  deviceId?: string;
   iat?: number;
   exp?: number;
 }
@@ -83,6 +87,7 @@ export interface CreateUserInput {
   password: string;
   roleId: string;
   email?: string;
+  allowWithoutCertificate?: boolean;
 }
 
 export interface UpdateUserInput {
@@ -92,6 +97,7 @@ export interface UpdateUserInput {
   email?: string;
   /** Promove ou rebaixa Administrator; aplicado na mesma transação da checagem do último admin ativo. */
   isAdmin?: boolean;
+  allowWithoutCertificate?: boolean;
 }
 
 export interface ResetPasswordInput {
