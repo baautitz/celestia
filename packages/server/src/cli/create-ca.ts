@@ -21,8 +21,9 @@ export async function createCaFiles({ certFile, keyFile, commonName }: CreateCaF
     writeFileSync(keyFile, material.privateKeyPem, { flag: "wx", mode: 0o600 });
     writeFileSync(certFile, material.certificatePem, { flag: "wx", mode: 0o644 });
   } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
-      throw new Error(`A CA já existe (${(err as NodeJS.ErrnoException).path}). Apague os arquivos só se for reemitir todos os Dispositivos.`, { cause: err });
+    const failure = err as NodeJS.ErrnoException;
+    if (failure.code === "EEXIST") {
+      throw new Error(`A CA já existe (${failure.path}). Apague os arquivos só se for reemitir todos os Dispositivos.`, { cause: err });
     }
     throw err;
   }

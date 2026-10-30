@@ -165,14 +165,14 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     let closingPeriodStore: ClosingPeriodStore | undefined;
     let auditLog: AuditLog | undefined;
     if (process.env.POSTGRES_HOST) {
-      const [{ db }, { PostgresUserStore }, { PostgresErpStore }, { PostgresClosingPeriodStore }] = await Promise.all([
+      const [{ db }, { PostgresUserStore }, { PostgresDeviceStore }, { PostgresErpStore }, { PostgresClosingPeriodStore }] = await Promise.all([
         import("./db/client.js"),
         import("./iam/postgres-user-store.js"),
+        import("./iam/postgres-device-store.js"),
         import("./erp/postgres-erp-store.js"),
         import("./closing-period/postgres-closing-period-store.js"),
       ]);
       userStore = new PostgresUserStore(db);
-      const { PostgresDeviceStore } = await import("./iam/postgres-device-store.js");
       deviceStore = new PostgresDeviceStore(db);
       erpStore = new PostgresErpStore(db);
       const { PostgresErpExternalsStore } = await import("./erp/postgres-erp-externals-store.js");
@@ -208,11 +208,10 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     await platform.start(); // falha de Module do Base System derruba o boot
     const app = platform.app;
     const port = Number(process.env.PORT) || 3000;
-    if (security.tls) {
-      if (!security.ca) throw new Error("O TLS exige a CA dos Dispositivos: defina DEVICE_CA_CERT_FILE e DEVICE_CA_KEY_FILE.");
+    if (security.tls && security.ca) {
       const server = serveSecure(app.fetch, { port, tls: security.tls, deviceCaCertificate: security.ca.certificatePem });
       // Renovação do certificado do site (ex.: Let's Encrypt) sem reiniciar.
-      watchServerCertificate(server, { certFile: process.env.TLS_CERT_FILE!, keyFile: process.env.TLS_KEY_FILE! });
+      watchServerCertificate(server, { certFile: security.tls.certFile, keyFile: security.tls.keyFile });
       console.log(`🚀 Plataforma Celestia Backend rodando em https://localhost:${port} (certificado de Dispositivo habilitado)`);
     } else {
       console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port} (sem TLS: nenhum certificado de Dispositivo é aceito)`);

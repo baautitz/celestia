@@ -48,6 +48,16 @@ describe("configuração de TLS e da CA (falha fechado)", () => {
   it("fora de produção, configuração pela metade é erro, não HTTP silencioso", () => {
     expect(() => loadServerSecurity({ TLS_CERT_FILE: "a.crt" }, read)).toThrow(/TLS_KEY_FILE/);
     expect(() => loadServerSecurity({ DEVICE_CA_CERT_FILE: "ca.crt" }, read)).toThrow(/DEVICE_CA_KEY_FILE/);
+    expect(() => loadServerSecurity({ TLS_KEY_FILE: "a.key", DEVICE_CA_CERT_FILE: "ca.crt", DEVICE_CA_KEY_FILE: "ca.key" }, read)).toThrow(/TLS_CERT_FILE/);
+  });
+
+  it("recusa o TLS sem a CA dos Dispositivos, antes de qualquer outro trabalho", () => {
+    expect(() => loadServerSecurity({ TLS_CERT_FILE: "a.crt", TLS_KEY_FILE: "a.key" }, read)).toThrow(/DEVICE_CA_CERT_FILE.*DEVICE_CA_KEY_FILE/s);
+  });
+
+  it("devolve os caminhos do certificado do site, para a recarga", () => {
+    const security = loadServerSecurity({ NODE_ENV: "production", ...files }, read);
+    expect(security.tls).toMatchObject({ certFile: "a.crt", keyFile: "a.key" });
   });
 
   it("recusa arquivo que não existe, dizendo qual", () => {

@@ -9,7 +9,7 @@ import type { CertificateAuthorityMaterial } from "../iam/device-certificate-aut
 
 export interface ServerSecurity {
   /** Certificado público do site, apresentado ao navegador. Independente da CA dos Dispositivos. */
-  tls?: { key: Buffer; cert: Buffer };
+  tls?: { key: Buffer; cert: Buffer; certFile: string; keyFile: string };
   /** CA que emite e valida os certificados dos Dispositivos. */
   ca?: CertificateAuthorityMaterial;
 }
@@ -50,8 +50,17 @@ export function loadServerSecurity(env: Env = process.env, read: ReadFile = read
 
   const hasTls = group(TLS_VARS);
   const hasCa = group(CA_VARS);
+  // O TLS só serve para pedir o certificado de cliente, que só vale contra a CA: sem ela falha já aqui, não no meio do boot.
+  if (hasTls && !hasCa) throw new Error(`O TLS exige a CA dos Dispositivos: defina também ${CA_VARS.join(", ")}.`);
   return {
-    tls: hasTls ? { cert: readOrExplain(env.TLS_CERT_FILE!, read), key: readOrExplain(env.TLS_KEY_FILE!, read) } : undefined,
+    tls: hasTls
+      ? {
+          cert: readOrExplain(env.TLS_CERT_FILE!, read),
+          key: readOrExplain(env.TLS_KEY_FILE!, read),
+          certFile: env.TLS_CERT_FILE!,
+          keyFile: env.TLS_KEY_FILE!,
+        }
+      : undefined,
     ca: hasCa
       ? {
           certificatePem: readOrExplain(env.DEVICE_CA_CERT_FILE!, read).toString("utf8"),
