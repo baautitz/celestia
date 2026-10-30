@@ -226,10 +226,10 @@
     "status": 200,
     "body": {
       "sub": "usr_1001",
+      "role": "role_admin",
       "username": "carlos.admin",
       "fullname": "Carlos Oliveira",
       "email": "carlos@farmacia.com.br",
-      "role": "role_admin",
       "permissions": [
         "system:users:create",
         "system:users:read",
@@ -256,9 +256,9 @@
     "status": 200,
     "body": {
       "sub": "usr_<uuid>",
+      "role": "role_colaborador",
       "username": "root.admin",
       "fullname": "Root Admin",
-      "role": "role_colaborador",
       "permissions": [
         "*",
         "system:users:create",
@@ -577,6 +577,7 @@
         "email": "carlos@farmacia.com.br",
         "roleId": "role_admin",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>"
       },
       {
@@ -586,6 +587,7 @@
         "email": "joao.silva@farmacia.com.br",
         "roleId": "role_colaborador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>"
       },
       {
@@ -595,6 +597,7 @@
         "email": "maria.souza@farmacia.com.br",
         "roleId": "role_operador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>"
       },
       {
@@ -603,6 +606,7 @@
         "username": "root.admin",
         "roleId": "role_colaborador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>",
         "isAdmin": true
       }
@@ -633,6 +637,7 @@
         "email": "carlos@farmacia.com.br",
         "roleId": "role_admin",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>"
       },
       {
@@ -642,6 +647,7 @@
         "email": "joao.silva@farmacia.com.br",
         "roleId": "role_colaborador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>"
       },
       {
@@ -651,6 +657,7 @@
         "email": "maria.souza@farmacia.com.br",
         "roleId": "role_operador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>"
       },
       {
@@ -659,6 +666,7 @@
         "username": "root.admin",
         "roleId": "role_colaborador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>",
         "isAdmin": true
       }
@@ -856,6 +864,7 @@
       "username": "novo.user",
       "roleId": "role_colaborador",
       "status": "active",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>"
     }
   },
@@ -879,6 +888,7 @@
       "username": "novo.root",
       "roleId": "role_colaborador",
       "status": "active",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>"
     }
   },
@@ -906,6 +916,7 @@
       "email": "a@b.com",
       "roleId": "role_colaborador",
       "status": "inactive",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
     }
@@ -954,6 +965,7 @@
       "email": "a@b.com",
       "roleId": "role_colaborador",
       "status": "inactive",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>",
       "updatedAt": "<ts>",
       "isAdmin": true
@@ -1095,6 +1107,7 @@
         "email": "carlos@farmacia.com.br",
         "roleId": "role_admin",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>"
       },
       {
@@ -1104,6 +1117,7 @@
         "email": "joao.silva@farmacia.com.br",
         "roleId": "role_colaborador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>",
         "updatedAt": "<ts>"
       },
@@ -1114,6 +1128,7 @@
         "email": "maria.souza@farmacia.com.br",
         "roleId": "role_operador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>"
       },
       {
@@ -1122,6 +1137,7 @@
         "username": "root.admin",
         "roleId": "role_colaborador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>",
         "isAdmin": true
       },
@@ -1131,6 +1147,7 @@
         "username": "novo.root",
         "roleId": "role_colaborador",
         "status": "active",
+        "allowWithoutCertificate": true,
         "createdAt": "<ts>"
       }
     ]
@@ -1938,6 +1955,7 @@
       "username": "gestor.limitado",
       "roleId": "role_gestor",
       "status": "active",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>"
     }
   },
@@ -1949,6 +1967,7 @@
       "username": "alvo.comum",
       "roleId": "role_colaborador",
       "status": "active",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>"
     }
   },
@@ -1960,6 +1979,7 @@
       "username": "alvo.admin",
       "roleId": "role_colaborador",
       "status": "active",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>"
     }
   },
@@ -1971,6 +1991,7 @@
       "username": "alvo.admin",
       "roleId": "role_colaborador",
       "status": "active",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>",
       "isAdmin": true,
       "updatedAt": "<ts>"
@@ -1990,6 +2011,7 @@
       "username": "alvo.comum",
       "roleId": "role_colaborador",
       "status": "active",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
     }
@@ -2008,6 +2030,7 @@
       "username": "legitimo.um",
       "roleId": "role_colaborador",
       "status": "active",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>"
     }
   },
@@ -2073,6 +2096,7 @@
       "username": "alvo.comum",
       "roleId": "role_colaborador",
       "status": "inactive",
+      "allowWithoutCertificate": true,
       "createdAt": "<ts>",
       "updatedAt": "<ts>"
     }

@@ -21,6 +21,8 @@ const store = new MemoryUserStore({
       passwordHash: PasswordService.hash(ADMIN_PASSWORD),
       roleId: "role_admin",
       status: "active",
+      // Sem Dispositivo emitido ainda, o administrador do e2e entra só com a senha.
+      allowWithoutCertificate: true,
       createdAt: new Date().toISOString(),
     },
   ],

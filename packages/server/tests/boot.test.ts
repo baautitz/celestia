@@ -1,10 +1,10 @@
+import { TestUserStore } from "./helpers/fixtures.js";
 import { describe, it, expect, vi } from "vitest";
 import { Hono } from "hono";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import { definePermissions, PermissionRegistry } from "@platform/core/permissions";
 import { composeModules, migrationPlan } from "../src/boot/compose.js";
 import { createPlatformApp } from "../src/index.js";
-import { MemoryUserStore } from "../src/iam/user-store.js";
 
 const quiet = { info: () => {}, warn: () => {}, error: () => {} };
 
@@ -82,7 +82,7 @@ describe("migrationPlan", () => {
 
 describe("createPlatformApp com Plugin que falha", () => {
   it("não derruba as rotas do resto nem poda as Permissions das roles", async () => {
-    const userStore = new MemoryUserStore({
+    const userStore = new TestUserStore({
       roles: [{ id: "r", name: "R", description: "", permissions: ["bad:thing:read", "obsolete:key"] }],
     });
     const app = createPlatformApp({ userStore, extraModules: [{ tier: "plugin", def: failingPlugin("bad") }] });

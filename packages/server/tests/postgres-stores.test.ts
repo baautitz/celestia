@@ -137,6 +137,23 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         ).rejects.toThrow(/não encontrada/);
         await expect(store.deleteRole("r1")).rejects.toThrow(/usuários vinculados/);
       });
+      it("a opção de acesso sem certificado nasce desligada, persiste e encerra as sessões ao mudar", async () => {
+        const store = new PostgresUserStore(db);
+        await store.createRole({ id: "r1", name: "Op", permissions: [] });
+        const comum = await store.createUser({ fullname: "Ana", username: "ana", password: "Abcdef1!", roleId: "r1" });
+        const isento = await store.createUser({ fullname: "Bia", username: "bia", password: "Abcdef1!", roleId: "r1", allowWithoutCertificate: true });
+        expect(comum.allowWithoutCertificate).toBe(false);
+        expect(isento.allowWithoutCertificate).toBe(true);
+
+        const before = (await store.findById(isento.id))?.sessionVersion;
+        await store.updateUser(isento.id, { allowWithoutCertificate: false });
+        const after = await store.findById(isento.id);
+        expect(after?.allowWithoutCertificate).toBe(false);
+        expect(after?.sessionVersion).toBe((before ?? 0) + 1);
+
+        await store.updateUser(isento.id, { allowWithoutCertificate: false });
+        expect((await store.findById(isento.id))?.sessionVersion).toBe((before ?? 0) + 1);
+      });
       it("setAdmin e syncOrphanPermissions persistem", async () => {
         const store = new PostgresUserStore(db);
         await store.createRole({ id: "r1", name: "Op", permissions: ["system:users:read", "legacy:gone", "*"] });
