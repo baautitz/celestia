@@ -31,6 +31,8 @@ pnpm create-ca            # usa DEVICE_CA_CERT_FILE e DEVICE_CA_KEY_FILE; --name
 
 ## Emitir e revogar
 
+- Pela tela **Dispositivos** (menu Administração & IAM): "Novo Dispositivo" emite o certificado e mostra a senha uma única vez, com o download do `.pfx`; o botão de revogar pede confirmação. A opção **Permitir acesso sem certificado** fica no formulário de Usuário, visível só para administradores, e a lista de Usuários mostra a coluna **Acesso**.
+- Se o servidor recusar renovar a sessão (ex.: Dispositivo revogado), o cliente web sai sozinho (`ApiClient.onSessionExpired`).
 - Emissão em `POST /api/iam/devices` (`system:devices:create`): devolve o `.pfx` (base64) e a senha **uma única vez**. O Celestia não guarda a chave privada nem o arquivo; arquivo perdido = revogar e emitir outro.
 - Revogação em `POST /api/iam/devices/:id/revoke` (`system:devices:revoke`): definitiva. Não há CRL: o servidor consulta o Dispositivo no banco.
 - Certificado de Dispositivo: 10 anos, sem renovação. O único cancelamento é a revogação.
