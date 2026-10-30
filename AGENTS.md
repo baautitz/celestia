@@ -65,6 +65,7 @@ pnpm check:plugins     # Plugin boundary check (integrations import only @platfo
 - **Database & Bootstrap** — [docs/conventions/database.md](docs/conventions/database.md): per-Module Postgres schema and `migrations/` directory, `pnpm db:migrate`, initial Roles (`gestor`, `operador`), and `pnpm create-admin`.
 - **Permissions & Events** — [docs/conventions/permissions.md](docs/conventions/permissions.md): `<module>:<resource>:<verb>` naming, `deniedMessage` in PT-BR, and `before`/`after` module events.
 - **UI** — [docs/conventions/ui.md](docs/conventions/ui.md): primitives from `@platform/ui/components/*`, `useUi()` windows/sheets with `<WindowActions>`, `<HeaderActions>`, `<DataTable>`, `Form*` + `<Label>`, `<MoneyInput />`, `<InputGroup>`, `<Button size="default" | "icon">`. Enforced by `pnpm check:ui`.
+- **Device certificates** — [docs/conventions/device-certificates.md](docs/conventions/device-certificates.md): access by Device (mTLS validated by the Node server, `pnpm create-ca`, `TLS_*` and `DEVICE_CA_*` env vars, fail-closed in production).
 - **Plugins** — [docs/conventions/plugins.md](docs/conventions/plugins.md): customer Plugins under `integrations/<name>/`, registered in `packages/server/src/plugins.ts` and `packages/web/src/modules.ts`. Enforced by `pnpm check:plugins`.
 - **Testing** — [docs/conventions/testing.md](docs/conventions/testing.md): Vitest component tests (`jsdom`) and Playwright E2E (`packages/e2e`) querying by role/label.
 
