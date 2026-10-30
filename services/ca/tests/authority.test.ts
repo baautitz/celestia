@@ -3,7 +3,8 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DeviceCertificateAuthority } from "../src/iam/device-certificate-authority.js";
+import * as asn1js from "asn1js";
+import { DeviceCertificateAuthority } from "../src/authority.js";
 
 const openssl = (args: string[]) => execFileSync("openssl", args, { encoding: "utf8" });
 
@@ -77,5 +78,37 @@ describe("DeviceCertificateAuthority", () => {
     expect(a.password).not.toBe(b.password);
     expect(a.fingerprint).not.toBe(b.fingerprint);
     expect(a.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  /** Tamanhos (em bytes) dos salts do PBKDF2 dentro do .pfx. */
+  const pbkdf2SaltLengths = (pfx: Uint8Array): number[] => {
+    const lengths: number[] = [];
+    const walk = (node: asn1js.BaseBlock): void => {
+      // O conteúdo do .pfx vem em OCTET STRINGs que carregam outro DER; só dá para ler entrando neles.
+      if (node instanceof asn1js.OctetString) {
+        const bytes = node.valueBlock.valueHexView;
+        const inner = asn1js.fromBER(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
+        if (inner.offset === bytes.byteLength && inner.result.valueBlock) walk(inner.result);
+        return;
+      }
+      const items = (node.valueBlock as { value?: asn1js.BaseBlock[] } | undefined)?.value;
+      if (!Array.isArray(items)) return;
+      items.forEach((child, i) => {
+        if (child instanceof asn1js.ObjectIdentifier && child.valueBlock.toString() === "1.2.840.113549.1.5.12") {
+          const params = items[i + 1] as asn1js.Sequence;
+          lengths.push((params.valueBlock.value[0] as asn1js.OctetString).valueBlock.valueHexView.byteLength);
+        }
+        walk(child);
+      });
+    };
+    const parsed = asn1js.fromBER(pfx.buffer.slice(pfx.byteOffset, pfx.byteOffset + pfx.byteLength) as ArrayBuffer);
+    walk(parsed.result);
+    return lengths;
+  };
+
+  // A libksba (gpgsm, Kleopatra) recusa o salt de 64 bytes que o pkijs põe por padrão no PBES2: "bad length of salt (64) for AES".
+  it("usa salt de 16 bytes, como o OpenSSL, na cifra da chave e do certificado do .pfx", async () => {
+    const issued = await ca.issue({ name: "Importável" });
+    expect(pbkdf2SaltLengths(issued.pfx)).toEqual([16, 16]);
   });
 });

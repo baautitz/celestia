@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
-import { DeviceCertificateAuthority } from "../iam/device-certificate-authority.js";
+import { DeviceCertificateAuthority } from "../authority.js";
 
 export interface CreateCaFilesInput {
   certFile: string;

@@ -1,14 +1,18 @@
 import { createHash, randomBytes } from "node:crypto";
 import * as asn1js from "asn1js";
 import {
+  AlgorithmIdentifier,
   Attribute,
   AttributeTypeAndValue,
   AuthenticatedSafe,
   BasicConstraints,
   CertBag,
   Certificate,
+  EncryptedContentInfo,
   Extension,
   ExtKeyUsage,
+  PBES2Params,
+  PBKDF2Params,
   PFX,
   PKCS8ShroudedKeyBag,
   PrivateKeyInfo,
@@ -18,7 +22,44 @@ import {
   CryptoEngine,
 } from "pkijs";
 
-setEngine("celestia", new CryptoEngine({ name: "celestia", crypto: globalThis.crypto }));
+const PBES2_OID = "1.2.840.113549.1.5.13";
+/** Tamanho do salt do PBKDF2 do .pfx. O pkijs usa 64 bytes, que a libksba (gpgsm, Kleopatra) recusa; 16 é o padrão do OpenSSL. */
+const PBES2_SALT_BYTES = 16;
+
+/** Igual ao motor do pkijs, só que o PBES2 do .pfx usa um salt de 16 bytes, aceito por todos os importadores. */
+class CelestiaCryptoEngine extends CryptoEngine {
+  override async encryptEncryptedContentInfo(parameters: Parameters<CryptoEngine["encryptEncryptedContentInfo"]>[0]): Promise<EncryptedContentInfo> {
+    const contentOid = this.getOIDByAlgorithm(parameters.contentEncryptionAlgorithm, true, "contentEncryptionAlgorithm");
+    const hmacOid = this.getOIDByAlgorithm({ name: "HMAC", hash: { name: parameters.hmacHashAlgorithm } } as Algorithm, true, "hmacHashAlgorithm");
+    const iv = this.getRandomValues(new Uint8Array(16));
+    const salt = this.getRandomValues(new Uint8Array(PBES2_SALT_BYTES));
+    const passwordKey = await this.importKey("raw", new Uint8Array(parameters.password), "PBKDF2", false, ["deriveKey"]);
+    const derivedKey = await this.deriveKey(
+      { name: "PBKDF2", hash: { name: parameters.hmacHashAlgorithm }, salt, iterations: parameters.iterationCount },
+      passwordKey,
+      parameters.contentEncryptionAlgorithm,
+      false,
+      ["encrypt"],
+    );
+    const encrypted = await this.encrypt({ name: parameters.contentEncryptionAlgorithm.name, iv }, derivedKey, new Uint8Array(parameters.contentToEncrypt));
+    const pbkdf2 = new PBKDF2Params({
+      salt: new asn1js.OctetString({ valueHex: toArrayBuffer(salt) }),
+      iterationCount: parameters.iterationCount,
+      prf: new AlgorithmIdentifier({ algorithmId: hmacOid, algorithmParams: new asn1js.Null() }),
+    });
+    const pbes2 = new PBES2Params({
+      keyDerivationFunc: new AlgorithmIdentifier({ algorithmId: this.getOIDByAlgorithm({ name: "PBKDF2" }, true, "PBKDF2"), algorithmParams: pbkdf2.toSchema() }),
+      encryptionScheme: new AlgorithmIdentifier({ algorithmId: contentOid, algorithmParams: new asn1js.OctetString({ valueHex: toArrayBuffer(iv) }) }),
+    });
+    return new EncryptedContentInfo({
+      contentType: parameters.contentType,
+      contentEncryptionAlgorithm: new AlgorithmIdentifier({ algorithmId: PBES2_OID, algorithmParams: pbes2.toSchema() }),
+      encryptedContent: new asn1js.OctetString({ valueHex: encrypted }),
+    });
+  }
+}
+
+setEngine("celestia", new CelestiaCryptoEngine({ name: "celestia", crypto: globalThis.crypto }));
 
 const subtle = globalThis.crypto.subtle;
 const RSA = { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" } as const;

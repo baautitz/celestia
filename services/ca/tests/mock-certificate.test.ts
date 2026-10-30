@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
-import { MemoryDeviceStore } from "../src/iam/device-store.js";
-import { createMockCertificateReader } from "../src/boot/mock-certificate.js";
+import { MemoryDeviceStore } from "../src/device-store.js";
+import { createMockCertificateReader } from "../src/mock-certificate.js";
 
 const input = (n: number) => ({ name: `Caixa ${n}`, fingerprint: n.toString(16).padStart(64, "0"), serial: `0${n}`, notAfter: "2036-01-01T00:00:00.000Z" });
 

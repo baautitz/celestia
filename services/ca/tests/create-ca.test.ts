@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createCaFiles } from "../src/cli/create-ca.js";
-import { DeviceCertificateAuthority } from "../src/iam/device-certificate-authority.js";
+import { DeviceCertificateAuthority } from "../src/authority.js";
 
 const openssl = (args: string[]) => execFileSync("openssl", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 

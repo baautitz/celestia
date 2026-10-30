@@ -13,6 +13,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@platform/shared": path.resolve(__dirname, "./packages/shared/src/index.ts"),
+      "@platform/ca": path.resolve(__dirname, "./services/ca/src/index.ts"),
       "@": path.resolve(__dirname, "./packages/web/src"),
     },
   },

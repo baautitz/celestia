@@ -4,14 +4,10 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Hono } from "hono";
-import { createPlatformApp } from "../src/index.js";
-import { DeviceCertificateAuthority } from "../src/iam/device-certificate-authority.js";
-import { MemoryDeviceStore } from "../src/iam/device-store.js";
-import { createForwardedCertificateReader } from "../src/boot/forwarded-certificate.js";
-import { createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
+import { DeviceCertificateAuthority } from "../src/authority.js";
+import { createForwardedCertificateReader } from "../src/forwarded-certificate.js";
 
 const SECRET = "segredo-do-proxy-com-mais-de-32-caracteres";
-const JSON_HEADERS = { "Content-Type": "application/json" };
 
 let issued: Awaited<ReturnType<DeviceCertificateAuthority["issue"]>>;
 /** Corpo do certificado em base64, como o Traefik o coloca no header (sem as linhas BEGIN/END). */
@@ -77,23 +73,5 @@ describe("certificado repassado pelo proxy (header)", () => {
 
   it("recusa um segredo curto demais, porque ele é a única trava contra um header forjado", () => {
     expect(() => createForwardedCertificateReader({ secret: "curto" })).toThrow(/32/);
-  });
-});
-
-describe("login por certificado repassado pelo proxy", () => {
-  it("só entra quem chega com o segredo e o certificado de um Dispositivo ativo", async () => {
-    const userStore = createSeededUserStore();
-    await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
-    await userStore.createUser({ fullname: "Com Cert", username: "com.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
-    const deviceStore = new MemoryDeviceStore();
-    await deviceStore.create({ name: "Caixa 1", fingerprint: issued.fingerprint, serial: issued.serial, notAfter: issued.notAfter.toISOString() });
-    const app = createPlatformApp({ userStore, deviceStore, clientCertificateFingerprint: createForwardedCertificateReader({ secret: SECRET }) });
-    const login = (headers: Record<string, string>) =>
-      app.request("/api/auth/login", { method: "POST", headers: { ...JSON_HEADERS, ...headers }, body: JSON.stringify({ username: "com.cert", password: TEST_PASSWORD }) });
-
-    expect((await login({ ...proxy, "x-forwarded-tls-client-cert": certBody })).status).toBe(200);
-    expect((await login({ "x-forwarded-tls-client-cert": certBody })).status).toBe(403);
-    expect((await login({ ...proxy })).status).toBe(403);
-    expect((await login({ ...proxy, "x-forwarded-tls-client-cert": otherBody })).status).toBe(403);
   });
 });

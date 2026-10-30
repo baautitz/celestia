@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { MemoryDeviceStore, DeviceNotFoundError, DuplicateDeviceFingerprintError } from "../src/iam/device-store.js";
+import { MemoryDeviceStore, DeviceNotFoundError, DuplicateDeviceFingerprintError } from "../src/device-store.js";
 
 const input = (n: number) => ({
   name: `Caixa ${n}`,

@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { DeviceStore } from "../iam/device-store.js";
+import type { DeviceStore } from "./device-store.js";
 
 /**
  * SÓ PARA DESENVOLVIMENTO: finge que toda requisição veio do Dispositivo ativo com o nome informado, para quem
