@@ -1,4 +1,4 @@
-import { MemoryDeviceStore } from "../src/iam/device-store.js";
+import { unavailableCertificateAuthority } from "../src/iam/certificate-authority-client.js";
 import { AuditLog } from "../src/audit/audit-log.js";
 import { MemoryAuditStore } from "../src/audit/audit-store.js";
 import { describe, it, expect } from "vitest";
@@ -17,8 +17,7 @@ async function boot() {
   const tokenService = new TokenService();
   const mod = createIamModule({
     userStore,
-    deviceStore: new MemoryDeviceStore(),
-    getClientCertificateFingerprint: () => undefined,
+    certificateAuthority: unavailableCertificateAuthority,
     auditLog: new AuditLog(new MemoryAuditStore()),
     tokenService,
     auth: createAuthMiddleware(tokenService, (p) => p),
@@ -62,8 +61,7 @@ describe("catálogo agrupado por Module", () => {
     const tokenService = new TokenService();
     const mod = createIamModule({
       userStore,
-      deviceStore: new MemoryDeviceStore(),
-      getClientCertificateFingerprint: () => undefined,
+      certificateAuthority: unavailableCertificateAuthority,
       auditLog: new AuditLog(new MemoryAuditStore()),
       extraPermissions: [{ key: "pharmacy:audit:run", label: "Auditar", module: "pharmacy" }],
       tokenService,

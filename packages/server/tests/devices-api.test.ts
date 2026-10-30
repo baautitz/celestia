@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,8 +6,7 @@ import { join } from "node:path";
 import { createPlatformApp } from "../src/index.js";
 import { AuditLog } from "../src/audit/audit-log.js";
 import { MemoryAuditStore } from "../src/audit/audit-store.js";
-import { DeviceCertificateAuthority } from "../src/iam/device-certificate-authority.js";
-import { MemoryDeviceStore } from "../src/iam/device-store.js";
+import { createTestCertificateAuthority } from "./helpers/certificate-authority.js";
 import { authHeader, createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -18,12 +17,7 @@ interface Issued {
   password: string;
 }
 
-let caMaterial: Awaited<ReturnType<typeof DeviceCertificateAuthority.create>>;
-beforeAll(async () => {
-  caMaterial = await DeviceCertificateAuthority.create({ commonName: "Celestia CA (teste)" });
-});
-
-async function setup(options: { withCa?: boolean } = {}) {
+async function setup(options: { withAuthority?: boolean } = {}) {
   const userStore = createSeededUserStore({ admin: true });
   await userStore.createRole({
     id: "role_devices",
@@ -35,13 +29,8 @@ async function setup(options: { withCa?: boolean } = {}) {
   await userStore.createUser({ fullname: "Gestor de Dispositivos", username: "gestor.disp", password: TEST_PASSWORD, roleId: "role_devices" });
   await userStore.createUser({ fullname: "Só Leitura", username: "so.leitura", password: TEST_PASSWORD, roleId: "role_read" });
   const auditLog = new AuditLog(new MemoryAuditStore());
-  const deviceStore = new MemoryDeviceStore();
-  const app = createPlatformApp({
-    userStore,
-    deviceStore,
-    auditLog,
-    deviceCertificateAuthority: options.withCa === false ? undefined : new DeviceCertificateAuthority(caMaterial),
-  });
+  const ca = await createTestCertificateAuthority({ withAuthority: options.withAuthority });
+  const app = createPlatformApp({ userStore, auditLog, certificateAuthority: ca.client });
   // Cada Usuário entra uma vez; as requisições seguintes reaproveitam o token na mesma plataforma.
   const tokens = new Map<string, Promise<Record<string, string>>>();
   const as = (username: string) => ({
@@ -52,7 +41,7 @@ async function setup(options: { withCa?: boolean } = {}) {
   });
   const issue = async (username: string, body: object = { name: "Caixa 1" }) =>
     as(username).request("/api/iam/devices", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) });
-  return { app, as, issue, auditLog, deviceStore };
+  return { app, as, issue, auditLog, ca };
 }
 
 describe("Dispositivos (/api/iam/devices)", () => {
@@ -98,20 +87,26 @@ describe("Dispositivos (/api/iam/devices)", () => {
     expect((await issue("gestor.disp", { name: "" })).status).toBe(400);
   });
 
-  it("responde 503 quando a CA não está configurada", async () => {
-    const { as } = await setup({ withCa: false });
-    const res = await as("gestor.disp").request("/api/iam/devices", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name: "Caixa" }) });
+  it("responde 503 quando a autoridade certificadora não tem a CA configurada ou está fora do ar", async () => {
+    const noKey = await setup({ withAuthority: false });
+    const res = await noKey.as("gestor.disp").request("/api/iam/devices", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name: "Caixa" }) });
     expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "A autoridade certificadora não tem a CA configurada." });
+
+    const { as, ca } = await setup();
+    ca.setDown(true);
+    expect((await as("gestor.disp").request("/api/iam/devices")).status).toBe(503);
+    expect((await as("gestor.disp").request("/api/iam/devices", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name: "Caixa" }) })).status).toBe(503);
   });
 
   it("revoga de forma definitiva, e revogar de novo ou um inexistente responde de forma previsível", async () => {
-    const { issue, as, deviceStore } = await setup();
+    const { issue, as, ca } = await setup();
     const created = (await (await issue("gestor.disp")).json()) as Issued;
 
     const revoked = await as("gestor.disp").request(`/api/iam/devices/${created.device.id}/revoke`, { method: "POST" });
     expect(revoked.status).toBe(200);
     expect(await revoked.json()).toMatchObject({ id: created.device.id, status: "revoked" });
-    expect(await deviceStore.findActiveByFingerprint(created.device.fingerprint)).toBeNull();
+    expect(await ca.deviceStore.findActiveByFingerprint(created.device.fingerprint)).toBeNull();
 
     const again = await as("gestor.disp").request(`/api/iam/devices/${created.device.id}/revoke`, { method: "POST" });
     expect(again.status).toBe(200);

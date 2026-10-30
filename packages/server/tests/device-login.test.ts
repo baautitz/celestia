@@ -1,71 +1,77 @@
 import { describe, it, expect } from "vitest";
 import { createPlatformApp } from "../src/index.js";
-import { MemoryDeviceStore } from "../src/iam/device-store.js";
 import { MemoryUserStore } from "../src/iam/user-store.js";
 import { AuditLog } from "../src/audit/audit-log.js";
 import { MemoryAuditStore } from "../src/audit/audit-store.js";
 import { upsertAdminUser } from "../src/cli/create-admin.js";
 import { DEFAULT_ADMIN_ROLE_ID } from "../src/iam/initial-roles.js";
 import { createSeededUserStore, TEST_PASSWORD, withAuth } from "./helpers/fixtures.js";
+import { createTestCertificateAuthority } from "./helpers/certificate-authority.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
-const FINGERPRINT = "a".repeat(64);
-const DENIED = "Este acesso exige um Dispositivo homologado. Fale com um administrador.";
+const DENIED = "Dispositivo não autorizado.";
+const UNAVAILABLE = "A autoridade certificadora não está disponível. Tente novamente em instantes.";
 
-async function setup() {
+async function setup(options: { auditLog?: AuditLog } = {}) {
   const userStore = createSeededUserStore();
   await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
-  await userStore.createUser({ fullname: "Com Cert", username: "com.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
-  await userStore.createUser({
-    fullname: "Sem Cert",
-    username: "sem.cert",
-    password: TEST_PASSWORD,
-    roleId: "role_a",
-    allowWithoutCertificate: true,
-  });
-  const deviceStore = new MemoryDeviceStore();
-  const device = await deviceStore.create({
-    name: "Caixa 1",
-    fingerprint: FINGERPRINT,
-    serial: "01",
-    notAfter: "2036-01-01T00:00:00.000Z",
-  });
-  // Fingerprint que o servidor "leu" do certificado da conexão; muda de um passo para outro.
-  const presented: { fingerprint?: string } = {};
-  const app = createPlatformApp({ userStore, deviceStore, clientCertificateFingerprint: () => presented.fingerprint });
-  const login = (username: string, password = TEST_PASSWORD) =>
-    app.request("/api/auth/login", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ username, password }) });
-  const refresh = (token: string) =>
-    app.request("/api/auth/refresh", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ refresh_token: token }) });
+  const comCert = await userStore.createUser({ fullname: "Com Cert", username: "com.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
+  await userStore.createUser({ fullname: "Sem Cert", username: "sem.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: true });
+  const ca = await createTestCertificateAuthority();
+  const { device } = await ca.issueDevice("Caixa 1");
+  const app = createPlatformApp({ userStore, certificateAuthority: ca.client, auditLog: options.auditLog });
+  const post = (path: string, body: object) => app.request(path, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) });
+  const login = (username: string, password = TEST_PASSWORD) => post("/api/auth/login", { username, password });
+  const refresh = (token: string) => post("/api/auth/refresh", { refresh_token: token });
   const refreshTokenOf = async (res: Response) => ((await res.json()) as { refresh_token: string }).refresh_token;
-  return { presented, deviceStore, device, login, refresh, refreshTokenOf };
+  /** Senha, depois o navegador apresenta `fingerprint` na CA, depois o callback troca o código. */
+  const loginWithCertificate = async (username: string, fingerprint?: string) => {
+    const first = (await (await login(username)).json()) as { certificateRequired: true; verifyUrl: string };
+    const { challengeId, code } = await ca.followVerifyUrl(first.verifyUrl, fingerprint);
+    return post("/api/auth/login/certificate", { challengeId, code });
+  };
+  return { ca, device, comCert, userStore, auditLog: options.auditLog, app, login, refresh, refreshTokenOf, loginWithCertificate, post };
 }
 
-describe("login e refresh com certificado de Dispositivo", () => {
-  it("nega o login de quem exige certificado e não apresentou nenhum", async () => {
+describe("login por certificado de Dispositivo", () => {
+  it("pede o certificado a quem exige, depois da senha, e devolve o link da CA no lugar dos tokens", async () => {
     const { login } = await setup();
     const res = await login("com.cert");
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: DENIED });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ certificateRequired: true, verifyUrl: expect.stringMatching(/^https:\/\/acesso\.exemplo\.com\/verify\?challenge=/) });
   });
 
-  it("aceita o login com o certificado de um Dispositivo ativo", async () => {
-    const { login, presented } = await setup();
-    presented.fingerprint = FINGERPRINT;
-    expect((await login("com.cert")).status).toBe(200);
+  it("entra com o certificado de um Dispositivo ativo", async () => {
+    const { loginWithCertificate, device } = await setup();
+    const res = await loginWithCertificate("com.cert", device.fingerprint);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ accessToken: expect.any(String), user: { username: "com.cert" } });
   });
 
-  it("nega certificado desconhecido e Dispositivo revogado com a mesma mensagem", async () => {
-    const { login, presented, deviceStore, device } = await setup();
-    presented.fingerprint = "b".repeat(64);
-    const unknown = await login("com.cert");
-    expect(unknown.status).toBe(403);
+  it("nega quem não apresentou certificado, certificado desconhecido e Dispositivo revogado com a mesma mensagem", async () => {
+    const { loginWithCertificate, device, ca } = await setup();
+    const none = await loginWithCertificate("com.cert");
+    expect(none.status).toBe(403);
+    expect(await none.json()).toEqual({ error: DENIED });
 
-    presented.fingerprint = FINGERPRINT;
-    await deviceStore.revoke(device.id);
-    const revoked = await login("com.cert");
+    expect((await loginWithCertificate("com.cert", "b".repeat(64))).status).toBe(403);
+
+    await ca.client.revokeDevice(device.id);
+    const revoked = await loginWithCertificate("com.cert", device.fingerprint);
     expect(revoked.status).toBe(403);
-    expect(await revoked.json()).toEqual(await unknown.json());
+    expect(await revoked.json()).toEqual({ error: DENIED });
+  });
+
+  it("o código só vale uma vez e só para o desafio dele", async () => {
+    const { login, post, ca, device } = await setup();
+    const first = (await (await login("com.cert")).json()) as { verifyUrl: string };
+    const second = (await (await login("com.cert")).json()) as { verifyUrl: string };
+    const one = await ca.followVerifyUrl(first.verifyUrl, device.fingerprint);
+    const two = await ca.followVerifyUrl(second.verifyUrl, device.fingerprint);
+
+    expect((await post("/api/auth/login/certificate", { challengeId: two.challengeId, code: one.code })).status).toBe(403);
+    expect((await post("/api/auth/login/certificate", one)).status).toBe(200);
+    expect((await post("/api/auth/login/certificate", one)).status).toBe(403);
   });
 
   it("não revela a exigência de certificado a quem errou a senha", async () => {
@@ -75,52 +81,58 @@ describe("login e refresh com certificado de Dispositivo", () => {
     expect(await res.json()).toEqual({ error: "Credenciais inválidas." });
   });
 
-  it("deixa entrar sem certificado quem tem a opção de acesso sem certificado", async () => {
-    const { login, presented } = await setup();
-    expect((await login("sem.cert")).status).toBe(200);
-    presented.fingerprint = "b".repeat(64);
-    expect((await login("sem.cert")).status).toBe(200);
+  it("deixa entrar só com a senha quem tem a opção de acesso sem certificado, mesmo com a CA fora do ar", async () => {
+    const { login, ca } = await setup();
+    ca.setDown(true);
+    const res = await login("sem.cert");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ accessToken: expect.any(String) });
   });
 
-  it("aceita um leitor de certificado assíncrono", async () => {
-    const { presented, deviceStore } = await setup();
-    void presented;
-    const userStore = createSeededUserStore();
-    await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
-    await userStore.createUser({ fullname: "Com Cert", username: "com.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
-    const app = createPlatformApp({ userStore, deviceStore, clientCertificateFingerprint: async () => FINGERPRINT });
-    const res = await app.request("/api/auth/login", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ username: "com.cert", password: TEST_PASSWORD }) });
-    expect(res.status).toBe(200);
+  it("falha fechado com 503 quando a CA está fora do ar, só para quem exige certificado", async () => {
+    const { login, post, ca } = await setup();
+    ca.setDown(true);
+    const res = await login("com.cert");
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: UNAVAILABLE });
+    expect((await post("/api/auth/login/certificate", { challengeId: "x", code: "y" })).status).toBe(503);
   });
 
   it("renova a sessão sem pedir o certificado de novo enquanto o Dispositivo estiver ativo", async () => {
-    const { login, refresh, refreshTokenOf, presented } = await setup();
-    presented.fingerprint = FINGERPRINT;
-    const token = await refreshTokenOf(await login("com.cert"));
+    const { loginWithCertificate, refresh, refreshTokenOf, device } = await setup();
+    const token = await refreshTokenOf(await loginWithCertificate("com.cert", device.fingerprint));
 
-    presented.fingerprint = undefined;
     const renewed = await refresh(token);
     expect(renewed.status).toBe(200);
     expect((await refresh(await refreshTokenOf(renewed))).status).toBe(200);
   });
 
   it("recusa a renovação quando o Dispositivo da sessão foi revogado", async () => {
-    const { login, refresh, refreshTokenOf, presented, deviceStore, device } = await setup();
-    presented.fingerprint = FINGERPRINT;
-    const token = await refreshTokenOf(await login("com.cert"));
+    const { loginWithCertificate, refresh, refreshTokenOf, ca, device } = await setup();
+    const token = await refreshTokenOf(await loginWithCertificate("com.cert", device.fingerprint));
 
-    await deviceStore.revoke(device.id, "admin-1");
+    await ca.client.revokeDevice(device.id, "admin-1");
 
     expect((await refresh(token)).status).toBe(401);
   });
 
-  it("não prende a sessão de quem tem a opção ao Dispositivo apresentado", async () => {
-    const { login, refresh, refreshTokenOf, presented, deviceStore, device } = await setup();
-    presented.fingerprint = FINGERPRINT;
+  it("recusa a renovação com 503, e não a renova às cegas, quando a CA está fora do ar", async () => {
+    const { loginWithCertificate, refresh, refreshTokenOf, ca, device } = await setup();
+    const token = await refreshTokenOf(await loginWithCertificate("com.cert", device.fingerprint));
+
+    ca.setDown(true);
+    const res = await refresh(token);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: UNAVAILABLE });
+
+    ca.setDown(false);
+    expect((await refresh(token)).status).toBe(200);
+  });
+
+  it("não prende a sessão de quem tem a opção a um Dispositivo", async () => {
+    const { login, refresh, refreshTokenOf, ca, device } = await setup();
     const token = await refreshTokenOf(await login("sem.cert"));
-
-    await deviceStore.revoke(device.id);
-
+    await ca.client.revokeDevice(device.id);
     expect((await refresh(token)).status).toBe(200);
   });
 });
@@ -179,39 +191,30 @@ describe("acesso sem certificado: quem altera e o que acontece com as sessões",
 
 describe("Audit Log do acesso por certificado", () => {
   it("registra o login negado por falta de certificado, e só depois da senha correta", async () => {
-    const userStore = createSeededUserStore();
-    await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
-    const user = await userStore.createUser({ fullname: "Com Cert", username: "com.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
     const auditLog = new AuditLog(new MemoryAuditStore());
-    const app = createPlatformApp({ userStore, auditLog });
-    const login = (password: string) =>
-      app.request("/api/auth/login", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ username: "com.cert", password }) });
+    const { comCert: user, login, loginWithCertificate } = await setup({ auditLog });
 
-    await login("SenhaErrada@1");
+    await login("com.cert", "SenhaErrada@1");
     expect(await auditLog.list({ plugin: "iam" })).toEqual([]);
 
-    expect((await login(TEST_PASSWORD)).status).toBe(403);
+    // A senha certa só abre o desafio; a negação é registrada quando o certificado não aparece.
+    expect((await login("com.cert")).status).toBe(200);
+    expect(await auditLog.list({ plugin: "iam" })).toEqual([]);
+
+    expect((await loginWithCertificate("com.cert")).status).toBe(403);
     const [entry] = await auditLog.list({ plugin: "iam" });
     expect(entry).toMatchObject({ action: "deny_login_without_certificate", actorId: user.id, targetId: user.id });
     expect(entry?.summary).toBe('Negou o login de "com.cert": o acesso exige o certificado de um Dispositivo ativo.');
   });
 
   it("registra o login que entrou por um Dispositivo, e nenhum quando o acesso foi sem certificado", async () => {
-    const userStore = createSeededUserStore();
-    await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
-    const user = await userStore.createUser({ fullname: "Com Cert", username: "com.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
-    await userStore.createUser({ fullname: "Sem Cert", username: "sem.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: true });
-    const deviceStore = new MemoryDeviceStore();
-    const device = await deviceStore.create({ name: "Caixa 1", fingerprint: FINGERPRINT, serial: "01", notAfter: "2036-01-01T00:00:00.000Z" });
     const auditLog = new AuditLog(new MemoryAuditStore());
-    const app = createPlatformApp({ userStore, deviceStore, auditLog, clientCertificateFingerprint: () => FINGERPRINT });
-    const login = (username: string) =>
-      app.request("/api/auth/login", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ username, password: TEST_PASSWORD }) });
+    const { comCert: user, device, login, loginWithCertificate } = await setup({ auditLog });
 
     expect((await login("sem.cert")).status).toBe(200);
     expect(await auditLog.list({ plugin: "iam" })).toEqual([]);
 
-    expect((await login("com.cert")).status).toBe(200);
+    expect((await loginWithCertificate("com.cert", device.fingerprint)).status).toBe(200);
     const [entry] = await auditLog.list({ plugin: "iam" });
     expect(entry).toMatchObject({ action: "login_with_device", actorId: user.id, actorName: "Com Cert", targetType: "device", targetId: device.id });
     expect(entry?.summary).toBe('Entrou pelo Dispositivo "Caixa 1".');

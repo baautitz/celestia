@@ -8,8 +8,6 @@ import { upsertAdminUser } from "../src/cli/create-admin.js";
 import { createPlatform } from "../src/index.js";
 import { DEFAULT_ADMIN_ROLE_ID, INITIAL_ROLES } from "../src/iam/initial-roles.js";
 import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
-import { PostgresDeviceStore } from "../src/iam/postgres-device-store.js";
-import { DeviceNotFoundError, DuplicateDeviceFingerprintError } from "../src/iam/device-store.js";
 import { LastAdminError } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
@@ -45,8 +43,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor e remover o tipo); os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 4 : 1);
+        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -64,7 +62,6 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "closing_period", name: "periods" },
         { schema: "erp", name: "erps" },
         { schema: "erp", name: "user_externals" },
-        { schema: "iam", name: "devices" },
         { schema: "iam", name: "roles" },
         { schema: "iam", name: "users" },
       ]);
@@ -116,7 +113,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, iam.devices, erp.erps, closing_period.periods CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods CASCADE`);
     });
 
     describe("Users e Roles", () => {
@@ -165,34 +162,6 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         expect((await store.findById(user.id))?.isAdmin).toBe(true);
         expect(await store.syncOrphanPermissions(new Set(["system:users:read"]))).toBe(1);
         expect((await store.getRole("r1"))?.permissions).toEqual(["system:users:read", "*"]);
-      });
-    });
-
-    describe("Dispositivos", () => {
-      const input = (n: number) => ({
-        name: `Caixa ${n}`,
-        fingerprint: n.toString(16).padStart(64, "0"),
-        serial: `0${n}`,
-        notAfter: "2036-01-01T00:00:00.000Z",
-      });
-      it("registra, encontra só o ativo e revoga de forma definitiva e idempotente", async () => {
-        const store = new PostgresDeviceStore(db);
-        const device = await store.create(input(1));
-        expect(await store.findActiveByFingerprint(input(1).fingerprint)).toEqual(device);
-
-        const revoked = await store.revoke(device.id, "admin-1");
-        expect(revoked).toMatchObject({ status: "revoked", revokedBy: "admin-1" });
-        expect(await store.findActiveByFingerprint(input(1).fingerprint)).toBeNull();
-        expect(await store.revoke(device.id, "admin-2")).toEqual(revoked);
-        expect(await store.list()).toEqual([revoked]);
-      });
-      it("recusa fingerprint duplicado e revogação de Dispositivo inexistente", async () => {
-        const store = new PostgresDeviceStore(db);
-        await store.create(input(1));
-        await expect(store.create({ ...input(2), fingerprint: input(1).fingerprint })).rejects.toBeInstanceOf(
-          DuplicateDeviceFingerprintError,
-        );
-        await expect(store.revoke("nao-existe")).rejects.toBeInstanceOf(DeviceNotFoundError);
       });
     });
 

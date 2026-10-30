@@ -1,4 +1,4 @@
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
@@ -17,9 +17,8 @@ import { MemoryAuditStore } from "./audit/audit-store.js";
 import { createAuditModule } from "./audit/audit-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
-import { MemoryDeviceStore, type DeviceStore } from "./iam/device-store.js";
-import { DeviceCertificateAuthority } from "./iam/device-certificate-authority.js";
-import { clientCertificateReader, loadServerSecurity } from "./boot/client-certificate.js";
+import { unavailableCertificateAuthority, type CertificateAuthorityClient } from "./iam/certificate-authority-client.js";
+import { loadCertificateAuthorityClient } from "./boot/certificate-authority.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
@@ -33,11 +32,8 @@ export interface CreatePlatformAppOptions {
   erpExternalsStore?: ErpExternalsStore;
   clientFactory?: ErpClientFactory;
   userStore?: UserStore;
-  deviceStore?: DeviceStore;
-  /** CA que emite os certificados dos Dispositivos; sem ela a emissão responde 503. */
-  deviceCertificateAuthority?: DeviceCertificateAuthority;
-  /** Fingerprint do certificado de cliente da conexão. Em produção vem do header que o proxy repassa; no desenvolvimento, de uma simulação; nos testes é injetado. */
-  clientCertificateFingerprint?: (c: Context) => string | undefined | Promise<string | undefined>;
+  /** Autoridade certificadora dos Dispositivos. Sem ela, quem exige certificado não entra (falha fechado). */
+  certificateAuthority?: CertificateAuthorityClient;
   tokenService?: TokenService;
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
@@ -73,9 +69,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   const allDrivers = { ...ERP_DRIVERS, ...extraDrivers };
   const clientFactory = options?.clientFactory || createErpClientFactory(allDrivers);
   const userStore = options?.userStore || new MemoryUserStore();
-  const deviceStore = options?.deviceStore || new MemoryDeviceStore();
-  // Sem leitor de certificado configurado ninguém apresenta certificado: quem exige é negado (falha fechado).
-  const clientCertificateFingerprint = options?.clientCertificateFingerprint ?? (() => undefined);
+  const certificateAuthority = options?.certificateAuthority ?? unavailableCertificateAuthority;
   const tokenService = options?.tokenService || new TokenService();
   const closingPeriodStore = options?.closingPeriodStore || new MemoryClosingPeriodStore();
 
@@ -98,7 +92,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   // Base System: iam e audit. Plugins: closing_period e erp (ADR 0003). Todos compartilham o registro de Permissions.
   const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
   const entries: ModuleEntry[] = [
-    { tier: "base", def: createIamModule({ userStore, deviceStore, deviceCertificateAuthority: options?.deviceCertificateAuthority, auditLog, getClientCertificateFingerprint: clientCertificateFingerprint, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
+    { tier: "base", def: createIamModule({ userStore, certificateAuthority, auditLog, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
     { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auditLog, auth }) },
     {
@@ -155,25 +149,22 @@ const isMain =
 
 if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
   void (async () => {
-    // Falha antes de qualquer outra coisa: em produção, sem a fonte do certificado e a CA o servidor não sobe.
-    const security = loadServerSecurity();
+    // Falha antes de qualquer outra coisa: sem a chave em comum com a CA (e, em produção, o endereço dela) o servidor não sobe.
+    const certificateAuthority = loadCertificateAuthorityClient();
     let userStore: UserStore | undefined;
-    let deviceStore: DeviceStore | undefined;
     const erpClients: ErpClientRegistry = {};
     let erpStore: ErpStore | undefined;
     let erpExternalsStore: ErpExternalsStore | undefined;
     let closingPeriodStore: ClosingPeriodStore | undefined;
     let auditLog: AuditLog | undefined;
     if (process.env.POSTGRES_HOST) {
-      const [{ db }, { PostgresUserStore }, { PostgresDeviceStore }, { PostgresErpStore }, { PostgresClosingPeriodStore }] = await Promise.all([
+      const [{ db }, { PostgresUserStore }, { PostgresErpStore }, { PostgresClosingPeriodStore }] = await Promise.all([
         import("./db/client.js"),
         import("./iam/postgres-user-store.js"),
-        import("./iam/postgres-device-store.js"),
         import("./erp/postgres-erp-store.js"),
         import("./closing-period/postgres-closing-period-store.js"),
       ]);
       userStore = new PostgresUserStore(db);
-      deviceStore = new PostgresDeviceStore(db);
       erpStore = new PostgresErpStore(db);
       const { PostgresErpExternalsStore } = await import("./erp/postgres-erp-externals-store.js");
       erpExternalsStore = new PostgresErpExternalsStore(db);
@@ -191,13 +182,9 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       }
     }
 
-    // A simulação do certificado consulta a mesma store de Dispositivos que a plataforma usa.
-    const devices = deviceStore ?? new MemoryDeviceStore();
     const platform = createPlatform({
       userStore,
-      deviceStore: devices,
-      deviceCertificateAuthority: security.ca ? new DeviceCertificateAuthority(security.ca) : undefined,
-      clientCertificateFingerprint: clientCertificateReader(security, devices),
+      certificateAuthority,
       erpStore, erpExternalsStore, closingPeriodStore,
       erpClients,
       auditLog,
@@ -210,11 +197,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     await platform.start(); // falha de Module do Base System derruba o boot
     const app = platform.app;
     const port = Number(process.env.PORT) || 3000;
-    const notes = {
-      header: "atrás do proxy: o certificado vem do header repassado por ele",
-      mock: `⚠️  CERTIFICADO SIMULADO (só desenvolvimento): ${security.mock?.deviceName ? `toda requisição vale como o Dispositivo "${security.mock.deviceName}"` : "ninguém apresenta certificado"}`,
-    } as const;
-    console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port} (${notes[security.source]})`);
+    console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
     serve({ fetch: app.fetch, port });
   })();
 }

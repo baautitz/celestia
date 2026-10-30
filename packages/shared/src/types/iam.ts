@@ -74,6 +74,15 @@ export interface AuthTokens {
 }
 
 /**
+ * Resposta do login quando o usuário exige o certificado de um Dispositivo: o navegador segue `verifyUrl`
+ * (a autoridade certificadora, onde ele apresenta o certificado) e volta ao app pelo callback.
+ */
+export interface LoginCertificateRequired {
+  certificateRequired: true;
+  verifyUrl: string;
+}
+
+/**
  * Inputs para endpoints de autenticação e gestão de usuários.
  */
 export interface LoginInput {
