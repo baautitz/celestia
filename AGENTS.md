@@ -33,6 +33,7 @@ celestia/
 │   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi, WindowActions), DataTable, forms, defineWebModule
 │   ├── web/      (@platform/web)    SPA: modules.ts registry, pages (Login, IAMUsers, IAMRoles, ERPs, ClosingPeriodsPage, AuditLogPage)
 │   └── e2e/      (@platform/e2e)    Playwright E2E suite against in-memory Hono API + Vite SPA
+├── services/     (@platform/ca)     certificate authority service: issues, revokes and reads Device certificates (schema `ca`, own process)
 ├── integrations/ Customer Plugins (e.g. integrations/inovafarma); boundary checked by `pnpm check:plugins`
 ├── docs/         adr/, conventions/ (database, ui, permissions, plugins, testing), agents/, security-audit.md
 └── scripts/      check-ui-boundaries.mjs, check-plugin-boundaries.mjs, test-db.mjs
@@ -48,7 +49,8 @@ See [package.json](package.json) for all workspace scripts:
 pnpm build             # build all packages (server depends on shared and core dist)
 pnpm test              # Vitest unit & component suite
 pnpm test:db           # Vitest suite + Postgres integration tests (throwaway Docker Postgres)
-pnpm db:migrate        # apply all Module migrations in dependency order
+pnpm db:migrate        # apply all Module migrations in dependency order (server Modules, then the certificate authority)
+pnpm dev               # run the server, the certificate authority and the web app together
 pnpm create-admin      # create or promote (--force) an Administrator user
 pnpm test:e2e          # Playwright E2E suite
 pnpm lint              # ESLint across workspaces
@@ -65,7 +67,7 @@ pnpm check:plugins     # Plugin boundary check (integrations import only @platfo
 - **Database & Bootstrap** — [docs/conventions/database.md](docs/conventions/database.md): per-Module Postgres schema and `migrations/` directory, `pnpm db:migrate`, initial Roles (`gestor`, `operador`), and `pnpm create-admin`.
 - **Permissions & Events** — [docs/conventions/permissions.md](docs/conventions/permissions.md): `<module>:<resource>:<verb>` naming, `deniedMessage` in PT-BR, and `before`/`after` module events.
 - **UI** — [docs/conventions/ui.md](docs/conventions/ui.md): primitives from `@platform/ui/components/*`, `useUi()` windows/sheets with `<WindowActions>`, `<HeaderActions>`, `<DataTable>`, `Form*` + `<Label>`, `<MoneyInput />`, `<InputGroup>`, `<Button size="default" | "icon">`. Enforced by `pnpm check:ui`.
-- **Device certificates** — [docs/conventions/device-certificates.md](docs/conventions/device-certificates.md): access by Device (client certificate validated by the Traefik proxy and forwarded in a header, `pnpm create-ca`, `CLIENT_CERT_SOURCE`, `PROXY_SHARED_SECRET` and `DEVICE_CA_*` env vars, fail-closed in production).
+- **Device certificates** — [docs/conventions/device-certificates.md](docs/conventions/device-certificates.md): access by Device through the separate certificate authority service (`services/ca`, two-step login with a callback, shared key `CA_SHARED_SECRET`, `CA_CERT_SOURCE`, `CA_PROXY_SECRET`, `DEVICE_CA_*` env vars, `pnpm create-ca`, fail-closed in production). See [ADR 0006](docs/adr/0006-autoridade-certificadora-como-servico-separado.md).
 - **Plugins** — [docs/conventions/plugins.md](docs/conventions/plugins.md): customer Plugins under `integrations/<name>/`, registered in `packages/server/src/plugins.ts` and `packages/web/src/modules.ts`. Enforced by `pnpm check:plugins`.
 - **Testing** — [docs/conventions/testing.md](docs/conventions/testing.md): Vitest component tests (`jsdom`) and Playwright E2E (`packages/e2e`) querying by role/label.
 

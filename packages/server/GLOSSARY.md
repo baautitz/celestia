@@ -64,16 +64,8 @@ _Avoid_: Perfil de Acesso, group, profile
 Stop a User from signing in while keeping the User. A deactivated User is not removed.
 _Avoid_: Delete, remove, block
 
-**Device** (pt-BR: **Dispositivo**):
-A computer or phone that Celestia approved, holding a certificate that Celestia issued for it. A Device belongs to the company, not to a User, so any User who requires a certificate can sign in from any active Device.
-_Avoid_: Computador, Terminal, Máquina, Certificado (as the name of the Device)
-
-**Revoke** (a Device):
-Stop a Device from being accepted while keeping its record. A revoked Device cannot be reactivated; a new Device must be issued.
-_Avoid_: Delete, remove, cancel
-
 **Certificate Exemption** (pt-BR: **Acesso sem certificado**):
-A flag on a User that lets them sign in without presenting a Device certificate. Without it, every User must present the certificate of an active Device.
+A flag on a User that lets them sign in without presenting a Device certificate (see the [Certificate Authority glossary](../../services/ca/GLOSSARY.md)). Without it, every User must present the certificate of an active Device.
 _Avoid_: Bypass, whitelist
 
 **Permission**:

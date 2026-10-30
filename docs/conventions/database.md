@@ -16,6 +16,8 @@ Cada **Module** com persistência em Postgres declara:
 2. Sua própria pasta `src/<module>/migrations/` referenciada no `defineModule({ ..., migrations })`.
 3. Uma tabela de controle isolada em `drizzle.__migrations_<moduleId>`, gerenciada por `runModuleMigrations` (`@platform/core/migrations`).
 
+A autoridade certificadora (`services/ca`, serviço à parte, não é um Module) segue a mesma regra com o schema `ca` (`ca.devices`), as migrations em `services/ca/src/migrations` e o `moduleId` `ca`; o `pnpm db:migrate` aplica as dos Modules e depois as dela.
+
 As migrations só evoluem para a frente: uma migration já aplicada nunca é editada. Toda mudança de schema vira uma migration nova, com nome descritivo (p.ex. `<timestamp>_add_devices_and_certificate_exemption`). A primeira de cada Module cria as tabelas (`<timestamp>_create_<descricao>`).
 
 Para gerar a migration de uma mudança a partir do `schema.ts` do Module (o `drizzle-kit` compara com o último `snapshot.json`):
