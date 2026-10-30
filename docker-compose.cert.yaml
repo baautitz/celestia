@@ -1,0 +1,26 @@
+# Traefik SÓ PARA DESENVOLVIMENTO: testa o login por certificado de Dispositivo de verdade, no navegador.
+# Em produção o Traefik é o do Dokploy, configurado separadamente (ver docs/conventions/device-certificates.md).
+#
+# Uso (com CLIENT_CERT_SOURCE=header e PROXY_SHARED_SECRET no .env, e a CA criada com `pnpm create-ca`):
+#   docker compose -f docker-compose.cert.yaml up          # sobe o Traefik em https://localhost:8443
+#   pnpm dev:server && pnpm dev:web                         # a API e o Vite, como sempre
+# O banco continua sendo o do docker-compose.yml (`docker compose up -d postgres`); este arquivo só sobe o Traefik.
+#
+# O Traefik usa a rede do host (só Linux) para alcançar o Vite em 127.0.0.1:5173 sem expor o Vite na rede.
+services:
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - --entrypoints.websecure.address=127.0.0.1:8443
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
+      - --log.level=INFO
+    environment:
+      PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:?defina PROXY_SHARED_SECRET no .env (mínimo 32 caracteres)}
+      CERT_UPSTREAM: ${CERT_UPSTREAM:-http://127.0.0.1:5173}
+    volumes:
+      - ./dev/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      # Só o certificado público da CA entra no Traefik; a chave fica onde o app a lê.
+      - ${DEVICE_CA_CERT_FILE:?defina DEVICE_CA_CERT_FILE no .env}:/certs/ca.crt:ro
