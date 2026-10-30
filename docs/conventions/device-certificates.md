@@ -4,23 +4,22 @@ Acesso por **Device** (Dispositivo): o Celestia emite um certificado de cliente 
 
 ## Como funciona
 
-- Quem **termina o TLS** é quem vê o certificado do cliente. Atrás de uma CDN ou de um proxy que termina o TLS, o Node não o vê. Por isso há três **fontes** do certificado (`CLIENT_CERT_SOURCE`), todas terminando na mesma regra: o app calcula o fingerprint (SHA-256 do DER) e consulta a tabela de Dispositivos.
+- Quem **termina o TLS** é quem vê o certificado do cliente. O Node nunca termina TLS: ele fica atrás de um proxy (o Traefik do Dokploy), que valida o certificado contra a CA do Celestia e o repassa em um header. O app calcula o fingerprint (SHA-256 do DER) e consulta a tabela de Dispositivos. Há duas **fontes** do certificado (`CLIENT_CERT_SOURCE`): `header` (produção) e `mock` (desenvolvimento).
 - O certificado é conferido **no login**. O refresh não o pede de novo: o refresh token guarda o Dispositivo, e a renovação é recusada se ele foi revogado (o cliente web faz logout). Sessões caem em até 5 minutos, a janela do Access Token.
 - Quem exige certificado e não o apresenta é negado pela aplicação (403), com a mesma mensagem para qualquer motivo. Mudar a opção **Acesso sem certificado** de um Usuário encerra as sessões dele, e só administradores a alteram.
 
 ## Fontes do certificado (`CLIENT_CERT_SOURCE`)
 
-| Fonte | Quem termina o TLS | Variáveis | Uso |
-| --- | --- | --- | --- |
-| `socket` (padrão) | O próprio Node | `TLS_CERT_FILE`, `TLS_KEY_FILE`, `DEVICE_CA_CERT_FILE`, `DEVICE_CA_KEY_FILE` | Node exposto direto. Pede o certificado e valida a cadeia contra a CA. |
-| `header` | Um proxy (Traefik) | `PROXY_SHARED_SECRET` (mín. 32 caracteres), `DEVICE_CA_CERT_FILE`, `DEVICE_CA_KEY_FILE` | **Produção atrás do Traefik do Dokploy.** O proxy valida a cadeia e repassa o certificado. |
-| `mock` | Ninguém | `DEV_CLIENT_CERT_DEVICE` (opcional) | **Só desenvolvimento.** Recusado em produção. |
+| Fonte | Variáveis | Uso |
+| --- | --- | --- |
+| `header` | `PROXY_SHARED_SECRET` (mín. 32 caracteres), `DEVICE_CA_CERT_FILE`, `DEVICE_CA_KEY_FILE` | **Produção atrás do Traefik do Dokploy.** O proxy valida a cadeia e repassa o certificado. |
+| `mock` | `DEV_CLIENT_CERT_DEVICE` (opcional) | **Só desenvolvimento.** Recusado em produção. |
 
-Em produção o servidor não sobe sem a configuração completa da fonte (falha fechada). Configuração pela metade é erro em qualquer ambiente. Opcionais da fonte `header`: `CLIENT_CERT_HEADER` (padrão `x-forwarded-tls-client-cert`) e `PROXY_SECRET_HEADER` (padrão `x-celestia-proxy-secret`).
+Em produção `CLIENT_CERT_SOURCE=header` é obrigatório e o servidor não sobe sem a configuração completa (falha fechada). Fora de produção, sem nenhuma configuração, ninguém apresenta certificado (só entra quem tem o acesso sem certificado). Configuração pela metade é erro em qualquer ambiente. Opcionais da fonte `header`: `CLIENT_CERT_HEADER` (padrão `x-forwarded-tls-client-cert`) e `PROXY_SECRET_HEADER` (padrão `x-celestia-proxy-secret`).
 
 ### Produção com Traefik (fonte `header`)
 
-O Traefik termina o TLS com o certificado do Let's Encrypt, **exige o certificado de cliente assinado pela CA do Celestia** e repassa o certificado ao app. O app só confia no header junto do segredo do proxy, e fica sem porta publicada: só o Traefik o alcança, pela rede interna.
+O Traefik termina o TLS com o certificado do Let's Encrypt (o Node não tem certificado de site), **exige o certificado de cliente assinado pela CA do Celestia** e repassa o certificado ao app. O app só confia no header junto do segredo do proxy, e fica sem porta publicada: só o Traefik o alcança, pela rede interna.
 
 Use um endereço próprio para o login por certificado (como o gov.br), com a nuvem da Cloudflare **desligada** (só DNS): a Cloudflare, quando faz proxy, termina o TLS e o certificado não chega ao servidor. O mTLS da Cloudflare com a **sua** CA é só do plano Enterprise. O endereço sem certificado (para quem tem a opção ligada) pode continuar atrás da Cloudflare.
 
