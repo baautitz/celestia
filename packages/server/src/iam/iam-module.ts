@@ -73,7 +73,7 @@ const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total
  *
  * Eventos (before/after; o payload nunca carrega senha nem passwordHash):
  * iam.login, iam.user.create, iam.user.update, iam.user.delete, iam.user.reset_password,
- * iam.role.create, iam.role.update. Um `before` que cancela responde 409 com o motivo.
+ * iam.role.create, iam.role.update, iam.device.create, iam.device.revoke. Um `before` que cancela responde 409 com o motivo.
  */
 export function createIamModule({
   userStore,
@@ -97,6 +97,13 @@ export function createIamModule({
       declareIamAudit(auditLog);
       permissions.registerProvider(() => extraPermissions.map((p) => ({ ...p, module: p.module ?? "system" })));
       const cancelled = (c: Context, reason: string) => c.json({ error: reason }, 409);
+      const P = IAM_PERMISSIONS.keys;
+      const recordIamAudit = (actor: { id: string; name: string }, action: string, target: { type: string; id: string }, attributes: Record<string, unknown>) =>
+        auditLog.record({ plugin: IAM_AUDIT_PLUGIN, action, actor, target, attributes });
+      const requestActor = (c: Context) => {
+        const caller = getAuthenticatedUser(c);
+        return { id: caller.sub, name: caller.fullname };
+      };
 
       routes.post(
         "/auth/login",
@@ -120,21 +127,15 @@ export function createIamModule({
 
           // Sem a opção de acesso sem certificado, o certificado de um Dispositivo ativo é obrigatório. Só se avalia
           // depois da senha, para não revelar a exigência a quem não a conhece, e a mensagem não distingue o motivo.
-          let deviceId: string | undefined;
+          let usedDevice: { id: string; name: string } | undefined;
           if (!user.allowWithoutCertificate) {
             const fingerprint = getClientCertificateFingerprint(c)?.toLowerCase();
             const device = fingerprint ? await deviceStore.findActiveByFingerprint(fingerprint) : null;
             if (!device) {
-              await auditLog.record({
-                plugin: IAM_AUDIT_PLUGIN,
-                action: "deny_login_without_certificate",
-                actor: { id: user.id, name: user.fullname },
-                target: { type: USER_AUDIT_TARGET, id: user.id },
-                attributes: { username: user.username },
-              });
+              await recordIamAudit({ id: user.id, name: user.fullname }, "deny_login_without_certificate", { type: USER_AUDIT_TARGET, id: user.id }, { username: user.username });
               return c.json({ error: CERTIFICATE_REQUIRED }, 403);
             }
-            deviceId = device.id;
+            usedDevice = { id: device.id, name: device.name };
           }
           loginRateLimiter.recordSuccess(username);
 
@@ -142,12 +143,15 @@ export function createIamModule({
           let tokens: { accessToken: string; refreshToken: string; payload: JWTAccessPayload } | undefined;
           const ran = await events.run("iam.login", { userId: user.id, username: user.username }, async () => {
             const access = await tokenService.generateAccessToken(user, role || undefined);
-            const refresh = await tokenService.generateRefreshToken(user, deviceId);
+            const refresh = await tokenService.generateRefreshToken(user, usedDevice?.id);
             tokens = { accessToken: access.token, refreshToken: refresh.token, payload: access.payload };
           });
           if (ran.cancelled) return cancelled(c, ran.reason);
           if (!tokens) return c.json({ error: "Credenciais inválidas." }, 401);
           const { accessToken, refreshToken, payload } = tokens;
+          if (usedDevice) {
+            await recordIamAudit({ id: user.id, name: user.fullname }, "login_with_device", { type: DEVICE_AUDIT_TARGET, id: usedDevice.id }, { username: user.username, deviceName: usedDevice.name });
+          }
 
           setCookie(c, "refresh_token", refreshToken, refreshCookie());
 
@@ -233,7 +237,6 @@ export function createIamModule({
       routes.get("/auth/me", auth, async (c) => c.json(c.get("user")));
 
       // ───────── Users e Roles ─────────
-      const P = IAM_PERMISSIONS.keys;
       const actorOf = (c: Context): string => getAuthenticatedUser(c).sub;
       const failure = (err: unknown, fallback: string): string => (err instanceof Error ? err.message : fallback);
 
@@ -259,34 +262,17 @@ export function createIamModule({
         return c.json({ system: grouped });
       });
 
-      const auditExemption = (c: Context, target: { id: string; username: string }, allowWithoutCertificate: boolean) => {
-        const actor = getAuthenticatedUser(c);
-        return auditLog.record({
-          plugin: IAM_AUDIT_PLUGIN,
-          action: "change_certificate_exemption",
-          actor: { id: actor.sub, name: actor.fullname },
-          target: { type: USER_AUDIT_TARGET, id: target.id },
-          attributes: { username: target.username, allowWithoutCertificate },
-        });
-      };
+      const auditExemption = (c: Context, target: { id: string; username: string }, allowWithoutCertificate: boolean) =>
+        recordIamAudit(requestActor(c), "change_certificate_exemption", { type: USER_AUDIT_TARGET, id: target.id }, { username: target.username, allowWithoutCertificate });
 
       // ───────── Dispositivos ─────────
-      const D = IAM_PERMISSIONS.keys;
       const DeviceBody = z.object({ name: z.string().trim().min(1).max(100) });
-      const auditDevice = (c: Context, action: "issue_device" | "revoke_device", device: { id: string; name: string }) => {
-        const actor = getAuthenticatedUser(c);
-        return auditLog.record({
-          plugin: IAM_AUDIT_PLUGIN,
-          action,
-          actor: { id: actor.sub, name: actor.fullname },
-          target: { type: DEVICE_AUDIT_TARGET, id: device.id },
-          attributes: { name: device.name },
-        });
-      };
+      const auditDevice = (c: Context, action: "issue_device" | "revoke_device", device: { id: string; name: string }) =>
+        recordIamAudit(requestActor(c), action, { type: DEVICE_AUDIT_TARGET, id: device.id }, { name: device.name });
 
-      routes.get("/iam/devices", auth, requirePermission(D["devices:read"]), async (c) => c.json(await deviceStore.list()));
+      routes.get("/iam/devices", auth, requirePermission(P["devices:read"]), async (c) => c.json(await deviceStore.list()));
 
-      routes.post("/iam/devices", auth, requirePermission(D["devices:create"]), zValidator("json", DeviceBody), async (c) => {
+      routes.post("/iam/devices", auth, requirePermission(P["devices:create"]), zValidator("json", DeviceBody), async (c) => {
         if (!deviceCertificateAuthority) {
           return c.json({ error: "A autoridade certificadora não está configurada neste servidor." }, 503);
         }
@@ -310,7 +296,7 @@ export function createIamModule({
         return c.json({ device, pfx: Buffer.from(issued.pfx).toString("base64"), password: issued.password }, 201);
       });
 
-      routes.post("/iam/devices/:id/revoke", auth, requirePermission(D["devices:revoke"]), async (c) => {
+      routes.post("/iam/devices/:id/revoke", auth, requirePermission(P["devices:revoke"]), async (c) => {
         const id = c.req.param("id");
         const actor = getAuthenticatedUser(c);
         try {

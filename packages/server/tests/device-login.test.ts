@@ -185,6 +185,27 @@ describe("Audit Log do acesso por certificado", () => {
     expect(entry?.summary).toBe('Negou o login de "com.cert": o acesso exige o certificado de um Dispositivo ativo.');
   });
 
+  it("registra o login que entrou por um Dispositivo, e nenhum quando o acesso foi sem certificado", async () => {
+    const userStore = createSeededUserStore();
+    await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
+    const user = await userStore.createUser({ fullname: "Com Cert", username: "com.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: false });
+    await userStore.createUser({ fullname: "Sem Cert", username: "sem.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: true });
+    const deviceStore = new MemoryDeviceStore();
+    const device = await deviceStore.create({ name: "Caixa 1", fingerprint: FINGERPRINT, serial: "01", notAfter: "2036-01-01T00:00:00.000Z" });
+    const auditLog = new AuditLog(new MemoryAuditStore());
+    const app = createPlatformApp({ userStore, deviceStore, auditLog, clientCertificateFingerprint: () => FINGERPRINT });
+    const login = (username: string) =>
+      app.request("/api/auth/login", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ username, password: TEST_PASSWORD }) });
+
+    expect((await login("sem.cert")).status).toBe(200);
+    expect(await auditLog.list({ plugin: "iam" })).toEqual([]);
+
+    expect((await login("com.cert")).status).toBe(200);
+    const [entry] = await auditLog.list({ plugin: "iam" });
+    expect(entry).toMatchObject({ action: "login_with_device", actorId: user.id, actorName: "Com Cert", targetType: "device", targetId: device.id });
+    expect(entry?.summary).toBe('Entrou pelo Dispositivo "Caixa 1".');
+  });
+
   it("registra quando a opção de acesso sem certificado muda, e só quando muda", async () => {
     const userStore = createSeededUserStore({ admin: true });
     await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });
