@@ -11,14 +11,25 @@ import type {
   ErpInput,
   AuditLogEntry,
   AuditLogFilter,
+  Device,
+  IssuedDevice,
 } from "@platform/shared";
 
 class ApiClient {
   private accessToken: string | null = null;
   private refreshPromise: Promise<string | null> | null = null;
+  private sessionExpiredHandler: (() => void) | null = null;
+  // Evita avisar mais de uma vez por sessão encerrada, mesmo com várias requisições falhando em sequência.
+  private sessionExpiredNotified = false;
 
   setAccessToken(token: string | null) {
     this.accessToken = token;
+    if (token) this.sessionExpiredNotified = false;
+  }
+
+  /** Chamado quando o servidor recusa renovar a sessão (ex.: o Dispositivo foi revogado); o cliente deve sair. */
+  onSessionExpired(handler: (() => void) | null) {
+    this.sessionExpiredHandler = handler;
   }
 
   getAccessToken(): string | null {
@@ -85,6 +96,10 @@ class ApiClient {
 
         if (!res.ok) {
           this.setAccessToken(null);
+          if (!this.sessionExpiredNotified) {
+            this.sessionExpiredNotified = true;
+            this.sessionExpiredHandler?.();
+          }
           return null;
         }
 
@@ -143,6 +158,7 @@ class ApiClient {
       email: string;
       password: string;
       roleId: string;
+      allowWithoutCertificate?: boolean;
     }): Promise<User> => {
       return this.request<User>("/api/iam/users", {
         method: "POST",
@@ -168,6 +184,21 @@ class ApiClient {
       return this.request<{ success: boolean }>(`/api/iam/users/${id}`, {
         method: "DELETE",
       });
+    },
+
+    listDevices: async (): Promise<Device[]> => {
+      return this.request<Device[]>("/api/iam/devices");
+    },
+
+    issueDevice: async (input: { name: string }): Promise<IssuedDevice> => {
+      return this.request<IssuedDevice>("/api/iam/devices", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    revokeDevice: async (id: string): Promise<Device> => {
+      return this.request<Device>(`/api/iam/devices/${id}/revoke`, { method: "POST" });
     },
 
     listRoles: async (): Promise<Role[]> => {

@@ -34,6 +34,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser();
   }, []);
 
+  // O servidor recusou renovar a sessão (ex.: o Dispositivo foi revogado): sai do cliente em vez de ficar "logado" com erro.
+  useEffect(() => {
+    api.onSessionExpired(() => setUser(null));
+    return () => api.onSessionExpired(null);
+  }, []);
+
   const login = async (username: string, password: string) => {
     const tokens = await api.auth.login(username, password);
     if (tokens.user) {
