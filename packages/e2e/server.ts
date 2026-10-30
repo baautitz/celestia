@@ -6,6 +6,7 @@ const { serve } = await import("@hono/node-server");
 const { createPlatformApp } = await import("../server/src/index.ts");
 const { MemoryUserStore } = await import("../server/src/iam/user-store.ts");
 const { PasswordService } = await import("../server/src/iam/password-service.ts");
+const { DeviceCertificateAuthority } = await import("../server/src/iam/device-certificate-authority.ts");
 const { ADMIN_USERNAME, ADMIN_PASSWORD } = await import("./tests/credentials.ts");
 
 const store = new MemoryUserStore({
@@ -30,5 +31,7 @@ const store = new MemoryUserStore({
 await store.setAdmin("usr_e2e_admin", true);
 
 const port = Number(process.env.E2E_API_PORT) || 3100;
-serve({ fetch: createPlatformApp({ userStore: store }).fetch, port });
+// CA só em memória: o e2e emite e revoga Dispositivos sem tocar em arquivo.
+const deviceCertificateAuthority = new DeviceCertificateAuthority(await DeviceCertificateAuthority.create({ commonName: "Celestia CA (e2e)" }));
+serve({ fetch: createPlatformApp({ userStore: store, deviceCertificateAuthority }).fetch, port });
 console.log(`Backend E2E em http://localhost:${port}`);
