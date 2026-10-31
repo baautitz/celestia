@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+.agents
+.vscode
+.env
+.env.*
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/coverage
+**/test-results
+**/playwright-report
+docs
+dev
