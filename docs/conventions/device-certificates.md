@@ -35,13 +35,13 @@ Em produção a CA só sobe com `CA_CERT_SOURCE=header` e a configuração compl
 
 ## Produção com Traefik (fonte `header`)
 
-O Traefik termina o TLS com o certificado do Let's Encrypt, **exige o certificado de cliente assinado pela CA do Celestia** e o repassa à CA. A CA só confia no header junto do segredo do proxy. A CA e o app ficam sem porta publicada: só o Traefik os alcança, pela rede interna, e **só `/verify` da CA é exposto**; a API da CA (`/devices`, `/challenges`) é interna, usada só pelo backend.
+O Traefik termina o TLS com o certificado do Let's Encrypt, **valida o certificado de cliente assinado pela CA do Celestia, quando o navegador apresenta um,** e o repassa à CA. A CA só confia no header junto do segredo do proxy. A CA e o app ficam sem porta publicada: só o Traefik os alcança, pela rede interna, e **só `/verify` da CA é exposto**; a API da CA (`/devices`, `/challenges`) é interna, usada só pelo backend.
 
 Use um endereço próprio para a leitura do certificado (`acesso.<domínio>`), com a nuvem da Cloudflare **desligada** (só DNS): a Cloudflare, quando faz proxy, termina o TLS e o certificado não chega ao servidor. O mTLS da Cloudflare com a **sua** CA é só do plano Enterprise. O app (`app.<domínio>`) não pede certificado e pode continuar atrás da Cloudflare. Como é só esse endereço que exige certificado, quem não tem um recebe a mensagem do app depois da senha, e não um erro de SSL.
 
 Configuração dinâmica do Traefik (arquivo, não labels: as opções de TLS só existem no arquivo). Use `dev/traefik/dynamic.yml` como modelo; os pontos que importam:
 
-- `tls.options.default.clientAuth`: `caFiles` com **só o certificado público** da CA (`ca.crt`), e `clientAuthType: RequireAndVerifyClientCert` para o endereço `acesso.`. Sem certificado válido nem o handshake completa.
+- `tls.options.default.clientAuth`: `caFiles` com **só o certificado público** da CA (`ca.crt`), e `clientAuthType: VerifyClientCertIfGiven` para o endereço `acesso.`. Um certificado inválido ainda derruba o handshake; sem certificado a conexão segue, a CA não acha Dispositivo e o app nega o acesso (nunca use `NoClientCert`, e não use `RequireAndVerifyClientCert`: o navegador mostraria `ERR_BAD_SSL_CLIENT_AUTH_CERT`).
 - `passTLSClientCert` com `pem: true`: repassa o certificado em `X-Forwarded-Tls-Client-Cert` (base64 do DER, em URL-encoding). O Traefik descarta o header se o cliente o mandar.
 - `headers.customRequestHeaders` com `X-Celestia-Proxy-Secret` igual ao `CA_PROXY_SECRET` da CA. Sobrescreve o que o cliente mandar.
 - Roteador ``Host(`acesso.<domínio>`) && Path(`/verify`)`` apontando para a CA.
