@@ -12,7 +12,7 @@ const config = loadCaConfig();
 let deviceStore: DeviceStore;
 if (process.env.POSTGRES_HOST) {
   const [{ db }, { PostgresDeviceStore }] = await Promise.all([import("./db.js"), import("./postgres-device-store.js")]);
-  // Verifica (sem aplicar) que as migrations estão em dia; aplicar é sempre explícito, por `pnpm --filter @platform/ca db:migrate`.
+  // Verifica (sem aplicar) que as migrations estão em dia; aplicar é por `pnpm --filter @platform/ca db:migrate` ou pelo start.sh da imagem.
   await assertMigrationsUpToDate(db, [CA_MIGRATIONS]);
   deviceStore = new PostgresDeviceStore(db);
 } else {
