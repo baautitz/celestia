@@ -29,7 +29,7 @@ Requer Node.js >= 24, pnpm e Docker (para o Postgres).
 
 ```bash
 pnpm install
-cp .env.example .env            # preencha os valores; as instruções estão no próprio arquivo
+cp .env.dev.example .env            # preencha os valores; as instruções estão no próprio arquivo
 docker compose up -d postgres
 pnpm build
 pnpm db:migrate

@@ -1,0 +1,48 @@
+# Producao: configuracao dinamica do Traefik para o endereco da CA (services/ca). Para desenvolvimento, veja dev/traefik/dynamic.yml.
+# Guia: docs/conventions/device-certificates.md
+# Copie para a pasta dinamica do Traefik (no Dokploy, /etc/dokploy/traefik/dynamic/celestia-ca.yml) e preencha os <...>.
+# O arquivo real tem o segredo do proxy: nao o coloque no repositorio.
+# Nao cadastre este dominio na tela de dominios do Dokploy: outro router no mesmo host causa conflito de opcoes de TLS.
+
+tls:
+  options:
+    # Opcao propria, nao `default`: a `default` valeria para todo host sem opcao propria, como o app e o painel do Dokploy.
+    device-cert:
+      clientAuth:
+        # So o certificado publico da CA. O caminho e o de dentro do container do Traefik.
+        caFiles:
+          - /etc/dokploy/traefik/dynamic/certificates/ca.crt
+        # IfGiven, nao Require: quem nao tem certificado chega a /verify e ve a negacao do app, nao um erro de SSL.
+        clientAuthType: VerifyClientCertIfGiven
+
+http:
+  middlewares:
+    # Repassa o certificado validado. O Traefik descarta qualquer X-Forwarded-Tls-Client-Cert enviado pelo cliente.
+    client-cert:
+      passTLSClientCert:
+        pem: true
+    # A CA so aceita o certificado repassado se vier com este segredo. Sobrescreve o que o cliente mandar.
+    proxy-secret:
+      headers:
+        customRequestHeaders:
+          X-Celestia-Proxy-Secret: "<CA_PROXY_SECRET>"
+
+  routers:
+    # So a rota /verify e exposta: a API da CA e interna e fala so com o backend.
+    celestia-ca:
+      rule: "Host(`<dominio-da-ca>`) && Path(`/verify`)"
+      entryPoints:
+        - websecure
+      service: celestia-ca
+      middlewares:
+        - client-cert
+        - proxy-secret
+      tls:
+        certResolver: letsencrypt
+        options: device-cert
+
+  services:
+    celestia-ca:
+      loadBalancer:
+        servers:
+          - url: "http://<nome-interno-da-ca>:3001"
