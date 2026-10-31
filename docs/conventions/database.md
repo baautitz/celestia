@@ -36,7 +36,7 @@ pnpm --filter @platform/server exec drizzle-kit generate \
 
 ## 2. Aplicando Migrations (`pnpm db:migrate`)
 
-O servidor **não** aplica migrations automaticamente no boot; o boot apenas verifica se há migrations pendentes (`assertMigrationsUpToDate`) e falha nomeando o Module caso haja.
+O processo do servidor **não** aplica migrations no boot; ele apenas verifica se há migrations pendentes (`assertMigrationsUpToDate`) e falha nomeando o Module caso haja. Em produção, quem aplica é o `start.sh` de cada imagem, a cada subida do container, antes de iniciar o processo (ver [Imagens Docker](./device-certificates.md#imagens-docker)).
 
 Para aplicar todas as migrations na ordem do grafo de dependências (`migrationPlan(platform.modules)`):
 
