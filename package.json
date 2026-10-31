@@ -4,7 +4,8 @@
   "packageManager": "pnpm@10.18.2",
   "workspaces": [
     "integrations/*",
-    "packages/*"
+    "packages/*",
+    "services/*"
   ],
   "scripts": {
     "build": "pnpm -r run build",
@@ -14,12 +15,16 @@
     "check:ui:test": "node scripts/check-ui-boundaries.test.mjs",
     "test:e2e": "pnpm --filter @platform/e2e test",
     "test:db": "node scripts/test-db.mjs",
-    "db:migrate": "pnpm --filter @platform/server db:migrate",
+    "db:migrate": "pnpm --filter @platform/server db:migrate && pnpm --filter @platform/ca db:migrate",
     "create-admin": "pnpm --filter @platform/server create-admin",
+    "create-ca": "pnpm --filter @platform/ca create-ca",
     "erp:query": "pnpm --filter @platform/server erp:query",
     "test:watch": "vitest",
+    "dev": "pnpm --parallel --filter @platform/server --filter @platform/ca --filter @platform/web dev",
     "dev:server": "pnpm --filter @platform/server dev",
+    "dev:ca": "pnpm --filter @platform/ca dev",
     "dev:web": "pnpm --filter @platform/web dev",
+    "dev:cert": "docker compose -f docker-compose.cert.yaml up",
     "lint": "pnpm -r run lint",
     "check": "pnpm check:ui && pnpm check:ui:test && pnpm check:plugins && pnpm lint && pnpm build && pnpm test",
     "prepare": "node scripts/setup-git-hooks.mjs"

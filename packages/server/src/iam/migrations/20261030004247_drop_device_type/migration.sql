@@ -1,0 +1,1 @@
+ALTER TABLE "iam"."devices" DROP COLUMN "type";

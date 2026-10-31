@@ -64,6 +64,10 @@ _Avoid_: Perfil de Acesso, group, profile
 Stop a User from signing in while keeping the User. A deactivated User is not removed.
 _Avoid_: Delete, remove, block
 
+**Certificate Exemption** (pt-BR: **Acesso sem certificado**):
+A flag on a User that lets them sign in without presenting a Device certificate (see the [Certificate Authority glossary](../../services/ca/GLOSSARY.md)). Without it, every User must present the certificate of an active Device.
+_Avoid_: Bypass, whitelist
+
 **Permission**:
 A key that authorizes one action, written `<module>:<resource>:<verb>`.
 _Avoid_: Privilege, right, scope

@@ -1,6 +1,6 @@
 # Banco de Dados, Migrations e Bootstrap
 
-Regras para schemas Postgres, migrations por **Module**, **Roles** iniciais e criação do primeiro **Administrator** (ver [ADR 0004](../adr/0004-sem-compatibilidade-banco-reconstruido.md) e [Server Glossary](../../packages/server/GLOSSARY.md)).
+Regras para schemas Postgres, migrations por **Module**, **Roles** iniciais e criação do primeiro **Administrator** (ver [Server Glossary](../../packages/server/GLOSSARY.md)).
 
 ---
 
@@ -16,19 +16,21 @@ Cada **Module** com persistência em Postgres declara:
 2. Sua própria pasta `src/<module>/migrations/` referenciada no `defineModule({ ..., migrations })`.
 3. Uma tabela de controle isolada em `drizzle.__migrations_<moduleId>`, gerenciada por `runModuleMigrations` (`@platform/core/migrations`).
 
-Enquanto o [ADR 0004](../adr/0004-sem-compatibilidade-banco-reconstruido.md) estiver em vigor, as migrations de cada Module são regeneradas do zero (uma migration inicial com nome descritivo por Module, p.ex. `<timestamp>_create_iam_tables`).
+A autoridade certificadora (`services/ca`, serviço à parte, não é um Module) segue a mesma regra com o schema `ca` (`ca.devices`), as migrations em `services/ca/src/migrations` e o `moduleId` `ca`; o `pnpm db:migrate` aplica as dos Modules e depois as dela.
 
-Para regenerar a migration de um Module a partir do seu `schema.ts`:
+As migrations só evoluem para a frente: uma migration já aplicada nunca é editada. Toda mudança de schema vira uma migration nova, com nome descritivo (p.ex. `<timestamp>_add_devices_and_certificate_exemption`). A primeira de cada Module cria as tabelas (`<timestamp>_create_<descricao>`).
+
+Para gerar a migration de uma mudança a partir do `schema.ts` do Module (o `drizzle-kit` compara com o último `snapshot.json`):
 
 ```bash
 pnpm --filter @platform/server exec drizzle-kit generate \
   --dialect postgresql \
   --schema ./src/<module>/schema.ts \
   --out ./src/<module>/migrations \
-  --name create_<descricao>
+  --name <descricao_da_mudanca>
 ```
 
-> **Atenção**: garanta `CREATE SCHEMA IF NOT EXISTS "<schema>";` no `migration.sql` gerado, pois `runModuleMigrations` cria o schema antes de invocar o migrator do Drizzle.
+> **Atenção**: na primeira migration de um Module, garanta `CREATE SCHEMA IF NOT EXISTS "<schema>";` no `migration.sql` gerado, pois `runModuleMigrations` cria o schema antes de invocar o migrator do Drizzle. Quando a mudança precisar acertar dados já existentes (p.ex. um `UPDATE` para uma coluna nova), acrescente o SQL à mão na migration gerada.
 
 ---
 
@@ -53,7 +55,7 @@ Todo banco recém-migrado já sobe com dois **Roles** iniciais semeados de forma
 
 | ID (`roles.id`) | Nome       | Descrição                                                                 | Permissões iniciais |
 | --------------- | ---------- | ------------------------------------------------------------------------- | ------------------- |
-| `gestor`        | `Gestor`   | Gestão de usuários, perfis, ERPs, períodos de fechamento e consulta de auditoria. | Todas as permissões de `iam`, `audit`, `erp` e `closing_period` (`system:users:*`, `system:roles:*`, `system:audit:read`, `system:erps:manage`, `closing_period:period:*`). |
+| `gestor`        | `Gestor`   | Gestão de usuários, perfis, ERPs, períodos de fechamento e consulta de auditoria. | Todas as permissões de `iam`, `audit`, `erp` e `closing_period` (`system:users:*`, `system:roles:*`, `system:devices:*`, `system:audit:read`, `system:erps:manage`, `closing_period:period:*`). |
 | `operador`      | `Operador` | Operação de períodos de fechamento.                                       | `closing_period:period:read`, `closing_period:period:create`, `closing_period:period:update`, `closing_period:period:close`. |
 
 Se um build de cliente não incluir algum Plugin, a poda de permissões órfãs no boot (`syncOrphanPermissions`) remove automaticamente das Roles as chaves de Plugins ausentes.

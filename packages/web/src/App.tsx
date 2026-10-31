@@ -1,5 +1,6 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { LoginCertificatePage } from "./pages/LoginCertificatePage";
 import { LoginPage } from "./pages/LoginPage";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
@@ -49,6 +50,7 @@ export const App: React.FC = () => {
       <Routes>
         {/* Rota Pública de Autenticação */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/login/certificado" element={<LoginCertificatePage />} />
 
         {/* Rotas Protegidas Autenticadas com Layout Corporativo */}
         <Route element={<ProtectedRoute />}>

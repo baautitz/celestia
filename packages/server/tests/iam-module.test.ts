@@ -1,3 +1,6 @@
+import { unavailableCertificateAuthority } from "../src/iam/certificate-authority-client.js";
+import { AuditLog } from "../src/audit/audit-log.js";
+import { MemoryAuditStore } from "../src/audit/audit-store.js";
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { loadModules } from "@platform/core/loader";
@@ -14,6 +17,8 @@ async function boot() {
   const tokenService = new TokenService();
   const mod = createIamModule({
     userStore,
+    certificateAuthority: unavailableCertificateAuthority,
+    auditLog: new AuditLog(new MemoryAuditStore()),
     tokenService,
     auth: createAuthMiddleware(tokenService, (p) => p),
     withAdminBypass: (p) => p,
@@ -56,6 +61,8 @@ describe("catálogo agrupado por Module", () => {
     const tokenService = new TokenService();
     const mod = createIamModule({
       userStore,
+      certificateAuthority: unavailableCertificateAuthority,
+      auditLog: new AuditLog(new MemoryAuditStore()),
       extraPermissions: [{ key: "pharmacy:audit:run", label: "Auditar", module: "pharmacy" }],
       tokenService,
       auth: createAuthMiddleware(tokenService, (p) => p),

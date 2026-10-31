@@ -17,6 +17,8 @@ import { MemoryAuditStore } from "./audit/audit-store.js";
 import { createAuditModule } from "./audit/audit-module.js";
 import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
+import { unavailableCertificateAuthority, type CertificateAuthorityClient } from "./iam/certificate-authority-client.js";
+import { loadCertificateAuthorityClient } from "./boot/certificate-authority.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
@@ -30,6 +32,8 @@ export interface CreatePlatformAppOptions {
   erpExternalsStore?: ErpExternalsStore;
   clientFactory?: ErpClientFactory;
   userStore?: UserStore;
+  /** Autoridade certificadora dos Dispositivos. Sem ela, quem exige certificado não entra (falha fechado). */
+  certificateAuthority?: CertificateAuthorityClient;
   tokenService?: TokenService;
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
@@ -65,6 +69,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   const allDrivers = { ...ERP_DRIVERS, ...extraDrivers };
   const clientFactory = options?.clientFactory || createErpClientFactory(allDrivers);
   const userStore = options?.userStore || new MemoryUserStore();
+  const certificateAuthority = options?.certificateAuthority ?? unavailableCertificateAuthority;
   const tokenService = options?.tokenService || new TokenService();
   const closingPeriodStore = options?.closingPeriodStore || new MemoryClosingPeriodStore();
 
@@ -87,7 +92,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   // Base System: iam e audit. Plugins: closing_period e erp (ADR 0003). Todos compartilham o registro de Permissions.
   const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
   const entries: ModuleEntry[] = [
-    { tier: "base", def: createIamModule({ userStore, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
+    { tier: "base", def: createIamModule({ userStore, certificateAuthority, auditLog, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
     { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auditLog, auth }) },
     {
@@ -144,6 +149,8 @@ const isMain =
 
 if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
   void (async () => {
+    // Falha antes de qualquer outra coisa: sem a chave em comum com a CA (e, em produção, o endereço dela) o servidor não sobe.
+    const certificateAuthority = loadCertificateAuthorityClient();
     let userStore: UserStore | undefined;
     const erpClients: ErpClientRegistry = {};
     let erpStore: ErpStore | undefined;
@@ -175,7 +182,13 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       }
     }
 
-    const platform = createPlatform({ userStore, erpStore, erpExternalsStore, closingPeriodStore, erpClients, auditLog });
+    const platform = createPlatform({
+      userStore,
+      certificateAuthority,
+      erpStore, erpExternalsStore, closingPeriodStore,
+      erpClients,
+      auditLog,
+    });
     if (process.env.POSTGRES_HOST) {
       // Verifica (sem aplicar) que as migrations dos Modules estão em dia; a mensagem nomeia o Module.
       const { db } = await import("./db/client.js");

@@ -24,6 +24,7 @@ export default defineConfig({
       url: `http://localhost:${API_PORT}/api/health`,
       env: {
         E2E_API_PORT: String(API_PORT),
+        E2E_WEB_PORT: String(WEB_PORT),
         // Chave AES-256 descartavel, so para os testes (cifra a senha da conexao).
         ERP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
       },

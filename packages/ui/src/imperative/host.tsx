@@ -77,13 +77,13 @@ function ManagedWindow({ entry, controller }: {
           </Sheet>
         ) : (
           <Dialog open onOpenChange={onOpenChange}>
-            <DialogContent className={options.size === "small" ? "gap-0 sm:max-w-md" : "gap-0 sm:max-w-lg"}>
+            <DialogContent className={options.size === "small" ? "sm:max-w-md" : "sm:max-w-lg"}>
               <DialogHeader>
                 <DialogTitle>{title}</DialogTitle>
                 {options.description && <DialogDescription>{options.description}</DialogDescription>}
               </DialogHeader>
               {body}
-              <DialogFooter ref={setFooter} className="gap-2" />
+              <DialogFooter ref={setFooter} className="gap-2 empty:hidden" />
             </DialogContent>
           </Dialog>
         )}
