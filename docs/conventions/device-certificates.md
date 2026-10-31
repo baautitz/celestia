@@ -47,7 +47,31 @@ Configuração dinâmica do Traefik (arquivo, não labels: as opções de TLS s�
 - Roteador ``Host(`acesso.<domínio>`) && Path(`/verify`)`` apontando para a CA.
 - O Let's Encrypt continua no roteador, como no resto do Dokploy. Se usar uma porta separada (ex.: 8443) só para esse endereço, o firewall pode liberar a 443 apenas aos IPs da Cloudflare.
 
-A CA sobe como mais um serviço ao lado do app e do Postgres: `pnpm --filter @platform/ca build` e `pnpm --filter @platform/ca start` (`node dist/main.js`), depois de `pnpm db:migrate`.
+A CA sobe como mais um serviço ao lado do app e do Postgres, pela imagem `celestia-ca`.
+
+## Imagens Docker
+
+Construa as duas da raiz do repositório. O Postgres é um serviço à parte, indicado por `POSTGRES_*`.
+
+```bash
+docker build -f packages/server/Dockerfile -t celestia .
+docker build -f services/ca/Dockerfile -t celestia-ca .
+```
+
+| Imagem | Porta | Healthcheck | Ao subir (`start.sh`) |
+| --- | --- | --- | --- |
+| `celestia` | 3000 | `/api/health` | Aplica as migrations dos Modules e inicia a API, que também serve o SPA. |
+| `celestia-ca` | 3001 | `/health` | Cria a CA se o volume estiver vazio, aplica as migrations da CA e inicia o serviço. |
+
+Qualquer falha impede o serviço de subir, inclusive banco fora do ar: configure a política de restart no Dokploy. Nenhuma das duas portas é publicada; só o Traefik as alcança.
+
+Instalação de uma instância:
+
+1. Monte um volume nomeado em `/data/ca`, só no `celestia-ca`. Ele guarda a `ca.key`.
+2. No primeiro boot da CA, copie o certificado público mostrado no log para o `caFiles` do Traefik e faça backup da `ca.key`.
+3. Crie o primeiro administrador: `docker exec -it <container celestia> node dist/cli/create-admin.js --username admin --fullname "Administrador"`.
+
+Se o volume da CA for perdido, o boot cria **outra** CA e os Dispositivos antigos deixam de valer: restaure o backup antes de subir. Com só um dos dois arquivos, o container recusa subir.
 
 ## Desenvolvimento
 

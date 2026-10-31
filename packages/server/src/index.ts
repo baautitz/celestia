@@ -19,6 +19,7 @@ import { TokenService } from "./iam/token-service.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { unavailableCertificateAuthority, type CertificateAuthorityClient } from "./iam/certificate-authority-client.js";
 import { loadCertificateAuthorityClient } from "./boot/certificate-authority.js";
+import { serveWebApp } from "./boot/web-app.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
@@ -196,6 +197,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     }
     await platform.start(); // falha de Module do Base System derruba o boot
     const app = platform.app;
+    if (process.env.WEB_ROOT) serveWebApp(app, process.env.WEB_ROOT);
     const port = Number(process.env.PORT) || 3000;
     console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
     serve({ fetch: app.fetch, port });
