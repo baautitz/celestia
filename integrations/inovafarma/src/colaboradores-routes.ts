@@ -91,6 +91,26 @@ function camposDoVinculo(vinculo: VinculoColaborador | null, usuarios: UsuarioRe
   };
 }
 
+type TipoAviso = "usuario_desativado" | "inativo_no_erp" | "loja_nao_encontrada" | "colaborador_nao_encontrado";
+interface Aviso {
+  tipo: TipoAviso;
+  mensagem: string;
+}
+
+/** O que mudou fora da tela desde a gravação do vínculo; o vínculo é mantido e a pessoa decide o que fazer. */
+function avisosDoVinculo(vinculo: VinculoColaborador | null, colaborador: ColaboradorErp | undefined, usuarios: UsuarioResumo[], lojas: LojaOpcao[]): Aviso[] {
+  if (!vinculo) return [];
+  const avisos: Aviso[] = [];
+  if (!colaborador) avisos.push({ tipo: "colaborador_nao_encontrado", mensagem: "Não encontrado no ERP" });
+  else if (!colaborador.ativo) avisos.push({ tipo: "inativo_no_erp", mensagem: "Inativo no ERP" });
+  const usuario = usuarios.find((u) => u.id === vinculo.usuarioId);
+  if (usuario && usuario.status !== "active") avisos.push({ tipo: "usuario_desativado", mensagem: "Usuário desativado" });
+  for (const codigo of vinculo.lojas) {
+    if (!lojas.some((l) => l.codigo === codigo)) avisos.push({ tipo: "loja_nao_encontrada", mensagem: `Loja não encontrada (cód. ${codigo})` });
+  }
+  return avisos;
+}
+
 /** Rotas de Colaboradores: listagem com o vínculo de cada um e gravação do vínculo por linha. */
 export function registerColaboradoresRoutes({ routes, permissions, auth, erpClient, store, users, audit, plugin }: ColaboradoresRoutesDeps): void {
   routes.get("/colaboradores", auth, async (c: AuthContext) => {
@@ -114,8 +134,15 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
 
     const [vinculos, usuarios] = await Promise.all([store.list(), users.list()]);
     const porCodigo = new Map(vinculos.map((v) => [v.codigoColaborador, v]));
+    const linha = (col: ColaboradorErp, encontrado: boolean) => {
+      const vinculo = porCodigo.get(col.codigoColaborador) ?? null;
+      return { ...col, ...camposDoVinculo(vinculo, usuarios), avisos: avisosDoVinculo(vinculo, encontrado ? col : undefined, usuarios, lojas) };
+    };
+    const noErp = new Set(colaboradores.map((col) => col.codigoColaborador));
+    // O ERP não informa mais o nome de quem sumiu, e o vínculo não o guarda.
+    const sumidos = vinculos.filter((v) => !noErp.has(v.codigoColaborador)).map((v) => ({ codigoColaborador: v.codigoColaborador, nome: `Colaborador ${v.codigoColaborador}`, ativo: false }));
     return c.json({
-      colaboradores: colaboradores.map((col) => ({ ...col, ...camposDoVinculo(porCodigo.get(col.codigoColaborador) ?? null, usuarios) })),
+      colaboradores: [...colaboradores.map((col) => linha(col, true)), ...sumidos.map((col) => linha(col, false))],
       usuarios: usuarios
         .filter((u) => u.status === "active")
         .map(({ id, fullname, username }) => ({ id, fullname, username }))
@@ -158,7 +185,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     if ((atual?.version ?? 0) !== version) return c.json({ error: VERSAO_DESATUALIZADA }, 409);
 
     const usuarios = await users.list();
-    const responder = (vinculo: VinculoColaborador | null) => c.json({ codigoColaborador, ...camposDoVinculo(vinculo, usuarios) });
+    const responder = (vinculo: VinculoColaborador | null) => c.json({ codigoColaborador, ...camposDoVinculo(vinculo, usuarios), avisos: avisosDoVinculo(vinculo, colaborador, usuarios, lojasErp) });
 
     // Sem mudança não é alteração: nada a gravar nem a auditar.
     const lojasAnteriores = atual?.lojas ?? [];

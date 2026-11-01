@@ -67,7 +67,7 @@ async function boot(permissions: string[] = [VIEW, UPDATE], erpClients: Record<s
     const res = await platform.app.request("/api/m/inovafarma/colaboradores", { headers });
     expect(res.status).toBe(200);
     return (await res.json()) as {
-      colaboradores: { codigoColaborador: number; confirmado: boolean; usuarioId: string | null; lojas: number[]; version: number; usuario: Record<string, unknown> | null }[];
+      colaboradores: { codigoColaborador: number; confirmado: boolean; usuarioId: string | null; lojas: number[]; version: number; usuario: Record<string, unknown> | null; avisos: { tipo: string; mensagem: string }[]; nome: string; ativo: boolean }[];
       usuarios: Record<string, unknown>[];
       lojas: unknown[];
     };
@@ -77,7 +77,7 @@ async function boot(permissions: string[] = [VIEW, UPDATE], erpClients: Record<s
     expect(res.status).toBe(200);
     return (await res.json()) as { action: string; actorId: string; targetType: string; targetId: string; attributes: unknown; summary: string }[];
   };
-  return { platform, salvar, listar, auditoria };
+  return { platform, userStore, salvar, listar, auditoria };
 }
 
 describe("Vínculo do Colaborador com Usuário", () => {
@@ -89,7 +89,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
   it("lista Pendente sem vínculo e oferece só Usuários ativos, sem dados além dos expostos pelo iam", async () => {
     const { listar } = await boot();
     const { colaboradores, usuarios } = await listar();
-    expect(colaboradores[0]).toEqual({ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, confirmado: false, usuarioId: null, usuario: null, lojas: [], version: 0 });
+    expect(colaboradores[0]).toEqual({ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, confirmado: false, usuarioId: null, usuario: null, lojas: [], version: 0, avisos: [] });
     expect(usuarios.map((u) => u.id)).toEqual(expect.arrayContaining(["ana", "bia"]));
     expect(usuarios.map((u) => u.id)).not.toContain("caio");
     expect(Object.keys(usuarios[0]!).sort()).toEqual(["fullname", "id", "username"]);
@@ -282,6 +282,65 @@ describe("Vínculo do Colaborador com Usuário", () => {
       expect((await auditoria()).map((e) => e.summary)).toContain(
         'Alterou o Usuário do Colaborador "ANA SOUZA" (cód. 7) de "Ana Souza" para "Bia Lima" e as Lojas de "Centro" para nenhuma.',
       );
+    });
+  });
+
+  describe("Avisos de vínculos desatualizados", () => {
+    const linha = (lista: Awaited<ReturnType<Awaited<ReturnType<typeof boot>>["listar"]>>, codigo: number) => lista.colaboradores.find((c) => c.codigoColaborador === codigo);
+
+    it("avisa Usuário desativado e mantém o vínculo", async () => {
+      const { salvar, listar, userStore } = await boot();
+      await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+      await userStore.updateUser("ana", { status: "inactive" });
+      expect(linha(await listar(), 7)).toMatchObject({
+        confirmado: true,
+        usuarioId: "ana",
+        avisos: [{ tipo: "usuario_desativado", mensagem: "Usuário desativado" }],
+      });
+    });
+
+    it("avisa Colaborador inativo só quando tem vínculo", async () => {
+      const { salvar, listar } = await boot();
+      expect(linha(await listar(), 9)?.avisos).toEqual([]);
+      await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
+      expect(linha(await listar(), 9)?.avisos).toEqual([{ tipo: "inativo_no_erp", mensagem: "Inativo no ERP" }]);
+    });
+
+    it("avisa cada Loja vinculada que saiu do ERP", async () => {
+      const { salvar, listar } = await boot();
+      const saiu = LOJAS[2]!;
+      await salvar(7, { usuarioId: null, lojas: [1, saiu.codigoEmpresa], version: 0 });
+      LOJAS.pop();
+      try {
+        expect(linha(await listar(), 7)?.avisos).toEqual([{ tipo: "loja_nao_encontrada", mensagem: "Loja não encontrada (cód. 3)" }]);
+      } finally {
+        LOJAS.push(saiu);
+      }
+    });
+
+    it("Colaborador vinculado que sumiu do ERP vira linha com aviso, e desfazer libera o Usuário", async () => {
+      const { salvar, listar } = await boot();
+      const sumiu = COLABORADORES[1]!;
+      await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
+      COLABORADORES.pop();
+      try {
+        const orfao = linha(await listar(), 9);
+        expect(orfao).toMatchObject({ confirmado: true, usuarioId: "ana", ativo: false, avisos: [{ tipo: "colaborador_nao_encontrado", mensagem: "Não encontrado no ERP" }] });
+        expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(409);
+
+        const desfeito = await salvar(9, { usuarioId: null, lojas: [], version: 1 });
+        expect(await desfeito.json()).toMatchObject({ confirmado: false, avisos: [] });
+        expect(linha(await listar(), 9)).toBeUndefined();
+        expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(200);
+      } finally {
+        COLABORADORES.push(sumiu);
+      }
+    });
+
+    it("a gravação devolve os avisos atualizados da linha", async () => {
+      const { salvar } = await boot();
+      const res = await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
+      expect(await res.json()).toMatchObject({ avisos: [{ tipo: "inativo_no_erp" }] });
     });
   });
 });
