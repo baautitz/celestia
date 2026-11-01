@@ -25,7 +25,7 @@ interface ColaboradorErp {
   codigoColaborador: number;
   nome: string;
   ativo: boolean;
-  codigoEmpresa: number;
+  codigoLoja: number;
 }
 
 export interface ColaboradoresRoutesDeps {
@@ -80,7 +80,7 @@ const toColaborador = (r: LinhaErp): ColaboradorErp => ({
   codigoColaborador: Number(r.codigoColaborador),
   nome: (r.nome || "").trim(),
   ativo: Boolean(r.ativo),
-  codigoEmpresa: Number(r.codigoEmpresa),
+  codigoLoja: Number(r.codigoEmpresa),
 });
 
 /** Campos do vínculo em cada linha da tabela; um vínculo desfeito é Pendente, mas mantém a `version`. */
@@ -150,11 +150,11 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     const pendentes = colaboradores.filter((col) => col.ativo && !estaConfirmado(col.codigoColaborador));
     const usuarioSugerido = sugerirUsuarios(pendentes, usuarios.filter((u) => u.status === "active" && !vinculados.has(u.id)));
     const linhasDoErp = colaboradores.map((col) => {
-      const { codigoEmpresa, ...dados } = col;
+      const { codigoLoja, ...dados } = col;
       const vinculo = porCodigo.get(col.codigoColaborador) ?? null;
       const sugestao = estaConfirmado(col.codigoColaborador)
         ? null
-        : { usuarioId: usuarioSugerido.get(col.codigoColaborador) ?? null, lojas: lojas.some((l) => l.codigo === codigoEmpresa) ? [codigoEmpresa] : [] };
+        : { usuarioId: usuarioSugerido.get(col.codigoColaborador) ?? null, lojas: lojas.some((l) => l.codigo === codigoLoja) ? [codigoLoja] : [] };
       return { ...dados, ...camposDoVinculo(vinculo, usuarios), sugestao, avisos: avisosDoVinculo(vinculo, col, usuarios, lojas) };
     });
     // O ERP não informa mais o nome de quem sumiu, e o vínculo não o guarda.
