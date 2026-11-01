@@ -116,7 +116,8 @@
           "closing_period:period:cancel",
           "system:erps:manage",
           "inovafarma:integration:view",
-          "inovafarma:colaboradores:view"
+          "inovafarma:colaboradores:view",
+          "inovafarma:colaboradores:update"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -297,7 +298,8 @@
         "closing_period:period:cancel",
         "system:erps:manage",
         "inovafarma:integration:view",
-        "inovafarma:colaboradores:view"
+        "inovafarma:colaboradores:view",
+        "inovafarma:colaboradores:update"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -465,6 +467,13 @@
             "label": "Visualizar Colaboradores",
             "description": "Permite abrir a página Colaboradores e consultar os Colaboradores do InovaFarma.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar os Colaboradores do InovaFarma.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:colaboradores:update",
+            "label": "Alterar vínculos de Colaboradores",
+            "description": "Permite vincular, alterar e desfazer o vínculo de um Colaborador do InovaFarma.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para alterar os vínculos dos Colaboradores do InovaFarma.",
             "module": "inovafarma"
           }
         ]
@@ -635,6 +644,13 @@
             "label": "Visualizar Colaboradores",
             "description": "Permite abrir a página Colaboradores e consultar os Colaboradores do InovaFarma.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar os Colaboradores do InovaFarma.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:colaboradores:update",
+            "label": "Alterar vínculos de Colaboradores",
+            "description": "Permite vincular, alterar e desfazer o vínculo de um Colaborador do InovaFarma.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para alterar os vínculos dos Colaboradores do InovaFarma.",
             "module": "inovafarma"
           }
         ]

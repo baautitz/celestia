@@ -1,10 +1,20 @@
+import { resolve } from "node:path";
 import type { Context, MiddlewareHandler } from "hono";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { INOVAFARMA_EXTERNALS } from "./externals.js";
 import { createInovafarmaDriver } from "./driver.js";
+import { registerColaboradoresRoutes, type UsersService } from "./colaboradores-routes.js";
+import { PostgresVinculoStore } from "./postgres-vinculo-store.js";
+import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
+import { MemoryVinculoStore } from "./vinculo-store.js";
 
-export { INOVAFARMA_PERMISSIONS, INOVAFARMA_EXTERNALS, createInovafarmaDriver };
+export { INOVAFARMA_PERMISSIONS, INOVAFARMA_EXTERNALS, createInovafarmaDriver, PostgresVinculoStore };
+export { UsuarioJaVinculadoError, VersaoDesatualizadaError } from "./vinculo-store.js";
+
+/** Migrations do Plugin (schema Postgres "inovafarma"), na raiz do pacote: valem para `src` e para `dist`. */
+export const INOVAFARMA_MIGRATIONS = { folder: resolve(import.meta.dirname, "../drizzle"), schema: "inovafarma" };
 
 /**
  * Categorias de produto somadas no Desempenho de Vendas (Qtde em unidades e Valor líquido).
@@ -57,18 +67,35 @@ export interface InovafarmaPluginDeps {
   erpClients?: Record<string, ErpQueryClient | undefined>;
   /** ID do ERP configurado no módulo central de ERPs (padrão: "inovafarma"). */
   erpId?: string;
+  /** Postgres do Celestia; sem ele os vínculos ficam em memória. */
+  db?: NodePgDatabase;
 }
 
 /**
  * Plugin InovaFarma: módulo cliente que consome a conexão MSSQL gerenciada pela plataforma
  * e expõe rotas de consulta baseadas nos identificadores externos (codigoColaborador, codigoLoja).
  */
-export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafarma" }: InovafarmaPluginDeps): ModuleDef {
+export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafarma", db }: InovafarmaPluginDeps): ModuleDef {
   return defineModule({
     id: "inovafarma",
     version: "1.0.0",
+    dependsOn: ["iam", "audit"],
     permissions: INOVAFARMA_PERMISSIONS,
-    register({ routes, permissions }) {
+    migrations: INOVAFARMA_MIGRATIONS,
+    register({ moduleId, routes, permissions, services }) {
+      const audit = services.use<AuditService>("audit", "log");
+      declareVinculoAudit(audit, moduleId);
+      registerColaboradoresRoutes({
+        routes,
+        permissions,
+        auth,
+        erpClient: () => erpClients[erpId],
+        store: db ? new PostgresVinculoStore(db) : new MemoryVinculoStore(),
+        users: services.use<UsersService>("iam", "users"),
+        audit,
+        plugin: moduleId,
+      });
+
       const viewKey = INOVAFARMA_PERMISSIONS.keys["integration:view"];
 
       routes.get("/status", auth, async (c: Context<{ Variables: { user?: { permissions?: string[] } } }>) => {
@@ -109,40 +136,6 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
           return c.json(rows.map((r) => ({ codigoEmpresa: Number(r.codigoEmpresa), nome: (r.nome || "").trim() })));
         } catch {
           return c.json([]);
-        }
-      });
-
-      routes.get("/colaboradores", auth, async (c: Context<{ Variables: { user?: { permissions?: string[] } } }>) => {
-        const colaboradoresView = INOVAFARMA_PERMISSIONS.ref("colaboradores:view");
-        if (!permissions.has(c.get("user")?.permissions, colaboradoresView.key)) {
-          return c.json({ error: colaboradoresView.deniedMessage }, 403);
-        }
-
-        const client = erpClients[erpId];
-        if (!client) {
-          return c.json({ error: "Conexão com ERP InovaFarma não configurada ou inativa." }, 503);
-        }
-
-        // Ativo vem só de Funcionario.Ativo: DataDesligamento está preenchida em poucos inativos.
-        const sql = `
-          SELECT f.CodigoFuncionario AS codigoColaborador, c.Nome AS nome, f.Ativo AS ativo
-          FROM Funcionario f
-          JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
-          WHERE c.Eliminado = 0
-          ORDER BY c.Nome
-        `;
-
-        try {
-          const rows = await client.query<{ codigoColaborador: number; nome: string | null; ativo: boolean | number | null }>(sql);
-          return c.json({
-            colaboradores: rows.map((r) => ({
-              codigoColaborador: Number(r.codigoColaborador),
-              nome: (r.nome || "").trim(),
-              ativo: Boolean(r.ativo),
-            })),
-          });
-        } catch {
-          return c.json({ error: "ERP InovaFarma indisponível. Tente novamente em instantes." }, 503);
         }
       });
 

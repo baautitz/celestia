@@ -93,7 +93,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       const { platform, headers } = await boot([view], { inovafarma: client });
       const res = await platform.app.request("/api/m/inovafarma/colaboradores", { headers });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({
+      expect(await res.json()).toMatchObject({
         colaboradores: [
           { codigoColaborador: 7, nome: "ANA SOUZA", ativo: true },
           { codigoColaborador: 9, nome: "BRUNO LIMA", ativo: false },

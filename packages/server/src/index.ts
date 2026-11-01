@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { assertEncryptionKey } from "./erp/secret-box.js";
@@ -40,6 +41,8 @@ export interface CreatePlatformAppOptions {
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
   auditLog?: AuditLog;
+  /** Postgres entregue aos Plugins, que não importam o servidor; sem ele, guardam em memória. */
+  db?: NodePgDatabase;
   /** Modules adicionais compostos junto aos padrão (testes e builds de cliente). */
   extraModules?: ModuleEntry[];
   /** Limite de tentativas de login (injetável em testes). */
@@ -109,7 +112,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
         extraDrivers,
       }),
     },
-    ...integrationPlugins({ auth, erpClients }),
+    ...integrationPlugins({ auth, erpClients, db: options?.db }),
     ...(options?.extraModules ?? []),
   ];
   const moduleApp = new Hono();
@@ -160,6 +163,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     let erpExternalsStore: ErpExternalsStore | undefined;
     let closingPeriodStore: ClosingPeriodStore | undefined;
     let auditLog: AuditLog | undefined;
+    let pluginDb: NodePgDatabase | undefined;
     if (process.env.POSTGRES_HOST) {
       const [{ db }, { PostgresUserStore }, { PostgresErpStore }, { PostgresClosingPeriodStore }] = await Promise.all([
         import("./db/client.js"),
@@ -167,6 +171,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
         import("./erp/postgres-erp-store.js"),
         import("./closing-period/postgres-closing-period-store.js"),
       ]);
+      pluginDb = db;
       userStore = new PostgresUserStore(db);
       erpStore = new PostgresErpStore(db);
       const { PostgresErpExternalsStore } = await import("./erp/postgres-erp-externals-store.js");
@@ -191,6 +196,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       erpStore, erpExternalsStore, closingPeriodStore,
       erpClients,
       auditLog,
+      db: pluginDb,
     });
     if (process.env.POSTGRES_HOST) {
       // Verifica (sem aplicar) que as migrations dos Modules estão em dia; a mensagem nomeia o Module.
