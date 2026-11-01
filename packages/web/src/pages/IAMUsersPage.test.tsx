@@ -6,7 +6,7 @@ import { HeaderActionsProvider } from "@/context/HeaderActionsContext";
 import { IAMUsersPage } from "./IAMUsersPage";
 
 const api = vi.hoisted(() => ({
-  iam: { listUsers: vi.fn(), listRoles: vi.fn(), updateUser: vi.fn() },
+  iam: { listUsers: vi.fn(), listRoles: vi.fn(), updateUser: vi.fn(), getPasswordPolicy: vi.fn(async () => ({ rules: [] })) },
 }));
 vi.mock("@/lib/api-client", () => ({ api }));
 vi.mock("@/context/AuthContext", () => ({

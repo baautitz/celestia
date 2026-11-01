@@ -7,6 +7,7 @@ import { Button } from "@platform/ui/components/button";
 import { Grid, Text } from "@platform/ui/components/layout";
 import { Input } from "@platform/ui/components/input";
 import { PasswordInput } from "@platform/ui/components/password-input";
+import { PasswordRequirements } from "@/iam/PasswordRequirements";
 import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription } from "@platform/ui/components/field";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
@@ -219,9 +220,7 @@ export const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, cur
                     <FormControl>
                       <PasswordInput autoComplete="new-password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
                     </FormControl>
-                    <Text variant="tiny" tone="muted">
-                      Requer: 1 maiúscula, 1 minúscula, 1 número e 1 especial.
-                    </Text>
+                    <PasswordRequirements value={field.value} />
                     <FormMessage />
                   </FormItem>
                 )}

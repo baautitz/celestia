@@ -221,6 +221,10 @@ class ApiClient {
       return this.request<Device>(`/api/iam/devices/${id}/revoke`, { method: "POST" });
     },
 
+    getPasswordPolicy: async (): Promise<{ rules: { label: string; pattern: string }[] }> => {
+      return this.request("/api/iam/password-policy");
+    },
+
     listRoles: async (): Promise<Role[]> => {
       return this.request<Role[]>("/api/iam/roles");
     },

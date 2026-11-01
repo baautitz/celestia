@@ -40,6 +40,7 @@ import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
 import { UserFormWindow, userFormWindowTexts } from "@/iam/UserFormWindow";
 import { PasswordInput } from "@platform/ui/components/password-input";
+import { PasswordRequirements } from "@/iam/PasswordRequirements";
 
 
 const resetSchema = z.object({
@@ -81,9 +82,7 @@ const ResetPasswordWindow: React.FC<{ user: User }> = ({ user }) => {
                   <FormControl>
                     <PasswordInput autoComplete="new-password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
                   </FormControl>
-                  <Text variant="tiny" tone="muted">
-                    Requer 1 maiúscula, 1 minúscula, 1 número e 1 especial.
-                  </Text>
+                    <PasswordRequirements value={field.value} />
                   <FormMessage />
                 </FormItem>
               )}
