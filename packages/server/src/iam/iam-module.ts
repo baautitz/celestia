@@ -16,7 +16,7 @@ import { CertificateAuthorityUnavailableError, DeviceNotFoundError, type Certifi
 import type { AuditLog } from "../audit/audit-log.js";
 import { DEVICE_AUDIT_TARGET, IAM_AUDIT_PLUGIN, USER_AUDIT_TARGET, declareIamAudit } from "./iam-audit.js";
 import { LoginRateLimiter } from "./login-rate-limiter.js";
-import { PasswordService, PasswordPolicySchema } from "./password-service.js";
+import { PASSWORD_RULES, PasswordService, PasswordPolicySchema } from "./password-service.js";
 
 /** Pasta de migrations do Module `iam` (schema Postgres "iam"). */
 export const IAM_MIGRATIONS = { folder: resolve(import.meta.dirname, "migrations"), schema: "iam" };
@@ -262,6 +262,11 @@ export function createIamModule({
       });
 
       routes.get("/auth/me", auth, async (c) => c.json(c.get("user")));
+
+      // A tela mostra o que a senha já cumpre; a validação continua no servidor.
+      routes.get("/iam/password-policy", auth, (c) =>
+        c.json({ rules: PASSWORD_RULES.map(({ label, pattern }) => ({ label, pattern: pattern.source })) }),
+      );
 
       // ───────── Users e Roles ─────────
       const actorOf = (c: Context): string => getAuthenticatedUser(c).sub;

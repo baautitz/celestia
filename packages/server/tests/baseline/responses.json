@@ -1019,11 +1019,8 @@
       "error": {
         "issues": [
           {
-            "code": "too_small",
-            "minimum": 8,
-            "type": "string",
-            "inclusive": true,
-            "exact": false,
+            "validation": "regex",
+            "code": "invalid_string",
             "message": "A senha deve conter no mínimo 8 caracteres.",
             "path": [
               "password"
@@ -1223,11 +1220,8 @@
       "error": {
         "issues": [
           {
-            "code": "too_small",
-            "minimum": 8,
-            "type": "string",
-            "inclusive": true,
-            "exact": false,
+            "validation": "regex",
+            "code": "invalid_string",
             "message": "A senha deve conter no mínimo 8 caracteres.",
             "path": [
               "newPassword"
