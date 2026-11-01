@@ -42,10 +42,6 @@ _Avoid_: Connection, source, conexão
 The technology Celestia uses to query an ERP, such as SQL Server.
 _Avoid_: ERP type, connector type
 
-**Externals**:
-The values that map a user to an ERP's own concepts, such as the user's ID, company or region in that ERP. A user has a set of Externals per ERP. The fields are declared by the module that integrates that ERP, not fixed by the platform.
-_Avoid_: External IDs, mapping, identifiers
-
 **Colaborador** (en: Collaborator):
 A person registered as an employee in an ERP, who may have sales attributed to them, whether or not they have sold anything yet. It is not the same as a User, who signs in to Celestia. In sales reports, a sale is attributed to the Colaborador of each item.
 _Avoid_: Vendedor, Funcionário, Seller
@@ -61,7 +57,7 @@ _Avoid_: Mapping, External
 ### Access
 
 **User** (pt-BR: **Usuário**):
-A person who signs in to Celestia with a username and password. It is not the same as a person's own account inside an ERP, which Externals link to it.
+A person who signs in to Celestia with a username and password. It is not the same as a person's own account inside an ERP.
 _Avoid_: Account, member, ERP user
 
 **Role** (pt-BR: **Grupo**):

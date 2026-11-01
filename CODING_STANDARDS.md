@@ -4,7 +4,7 @@ Reference for code review (`/code-review`) and architectural judgement calls acr
 
 ## Context Pointers
 
-- **Domain vocabulary** — [GLOSSARY-MAP.md](GLOSSARY-MAP.md): read when naming symbols, routes, tables, UI labels, or Audit Log entries (`Closing Period`, `Cancel`/`Close`/`Reopen`, `ERP`, `ERP Driver`, `Externals`, `User`, `Role`, `Deactivate`, `Permission`, `Administrator`, `Audit Log`, `Log Entry`).
+- **Domain vocabulary** — [GLOSSARY-MAP.md](GLOSSARY-MAP.md): read when naming symbols, routes, tables, UI labels, or Audit Log entries (`Closing Period`, `Cancel`/`Close`/`Reopen`, `ERP`, `ERP Driver`, `User`, `Role`, `Deactivate`, `Permission`, `Administrator`, `Audit Log`, `Log Entry`).
 - **UI primitives and imperative windows** — [docs/conventions/ui.md](docs/conventions/ui.md): read when reviewing `packages/web`, `packages/ui`, or `integrations/*/src/web.tsx` (primitives from `@platform/ui/components/*`, `useUi()` windows/sheets/confirmations/toasts, `<WindowActions>`, `<HeaderActions>`, `<DataTable>`, `Form*` + `<Label>`, `<MoneyInput />`, `<InputGroup>`, `<Button size="default" | "icon">`).
 - **Permission and event naming** — [docs/conventions/permissions.md](docs/conventions/permissions.md): read when reviewing `definePermissions`, `guarded`, `byPermission`, permission catalogs, or `before`/`after` module events (`<module>:<resource>:<verb>`, `deniedMessage` in PT-BR, fail-closed `before` handlers).
 - **Customer Plugins** — [docs/conventions/plugins.md](docs/conventions/plugins.md): read when reviewing `integrations/*`, `packages/server/src/plugins.ts`, or `packages/web/src/modules.ts` (package boundaries, dependency injection via `createXPlugin`, static registration).

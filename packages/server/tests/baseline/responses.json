@@ -1581,8 +1581,7 @@
             "defaultValue": false,
             "description": "Ative para servidores com certificado autoassinado."
           }
-        ],
-        "externalFields": []
+        ]
       },
       {
         "id": "inovafarma",
@@ -1628,18 +1627,6 @@
             "type": "switch",
             "defaultValue": true,
             "description": "Ative para servidores com certificado autoassinado."
-          }
-        ],
-        "externalFields": [
-          {
-            "name": "codigoColaborador",
-            "label": "Código do Colaborador",
-            "type": "text"
-          },
-          {
-            "name": "codigoLoja",
-            "label": "Código da Loja",
-            "type": "text"
           }
         ]
       }
@@ -1708,8 +1695,7 @@
             "defaultValue": false,
             "description": "Ative para servidores com certificado autoassinado."
           }
-        ],
-        "externalFields": []
+        ]
       },
       {
         "id": "inovafarma",
@@ -1755,18 +1741,6 @@
             "type": "switch",
             "defaultValue": true,
             "description": "Ative para servidores com certificado autoassinado."
-          }
-        ],
-        "externalFields": [
-          {
-            "name": "codigoColaborador",
-            "label": "Código do Colaborador",
-            "type": "text"
-          },
-          {
-            "name": "codigoLoja",
-            "label": "Código da Loja",
-            "type": "text"
           }
         ]
       }

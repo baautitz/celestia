@@ -12,7 +12,7 @@ Cada **Module** com persistência em Postgres declara:
    - `iam` → schema `iam` (`iam.roles`, `iam.users`)
    - `audit` → schema `audit` (`audit.audit_log_entries` + trigger append-only)
    - `closing_period` → schema `closing_period` (`closing_period.periods`)
-   - `erp` → schema `erp` (`erp.erps`, `erp.user_externals`)
+   - `erp` → schema `erp` (`erp.erps`)
 2. Sua própria pasta `src/<module>/migrations/` referenciada no `defineModule({ ..., migrations })`.
 3. Uma tabela de controle isolada em `drizzle.__migrations_<moduleId>`, gerenciada por `runModuleMigrations` (`@platform/core/migrations`).
 

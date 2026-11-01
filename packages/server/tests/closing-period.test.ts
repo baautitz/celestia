@@ -256,7 +256,7 @@ describe("Closing Period: veto por handler before", () => {
         store,
         auditLog: new AuditLog(new MemoryAuditStore()),
         auth: async (c, next) => {
-          c.set("user", { sub: "usr_test", username: "t", fullname: "T", role: "r", permissions: ["*"], externals: {} });
+          c.set("user", { sub: "usr_test", username: "t", fullname: "T", role: "r", permissions: ["*"] });
           await next();
         },
       }),

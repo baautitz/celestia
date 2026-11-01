@@ -7,7 +7,6 @@ import { IAMUsersPage } from "./IAMUsersPage";
 
 const api = vi.hoisted(() => ({
   iam: { listUsers: vi.fn(), listRoles: vi.fn(), updateUser: vi.fn() },
-  erps: { listExternals: vi.fn() },
 }));
 vi.mock("@/lib/api-client", () => ({ api }));
 vi.mock("@/context/AuthContext", () => ({
@@ -29,7 +28,6 @@ beforeEach(() => {
   });
   api.iam.listUsers.mockResolvedValue([user]);
   api.iam.listRoles.mockResolvedValue([{ id: "gestor", name: "Gestor", permissions: [] }]);
-  api.erps.listExternals.mockResolvedValue([]);
 });
 afterEach(() => {
   cleanup();
@@ -52,17 +50,6 @@ describe("IAMUsersPage", () => {
     expect(await screen.findByText("Maria Souza")).toBeTruthy();
     expect(api.iam.listUsers).toHaveBeenCalledTimes(1);
     expect(api.iam.listRoles).toHaveBeenCalledTimes(1);
-  });
-
-  it("carrega os identificadores ERP uma vez ao abrir a edição, mesmo com re-renderizações", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Editar Usuário" }));
-    const name = await screen.findByLabelText("Nome Completo");
-    await waitFor(() => expect(api.erps.listExternals).toHaveBeenCalledWith("u1"));
-    fireEvent.change(name, { target: { value: "Maria S." } });
-    fireEvent.change(name, { target: { value: "Maria Souza S." } });
-    await new Promise((r) => setTimeout(r, 50));
-    expect(api.erps.listExternals).toHaveBeenCalledTimes(1);
   });
 
   it("o administrador liga o acesso sem certificado na edição", async () => {

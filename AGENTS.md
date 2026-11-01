@@ -28,7 +28,7 @@ celestia/
 │   │             iam/ (module, permissions, initial-roles, auth, stores, schema, migrations/, login-rate-limiter),
 │   │             audit/ (module, audit-log, stores, schema, migrations/),
 │   │             closing-period/ (Plugin: module, permissions, audit, stores, schema, migrations/),
-│   │             erp/ (Plugin: module, permissions, drivers, clients, externals, stores, secret-box, read-only-guard, schema, migrations/),
+│   │             erp/ (Plugin: module, permissions, drivers, clients, stores, secret-box, read-only-guard, schema, migrations/),
 │   │             engine/ (template-engine), db/ (client, migrate), cli/ (create-admin, erp-query)
 │   ├── ui/       (@platform/ui)     shadcn/ui primitives, imperative UI (useUi, WindowActions), DataTable, forms, defineWebModule
 │   ├── web/      (@platform/web)    SPA: modules.ts registry, pages (Login, IAMUsers, IAMRoles, ERPs, ClosingPeriodsPage, AuditLogPage)
