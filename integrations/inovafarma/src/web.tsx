@@ -312,7 +312,7 @@ function FiltrosCampos({
   const lojas = visualizacoes.find((v) => v.id === value.visualizacao)?.lojas ?? [];
   return (
     <>
-      {visualizacoes.length > 1 && (
+      {visualizacoes.length > 0 && (
         <FiltroSelect icon={<Eye />} label="Visualização">
           <Select value={value.visualizacao} onValueChange={(val) => val && onChange({ ...value, visualizacao: val as Visualizacao, loja: "all" })}>
             <SelectTrigger>
