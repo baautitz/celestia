@@ -380,6 +380,7 @@ export const IAMUsersPage: React.FC = () => {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao alterar status";
       ui.feedback.notify({ type: "error", title: msg });
+      fetchData();
     }
   };
 

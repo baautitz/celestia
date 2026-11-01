@@ -182,6 +182,7 @@ export const IAMDevicesPage: React.FC = () => {
       fetchData();
     } catch (err: unknown) {
       ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao revogar o Dispositivo." });
+      fetchData();
     }
   };
 

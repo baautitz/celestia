@@ -272,6 +272,8 @@ export const ClosingPeriodsPage: React.FC = () => {
       fetchData();
     } catch (err: unknown) {
       ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : failure });
+      // Uma falha costuma vir de uma lista velha (o período mudou ou sumiu): revalida para mostrar o que existe agora.
+      fetchData();
     }
   };
 

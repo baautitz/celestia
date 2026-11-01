@@ -269,6 +269,7 @@ export const ERPsPage: React.FC = () => {
       fetchData();
     } catch (err: unknown) {
       ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao excluir ERP" });
+      fetchData();
     }
   };
 
