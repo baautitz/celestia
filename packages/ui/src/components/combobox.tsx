@@ -15,6 +15,8 @@ import { ChevronDownIcon, XIcon, CheckIcon } from "lucide-react"
 
 const Combobox = ComboboxPrimitive.Root
 
+const TABLE_CELL_WIDTH = "w-52"
+
 function ComboboxValue({ ...props }: ComboboxPrimitive.Value.Props) {
   return <ComboboxPrimitive.Value data-slot="combobox-value" {...props} />
 }
@@ -57,15 +59,18 @@ function ComboboxInput({
   showTrigger = true,
   showClear = false,
   clearLabel,
+  inTableCell = false,
   ...props
 }: ComboboxPrimitive.Input.Props & {
+  /** Largura fixa, para o campo não colapsar em uma coluna de tabela. */
+  inTableCell?: boolean
   showTrigger?: boolean
   showClear?: boolean
   /** Nome acessível do botão de limpar; padrão: "Limpar". */
   clearLabel?: string
 }) {
   return (
-    <InputGroup className={cn("w-auto", className)}>
+    <InputGroup className={cn("w-auto", inTableCell && TABLE_CELL_WIDTH, className)}>
       <ComboboxPrimitive.Input
         render={<InputGroupInput disabled={disabled} />}
         {...props}
@@ -218,14 +223,19 @@ function ComboboxSeparator({
 
 function ComboboxChips({
   className,
+  inTableCell = false,
   ...props
 }: React.ComponentPropsWithRef<typeof ComboboxPrimitive.Chips> &
-  ComboboxPrimitive.Chips.Props) {
+  ComboboxPrimitive.Chips.Props & {
+    /** Largura fixa: em tabela, a coluna cresceria com os chips e eles nunca virariam "+N". */
+    inTableCell?: boolean
+  }) {
   return (
     <ComboboxPrimitive.Chips
       data-slot="combobox-chips"
       className={cn(
         "flex min-h-8 flex-wrap items-center gap-1 rounded-none border border-input bg-transparent bg-clip-padding px-2.5 py-1 text-xs transition-colors focus-within:border-ring focus-within:ring-1 focus-within:ring-ring/50 has-aria-invalid:border-destructive has-aria-invalid:ring-1 has-aria-invalid:ring-destructive/20 has-data-[slot=combobox-chip]:px-1 dark:bg-input/30 dark:has-aria-invalid:border-destructive/50 dark:has-aria-invalid:ring-destructive/40",
+        inTableCell && TABLE_CELL_WIDTH,
         className
       )}
       {...props}
@@ -237,9 +247,12 @@ function ComboboxChip({
   className,
   children,
   showRemove = true,
+  removeLabel,
   ...props
 }: ComboboxPrimitive.Chip.Props & {
   showRemove?: boolean
+  /** Nome acessível do botão de remover. */
+  removeLabel?: string
 }) {
   return (
     <ComboboxPrimitive.Chip
@@ -256,6 +269,7 @@ function ComboboxChip({
           render={<Button variant="ghost" size="icon-xs" />}
           className="-ml-1 opacity-50 hover:opacity-100"
           data-slot="combobox-chip-remove"
+          aria-label={removeLabel}
         >
           <XIcon className="pointer-events-none" />
         </ComboboxPrimitive.ChipRemove>
@@ -277,6 +291,76 @@ function ComboboxChipsInput({
   )
 }
 
+const CHIPS_GAP = 4
+const CHIPS_INPUT_MIN = 64
+const CHIPS_CONTADOR = 32
+
+/** Quantos chips, na ordem, cabem na largura; ao menos um, truncado se preciso. Sem largura medida (fora de layout), mostra todos. */
+function chipsQueCabem(larguras: number[], disponivel: number): number {
+  if (disponivel <= 0) return larguras.length
+  const ocupado = (n: number) => larguras.slice(0, n).reduce((soma, l) => soma + l + CHIPS_GAP, 0)
+  const semContador = disponivel - CHIPS_INPUT_MIN
+  if (ocupado(larguras.length) <= semContador) return larguras.length
+  const comContador = semContador - CHIPS_CONTADOR - CHIPS_GAP
+  let n = 0
+  while (n < larguras.length && ocupado(n + 1) <= comContador) n++
+  return Math.max(n, 1)
+}
+
+/**
+ * Chips em uma linha só: os que não cabem viram "+N", com os nomes no `title`. Todos continuam
+ * montados (os excedentes invisíveis) porque o Combobox identifica cada chip pela posição.
+ */
+function ComboboxChipsResumidos({
+  labels,
+  removeLabel,
+  children,
+}: {
+  labels: string[]
+  removeLabel?: (label: string) => string
+  /** O `ComboboxChipsInput`. */
+  children: React.ReactNode
+}) {
+  const ref = React.useRef<HTMLDivElement | null>(null)
+  const [visiveis, setVisiveis] = React.useState(labels.length)
+  const chave = labels.join("\n")
+
+  React.useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const medir = () => {
+      const chips = el.querySelectorAll<HTMLElement>("[data-slot=combobox-chip]")
+      setVisiveis(chipsQueCabem(Array.from(chips, (c) => c.offsetWidth), el.clientWidth))
+    }
+    medir()
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(medir)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [chave])
+
+  const ocultos = labels.slice(visiveis)
+  return (
+    <div ref={ref} className="relative flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+      {labels.map((label, i) => (
+        <ComboboxChip
+          key={`${label}-${i}`}
+          removeLabel={removeLabel?.(label)}
+          className={cn(i === 0 ? "min-w-0 shrink" : "shrink-0", i >= visiveis && "invisible absolute")}
+        >
+          <span className="truncate">{label}</span>
+        </ComboboxChip>
+      ))}
+      {ocultos.length > 0 && (
+        <span title={ocultos.join(", ")} className="shrink-0 text-xs font-medium text-muted-foreground">
+          +{ocultos.length}
+        </span>
+      )}
+      {children}
+    </div>
+  )
+}
+
 function useComboboxAnchor() {
   return React.useRef<HTMLDivElement | null>(null)
 }
@@ -295,6 +379,7 @@ export {
   ComboboxChips,
   ComboboxChip,
   ComboboxChipsInput,
+  ComboboxChipsResumidos,
   ComboboxTrigger,
   ComboboxValue,
   useComboboxAnchor,
