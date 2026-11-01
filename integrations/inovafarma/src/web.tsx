@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
-import { TrendingUp, RefreshCw, Calendar, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX, ClipboardCheck } from "lucide-react";
+import { TrendingUp, RefreshCw, Calendar, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
@@ -16,6 +16,7 @@ import { ColaboradoresPendentesBadge } from "./colaboradores-badge";
 import { ColaboradoresPage } from "./colaboradores-page";
 import { AvaliacoesPage } from "./avaliacoes-page";
 import { PreVencidosPage } from "./pre-vencidos-page";
+import { FuroEstoquePage } from "./furo-estoque-page";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
 
@@ -794,6 +795,18 @@ export const inovafarmaWebModule = defineWebModule({
         { permission: "inovafarma:avaliacoes-loja:manage", component: AvaliacoesPage },
         { permission: "inovafarma:avaliacoes-geral:manage", component: AvaliacoesPage },
       ],
+    },
+    {
+      id: "inovafarma-furo-estoque",
+      label: "Furo de Estoque",
+      title: "Furo de Estoque",
+      icon: PackageSearch,
+      path: "/inovafarma/furo-estoque",
+      section: "inovafarma-lancamentos",
+      order: 40,
+      permission: "inovafarma:furo-estoque-loja:manage",
+      component: FuroEstoquePage,
+      variants: [{ permission: "inovafarma:furo-estoque-geral:manage", component: FuroEstoquePage }],
     },
     {
       id: "inovafarma-vendas",
