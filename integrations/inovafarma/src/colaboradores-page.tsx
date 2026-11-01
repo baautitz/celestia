@@ -282,7 +282,7 @@ export function ColaboradoresPage() {
         render: (r) => {
           const { usuarioId } = valoresDe(r);
           return (
-            <Stack gap="field" align="start">
+            <Stack direction="row" gap="field" align="center">
               <UsuarioSelect row={r} opcoes={opcoes} usuarioId={usuarioId} onChange={(novo) => editar(r, { usuarioId: novo })} />
               {usuarioId !== null && usuarioId === r.sugestao?.usuarioId && <SeloSugestao />}
             </Stack>
@@ -296,7 +296,7 @@ export function ColaboradoresPage() {
           const valores = valoresDe(r).lojas;
           const sugeridas = r.sugestao?.lojas ?? [];
           return (
-            <Stack gap="field" align="start">
+            <Stack direction="row" gap="field" align="center">
               <LojasSelect row={r} opcoes={lojas} lojas={valores} onChange={(selecionadas) => editar(r, { lojas: selecionadas })} />
               {sugeridas.length > 0 && mesmasLojas(valores, sugeridas) && <SeloSugestao />}
             </Stack>
