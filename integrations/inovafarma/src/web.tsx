@@ -743,12 +743,16 @@ function VendasComissoesPage() {
   );
 }
 
-/** Tela e item de menu do Plugin InovaFarma na seção Relatórios. */
+/** Telas e itens de menu do Plugin InovaFarma: Lançamentos, InovaFarma e Relatórios. */
 export const inovafarmaWebModule = defineWebModule({
   id: "inovafarma",
   // Colaboradores cria Usuário pelo cadastro do IAM (serviço `iam:users`).
   dependsOn: ["iam"],
-  sections: [{ id: "inovafarma", label: "InovaFarma", order: 250 }],
+  sections: [
+    // Trabalho do dia a dia de quem lança, no topo do menu.
+    { id: "inovafarma-lancamentos", label: "Lançamentos", order: 50 },
+    { id: "inovafarma", label: "InovaFarma", order: 250 },
+  ],
   entries: [
     {
       id: "inovafarma-colaboradores",
@@ -768,7 +772,7 @@ export const inovafarmaWebModule = defineWebModule({
       title: "Pré-vencidos",
       icon: PackageX,
       path: "/inovafarma/pre-vencidos",
-      section: "inovafarma",
+      section: "inovafarma-lancamentos",
       order: 20,
       permission: "inovafarma:pre-vencidos-lancamento:manage",
       component: PreVencidosPage,
@@ -781,7 +785,7 @@ export const inovafarmaWebModule = defineWebModule({
       title: "Avaliações",
       icon: ClipboardCheck,
       path: "/inovafarma/avaliacoes",
-      section: "inovafarma",
+      section: "inovafarma-lancamentos",
       order: 30,
       permission: "inovafarma:avaliacoes-individual:view",
       component: AvaliacoesPage,
