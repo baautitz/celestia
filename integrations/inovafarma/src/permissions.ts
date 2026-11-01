@@ -57,4 +57,14 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite lançar, editar, excluir e ver as Avaliações dos Colaboradores de todas as Lojas.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para gerenciar as Avaliações de todas as Lojas.",
   },
+  "furo-estoque-loja:manage": {
+    label: "Furo de Estoque: Justificar por Loja",
+    description: "Permite ver e justificar os Ajustes de Estoque das Lojas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque da Loja.",
+  },
+  "furo-estoque-geral:manage": {
+    label: "Furo de Estoque: Justificar todas e gerenciar Motivos",
+    description: "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
+  },
 });
