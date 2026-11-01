@@ -63,6 +63,15 @@ describe("IAMUsersPage", () => {
     await waitFor(() => expect(api.iam.updateUser).toHaveBeenCalledWith("u1", expect.objectContaining({ allowWithoutCertificate: true })));
   });
 
+  it("salva o Usuário sem e-mail", async () => {
+    api.iam.updateUser.mockResolvedValue(user);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Editar Usuário" }));
+    fireEvent.change(await screen.findByLabelText("E-mail"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar Alterações" }));
+    await waitFor(() => expect(api.iam.updateUser).toHaveBeenCalledWith("u1", expect.objectContaining({ email: undefined })));
+  });
+
   it("mostra quem acessa sem certificado na lista", async () => {
     api.iam.listUsers.mockResolvedValue([{ ...user, allowWithoutCertificate: true }, { ...user, id: "u2", fullname: "Outro Nome", username: "outro" }]);
     renderPage();

@@ -175,7 +175,7 @@ class ApiClient {
     createUser: async (user: {
       fullname: string;
       username: string;
-      email: string;
+      email?: string;
       password: string;
       roleId: string;
       allowWithoutCertificate?: boolean;

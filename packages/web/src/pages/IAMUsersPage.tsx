@@ -51,7 +51,8 @@ import { HeaderActions } from "@/context/HeaderActionsContext";
 const userSchema = z.object({
   fullname: z.string().min(1, "Informe o nome completo."),
   username: z.string().min(1, "Informe o nome de usuário."),
-  email: z.string().min(1, "Informe o e-mail.").email("E-mail inválido."),
+  // Opcional: em branco, o Usuário fica sem e-mail.
+  email: z.string().trim().pipe(z.literal("").or(z.string().email("E-mail inválido."))),
   roleId: z.string().min(1),
   isAdmin: z.boolean(),
   allowWithoutCertificate: z.boolean(),
@@ -94,7 +95,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
       if (user) {
         await api.iam.updateUser(user.id, {
           fullname: v.fullname.trim(),
-          email: v.email.trim(),
+          email: v.email.trim() || undefined,
           roleId: v.roleId,
           ...(currentUser?.isAdmin ? { isAdmin: v.isAdmin, allowWithoutCertificate: v.allowWithoutCertificate } : {}),
         });
@@ -103,7 +104,7 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
         await api.iam.createUser({
           fullname: v.fullname.trim(),
           username: v.username.trim(),
-          email: v.email.trim(),
+          email: v.email.trim() || undefined,
           password: v.password,
           roleId: v.roleId,
           ...(currentUser?.isAdmin && v.allowWithoutCertificate ? { allowWithoutCertificate: true } : {}),
