@@ -53,7 +53,7 @@ describe("ERPs (/api/admin/erps)", () => {
     });
 
   beforeEach(() => {
-    process.env.ERP_ENCRYPTION_KEY = randomBytes(32).toString("base64");
+    process.env.ERP_ENCRYPTION_KEY = randomBytes(16).toString("hex");
     erpStore = new MemoryErpStore();
     closed.length = 0;
     const fake: ErpClient = {

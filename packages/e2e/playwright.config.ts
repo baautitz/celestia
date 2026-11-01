@@ -26,7 +26,7 @@ export default defineConfig({
         E2E_API_PORT: String(API_PORT),
         E2E_WEB_PORT: String(WEB_PORT),
         // Chave AES-256 descartavel, so para os testes (cifra a senha da conexao).
-        ERP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
+        ERP_ENCRYPTION_KEY: Buffer.alloc(16, 7).toString("hex"),
       },
       // Estado em memoria: sempre um backend novo, para os testes serem repetiveis.
       reuseExistingServer: false,
