@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { HeaderActionsProvider } from "./context/HeaderActionsContext";
 import { UiProvider } from "@platform/ui/imperative/provider";
@@ -17,16 +17,27 @@ function RouterUiProvider({ children }: { children: React.ReactNode }) {
   return <UiProvider navigation={useRouterNavigation()}>{children}</UiProvider>;
 }
 
+// Roteador de dados: é o que permite a uma tela segurar a saída (useLeaveGuard). As rotas seguem em <App />.
+const router = createBrowserRouter(
+  [
+    {
+      path: "*",
+      element: (
+        <AuthProvider>
+          <RouterUiProvider>
+            <HeaderActionsProvider>
+              <App />
+            </HeaderActionsProvider>
+          </RouterUiProvider>
+        </AuthProvider>
+      ),
+    },
+  ],
+  { future: { v7_relativeSplatPath: true } },
+);
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <AuthProvider>
-        <RouterUiProvider>
-          <HeaderActionsProvider>
-            <App />
-          </HeaderActionsProvider>
-        </RouterUiProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <RouterProvider router={router} future={{ v7_startTransition: true }} />
   </React.StrictMode>
 );
