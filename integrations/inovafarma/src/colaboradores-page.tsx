@@ -34,12 +34,18 @@ interface LojaOpcao {
   nome: string;
 }
 
+interface Aviso {
+  tipo: string;
+  mensagem: string;
+}
+
 interface CamposVinculo {
   confirmado: boolean;
   usuarioId: string | null;
   usuario: (UsuarioOpcao & { status: string }) | null;
   lojas: number[];
   version: number;
+  avisos: Aviso[];
 }
 
 interface Colaborador extends CamposVinculo {
@@ -59,6 +65,8 @@ type Valores = Pick<CamposVinculo, "usuarioId" | "lojas">;
 
 const gravados = ({ usuarioId, lojas }: CamposVinculo): Valores => ({ usuarioId, lojas });
 const mesmasLojas = (a: number[], b: number[]) => a.length === b.length && a.every((codigo) => b.includes(codigo));
+
+const naoEncontrado = (c: CamposVinculo) => c.avisos.some((a) => a.tipo === "colaborador_nao_encontrado");
 
 type Situacao = "ativos" | "todos";
 
@@ -220,7 +228,10 @@ export function ColaboradoresPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ usuarioId: valores.usuarioId, lojas: valores.lojas, version: row.version }),
         });
-        setColaboradores((atual) => atual.map((c) => (c.codigoColaborador === codigo ? { ...c, ...salvo } : c)));
+        // Sem o vínculo, quem sumiu do ERP não tem mais por que ser linha da tabela.
+        setColaboradores((atual) =>
+          naoEncontrado(row) && !salvo.confirmado ? atual.filter((c) => c.codigoColaborador !== codigo) : atual.map((c) => (c.codigoColaborador === codigo ? { ...c, ...salvo } : c)),
+        );
         descartarEdicao(codigo);
       } catch (err: unknown) {
         const mensagem = err instanceof Error ? err : new Error("Erro desconhecido ao salvar o vínculo.");
@@ -281,7 +292,19 @@ export function ColaboradoresPage() {
       {
         key: "status",
         label: "Status",
-        render: (r) => <Badge variant={r.confirmado ? "default" : "outline"}>{r.confirmado ? "Confirmado" : "Pendente"}</Badge>,
+        render: (r) => (
+          <Stack direction="row" wrap gap="field">
+            <Badge variant={r.confirmado ? "default" : "outline"}>{r.confirmado ? "Confirmado" : "Pendente"}</Badge>
+            {/* A Loja não encontrada já aparece no próprio chip. */}
+            {r.avisos
+              .filter((a) => a.tipo !== "loja_nao_encontrada")
+              .map((a) => (
+                <Badge key={a.tipo} variant="destructive">
+                  {a.mensagem}
+                </Badge>
+              ))}
+          </Stack>
+        ),
       },
       {
         key: "acao",
@@ -289,8 +312,10 @@ export function ColaboradoresPage() {
         render: (r) => {
           const valores = valoresDe(r);
           const alterado = valores.usuarioId !== r.usuarioId || !mesmasLojas(valores.lojas, r.lojas);
+          // Sem o Colaborador no ERP só se pode desfazer o vínculo.
+          const bloqueado = naoEncontrado(r) && (valores.usuarioId !== null || valores.lojas.length > 0);
           return (
-            <Button variant="outline" disabled={!alterado || salvando.has(r.codigoColaborador)} onClick={() => void salvar(r, valores)}>
+            <Button variant="outline" disabled={!alterado || bloqueado || salvando.has(r.codigoColaborador)} onClick={() => void salvar(r, valores)}>
               {r.confirmado ? "Salvar" : "Confirmar"}
             </Button>
           );
@@ -300,7 +325,7 @@ export function ColaboradoresPage() {
   }, [edicoes, lojas, opcoes, salvando, salvar]);
 
   const rows = useMemo(
-    () => (situacao === "ativos" ? colaboradores.filter((c) => c.ativo) : colaboradores),
+    () => (situacao === "ativos" ? colaboradores.filter((c) => c.ativo || naoEncontrado(c)) : colaboradores),
     [colaboradores, situacao],
   );
 

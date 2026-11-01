@@ -10,7 +10,7 @@ vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof
 const feedback = vi.hoisted(() => ({ notify: vi.fn(), notifyError: vi.fn() }));
 vi.mock("@platform/ui/imperative/provider", () => ({ useUi: () => ({ feedback }) }));
 
-const pendente = { confirmado: false, usuarioId: null, usuario: null, lojas: [] as number[], version: 0 };
+const pendente = { confirmado: false, usuarioId: null, usuario: null, lojas: [] as number[], version: 0, avisos: [] as { tipo: string; mensagem: string }[] };
 const ana = { id: "ana", fullname: "Ana Souza", username: "ana.souza" };
 const bia = { id: "bia", fullname: "Bia Lima", username: "bia.lima" };
 const lista = {
@@ -25,7 +25,7 @@ const lista = {
     { codigo: 3, nome: "Shopping" },
   ],
 };
-const vinculadoAna = { confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [] as number[], version: 3 };
+const vinculadoAna = { confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [] as number[], version: 3, avisos: [] as { tipo: string; mensagem: string }[] };
 const listaComVinculo = {
   ...lista,
   colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna }],
@@ -280,6 +280,73 @@ describe("ColaboradoresPage", () => {
         largura.mockRestore();
         chip.mockRestore();
       }
+    });
+  });
+
+  describe("Avisos", () => {
+    const comAvisos = (avisos: { tipo: string; mensagem: string }[], campos: Record<string, unknown> = {}) => ({
+      ...lista,
+      colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna, avisos, ...campos }],
+    });
+
+    it("mostra Usuário desativado na linha, mantendo o vínculo", async () => {
+      apiFetch.mockResolvedValueOnce(comAvisos([{ tipo: "usuario_desativado", mensagem: "Usuário desativado" }]));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      expect(within(row).getByText("Usuário desativado")).toBeTruthy();
+      expect(within(row).getByText("Confirmado")).toBeTruthy();
+    });
+
+    it("mostra Inativo no ERP no filtro Todos", async () => {
+      apiFetch.mockResolvedValueOnce(comAvisos([{ tipo: "inativo_no_erp", mensagem: "Inativo no ERP" }], { ativo: false }));
+      render(<ColaboradoresPage />);
+      await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+      fireEvent.click(await screen.findByRole("combobox", { name: "Situação" }));
+      const todos = await screen.findByRole("option", { name: "Todos" });
+      fireEvent.mouseMove(todos);
+      fireEvent.click(todos);
+      expect(within(await linha("ANA SOUZA")).getByText("Inativo no ERP")).toBeTruthy();
+    });
+
+    it("mostra Loja não encontrada uma única vez, no chip", async () => {
+      apiFetch.mockResolvedValueOnce(comAvisos([{ tipo: "loja_nao_encontrada", mensagem: "Loja não encontrada (cód. 99)" }], { lojas: [99] }));
+      render(<ColaboradoresPage />);
+      expect(within(await linha("ANA SOUZA")).getAllByText("Loja não encontrada (cód. 99)")).toHaveLength(1);
+    });
+
+    describe("Colaborador que sumiu do ERP", () => {
+      const orfao = () => comAvisos([{ tipo: "colaborador_nao_encontrado", mensagem: "Não encontrado no ERP" }], { ativo: false });
+
+      it("aparece mesmo com o filtro só nos ativos", async () => {
+        apiFetch.mockResolvedValueOnce(orfao());
+        render(<ColaboradoresPage />);
+        expect(within(await linha("ANA SOUZA")).getByText("Não encontrado no ERP")).toBeTruthy();
+      });
+
+      it("desfazer o vínculo grava e tira a linha da tabela", async () => {
+        apiFetch.mockResolvedValueOnce(orfao());
+        render(<ColaboradoresPage />);
+        const row = await linha("ANA SOUZA");
+        fireEvent.click(botao(row, "Limpar Usuário"));
+        await waitFor(() => expect(botao(row, "Salvar").disabled).toBe(false));
+
+        apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente });
+        fireEvent.click(botao(row, "Salvar"));
+
+        await waitFor(() => expect(screen.queryByText("ANA SOUZA")).toBeNull());
+        expect(apiFetch).toHaveBeenLastCalledWith(
+          "/api/m/inovafarma/colaboradores/7/vinculo",
+          expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [], version: 3 }) }),
+        );
+      });
+
+      it("só permite salvar quando o vínculo fica vazio", async () => {
+        apiFetch.mockResolvedValueOnce(orfao());
+        render(<ColaboradoresPage />);
+        const row = await linha("ANA SOUZA");
+        await escolherUsuario(row, "Bia Lima");
+        expect(botao(row, "Salvar").disabled).toBe(true);
+      });
     });
   });
 });
