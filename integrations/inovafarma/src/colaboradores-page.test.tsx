@@ -432,10 +432,22 @@ describe("ColaboradoresPage", () => {
       expect(within(await linha("ANA SOUZA")).getByText("Inativo no ERP")).toBeTruthy();
     });
 
-    it("mostra Loja não encontrada uma única vez, no chip", async () => {
-      apiFetch.mockResolvedValueOnce(comAvisos([{ tipo: "loja_nao_encontrada", mensagem: "Loja não encontrada (cód. 99)" }], { lojas: [99] }));
-      render(<ColaboradoresPage />);
-      expect(within(await linha("ANA SOUZA")).getAllByText("Loja não encontrada (cód. 99)")).toHaveLength(1);
+    it("mantém visível no Status a Loja não encontrada cujo chip foi resumido em +N", async () => {
+      const largura = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(200);
+      const chip = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(80);
+      try {
+        const avisos = [98, 99].map((codigo) => ({ tipo: "loja_nao_encontrada", mensagem: `Loja não encontrada (cód. ${codigo})` }));
+        apiFetch.mockResolvedValueOnce(comAvisos(avisos, { lojas: [98, 99] }));
+        render(<ColaboradoresPage />);
+        const row = await linha("ANA SOUZA");
+        await within(row).findByText("+1");
+        const status = within(row).getAllByRole("cell")[4]!;
+        expect(within(status).getByText("Loja não encontrada (cód. 98)")).toBeTruthy();
+        expect(within(status).getByText("Loja não encontrada (cód. 99)")).toBeTruthy();
+      } finally {
+        largura.mockRestore();
+        chip.mockRestore();
+      }
     });
 
     describe("Colaborador que sumiu do ERP", () => {

@@ -327,14 +327,11 @@ export function ColaboradoresPage() {
         render: (r) => (
           <Stack direction="row" wrap gap="field">
             <Badge variant={r.confirmado ? "default" : "outline"}>{r.confirmado ? "Confirmado" : "Pendente"}</Badge>
-            {/* A Loja não encontrada já aparece no próprio chip. */}
-            {r.avisos
-              .filter((a) => a.tipo !== "loja_nao_encontrada")
-              .map((a) => (
-                <Badge key={a.tipo} variant="destructive">
-                  {a.mensagem}
-                </Badge>
-              ))}
+            {r.avisos.map((a) => (
+              <Badge key={a.mensagem} variant="destructive">
+                {a.mensagem}
+              </Badge>
+            ))}
           </Stack>
         ),
       },
