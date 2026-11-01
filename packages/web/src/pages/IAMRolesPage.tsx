@@ -296,10 +296,10 @@ export const IAMRolesPage: React.FC = () => {
       key: "permissions",
       label: "Permissões Ativas",
       mobileLabel: "Permissões",
-      value: (r) => (r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`),
+      value: (r) => (r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} ${r.permissions.length === 1 ? "permissão" : "permissões"}`),
       render: (r) => (
         <Badge variant="secondary">
-          {r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} permissões`}
+          {r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} ${r.permissions.length === 1 ? "permissão" : "permissões"}`}
         </Badge>
       ),
       skeletonClassName: "h-5 w-20",
