@@ -70,6 +70,7 @@ async function boot(permissions: string[] = [VIEW, UPDATE], erpClients: Record<s
     return (await res.json()) as {
       colaboradores: { codigoColaborador: number; confirmado: boolean; usuarioId: string | null; lojas: number[]; version: number; usuario: Record<string, unknown> | null; avisos: { tipo: string; mensagem: string }[]; nome: string; ativo: boolean; sugestao: { usuarioId: string | null; lojas: number[] } | null }[];
       usuarios: Record<string, unknown>[];
+      podeCriarUsuario: boolean;
       lojas: unknown[];
     };
   };
@@ -487,7 +488,7 @@ describe("Sugestões do Vínculo do Colaborador", () => {
   });
 });
 
-describe("pendentes", () => {
+describe("pendentes e criação de Usuário", () => {
   it("conta só os Colaboradores ativos sem vínculo confirmado e exige a Permission", async () => {
     const { platform, headers, salvar } = await boot();
     const total = async () => {
@@ -502,5 +503,12 @@ describe("pendentes", () => {
     const semPermissao = await boot([]);
     const negado = await semPermissao.platform.app.request("/api/m/inovafarma/colaboradores/pendentes", { headers: semPermissao.headers });
     expect(negado.status).toBe(403);
+  });
+
+  it("informa à tela se a pessoa pode criar Usuários", async () => {
+    const sem = await boot();
+    expect((await sem.listar()).podeCriarUsuario).toBe(false);
+    const com = await boot([VIEW, "system:users:create", "system:roles:read"]);
+    expect((await com.listar()).podeCriarUsuario).toBe(true);
   });
 });

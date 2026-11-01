@@ -11,7 +11,7 @@ const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
 
 const feedback = vi.hoisted(() => ({ notify: vi.fn(), notifyError: vi.fn() }));
-const windows = vi.hoisted(() => ({ confirm: vi.fn() }));
+const windows = vi.hoisted(() => ({ confirm: vi.fn(), open: vi.fn() }));
 vi.mock("@platform/ui/imperative/provider", () => ({ useUi: () => ({ feedback, windows }) }));
 
 /** Monta a tela num roteador de dados, com um link para outra tela, como no app. */
@@ -627,6 +627,26 @@ describe("rascunhos não salvos", () => {
     windows.confirm.mockResolvedValue(false);
     await expect(confirmLeave()).resolves.toBe(false);
     expect(windows.confirm).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("criar Usuário pela tela", () => {
+  const nome = "Criar Usuário para ANA SOUZA";
+
+  it("sem as Permissions de criação, não mostra o botão", async () => {
+    apiFetch.mockResolvedValue({ ...lista, podeCriarUsuario: false });
+    render(<ColaboradoresPage />);
+    expect(within(await linha("ANA SOUZA")).queryByRole("button", { name: nome })).toBeNull();
+  });
+
+  it("o Usuário criado entra como rascunho e só grava ao confirmar", async () => {
+    apiFetch.mockResolvedValue({ ...lista, podeCriarUsuario: true });
+    windows.open.mockResolvedValue({ status: "confirmed", value: { id: "novo", fullname: "Novo Usuário", username: "novo" } });
+    render(<ColaboradoresPage />);
+    const row = await linha("ANA SOUZA");
+    fireEvent.click(within(row).getByRole("button", { name: nome }));
+    await waitFor(() => expect(within(row).getByRole<HTMLInputElement>("combobox", { name: /^Usuário de / }).value).toBe("Novo Usuário"));
+    expect(apiFetch).not.toHaveBeenCalledWith(expect.stringContaining("/vinculo"), expect.anything());
   });
 });
 

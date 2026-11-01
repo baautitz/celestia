@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, UserPlus } from "lucide-react";
 import { avisarVinculoAlterado } from "./colaboradores-badge";
+import { CriarUsuarioWindow, type GrupoOpcao } from "./criar-usuario-window";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button, MultiValueButton } from "@platform/ui/components/button";
@@ -56,6 +57,7 @@ interface Colaborador extends CamposVinculo {
 interface ListaColaboradores {
   colaboradores: Colaborador[];
   usuarios: UsuarioOpcao[];
+  podeCriarUsuario: boolean;
   lojas: LojaOpcao[];
 }
 
@@ -177,7 +179,8 @@ function LojasSelect({
 
 /** Página Colaboradores: lista os Colaboradores do ERP e grava o vínculo de cada um na própria linha. */
 export function ColaboradoresPage() {
-  const { feedback } = useUi();
+  const { feedback, windows } = useUi();
+  const [podeCriarUsuario, setPodeCriarUsuario] = useState(false);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
   const [lojas, setLojas] = useState<LojaOpcao[]>([]);
@@ -194,6 +197,7 @@ export function ColaboradoresPage() {
       const data = await apiFetch<ListaColaboradores>("/api/m/inovafarma/colaboradores");
       setColaboradores(data.colaboradores);
       setUsuarios(data.usuarios);
+      setPodeCriarUsuario(data.podeCriarUsuario);
       setLojas(data.lojas);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erro desconhecido ao carregar os Colaboradores.");
@@ -258,6 +262,25 @@ export function ColaboradoresPage() {
     const valoresDe = (r: Colaborador): Rascunho => edicoes[r.codigoColaborador] ?? novoRascunho(r);
     const editar = (r: Colaborador, alteracao: Partial<Valores>) =>
       setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? novoRascunho(r)), ...alteracao } }));
+    // O Usuário criado entra só como rascunho: o vínculo continua dependendo de confirmar a linha.
+    const criarUsuario = async (r: Colaborador) => {
+      try {
+        const grupos = await apiFetch<GrupoOpcao[]>("/api/iam/roles");
+        const resultado = await windows.open<UsuarioOpcao>({
+          surface: "dialog",
+          size: "small",
+          title: "Criar Usuário",
+          description: `Crie o Usuário de ${r.nome}.`,
+          content: () => <CriarUsuarioWindow fullname={r.nome} grupos={grupos} />,
+        });
+        if (resultado.status !== "confirmed") return;
+        const criado = resultado.value;
+        setUsuarios((atual) => [...atual, criado].sort((a, b) => a.fullname.localeCompare(b.fullname, "pt-BR")));
+        editar(r, { usuarioId: criado.id });
+      } catch (err: unknown) {
+        feedback.notifyError(err instanceof Error ? err : new Error("Erro ao criar o Usuário."));
+      }
+    };
     return [
       {
         key: "codigoColaborador",
@@ -287,6 +310,11 @@ export function ColaboradoresPage() {
             <Stack direction="row" gap="field" align="center">
               <UsuarioSelect row={r} opcoes={opcoes} usuarioId={usuarioId} onChange={(novo) => editar(r, { usuarioId: novo })} />
               {usuarioId !== null && usuarioId === r.sugestao?.usuarioId && <SeloSugestao />}
+              {podeCriarUsuario && usuarioId === null && !naoEncontrado(r) && (
+                <Button variant="outline" size="icon" aria-label={`Criar Usuário para ${r.nome}`} onClick={() => void criarUsuario(r)}>
+                  <UserPlus />
+                </Button>
+              )}
             </Stack>
           );
         },
@@ -336,7 +364,7 @@ export function ColaboradoresPage() {
         },
       },
     ];
-  }, [edicoes, lojas, opcoes, salvando, salvar]);
+  }, [edicoes, lojas, opcoes, salvando, salvar, podeCriarUsuario, windows, feedback]);
 
   useLeaveGuard(
     colaboradores.some((c) => {

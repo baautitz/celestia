@@ -186,8 +186,11 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
       }));
     // Ordem fixada no servidor: a linha não salta na tela ao ser confirmada.
     const todas = [...linhasDoErp, ...sumidos].sort((a, b) => Number(a.confirmado) - Number(b.confirmado));
+    const permissoes = c.get("user")?.permissions;
     return c.json({
       colaboradores: todas,
+      // A criação usa as rotas do IAM, que exigem as duas Permissions.
+      podeCriarUsuario: permissions.has(permissoes, "system:users:create") && permissions.has(permissoes, "system:roles:read"),
       usuarios: usuarios
         .filter((u) => u.status === "active")
         .map(({ id, fullname, username }) => ({ id, fullname, username }))
