@@ -52,7 +52,7 @@ const Codigo = z.coerce.number().int().min(1).max(MAX_INT);
 const Gravacao = z.object({ usuarioId: z.string().min(1).nullable(), lojas: z.array(Codigo), version: z.number().int().min(0) });
 
 // Ativo vem só de Funcionario.Ativo: DataDesligamento está preenchida em poucos inativos.
-const COLABORADORES_SQL = `
+export const COLABORADORES_SQL = `
   SELECT f.CodigoFuncionario AS codigoColaborador, c.Nome AS nome, f.Ativo AS ativo, c.CodigoEmpresa AS codigoEmpresa
   FROM Funcionario f
   JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro

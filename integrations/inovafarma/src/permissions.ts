@@ -32,4 +32,14 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite vincular, alterar e desfazer o vínculo de um Colaborador do InovaFarma.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para alterar os vínculos dos Colaboradores do InovaFarma.",
   },
+  "pre-vencidos-lancamento:manage": {
+    label: "Lançar Pré-vencidos",
+    description: "Permite lançar, editar e excluir os próprios Lançamentos de Pré-vencidos no Closing Period aberto.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para lançar Pré-vencidos.",
+  },
+  "pre-vencidos-conferencia:view": {
+    label: "Conferir Pré-vencidos",
+    description: "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
+  },
 });

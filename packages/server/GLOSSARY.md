@@ -54,6 +54,14 @@ _Avoid_: Filial, Empresa, Branch
 The optional association of a Colaborador with one User and with the Lojas where they work, which can be more than one. Each part is independent of the other, and a User can be linked to at most one Colaborador.
 _Avoid_: Mapping, External
 
+**Pré-vencido** (en: Near-expiry Product):
+A product, as registered in an ERP, whose expiry date is close enough that the business wants it sold before it is lost.
+_Avoid_: Vencido, Próximo do vencimento
+
+**Lançamento de Pré-vencido** (en: Near-expiry Entry):
+A record made by a Colaborador, through their linked User, that they sold a quantity of a Pré-vencido with a given expiry date in a Loja, within an open Closing Period. The same product can be entered more than once.
+_Avoid_: Pré-vendido, Registro
+
 ### Access
 
 **User** (pt-BR: **Usuário**):

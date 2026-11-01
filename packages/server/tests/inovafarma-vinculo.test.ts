@@ -85,7 +85,7 @@ async function boot(permissions: string[] = [VIEW, UPDATE], erpClients: Record<s
 describe("Vínculo do Colaborador com Usuário", () => {
   it("o Plugin depende de iam e audit", async () => {
     const { platform } = await boot();
-    expect(platform.modules.find((m) => m.id === "inovafarma")?.dependsOn).toEqual(["iam", "audit"]);
+    expect(platform.modules.find((m) => m.id === "inovafarma")?.dependsOn).toEqual(["iam", "audit", "closing_period"]);
   });
 
   it("lista Pendente sem vínculo e oferece só Usuários ativos, sem dados além dos expostos pelo iam", async () => {

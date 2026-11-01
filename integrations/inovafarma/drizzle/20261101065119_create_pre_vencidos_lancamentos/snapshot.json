@@ -1,0 +1,359 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "adcc5a58-8f25-4600-83e0-4f3a539ac0ca",
+  "prevIds": [
+    "86f822e5-f204-4605-8002-5d2833e3e7fd"
+  ],
+  "ddl": [
+    {
+      "name": "inovafarma",
+      "entityType": "schemas"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "pre_vencidos_lancamentos",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "vinculos_colaborador",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "periodo_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_colaborador",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "nome_colaborador",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "usuario_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_loja",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "produto_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_produto",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "nome_produto",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_barra",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "quantidade",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "validade",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_colaborador",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "usuario_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 1,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "lojas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_por",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "periodo_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "codigo_colaborador",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "pre_vencidos_lancamentos_periodo_idx",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "pre_vencidos_lancamentos_pkey",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_lancamentos",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "codigo_colaborador"
+      ],
+      "nameExplicit": false,
+      "name": "vinculos_colaborador_pkey",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "usuario_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "vinculos_colaborador_usuario_id_unique",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador",
+      "entityType": "uniques"
+    }
+  ],
+  "renames": []
+}

@@ -67,7 +67,11 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
     prefix: "/api/closing-periods",
     permissions: CLOSING_PERIOD_PERMISSIONS,
     migrations: CLOSING_PERIOD_MIGRATIONS,
-    register({ routes, events }) {
+    register({ routes, events, services }) {
+      // Só estes campos saem para outros Modules (ADR 0002).
+      services.expose("periods", {
+        list: async () => (await store.list()).map(({ id, name, startDate, endDate, status }) => ({ id, name, startDate, endDate, status })),
+      });
       const P = CLOSING_PERIOD_PERMISSIONS.keys;
       const NOT_FOUND = "Período de Fechamento não encontrado.";
 

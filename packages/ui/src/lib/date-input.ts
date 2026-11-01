@@ -49,3 +49,31 @@ export function parseDateRange(text: string): { from: Date; to: Date } | undefin
   if (!from || !to || to < from) return undefined;
   return { from, to };
 }
+
+const MONTH_LENGTH = 7;
+const MIN_YEAR = 1900;
+
+/** Aplica a máscara mm/aaaa a medida que o usuário digita. */
+export function maskMonth(text: string): string {
+  const digits = text.replace(/\D/g, "").slice(0, 6);
+  return digits.length <= 2 ? digits : `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+/** Converte "mm/aaaa" em "AAAA-MM", só com o texto completo e um mês real. */
+export function parseMonth(text: string): string | undefined {
+  const match = /^(0[1-9]|1[0-2])\/(\d{4})$/.exec(text);
+  if (!match || Number(match[2]) < MIN_YEAR) return undefined;
+  return `${match[2]}-${match[1]}`;
+}
+
+/** Mostra "AAAA-MM" como "mm/aaaa". */
+export function formatMonth(value: string | undefined): string {
+  return value ? `${value.slice(5, 7)}/${value.slice(0, 4)}` : "";
+}
+
+export const INVALID_MONTH_MESSAGE = "Mês inválido. Use mm/aaaa.";
+
+export function monthTextError(text: string, touched: boolean): string | undefined {
+  if (text === "" || parseMonth(text) || !(touched || text.length === MONTH_LENGTH)) return undefined;
+  return INVALID_MONTH_MESSAGE;
+}

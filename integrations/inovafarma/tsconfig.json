@@ -14,5 +14,5 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/server.ts", "src/permissions.ts", "src/driver.ts", "src/colaboradores-routes.ts", "src/sugestao-usuario.ts", "src/schema.ts", "src/postgres-vinculo-store.ts", "src/vinculo-audit.ts", "src/vinculo-store.ts", "src/visualizacoes.ts"]
+  "include": ["src/server.ts", "src/permissions.ts", "src/driver.ts", "src/colaboradores-routes.ts", "src/sugestao-usuario.ts", "src/schema.ts", "src/postgres-vinculo-store.ts", "src/vinculo-audit.ts", "src/vinculo-store.ts", "src/visualizacoes.ts", "src/pre-vencidos-audit.ts", "src/pre-vencidos-conferencia.ts", "src/pre-vencidos-routes.ts", "src/pre-vencidos-store.ts", "src/postgres-pre-vencido-store.ts"]
 }

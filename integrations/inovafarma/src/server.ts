@@ -6,6 +6,10 @@ import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { createInovafarmaDriver } from "./driver.js";
 import { LOJAS_SQL, registerColaboradoresRoutes, type UsersService } from "./colaboradores-routes.js";
 import { PostgresVinculoStore } from "./postgres-vinculo-store.js";
+import { declarePreVencidoAudit } from "./pre-vencidos-audit.js";
+import { registerPreVencidosRoutes, type PeriodsService } from "./pre-vencidos-routes.js";
+import { MemoryPreVencidoStore } from "./pre-vencidos-store.js";
+import { PostgresPreVencidoStore } from "./postgres-pre-vencido-store.js";
 import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
 import { MemoryVinculoStore } from "./vinculo-store.js";
 import { SEM_VISUALIZACAO, VISUALIZACAO_PERMISSION, VISUALIZACOES, visualizacoesDoUsuario, type Visualizacao } from "./visualizacoes.js";
@@ -79,12 +83,13 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
   return defineModule({
     id: "inovafarma",
     version: "1.0.0",
-    dependsOn: ["iam", "audit"],
+    dependsOn: ["iam", "audit", "closing_period"],
     permissions: INOVAFARMA_PERMISSIONS,
     migrations: INOVAFARMA_MIGRATIONS,
     register({ routes, permissions, services }) {
       const audit = services.use<AuditService>("audit", "log");
       declareVinculoAudit(audit);
+      declarePreVencidoAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
       registerColaboradoresRoutes({
         routes,
@@ -93,6 +98,16 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         erpClient: () => erpClients[erpId],
         store,
         users: services.use<UsersService>("iam", "users"),
+        audit,
+      });
+      registerPreVencidosRoutes({
+        routes,
+        permissions,
+        auth,
+        erpClient: () => erpClients[erpId],
+        store: db ? new PostgresPreVencidoStore(db) : new MemoryPreVencidoStore(),
+        vinculos: store,
+        periods: services.use<PeriodsService>("closing_period", "periods"),
         audit,
       });
 
