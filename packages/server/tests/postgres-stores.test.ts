@@ -11,6 +11,7 @@ import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
 import { LastAdminError } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
+import { PostgresPreVencidoStore } from "../../../integrations/inovafarma/src/postgres-pre-vencido-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
 
@@ -43,8 +44,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); o erp tem a inicial e a que apaga a tabela legada; o inovafarma tem a inicial e a das Lojas; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : item.moduleId === "erp" || item.moduleId === "inovafarma" ? 2 : 1);
+        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); o erp tem a inicial e a que apaga a tabela legada; o inovafarma tem a inicial, a das Lojas e a dos Lançamentos de Pré-vencidos; os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : item.moduleId === "erp" ? 2 : item.moduleId === "inovafarma" ? 3 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -63,6 +64,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "erp", name: "erps" },
         { schema: "iam", name: "roles" },
         { schema: "iam", name: "users" },
+        { schema: "inovafarma", name: "pre_vencidos_lancamentos" },
         { schema: "inovafarma", name: "vinculos_colaborador" },
       ]);
     });
@@ -113,7 +115,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_lancamentos CASCADE`);
     });
 
     describe("Users e Roles", () => {
@@ -241,6 +243,38 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         expect(await version()).toBe(3);
         await store.revokeSessions(u.id);
         expect(await version()).toBe(4);
+      });
+    });
+
+    describe("Lançamentos de Pré-vencidos", () => {
+      const novo = {
+        periodoId: "p1",
+        codigoColaborador: 7,
+        nomeColaborador: "ANA",
+        usuarioId: "ana",
+        codigoLoja: 1,
+        produtoId: "guid-1",
+        codigoProduto: 987654,
+        nomeProduto: "DIPIRONA 500MG",
+        codigoBarra: "7891234567895",
+        quantidade: 3,
+        validade: "2027-06",
+      };
+
+      it("cria, lista pelo período e Colaborador, edita e exclui com a version", async () => {
+        const store = new PostgresPreVencidoStore(db);
+        const criado = await store.criar(novo);
+        await store.criar({ ...novo, codigoColaborador: 8 });
+        expect(criado).toMatchObject({ version: 1, quantidade: 3, codigoProduto: 987654 });
+        expect(await store.listar({ periodoId: "p1", codigoColaborador: 7 })).toHaveLength(1);
+        expect(await store.listar({ periodoId: "p1" })).toHaveLength(2);
+        expect(await store.listar({ periodoId: "outro" })).toHaveLength(0);
+
+        expect(await store.atualizar(criado.id, { quantidade: 9, validade: "2027-08" }, 99)).toBeNull();
+        expect(await store.atualizar(criado.id, { quantidade: 9, validade: "2027-08" }, 1)).toMatchObject({ quantidade: 9, validade: "2027-08", version: 2 });
+        expect(await store.excluir(criado.id, 1)).toBe(false);
+        expect(await store.excluir(criado.id, 2)).toBe(true);
+        expect(await store.get(criado.id)).toBeNull();
       });
     });
 
