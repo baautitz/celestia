@@ -304,6 +304,13 @@ export function ColaboradoresPage() {
       {
         key: "usuario",
         label: "Usuário",
+        // A busca e a ordenação seguem o Usuário exibido na linha, inclusive o rascunho ainda não confirmado.
+        value: (r) => {
+          const { usuarioId } = valoresDe(r);
+          return opcoes.find((o) => o.value === usuarioId)?.label ?? opcaoGravada(r)?.label ?? "";
+        },
+        sortable: true,
+        searchable: true,
         render: (r) => {
           const { usuarioId } = valoresDe(r);
           return (
@@ -435,7 +442,7 @@ export function ColaboradoresPage() {
         getRowId={(r) => String(r.codigoColaborador)}
         loading={loading}
         title="Colaboradores"
-        search={{ placeholder: "Buscar por nome ou código..." }}
+        search={{ placeholder: "Buscar por nome, código ou usuário..." }}
         emptyMessage="Nenhum Colaborador encontrado."
         striped
         bordered
