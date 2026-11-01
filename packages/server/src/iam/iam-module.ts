@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import type { Context, MiddlewareHandler } from "hono";
-import { getConnInfo } from "@hono/node-server/conninfo";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -46,15 +45,6 @@ function getDummyHash(): string {
 /** `Secure` em produção (HTTPS); fora dela o cookie precisa funcionar em http://localhost. */
 const refreshCookie = () =>
   ({ path: "/api/auth", httpOnly: true, sameSite: "Lax", maxAge: 7 * 24 * 3600, secure: process.env.NODE_ENV === "production" }) as const;
-
-/** IP do socket; indefinido quando o servidor não o expõe (ex.: testes sem `env`). Não confia em X-Forwarded-For. */
-function clientIp(c: Context): string | undefined {
-  try {
-    return getConnInfo(c).remote.address;
-  } catch {
-    return undefined;
-  }
-}
 
 const LAST_ADMIN = LAST_ADMIN_MESSAGE;
 const ADMIN_TARGET_ONLY = "Somente administradores podem inativar outro administrador.";
@@ -135,8 +125,7 @@ export function createIamModule({
         zValidator("json", z.object({ username: z.string(), password: z.string() })),
         async (c) => {
           const { username, password } = c.req.valid("json");
-          const ip = clientIp(c);
-          const retryAfter = loginRateLimiter.retryAfterSeconds(username, ip);
+          const retryAfter = loginRateLimiter.retryAfterSeconds(username);
           if (retryAfter > 0) {
             c.header("Retry-After", String(retryAfter));
             return c.json({ error: "Muitas tentativas de login. Tente novamente mais tarde." }, 429);
@@ -146,7 +135,7 @@ export function createIamModule({
           // Mesma mensagem e mesmo custo (hash dummy) para inexistente, senha errada e inativo.
           const isPasswordValid = PasswordService.verify(password, user?.passwordHash || getDummyHash());
           if (!user || user.status === "inactive" || !isPasswordValid) {
-            loginRateLimiter.recordFailure(username, ip);
+            loginRateLimiter.recordFailure(username);
             return c.json({ error: "Credenciais inválidas." }, 401);
           }
 

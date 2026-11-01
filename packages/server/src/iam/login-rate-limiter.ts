@@ -1,8 +1,6 @@
 export interface LoginRateLimiterOptions {
   /** Falhas toleradas por username dentro da janela. */
   maxPerUsername?: number;
-  /** Falhas toleradas por IP dentro da janela. */
-  maxPerIp?: number;
   windowMs?: number;
   /** Teto de buckets em memória; ao exceder, descarta os mais antigos. */
   maxBuckets?: number;
@@ -21,7 +19,6 @@ interface Bucket {
  */
 export class LoginRateLimiter {
   private readonly maxPerUsername: number;
-  private readonly maxPerIp: number;
   private readonly windowMs: number;
   private readonly maxBuckets: number;
   private readonly now: () => number;
@@ -29,7 +26,6 @@ export class LoginRateLimiter {
 
   constructor(options: LoginRateLimiterOptions = {}) {
     this.maxPerUsername = options.maxPerUsername ?? 5;
-    this.maxPerIp = options.maxPerIp ?? 20;
     this.windowMs = options.windowMs ?? 15 * 60 * 1000;
     this.maxBuckets = options.maxBuckets ?? 10_000;
     this.now = options.now ?? Date.now;
@@ -54,27 +50,20 @@ export class LoginRateLimiter {
   }
 
   /** Segundos até liberar, ou 0 se a tentativa pode prosseguir. */
-  retryAfterSeconds(username: string, ip: string | undefined): number {
-    const limits: Array<[string, number]> = [[LoginRateLimiter.usernameKey(username), this.maxPerUsername]];
-    if (ip) limits.push([`i:${ip}`, this.maxPerIp]);
-    let resetAt = 0;
-    for (const [key, max] of limits) {
-      const bucket = this.active(key);
-      if (bucket && bucket.count >= max) resetAt = Math.max(resetAt, bucket.resetAt);
-    }
-    return resetAt ? Math.max(1, Math.ceil((resetAt - this.now()) / 1000)) : 0;
+  retryAfterSeconds(username: string): number {
+    const bucket = this.active(LoginRateLimiter.usernameKey(username));
+    if (!bucket || bucket.count < this.maxPerUsername) return 0;
+    return Math.max(1, Math.ceil((bucket.resetAt - this.now()) / 1000));
   }
 
-  recordFailure(username: string, ip: string | undefined): void {
+  recordFailure(username: string): void {
     this.prune();
-    for (const key of [LoginRateLimiter.usernameKey(username), ip ? `i:${ip}` : undefined]) {
-      if (!key) continue;
-      const bucket = this.active(key) ?? { count: 0, resetAt: this.now() + this.windowMs };
-      bucket.count += 1;
-      // Reinserir move a chave para o fim: o Map itera do mais antigo ao mais recente.
-      this.buckets.delete(key);
-      this.buckets.set(key, bucket);
-    }
+    const key = LoginRateLimiter.usernameKey(username);
+    const bucket = this.active(key) ?? { count: 0, resetAt: this.now() + this.windowMs };
+    bucket.count += 1;
+    // Reinserir move a chave para o fim: o Map itera do mais antigo ao mais recente.
+    this.buckets.delete(key);
+    this.buckets.set(key, bucket);
     for (const key of this.buckets.keys()) {
       if (this.buckets.size <= this.maxBuckets) break;
       this.buckets.delete(key);
