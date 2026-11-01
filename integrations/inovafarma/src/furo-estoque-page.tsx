@@ -8,6 +8,7 @@ import { Grid, KpiCard, Stack, Text } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
+import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatCurrency, formatDate, formatNumber } from "@platform/ui/lib/format";
@@ -321,12 +322,12 @@ function Motivos({ motivos, recarregar }: { motivos: Motivo[]; recarregar: () =>
   ];
   return (
     <Stack gap="section">
-      <Stack direction="row" justify="end">
+      <HeaderActions>
         <Button onClick={() => void abrir()}>
           <Plus />
           Novo Motivo
         </Button>
-      </Stack>
+      </HeaderActions>
       <DataTable
         columns={colunas}
         rows={motivos}
