@@ -66,6 +66,22 @@ _Avoid_: Pré-vendido, Registro
 A record made by a manager about a Colaborador of one of their Lojas, within a Closing Period, with a description and an amount to discount from the Colaborador, which may be zero. It keeps the Loja it was made in, even if the Colaborador later changes Loja. A Colaborador can be assessed without a Vínculo or a User: their Lojas are those of the Vínculo when it has any, otherwise their Loja in the ERP while they are active there. The Colaborador sees their own Avaliações only through their linked User.
 _Avoid_: Advertência, Desconto, Ocorrência
 
+**Ajuste de Estoque** (en: Stock Adjustment):
+A movement registered in an ERP that changes the quantity of one or more products in a Loja, up (+) or down (−), outside of sales and purchases. Celestia only reads it.
+_Avoid_: Acerto, Inventário, Movimentação
+
+**Justificativa do Ajuste** (en: Adjustment Justification):
+A record made in Celestia that explains one whole Ajuste de Estoque, with a Motivo and an optional note, within the Closing Period the Ajuste belongs to.
+_Avoid_: Explicação, Comentário
+
+**Motivo do Ajuste** (en: Adjustment Reason):
+One of a list of reasons, kept by the customer, that classifies a Justificativa do Ajuste, such as breakage, expiry or counting error.
+_Avoid_: Causa, Tipo
+
+**Furo de Estoque** (en: Stock Shortfall):
+The report that gathers the Ajustes de Estoque of a Closing Period with their Justificativas. The Ajustes without a Justificativa are what the business treats as the unexplained shortfall.
+_Avoid_: Perda, Quebra
+
 ### Access
 
 **User** (pt-BR: **Usuário**):
