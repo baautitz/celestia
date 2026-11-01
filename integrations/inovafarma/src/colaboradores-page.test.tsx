@@ -44,6 +44,8 @@ const lista = {
     { codigo: 3, nome: "Shopping" },
   ],
 };
+/** A lista como o servidor a devolve ao revalidar, depois de gravar. */
+const revalidada = (colaboradores: object[]) => ({ ...lista, colaboradores });
 const vinculadoAna = { confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [] as number[], version: 3, avisos: [] as { tipo: string; mensagem: string }[], sugestao: null };
 const listaComVinculo = {
   ...lista,
@@ -154,15 +156,37 @@ describe("ColaboradoresPage", () => {
     await escolherUsuario(row, "Bia Lima");
 
     apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, version: 1 });
+    apiFetch.mockResolvedValueOnce(revalidada([{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna, usuarioId: "bia", usuario: { ...bia, status: "active" }, version: 1 }]));
     fireEvent.click(salvarTudo());
 
     expect(await within(row).findByText("Confirmado")).toBeTruthy();
-    expect(apiFetch).toHaveBeenLastCalledWith("/api/m/inovafarma/colaboradores/7/vinculo", {
+    expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/colaboradores/7/vinculo", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ usuarioId: "bia", lojas: [], version: 0 }),
     });
     expect((salvarTudo()).disabled).toBe(true);
+  });
+
+  it("depois de gravar, revalida a tabela com o servidor e mostra o que mudou nas outras linhas", async () => {
+    const duasAtivas = { ...lista, colaboradores: lista.colaboradores.map((c) => ({ ...c, ativo: true })) };
+    apiFetch.mockResolvedValueOnce(duasAtivas);
+    render(<ColaboradoresPage />);
+    await escolherUsuario(await linha("ANA SOUZA"), "Ana Souza");
+
+    apiFetch.mockResolvedValueOnce({ ...vinculadoAna, version: 1 });
+    // Enquanto isso, outra pessoa vinculou o Bruno: só a revalidação traz isso para a tela.
+    apiFetch.mockResolvedValueOnce({
+      ...duasAtivas,
+      colaboradores: [
+        { codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna, version: 1 },
+        { codigoColaborador: 9, nome: "BRUNO LIMA", ativo: true, ...vinculadoAna, usuarioId: "bia", usuario: { ...bia, status: "active" }, version: 1 },
+      ],
+    });
+    fireEvent.click(salvarTudo());
+
+    expect(await within(await linha("BRUNO LIMA")).findByText("Confirmado")).toBeTruthy();
+    expect(apiFetch.mock.calls.slice(1).map(([url]) => url)).toEqual(["/api/m/inovafarma/colaboradores/7/vinculo", "/api/m/inovafarma/colaboradores"]);
   });
 
   it("limpar o campo e salvar desfaz o vínculo e devolve a Pendente", async () => {
@@ -174,12 +198,13 @@ describe("ColaboradoresPage", () => {
 
     fireEvent.click(within(row).getByRole("button", { name: "Limpar Usuário" }));
     apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente });
+    apiFetch.mockResolvedValueOnce(revalidada([{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...pendente, version: 4 }]));
     const salvar = salvarTudo();
     await waitFor(() => expect(salvar.disabled).toBe(false));
     fireEvent.click(salvar);
 
     expect(await within(row).findByText("Pendente")).toBeTruthy();
-    expect(apiFetch).toHaveBeenLastCalledWith(
+    expect(apiFetch).toHaveBeenCalledWith(
       "/api/m/inovafarma/colaboradores/7/vinculo",
       expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [], version: 3 }) }),
     );
@@ -200,7 +225,7 @@ describe("ColaboradoresPage", () => {
     expect((screen.getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Ana Souza");
   });
 
-  it("no 409 de Usuário já vinculado mostra a mensagem e mantém o rascunho inteiro, sem recarregar", async () => {
+  it("no 409 de Usuário já vinculado mostra a mensagem, revalida a tabela e mantém o rascunho inteiro", async () => {
     apiFetch.mockResolvedValueOnce(lista);
     render(<ColaboradoresPage />);
     const row = await linha("ANA SOUZA");
@@ -209,17 +234,18 @@ describe("ColaboradoresPage", () => {
 
     const jaVinculado = new ApiError("Este Usuário já está vinculado a outro Colaborador.", 409, "usuario_ja_vinculado");
     apiFetch.mockRejectedValueOnce(jaVinculado);
+    apiFetch.mockResolvedValueOnce(lista);
     fireEvent.click(salvarTudo());
 
     await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ description: "ANA SOUZA: Este Usuário já está vinculado a outro Colaborador." })));
-    expect(apiFetch).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(3));
     expect(within(row).getByText("Não salvo")).toBeTruthy();
     expect((within(row).getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Bia Lima");
     expect(within(row).getByText("Shopping")).toBeTruthy();
     await waitFor(() => expect(salvarTudo().disabled).toBe(false));
   });
 
-  it("em outra falha avisa e mantém a edição, sem recarregar", async () => {
+  it("em outra falha avisa, revalida a tabela e mantém a edição", async () => {
     apiFetch.mockResolvedValueOnce(lista);
     render(<ColaboradoresPage />);
     const row = await linha("ANA SOUZA");
@@ -227,10 +253,11 @@ describe("ColaboradoresPage", () => {
 
     const negado = new ApiError("Acesso negado.", 403);
     apiFetch.mockRejectedValueOnce(negado);
+    apiFetch.mockResolvedValueOnce(lista);
     fireEvent.click(salvarTudo());
 
     await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "0 salvos, 1 não salvos", description: "ANA SOUZA: Acesso negado." })));
-    expect(apiFetch).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(3));
     expect((within(row).getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Bia Lima");
   });
 
@@ -245,10 +272,11 @@ describe("ColaboradoresPage", () => {
       await escolherLoja(row, "Centro");
 
       apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente, confirmado: true, lojas: [1, 2], version: 1 });
+      apiFetch.mockResolvedValueOnce(revalidada([{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...pendente, confirmado: true, lojas: [1, 2], version: 1 }]));
       fireEvent.click(salvarTudo());
 
       expect(await within(row).findByText("Confirmado")).toBeTruthy();
-      expect(apiFetch).toHaveBeenLastCalledWith(
+      expect(apiFetch).toHaveBeenCalledWith(
         "/api/m/inovafarma/colaboradores/7/vinculo",
         expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [1, 2], version: 0 }) }),
       );
@@ -263,10 +291,11 @@ describe("ColaboradoresPage", () => {
       await escolherLoja(row, "Shopping");
 
       apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, lojas: [3], version: 1 });
+      apiFetch.mockResolvedValueOnce(revalidada([{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna, usuarioId: "bia", usuario: { ...bia, status: "active" }, lojas: [3], version: 1 }]));
       fireEvent.click(salvarTudo());
 
       expect(await within(row).findByText("Confirmado")).toBeTruthy();
-      expect(apiFetch).toHaveBeenLastCalledWith(
+      expect(apiFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ body: JSON.stringify({ usuarioId: "bia", lojas: [3], version: 0 }) }),
       );
@@ -283,10 +312,11 @@ describe("ColaboradoresPage", () => {
       await waitFor(() => expect(within(row).queryByText("Centro")).toBeNull());
 
       apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente });
+      apiFetch.mockResolvedValueOnce(revalidada([{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...pendente, version: 4 }]));
       fireEvent.click(salvarTudo());
 
       expect(await within(row).findByText("Pendente")).toBeTruthy();
-      expect(apiFetch).toHaveBeenLastCalledWith(
+      expect(apiFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [], version: 3 }) }),
       );
@@ -355,10 +385,11 @@ describe("ColaboradoresPage", () => {
       await waitFor(() => expect(salvarTudo().disabled).toBe(false));
 
       apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [2, 3], version: 1, avisos: [], sugestao: null });
+      apiFetch.mockResolvedValueOnce(revalidada([{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna, lojas: [2, 3], version: 1 }]));
       fireEvent.click(salvarTudo());
 
       expect(await within(row).findByText("Confirmado")).toBeTruthy();
-      expect(apiFetch).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ body: JSON.stringify({ usuarioId: "ana", lojas: [2, 3], version: 0 }) }));
+      expect(apiFetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ body: JSON.stringify({ usuarioId: "ana", lojas: [2, 3], version: 0 }) }));
       expect(seloUsuario(row)).toBeNull();
       expect(seloLojas(row)).toBeNull();
     });
@@ -469,10 +500,11 @@ describe("ColaboradoresPage", () => {
         await waitFor(() => expect(salvarTudo().disabled).toBe(false));
 
         apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente });
+        apiFetch.mockResolvedValueOnce(revalidada([]));
         fireEvent.click(salvarTudo());
 
         await waitFor(() => expect(screen.queryByText("ANA SOUZA")).toBeNull());
-        expect(apiFetch).toHaveBeenLastCalledWith(
+        expect(apiFetch).toHaveBeenCalledWith(
           "/api/m/inovafarma/colaboradores/7/vinculo",
           expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [], version: 3 }) }),
         );
@@ -496,10 +528,11 @@ describe("ColaboradoresPage", () => {
         expect(salvarTudo().textContent).toBe("Salvar (1)");
 
         apiFetch.mockResolvedValueOnce({ confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [], version: 1, avisos: [], sugestao: null });
+        apiFetch.mockResolvedValueOnce({ ...resto, colaboradores: [...colaboradores, { ...outra, ...vinculadoAna, version: 1 }] });
         fireEvent.click(salvarTudo());
 
         await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "1 vínculo salvo", type: "warning", description: expect.stringContaining("1 sem o Colaborador no ERP") })));
-        expect(apiFetch).toHaveBeenCalledTimes(2);
+        await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(3));
       });
     });
   });
@@ -543,12 +576,15 @@ describe("rascunhos não salvos", () => {
 
     apiFetch.mockResolvedValueOnce({ ...vinculadoAna, version: 1 });
     apiFetch.mockResolvedValueOnce({ confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, lojas: [], version: 1, avisos: [], sugestao: null });
+    apiFetch.mockResolvedValueOnce({ ...duasAtivas, colaboradores: duasAtivas.colaboradores.map((c) => ({ ...c, ...vinculadoAna, version: 1 })) });
     fireEvent.click(salvarTudo());
 
     await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "2 vínculos salvos", type: "success" })));
+    // As duas gravações, uma a uma, e depois a lista revalidada com o servidor.
     expect(apiFetch.mock.calls.slice(1).map(([url]) => url)).toEqual([
       "/api/m/inovafarma/colaboradores/7/vinculo",
       "/api/m/inovafarma/colaboradores/9/vinculo",
+      "/api/m/inovafarma/colaboradores",
     ]);
     expect(salvarTudo().textContent).toBe("Salvar (0)");
   });
@@ -562,6 +598,7 @@ describe("rascunhos não salvos", () => {
 
     apiFetch.mockRejectedValueOnce(new ApiError("Acesso negado.", 403));
     apiFetch.mockResolvedValueOnce({ confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, lojas: [], version: 1, avisos: [], sugestao: null });
+    apiFetch.mockResolvedValueOnce({ ...duasAtivas, colaboradores: [duasAtivas.colaboradores[0], { ...duasAtivas.colaboradores[1], ...vinculadoAna, usuarioId: "bia", usuario: { ...bia, status: "active" }, version: 1 }] });
     fireEvent.click(salvarTudo());
 
     await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "1 salvos, 1 não salvos", description: "ANA SOUZA: Acesso negado." })));
@@ -623,8 +660,9 @@ describe("rascunhos não salvos", () => {
     expect(campoUsuario(await linha("BRUNO LIMA")).value).toBe("Bia Lima");
 
     apiFetch.mockRejectedValueOnce(new ApiError("Acesso negado.", 403));
+    apiFetch.mockResolvedValueOnce({ ...lista, colaboradores: ativas.map((c) => ({ ...c, version: 5 })) });
     fireEvent.click(salvarTudo());
-    await waitFor(() => expect(apiFetch).toHaveBeenLastCalledWith(
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
       "/api/m/inovafarma/colaboradores/9/vinculo",
       expect.objectContaining({ body: JSON.stringify({ usuarioId: "bia", lojas: [], version: 0 }) }),
     ));
@@ -661,7 +699,7 @@ describe("rascunhos não salvos", () => {
 
   it("depois de gravar, sai sem pedir confirmação", async () => {
     await abrirComRascunho();
-    apiFetch.mockResolvedValue(vinculadoAna);
+    apiFetch.mockImplementation(async (_url: string, init?: RequestInit) => (init?.method === "PUT" ? vinculadoAna : revalidada([{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna }])));
     fireEvent.click(salvarTudo());
     await within(await linha("ANA SOUZA")).findByText("Confirmado");
     sair();

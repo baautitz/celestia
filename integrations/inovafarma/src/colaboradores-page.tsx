@@ -281,10 +281,10 @@ export function ColaboradoresPage() {
     const salvos = pendentes.length - erros.length;
     if (salvos > 0) avisarVinculoAlterado();
     const desatualizados = erros.filter(({ erro }) => erro instanceof ApiError && erro.code === "versao_desatualizada");
-    if (desatualizados.length > 0) {
-      await buscar();
-      desatualizados.forEach(({ row }) => descartarEdicao(row.codigoColaborador));
-    }
+    // Revalida a lista com o servidor depois de gravar, deu certo ou não: status, avisos e sugestões das demais linhas
+    // dependem do que foi gravado. O rascunho de quem falhou fica (com a `version` de quando a edição começou).
+    await buscar();
+    desatualizados.forEach(({ row }) => descartarEdicao(row.codigoColaborador));
     setFalhas(Object.fromEntries(erros.filter((e) => !desatualizados.includes(e)).map(({ row, erro }) => [row.codigoColaborador, erro.message])));
     const pulados = bloqueados.length > 0 ? ` ${bloqueados.length} sem o Colaborador no ERP só aceitam desfazer o vínculo e não foram gravados.` : "";
     if (erros.length === 0) {
