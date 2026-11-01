@@ -12,6 +12,7 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import type { Trend } from "@platform/ui/components/trend";
+import { ColaboradoresPendentesBadge } from "./colaboradores-badge";
 import { ColaboradoresPage } from "./colaboradores-page";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
@@ -701,6 +702,7 @@ export const inovafarmaWebModule = defineWebModule({
       order: 10,
       permission: "inovafarma:colaboradores:view",
       component: ColaboradoresPage,
+      badge: ColaboradoresPendentesBadge,
     },
     {
       id: "inovafarma-vendas",

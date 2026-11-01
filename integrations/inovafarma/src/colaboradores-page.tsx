@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
+import { avisarVinculoAlterado } from "./colaboradores-badge";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button, MultiValueButton } from "@platform/ui/components/button";
@@ -229,6 +230,7 @@ export function ColaboradoresPage() {
           naoEncontrado(row) && !salvo.confirmado ? atual.filter((c) => c.codigoColaborador !== codigo) : atual.map((c) => (c.codigoColaborador === codigo ? { ...c, ...salvo } : c)),
         );
         descartarEdicao(codigo);
+        avisarVinculoAlterado();
       } catch (err: unknown) {
         const mensagem = err instanceof Error ? err : new Error("Erro desconhecido ao salvar o vínculo.");
         if (err instanceof ApiError && err.code === "versao_desatualizada") {

@@ -118,6 +118,24 @@ function avisosDoVinculo(vinculo: VinculoColaborador | null, colaborador: Colabo
 
 /** Rotas de Colaboradores: listagem com o vínculo de cada um e gravação do vínculo por linha. */
 export function registerColaboradoresRoutes({ routes, permissions, auth, erpClient, store, users, audit }: ColaboradoresRoutesDeps): void {
+  // Colaboradores ativos sem vínculo confirmado: o número do badge no menu.
+  routes.get("/colaboradores/pendentes", auth, async (c: AuthContext) => {
+    const colaboradoresView = INOVAFARMA_PERMISSIONS.ref("colaboradores:view");
+    if (!permissions.has(c.get("user")?.permissions, colaboradoresView.key)) {
+      return c.json({ error: colaboradoresView.deniedMessage }, 403);
+    }
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    let colaboradores: ColaboradorErp[];
+    try {
+      colaboradores = (await client.query<LinhaErp>(COLABORADORES_SQL)).map(toColaborador);
+    } catch {
+      return c.json({ error: ERP_INDISPONIVEL }, 503);
+    }
+    const confirmados = new Set((await store.list()).filter((v) => !vinculoDesfeito(v)).map((v) => v.codigoColaborador));
+    return c.json({ total: colaboradores.filter((col) => col.ativo && !confirmados.has(col.codigoColaborador)).length });
+  });
+
   routes.get("/colaboradores", auth, async (c: AuthContext) => {
     const colaboradoresView = INOVAFARMA_PERMISSIONS.ref("colaboradores:view");
     if (!permissions.has(c.get("user")?.permissions, colaboradoresView.key)) {

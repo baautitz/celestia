@@ -78,7 +78,7 @@ async function boot(permissions: string[] = [VIEW, UPDATE], erpClients: Record<s
     expect(res.status).toBe(200);
     return (await res.json()) as { action: string; actorId: string; targetType: string; targetId: string; attributes: unknown; summary: string }[];
   };
-  return { platform, userStore, salvar, listar, auditoria };
+  return { platform, userStore, headers, salvar, listar, auditoria };
 }
 
 describe("Vínculo do Colaborador com Usuário", () => {
@@ -484,5 +484,23 @@ describe("Sugestões do Vínculo do Colaborador", () => {
     const { salvar, listar } = await boot([VIEW, UPDATE], erpCom([colaborador(1, "ALFA"), colaborador(2, "BETA"), colaborador(3, "GAMA")]));
     await salvar(1, { usuarioId: null, lojas: [1], version: 0 });
     expect((await listar()).colaboradores.map((c) => c.codigoColaborador)).toEqual([2, 3, 1]);
+  });
+});
+
+describe("pendentes", () => {
+  it("conta só os Colaboradores ativos sem vínculo confirmado e exige a Permission", async () => {
+    const { platform, headers, salvar } = await boot();
+    const total = async () => {
+      const res = await platform.app.request("/api/m/inovafarma/colaboradores/pendentes", { headers });
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { total: number }).total;
+    };
+    expect(await total()).toBe(1);
+    expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(200);
+    expect(await total()).toBe(0);
+
+    const semPermissao = await boot([]);
+    const negado = await semPermissao.platform.app.request("/api/m/inovafarma/colaboradores/pendentes", { headers: semPermissao.headers });
+    expect(negado.status).toBe(403);
   });
 });
