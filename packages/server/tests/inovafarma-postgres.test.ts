@@ -24,8 +24,8 @@ describe.skipIf(!dbTestsEnabled)("Vínculos do Colaborador contra Postgres real"
     await pool?.end();
   });
 
-  const gravar = (codigoColaborador: number, usuarioId: string | null, version: number) =>
-    store.gravar({ codigoColaborador, usuarioId, atualizadoPor: "autor" }, version);
+  const gravar = (codigoColaborador: number, usuarioId: string | null, version: number, lojas: number[] = []) =>
+    store.gravar({ codigoColaborador, usuarioId, lojas, atualizadoPor: "autor" }, version);
 
   it("cria, altera incrementando a version, lista e desfaz", async () => {
     expect(await gravar(7, "ana", 0)).toMatchObject({ codigoColaborador: 7, usuarioId: "ana", version: 1, atualizadoPor: "autor" });
@@ -52,10 +52,18 @@ describe.skipIf(!dbTestsEnabled)("Vínculos do Colaborador contra Postgres real"
     await expect(gravar(9, "ana", 1)).rejects.toBeInstanceOf(UsuarioJaVinculadoError);
   });
 
-  it("aceita vários vínculos sem Usuário, para a #78 gravar só Lojas", async () => {
-    await gravar(7, null, 0);
-    await gravar(9, null, 0);
-    expect(await store.list()).toHaveLength(2);
+  it("grava várias Lojas em vínculos sem Usuário, sem Usuário repetido", async () => {
+    await gravar(7, null, 0, [1, 2]);
+    await gravar(9, null, 0, [2]);
+    expect((await store.list()).map((v) => v.lojas).sort((a, b) => b.length - a.length)).toEqual([[1, 2], [2]]);
+  });
+
+  it("altera as Lojas pelo compare-and-set e aceita ficar sem nenhuma", async () => {
+    await gravar(7, "ana", 0, [1, 2, 3]);
+    expect(await gravar(7, "ana", 1, [3])).toMatchObject({ lojas: [3], version: 2 });
+    await expect(gravar(7, "ana", 1, [9])).rejects.toBeInstanceOf(VersaoDesatualizadaError);
+    expect((await store.get(7))?.lojas).toEqual([3]);
+    expect(await gravar(7, "ana", 2, [])).toMatchObject({ lojas: [], version: 3 });
   });
 
   it("não há FK entre o vínculo e iam.users", async () => {

@@ -1,0 +1,120 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "86f822e5-f204-4605-8002-5d2833e3e7fd",
+  "prevIds": [
+    "efa63836-abc5-4686-93ad-6566f1490f4a"
+  ],
+  "ddl": [
+    {
+      "name": "inovafarma",
+      "entityType": "schemas"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "vinculos_colaborador",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_colaborador",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "usuario_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 1,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "lojas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_por",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "columns": [
+        "codigo_colaborador"
+      ],
+      "nameExplicit": false,
+      "name": "vinculos_colaborador_pkey",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "usuario_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "vinculos_colaborador_usuario_id_unique",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador",
+      "entityType": "uniques"
+    }
+  ],
+  "renames": []
+}
