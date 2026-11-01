@@ -65,6 +65,9 @@ interface ListaColaboradores {
 /** Valores editáveis de uma linha: os gravados ou o rascunho ainda não salvo. */
 type Valores = Pick<CamposVinculo, "usuarioId" | "lojas">;
 
+/** A `version` é a de quando a edição começou: recarregar a lista não pode esconder um conflito. */
+type Rascunho = Valores & Pick<CamposVinculo, "version">;
+
 const iniciais = ({ usuarioId, lojas, sugestao }: CamposVinculo): Valores => sugestao ?? { usuarioId, lojas };
 const mesmasLojas = (a: number[], b: number[]) => a.length === b.length && a.every((codigo) => b.includes(codigo));
 
@@ -196,7 +199,7 @@ export function ColaboradoresPage() {
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
   // Edições ainda não gravadas, por Colaborador; ficam aqui porque a célula desmonta ao trocar de página.
   const [lojas, setLojas] = useState<LojaOpcao[]>([]);
-  const [edicoes, setEdicoes] = useState<Record<number, Valores>>({});
+  const [edicoes, setEdicoes] = useState<Record<number, Rascunho>>({});
   const [salvando, setSalvando] = useState<ReadonlySet<number>>(new Set());
   const [situacao, setSituacao] = useState<Situacao>("ativos");
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("todos");
@@ -230,14 +233,14 @@ export function ColaboradoresPage() {
   }, []);
 
   const salvar = useCallback(
-    async (row: Colaborador, valores: Valores) => {
+    async (row: Colaborador, rascunho: Rascunho) => {
       const codigo = row.codigoColaborador;
       setSalvando((atual) => new Set(atual).add(codigo));
       try {
         const salvo = await apiFetch<CamposVinculo>(`/api/m/inovafarma/colaboradores/${codigo}/vinculo`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ usuarioId: valores.usuarioId, lojas: valores.lojas, version: row.version }),
+          body: JSON.stringify({ usuarioId: rascunho.usuarioId, lojas: rascunho.lojas, version: rascunho.version }),
         });
         // Sem o vínculo, quem sumiu do ERP não tem mais por que ser linha da tabela.
         setColaboradores((atual) =>
@@ -267,9 +270,10 @@ export function ColaboradoresPage() {
   const opcoes = useMemo(() => usuarios.map(paraOpcao), [usuarios]);
 
   const columns = useMemo<DataTableColumn<Colaborador>[]>(() => {
-    const valoresDe = (r: Colaborador): Valores => edicoes[r.codigoColaborador] ?? iniciais(r);
+    const novoRascunho = (r: Colaborador): Rascunho => ({ ...iniciais(r), version: r.version });
+    const valoresDe = (r: Colaborador): Rascunho => edicoes[r.codigoColaborador] ?? novoRascunho(r);
     const editar = (r: Colaborador, alteracao: Partial<Valores>) =>
-      setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? iniciais(r)), ...alteracao } }));
+      setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? novoRascunho(r)), ...alteracao } }));
     return [
       {
         key: "codigoColaborador",

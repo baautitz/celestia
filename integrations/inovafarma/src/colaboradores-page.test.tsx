@@ -560,6 +560,29 @@ describe("rascunhos não salvos", () => {
     });
   });
 
+  it("um rascunho guarda a version de quando começou: recarregar por conflito em outra linha não a atualiza", async () => {
+    const ativas = lista.colaboradores.map((c) => ({ ...c, ativo: true }));
+    apiFetch.mockResolvedValueOnce({ ...lista, colaboradores: ativas });
+    render(<ColaboradoresPage />);
+    await escolherUsuario(await linha("ANA SOUZA"), "Ana Souza");
+    await escolherUsuario(await linha("BRUNO LIMA"), "Bia Lima");
+
+    apiFetch.mockRejectedValueOnce(new ApiError("Alterado.", 409, "versao_desatualizada"));
+    apiFetch.mockResolvedValueOnce({ ...lista, colaboradores: ativas.map((c) => ({ ...c, version: 5 })) });
+    fireEvent.click(botao(await linha("ANA SOUZA"), "Confirmar"));
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalled());
+    await waitFor(async () => expect(campoUsuario(await linha("ANA SOUZA")).value).toBe(""));
+
+    apiFetch.mockRejectedValueOnce(new ApiError("Alterado.", 409, "versao_desatualizada"));
+    apiFetch.mockResolvedValueOnce({ ...lista, colaboradores: ativas.map((c) => ({ ...c, version: 5 })) });
+    fireEvent.click(botao(await linha("BRUNO LIMA"), "Confirmar"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
+      "/api/m/inovafarma/colaboradores/9/vinculo",
+      expect.objectContaining({ body: JSON.stringify({ usuarioId: "bia", lojas: [], version: 0 }) }),
+    ));
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalledTimes(2));
+  });
+
   it("um rascunho desfeito não pede confirmação", async () => {
     await abrirComRascunho();
     fireEvent.click(within(await linha("ANA SOUZA")).getByRole("button", { name: "Limpar Usuário" }));
