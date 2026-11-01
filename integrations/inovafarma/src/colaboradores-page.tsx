@@ -355,6 +355,7 @@ export function ColaboradoresPage() {
       },
       {
         key: "usuario",
+        mobileWide: true,
         label: "Usuário",
         // A busca e a ordenação seguem o Usuário exibido na linha, inclusive o rascunho ainda não confirmado.
         value: (r) => {
@@ -380,6 +381,7 @@ export function ColaboradoresPage() {
       },
       {
         key: "lojas",
+        mobileWide: true,
         label: "Lojas",
         render: (r) => {
           const valores = valoresDe(r).lojas;
