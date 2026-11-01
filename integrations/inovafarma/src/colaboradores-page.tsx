@@ -3,7 +3,19 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@platform/ui/components/combobox";
+import {
+  Combobox,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxChipsResumidos,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxValue,
+  useComboboxAnchor,
+} from "@platform/ui/components/combobox";
 import { Label } from "@platform/ui/components/label";
 import { Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
@@ -17,10 +29,16 @@ interface UsuarioOpcao {
   username: string;
 }
 
+interface LojaOpcao {
+  codigo: number;
+  nome: string;
+}
+
 interface CamposVinculo {
   confirmado: boolean;
   usuarioId: string | null;
   usuario: (UsuarioOpcao & { status: string }) | null;
+  lojas: number[];
   version: number;
 }
 
@@ -33,7 +51,14 @@ interface Colaborador extends CamposVinculo {
 interface ListaColaboradores {
   colaboradores: Colaborador[];
   usuarios: UsuarioOpcao[];
+  lojas: LojaOpcao[];
 }
+
+/** Valores editáveis de uma linha: os gravados ou o rascunho ainda não salvo. */
+type Valores = Pick<CamposVinculo, "usuarioId" | "lojas">;
+
+const gravados = ({ usuarioId, lojas }: CamposVinculo): Valores => ({ usuarioId, lojas });
+const mesmasLojas = (a: number[], b: number[]) => a.length === b.length && a.every((codigo) => b.includes(codigo));
 
 type Situacao = "ativos" | "todos";
 
@@ -79,7 +104,7 @@ function UsuarioSelect({
       itemToStringValue={(item: OpcaoUsuario) => item.value}
       isItemEqualToValue={(a: OpcaoUsuario, b: OpcaoUsuario) => a.value === b.value}
     >
-      <ComboboxInput aria-label={`Usuário de ${row.nome}`} placeholder="Selecione um Usuário" showClear={value !== null} clearLabel="Limpar Usuário" />
+      <ComboboxInput inTableCell aria-label={`Usuário de ${row.nome}`} placeholder="Selecione um Usuário" showClear={value !== null} clearLabel="Limpar Usuário" />
       <ComboboxContent>
         <ComboboxEmpty>Nenhum Usuário encontrado.</ComboboxEmpty>
         <ComboboxList>
@@ -94,13 +119,66 @@ function UsuarioSelect({
   );
 }
 
+function LojasSelect({
+  row,
+  opcoes,
+  lojas,
+  onChange,
+}: {
+  row: Colaborador;
+  opcoes: LojaOpcao[];
+  lojas: number[];
+  onChange: (lojas: number[]) => void;
+}) {
+  const anchor = useComboboxAnchor();
+  const items = useMemo(() => {
+    const foraDoErp = row.lojas.filter((codigo) => !opcoes.some((o) => o.codigo === codigo)).map((codigo) => ({ codigo, nome: `Loja não encontrada (cód. ${codigo})` }));
+    return [...foraDoErp, ...opcoes];
+  }, [row.lojas, opcoes]);
+  const value = useMemo(() => items.filter((o) => lojas.includes(o.codigo)), [items, lojas]);
+
+  return (
+    <Combobox
+      multiple
+      autoHighlight
+      items={items}
+      value={value}
+      onValueChange={(selecionadas: LojaOpcao[]) => onChange(selecionadas.map((o) => o.codigo).sort((a, b) => a - b))}
+      itemToStringLabel={(item: LojaOpcao) => item.nome}
+      itemToStringValue={(item: LojaOpcao) => String(item.codigo)}
+      isItemEqualToValue={(a: LojaOpcao, b: LojaOpcao) => a.codigo === b.codigo}
+    >
+      <ComboboxChips ref={anchor} inTableCell>
+        <ComboboxValue>
+          {(selecionadas: LojaOpcao[]) => (
+            <ComboboxChipsResumidos labels={selecionadas.map((o) => o.nome)} removeLabel={(nome) => `Remover ${nome}`}>
+              <ComboboxChipsInput aria-label={`Lojas de ${row.nome}`} placeholder={selecionadas.length === 0 ? "Selecione as Lojas" : undefined} />
+            </ComboboxChipsResumidos>
+          )}
+        </ComboboxValue>
+      </ComboboxChips>
+      <ComboboxContent anchor={anchor}>
+        <ComboboxEmpty>Nenhuma Loja encontrada.</ComboboxEmpty>
+        <ComboboxList>
+          {(item: LojaOpcao) => (
+            <ComboboxItem key={item.codigo} value={item}>
+              {item.nome}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  );
+}
+
 /** Página Colaboradores: lista os Colaboradores do ERP e grava o vínculo de cada um na própria linha. */
 export function ColaboradoresPage() {
   const { feedback } = useUi();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
   // Edições ainda não gravadas, por Colaborador; ficam aqui porque a célula desmonta ao trocar de página.
-  const [edicoes, setEdicoes] = useState<Record<number, string | null>>({});
+  const [lojas, setLojas] = useState<LojaOpcao[]>([]);
+  const [edicoes, setEdicoes] = useState<Record<number, Valores>>({});
   const [salvando, setSalvando] = useState<ReadonlySet<number>>(new Set());
   const [situacao, setSituacao] = useState<Situacao>("ativos");
   const [loading, setLoading] = useState(true);
@@ -111,6 +189,7 @@ export function ColaboradoresPage() {
       const data = await apiFetch<ListaColaboradores>("/api/m/inovafarma/colaboradores");
       setColaboradores(data.colaboradores);
       setUsuarios(data.usuarios);
+      setLojas(data.lojas);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erro desconhecido ao carregar os Colaboradores.");
     }
@@ -132,20 +211,16 @@ export function ColaboradoresPage() {
   }, []);
 
   const salvar = useCallback(
-    async (row: Colaborador, usuarioId: string | null) => {
+    async (row: Colaborador, valores: Valores) => {
       const codigo = row.codigoColaborador;
       setSalvando((atual) => new Set(atual).add(codigo));
       try {
         const salvo = await apiFetch<CamposVinculo>(`/api/m/inovafarma/colaboradores/${codigo}/vinculo`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ usuarioId, version: row.version }),
+          body: JSON.stringify({ usuarioId: valores.usuarioId, lojas: valores.lojas, version: row.version }),
         });
-        setColaboradores((atual) =>
-          atual.map((c) =>
-            c.codigoColaborador === codigo ? { ...c, confirmado: salvo.confirmado, usuarioId: salvo.usuarioId, usuario: salvo.usuario, version: salvo.version } : c,
-          ),
-        );
+        setColaboradores((atual) => atual.map((c) => (c.codigoColaborador === codigo ? { ...c, ...salvo } : c)));
         descartarEdicao(codigo);
       } catch (err: unknown) {
         const mensagem = err instanceof Error ? err : new Error("Erro desconhecido ao salvar o vínculo.");
@@ -170,7 +245,9 @@ export function ColaboradoresPage() {
   const opcoes = useMemo(() => usuarios.map(paraOpcao), [usuarios]);
 
   const columns = useMemo<DataTableColumn<Colaborador>[]>(() => {
-    const usuarioDe = (r: Colaborador) => (r.codigoColaborador in edicoes ? (edicoes[r.codigoColaborador] ?? null) : r.usuarioId);
+    const valoresDe = (r: Colaborador): Valores => edicoes[r.codigoColaborador] ?? gravados(r);
+    const editar = (r: Colaborador, alteracao: Partial<Valores>) =>
+      setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? gravados(r)), ...alteracao } }));
     return [
       {
         key: "codigoColaborador",
@@ -194,14 +271,12 @@ export function ColaboradoresPage() {
       {
         key: "usuario",
         label: "Usuário",
-        render: (r) => (
-          <UsuarioSelect
-            row={r}
-            opcoes={opcoes}
-            usuarioId={usuarioDe(r)}
-            onChange={(usuarioId) => setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: usuarioId }))}
-          />
-        ),
+        render: (r) => <UsuarioSelect row={r} opcoes={opcoes} usuarioId={valoresDe(r).usuarioId} onChange={(usuarioId) => editar(r, { usuarioId })} />,
+      },
+      {
+        key: "lojas",
+        label: "Lojas",
+        render: (r) => <LojasSelect row={r} opcoes={lojas} lojas={valoresDe(r).lojas} onChange={(selecionadas) => editar(r, { lojas: selecionadas })} />,
       },
       {
         key: "status",
@@ -212,16 +287,17 @@ export function ColaboradoresPage() {
         key: "acao",
         label: "Ação",
         render: (r) => {
-          const usuarioId = usuarioDe(r);
+          const valores = valoresDe(r);
+          const alterado = valores.usuarioId !== r.usuarioId || !mesmasLojas(valores.lojas, r.lojas);
           return (
-            <Button variant="outline" disabled={usuarioId === r.usuarioId || salvando.has(r.codigoColaborador)} onClick={() => void salvar(r, usuarioId)}>
+            <Button variant="outline" disabled={!alterado || salvando.has(r.codigoColaborador)} onClick={() => void salvar(r, valores)}>
               {r.confirmado ? "Salvar" : "Confirmar"}
             </Button>
           );
         },
       },
     ];
-  }, [edicoes, opcoes, salvando, salvar]);
+  }, [edicoes, lojas, opcoes, salvando, salvar]);
 
   const rows = useMemo(
     () => (situacao === "ativos" ? colaboradores.filter((c) => c.ativo) : colaboradores),

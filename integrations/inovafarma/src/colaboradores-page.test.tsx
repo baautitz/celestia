@@ -10,7 +10,7 @@ vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof
 const feedback = vi.hoisted(() => ({ notify: vi.fn(), notifyError: vi.fn() }));
 vi.mock("@platform/ui/imperative/provider", () => ({ useUi: () => ({ feedback }) }));
 
-const pendente = { confirmado: false, usuarioId: null, usuario: null, version: 0 };
+const pendente = { confirmado: false, usuarioId: null, usuario: null, lojas: [] as number[], version: 0 };
 const ana = { id: "ana", fullname: "Ana Souza", username: "ana.souza" };
 const bia = { id: "bia", fullname: "Bia Lima", username: "bia.lima" };
 const lista = {
@@ -19,8 +19,13 @@ const lista = {
     { codigoColaborador: 9, nome: "BRUNO LIMA", ativo: false, ...pendente },
   ],
   usuarios: [ana, bia],
+  lojas: [
+    { codigo: 1, nome: "Centro" },
+    { codigo: 2, nome: "Bairro" },
+    { codigo: 3, nome: "Shopping" },
+  ],
 };
-const vinculadoAna = { confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, version: 3 };
+const vinculadoAna = { confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [] as number[], version: 3 };
 const listaComVinculo = {
   ...lista,
   colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna }],
@@ -38,6 +43,16 @@ async function escolherUsuario(row: HTMLElement, nome: string) {
   fireEvent.click(opcao);
   await waitFor(() => expect((campo as HTMLInputElement).value).toBe(nome));
 }
+
+async function escolherLoja(row: HTMLElement, nome: string) {
+  fireEvent.input(within(row).getByRole("combobox", { name: /^Lojas de / }), { target: { value: nome.slice(0, 3) }, inputType: "insertText" });
+  const opcao = await screen.findByRole("option", { name: nome });
+  fireEvent.mouseMove(opcao);
+  fireEvent.click(opcao);
+  await within(row).findByText(nome);
+}
+
+const botao = (row: HTMLElement, nome: string) => within(row).getByRole("button", { name: nome }) as HTMLButtonElement;
 
 beforeEach(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -123,7 +138,7 @@ describe("ColaboradoresPage", () => {
     expect(apiFetch).toHaveBeenLastCalledWith("/api/m/inovafarma/colaboradores/7/vinculo", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usuarioId: "bia", version: 0 }),
+      body: JSON.stringify({ usuarioId: "bia", lojas: [], version: 0 }),
     });
     expect((within(row).getByRole("button", { name: "Salvar" }) as HTMLButtonElement).disabled).toBe(true);
   });
@@ -144,7 +159,7 @@ describe("ColaboradoresPage", () => {
     expect(await within(row).findByText("Pendente")).toBeTruthy();
     expect(apiFetch).toHaveBeenLastCalledWith(
       "/api/m/inovafarma/colaboradores/7/vinculo",
-      expect.objectContaining({ body: JSON.stringify({ usuarioId: null, version: 3 }) }),
+      expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [], version: 3 }) }),
     );
   });
 
@@ -176,5 +191,95 @@ describe("ColaboradoresPage", () => {
     await waitFor(() => expect(feedback.notifyError).toHaveBeenCalledWith(negado, expect.any(String)));
     expect(apiFetch).toHaveBeenCalledTimes(2);
     expect((within(row).getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Bia Lima");
+  });
+
+  describe("Lojas", () => {
+    const comLojas = (lojas: number[]) => ({ ...lista, colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna, lojas }] });
+
+    it("grava só as Lojas, várias, sem Usuário", async () => {
+      apiFetch.mockResolvedValueOnce(lista);
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      await escolherLoja(row, "Bairro");
+      await escolherLoja(row, "Centro");
+
+      apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente, confirmado: true, lojas: [1, 2], version: 1 });
+      fireEvent.click(botao(row, "Confirmar"));
+
+      expect(await within(row).findByText("Confirmado")).toBeTruthy();
+      expect(apiFetch).toHaveBeenLastCalledWith(
+        "/api/m/inovafarma/colaboradores/7/vinculo",
+        expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [1, 2], version: 0 }) }),
+      );
+      expect(botao(row, "Salvar").disabled).toBe(true);
+    });
+
+    it("grava Usuário e Lojas juntos", async () => {
+      apiFetch.mockResolvedValueOnce(lista);
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      await escolherUsuario(row, "Bia Lima");
+      await escolherLoja(row, "Shopping");
+
+      apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, lojas: [3], version: 1 });
+      fireEvent.click(botao(row, "Confirmar"));
+
+      expect(await within(row).findByText("Confirmado")).toBeTruthy();
+      expect(apiFetch).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ body: JSON.stringify({ usuarioId: "bia", lojas: [3], version: 0 }) }),
+      );
+    });
+
+    it("limpar Usuário e Lojas desfaz o vínculo", async () => {
+      apiFetch.mockResolvedValueOnce(comLojas([1]));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      expect(within(row).getByText("Centro")).toBeTruthy();
+
+      fireEvent.click(botao(row, "Limpar Usuário"));
+      fireEvent.click(botao(row, "Remover Centro"));
+      await waitFor(() => expect(within(row).queryByText("Centro")).toBeNull());
+
+      apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente });
+      fireEvent.click(botao(row, "Salvar"));
+
+      expect(await within(row).findByText("Pendente")).toBeTruthy();
+      expect(apiFetch).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [], version: 3 }) }),
+      );
+    });
+
+    it("voltar à mesma escolha não é alteração", async () => {
+      apiFetch.mockResolvedValueOnce(comLojas([1, 2]));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      fireEvent.click(botao(row, "Remover Centro"));
+      await waitFor(() => expect(botao(row, "Salvar").disabled).toBe(false));
+      await escolherLoja(row, "Centro");
+      await waitFor(() => expect(botao(row, "Salvar").disabled).toBe(true));
+    });
+
+    it("mantém visível uma Loja gravada que saiu do ERP", async () => {
+      apiFetch.mockResolvedValueOnce(comLojas([99]));
+      render(<ColaboradoresPage />);
+      expect(within(await linha("ANA SOUZA")).getByText("Loja não encontrada (cód. 99)")).toBeTruthy();
+    });
+
+    it("resume em +N as Lojas que não cabem, com os nomes no title", async () => {
+      const largura = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(200);
+      const chip = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(80);
+      try {
+        apiFetch.mockResolvedValueOnce(comLojas([1, 2, 3]));
+        render(<ColaboradoresPage />);
+        const row = await linha("ANA SOUZA");
+        const resumo = await within(row).findByText("+2");
+        expect(resumo.getAttribute("title")).toBe("Bairro, Shopping");
+      } finally {
+        largura.mockRestore();
+        chip.mockRestore();
+      }
+    });
   });
 });
