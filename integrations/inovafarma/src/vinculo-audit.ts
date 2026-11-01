@@ -50,5 +50,5 @@ export interface AuditService {
 
 /** Declara no Audit Log o schema da ação de alteração do vínculo (ADR 0001). */
 export function declareVinculoAudit(audit: AuditService, plugin: string): void {
-  audit.declareAction({ plugin, action: VINCULO_ACTION, schemaVersion: 2, schema: Atributos, summary: resumo });
+  audit.declareAction({ plugin, action: VINCULO_ACTION, schemaVersion: 1, schema: Atributos, summary: resumo });
 }
