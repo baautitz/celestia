@@ -66,12 +66,18 @@ importers:
 
   integrations/inovafarma:
     dependencies:
+      '@hookform/resolvers':
+        specifier: ^3.10.0
+        version: 3.10.0(react-hook-form@7.85.0(react@19.2.8))
       '@platform/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@platform/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      drizzle-orm:
+        specifier: 1.0.0-rc.4
+        version: 1.0.0-rc.4(@types/mssql@12.3.0)(@types/pg@8.23.1)(mssql@12.7.4)(pg@8.23.1)(zod@3.25.76)
       hono:
         specifier: ^4.13.13
         version: 4.13.13
@@ -81,10 +87,25 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.8
+      react-hook-form:
+        specifier: ^7.85.0
+        version: 7.85.0(react@19.2.8)
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.18
+      react-router-dom:
+        specifier: ^6.28.0
+        version: 6.30.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       typescript:
         specifier: ^5.6.3
         version: 5.9.3

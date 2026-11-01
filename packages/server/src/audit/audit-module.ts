@@ -31,7 +31,8 @@ export function createAuditModule({ auditLog, auth }: AuditModuleDeps): ModuleDe
     version: "1.0.0",
     prefix: "/api/audit",
     migrations: AUDIT_MIGRATIONS,
-    register({ routes }) {
+    register({ routes, services }) {
+      services.expose("log", { declareAction: auditLog.declareAction.bind(auditLog), record: auditLog.record.bind(auditLog) });
       routes.get("/", auth, requirePermission("system:audit:read"), zValidator("query", Query), async (c) =>
         c.json(await auditLog.list(c.req.valid("query"))),
       );

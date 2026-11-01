@@ -15,6 +15,13 @@ afterEach(() => {
   api.onSessionExpired(null);
 });
 
+describe("respostas de erro", () => {
+  it("expõe status, mensagem e o código que distingue o erro", async () => {
+    fetchMock.mockImplementation(async () => json(409, { error: "Já vinculado.", code: "usuario_ja_vinculado" }));
+    await expect(api.request("/api/x")).rejects.toMatchObject({ message: "Já vinculado.", status: 409, code: "usuario_ja_vinculado" });
+  });
+});
+
 describe("sessão encerrada pelo servidor", () => {
   it("avisa quando a renovação é recusada (ex.: o Dispositivo foi revogado)", async () => {
     const expired = vi.fn();

@@ -11,7 +11,6 @@ import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
 import { LastAdminError } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
-import { PostgresErpExternalsStore } from "../src/erp/postgres-erp-externals-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
 
@@ -40,11 +39,12 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { moduleId: "audit", schema: "audit" },
         { moduleId: "closing_period", schema: "closing_period" },
         { moduleId: "erp", schema: "erp" },
+        { moduleId: "inovafarma", schema: "inovafarma" },
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : 1);
+        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); o erp tem a inicial e a que apaga a tabela legada; o inovafarma tem a inicial e a das Lojas; os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : item.moduleId === "erp" || item.moduleId === "inovafarma" ? 2 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -54,16 +54,16 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       const tables = await db.execute<{ schema: string; name: string }>(sql`
         SELECT table_schema AS schema, table_name AS name
         FROM information_schema.tables
-        WHERE table_schema IN ('iam', 'audit', 'closing_period', 'erp')
+        WHERE table_schema IN ('iam', 'audit', 'closing_period', 'erp', 'inovafarma')
         ORDER BY table_schema, table_name
       `);
       expect(tables.rows).toEqual([
         { schema: "audit", name: "audit_log_entries" },
         { schema: "closing_period", name: "periods" },
         { schema: "erp", name: "erps" },
-        { schema: "erp", name: "user_externals" },
         { schema: "iam", name: "roles" },
         { schema: "iam", name: "users" },
+        { schema: "inovafarma", name: "vinculos_colaborador" },
       ]);
     });
 
@@ -176,20 +176,6 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         expect(await store.list()).toHaveLength(1);
         await store.delete("c1");
         expect(await store.get("c1")).toBeNull();
-      });
-    });
-
-    describe("Externals", () => {
-      it("grava por usuário e ERP e some junto com o ERP", async () => {
-        const erps = new PostgresErpStore(db);
-        const store = new PostgresErpExternalsStore(db);
-        await erps.save({ id: "ex1", name: "ERP", driver: "mssql", config: {}, secretsEncrypted: "" });
-        await store.save("usr_a", "ex1", { userId: "7" });
-        await store.save("usr_a", "ex1", { userId: "8", company: "Matriz" });
-        expect(await store.get("usr_a", "ex1")).toEqual({ userId: "8", company: "Matriz" });
-        expect(await store.get("usr_b", "ex1")).toEqual({});
-        await erps.delete("ex1");
-        expect(await store.get("usr_a", "ex1")).toEqual({});
       });
     });
 

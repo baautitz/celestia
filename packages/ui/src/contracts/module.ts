@@ -21,6 +21,8 @@ export interface NavEntry {
   title?: string
   /** Tela padrão, usada quando o User tem `permission` e nenhuma variante casa. */
   component: ComponentType
+  /** Indicador opcional ao lado do item do menu, como uma contagem de pendências. */
+  badge?: ComponentType
   /** Variantes de tela por Permission; a primeira que casa (ordem de declaração) vence. */
   variants?: NavVariant[]
 }

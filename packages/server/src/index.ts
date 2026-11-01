@@ -1,10 +1,10 @@
 import { Hono } from "hono";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { assertEncryptionKey } from "./erp/secret-box.js";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
 import { MemoryErpStore, type ErpStore } from "./erp/erp-store.js";
-import { MemoryErpExternalsStore, type ErpExternalsStore } from "./erp/erp-externals-store.js";
 import { createErpClientFactory, type ErpClientFactory } from "./erp/erp-factory.js";
 import { ERP_DRIVERS } from "./erp/erp-drivers.js";
 import { createErpModule } from "./erp/erp-module.js";
@@ -23,7 +23,7 @@ import { loadCertificateAuthorityClient } from "./boot/certificate-authority.js"
 import { serveWebApp } from "./boot/web-app.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
-import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
+import { integrationPlugins, integrationErpDrivers } from "./plugins.js";
 import { createClosingPeriodModule } from "./closing-period/closing-period-module.js";
 import { MemoryClosingPeriodStore, type ClosingPeriodStore } from "./closing-period/closing-period-store.js";
 import type { JWTAccessPayload } from "@platform/shared";
@@ -31,7 +31,6 @@ import type { JWTAccessPayload } from "@platform/shared";
 export interface CreatePlatformAppOptions {
   erpClients?: ErpClientRegistry;
   erpStore?: ErpStore;
-  erpExternalsStore?: ErpExternalsStore;
   clientFactory?: ErpClientFactory;
   userStore?: UserStore;
   /** Autoridade certificadora dos Dispositivos. Sem ela, quem exige certificado não entra (falha fechado). */
@@ -40,6 +39,8 @@ export interface CreatePlatformAppOptions {
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
   auditLog?: AuditLog;
+  /** Postgres entregue aos Plugins, que não importam o servidor; sem ele, guardam em memória. */
+  db?: NodePgDatabase;
   /** Modules adicionais compostos junto aos padrão (testes e builds de cliente). */
   extraModules?: ModuleEntry[];
   /** Limite de tentativas de login (injetável em testes). */
@@ -66,7 +67,6 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   );
   const erpClients = options?.erpClients || {};
   const erpStore = options?.erpStore || new MemoryErpStore();
-  const erpExternalsStore = options?.erpExternalsStore || new MemoryErpExternalsStore();
   const extraDrivers = integrationErpDrivers();
   const allDrivers = { ...ERP_DRIVERS, ...extraDrivers };
   const clientFactory = options?.clientFactory || createErpClientFactory(allDrivers);
@@ -101,15 +101,13 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
       tier: "plugin",
       def: createErpModule({
         erpStore,
-        externalsStore: erpExternalsStore,
         clients: erpClients,
         clientFactory,
         auth,
-        externalFieldsByErp: integrationExternalFields(),
         extraDrivers,
       }),
     },
-    ...integrationPlugins({ auth, erpClients }),
+    ...integrationPlugins({ auth, erpClients, db: options?.db }),
     ...(options?.extraModules ?? []),
   ];
   const moduleApp = new Hono();
@@ -157,9 +155,9 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     let userStore: UserStore | undefined;
     const erpClients: ErpClientRegistry = {};
     let erpStore: ErpStore | undefined;
-    let erpExternalsStore: ErpExternalsStore | undefined;
     let closingPeriodStore: ClosingPeriodStore | undefined;
     let auditLog: AuditLog | undefined;
+    let pluginDb: NodePgDatabase | undefined;
     if (process.env.POSTGRES_HOST) {
       const [{ db }, { PostgresUserStore }, { PostgresErpStore }, { PostgresClosingPeriodStore }] = await Promise.all([
         import("./db/client.js"),
@@ -167,10 +165,9 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
         import("./erp/postgres-erp-store.js"),
         import("./closing-period/postgres-closing-period-store.js"),
       ]);
+      pluginDb = db;
       userStore = new PostgresUserStore(db);
       erpStore = new PostgresErpStore(db);
-      const { PostgresErpExternalsStore } = await import("./erp/postgres-erp-externals-store.js");
-      erpExternalsStore = new PostgresErpExternalsStore(db);
       closingPeriodStore = new PostgresClosingPeriodStore(db);
       const { PostgresAuditStore } = await import("./audit/postgres-audit-store.js");
       auditLog = new AuditLog(new PostgresAuditStore(db));
@@ -188,9 +185,10 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     const platform = createPlatform({
       userStore,
       certificateAuthority,
-      erpStore, erpExternalsStore, closingPeriodStore,
+      erpStore, closingPeriodStore,
       erpClients,
       auditLog,
+      db: pluginDb,
     });
     if (process.env.POSTGRES_HOST) {
       // Verifica (sem aplicar) que as migrations dos Modules estão em dia; a mensagem nomeia o Module.

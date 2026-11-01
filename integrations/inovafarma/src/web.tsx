@@ -12,6 +12,8 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import type { Trend } from "@platform/ui/components/trend";
+import { ColaboradoresPendentesBadge } from "./colaboradores-badge";
+import { ColaboradoresPage } from "./colaboradores-page";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
 
@@ -688,7 +690,20 @@ function VendasComissoesPage() {
 /** Tela e item de menu do Plugin InovaFarma na seção Relatórios. */
 export const inovafarmaWebModule = defineWebModule({
   id: "inovafarma",
+  sections: [{ id: "inovafarma", label: "InovaFarma", order: 250 }],
   entries: [
+    {
+      id: "inovafarma-colaboradores",
+      label: "Colaboradores",
+      title: "Colaboradores",
+      icon: Users,
+      path: "/inovafarma/colaboradores",
+      section: "inovafarma",
+      order: 10,
+      permission: "inovafarma:colaboradores:view",
+      component: ColaboradoresPage,
+      badge: ColaboradoresPendentesBadge,
+    },
     {
       id: "inovafarma-vendas",
       label: "Desempenho de Vendas",

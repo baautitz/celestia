@@ -1,7 +1,7 @@
 import { TestUserStore } from "./helpers/fixtures.js";
 import { describe, it, expect } from "vitest";
 import { createPlatform } from "../src/index.js";
-import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "../src/plugins.js";
+import { integrationPlugins, integrationErpDrivers } from "../src/plugins.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import type { ErpClient, ErpClientRegistry } from "../src/erp/erp-client.js";
 
@@ -47,35 +47,90 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
     expect(entries.some((e) => e.tier === "plugin" && e.def.id === "inovafarma")).toBe(true);
   });
 
-  it("declara externals para o ERP inovafarma", () => {
-    const fields = integrationExternalFields();
-    expect(fields.inovafarma).toBeDefined();
-    expect(fields.inovafarma!.map((f) => f.name)).toEqual(["codigoColaborador", "codigoLoja"]);
-  });
-
-  it("exporta o driver InovaFarma com os campos de conexão e externals", () => {
+  it("exporta o driver InovaFarma com os campos de conexão", () => {
     const drivers = integrationErpDrivers();
     expect(drivers.inovafarma).toBeDefined();
     expect(drivers.inovafarma.label).toBe("InovaFarma");
-    expect(drivers.inovafarma.externalFields.map((f) => f.name)).toEqual(["codigoColaborador", "codigoLoja"]);
+    expect(drivers.inovafarma).not.toHaveProperty("externalFields");
   });
 
   it("serve a rota /status com a Permission e nega sem ela", async () => {
     const allowed = await boot(["inovafarma:integration:view"]);
     const ok = await allowed.platform.app.request("/api/m/inovafarma/status", { headers: allowed.headers });
     expect(ok.status).toBe(200);
-    expect(await ok.json()).toMatchObject({
-      module: "inovafarma",
-      erpId: "inovafarma",
-      externals: expect.arrayContaining([
-        expect.objectContaining({ name: "codigoColaborador" }),
-        expect.objectContaining({ name: "codigoLoja" }),
-      ]),
-    });
+    const status = await ok.json();
+    expect(status).toMatchObject({ module: "inovafarma", erpId: "inovafarma" });
+    expect(status).not.toHaveProperty("externals");
 
     const denied = await boot([]);
     expect((await denied.platform.app.request("/api/m/inovafarma/status", { headers: denied.headers })).status).toBe(403);
     expect((await denied.platform.app.request("/api/m/inovafarma/status")).status).toBe(401);
+  });
+
+  describe("GET /colaboradores", () => {
+    const view = "inovafarma:colaboradores:view";
+
+    it("lista todo Funcionario com Cadastro não eliminado, com Cód., nome e situação no ERP", async () => {
+      let consulta = "";
+      const client = mockErpClient(async (sql) => {
+        if (sql.includes("Config")) return [];
+        consulta = sql;
+        return [
+          { codigoColaborador: 7, nome: " ANA SOUZA ", ativo: true },
+          { codigoColaborador: 9, nome: "BRUNO LIMA", ativo: false },
+        ];
+      });
+      const { platform, headers } = await boot([view], { inovafarma: client });
+      const res = await platform.app.request("/api/m/inovafarma/colaboradores", { headers });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        colaboradores: [
+          { codigoColaborador: 7, nome: "ANA SOUZA", ativo: true },
+          { codigoColaborador: 9, nome: "BRUNO LIMA", ativo: false },
+        ],
+      });
+      expect(consulta).toContain("FROM Funcionario");
+      expect(consulta).toContain("c.Eliminado = 0");
+      expect(consulta).not.toContain("DataDesligamento");
+      expect(consulta).not.toMatch(/WHERE[^]*Ativo/);
+    });
+
+    it("nega sem a Permission com a mensagem em PT-BR, mesmo com a Permission do relatório", async () => {
+      const { platform, headers } = await boot(["inovafarma:integration:view"]);
+      const res = await platform.app.request("/api/m/inovafarma/colaboradores", { headers });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        error: "Acesso negado: o usuário não possui permissão para visualizar os Colaboradores do InovaFarma.",
+      });
+      expect((await platform.app.request("/api/m/inovafarma/colaboradores")).status).toBe(401);
+    });
+
+    it("responde 503 sem conexão com o ERP", async () => {
+      const { platform, headers } = await boot([view]);
+      const res = await platform.app.request("/api/m/inovafarma/colaboradores", { headers });
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: "Conexão com ERP InovaFarma não configurada ou inativa." });
+    });
+
+    it("responde 503 quando a consulta ao ERP falha, sem expor o erro do banco", async () => {
+      const client = mockErpClient(async () => {
+        throw new Error("login failed for user sa");
+      });
+      const { platform, headers } = await boot([view], { inovafarma: client });
+      const res = await platform.app.request("/api/m/inovafarma/colaboradores", { headers });
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: "ERP InovaFarma indisponível. Tente novamente em instantes." });
+    });
+
+    it("não muda a rota /lojas: falha no ERP continua respondendo lista vazia", async () => {
+      const client = mockErpClient(async () => {
+        throw new Error("fora do ar");
+      });
+      const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: client });
+      const res = await platform.app.request("/api/m/inovafarma/lojas", { headers });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+    });
   });
 
   it("lista lojas através da tabela Config", async () => {

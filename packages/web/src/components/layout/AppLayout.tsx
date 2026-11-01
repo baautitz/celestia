@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { confirmLeave } from "@platform/ui/adapters/leave-guard";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useHeaderActions } from "@/context/HeaderActionsContext";
@@ -89,6 +90,7 @@ export const AppLayout: React.FC = () => {
 
 
   const handleLogout = async () => {
+    if (!(await confirmLeave())) return;
     await logout();
     navigate("/login");
   };
@@ -134,6 +136,7 @@ export const AppLayout: React.FC = () => {
                       <entry.icon />
                       <Text>{entry.label}</Text>
                     </SidebarMenuButton>
+                    {entry.badge && <entry.badge />}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

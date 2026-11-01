@@ -42,23 +42,31 @@ _Avoid_: Connection, source, conexão
 The technology Celestia uses to query an ERP, such as SQL Server.
 _Avoid_: ERP type, connector type
 
-**Externals**:
-The values that map a user to an ERP's own concepts, such as the user's ID, company or region in that ERP. A user has a set of Externals per ERP. The fields are declared by the module that integrates that ERP, not fixed by the platform.
-_Avoid_: External IDs, mapping, identifiers
-
 **Colaborador** (en: Collaborator):
-A person who makes sales in an ERP, identified by the `codigoColaborador` External. It is not the same as a User, who signs in to Celestia. In sales reports, a sale is attributed to the Colaborador of each item.
+A person registered as an employee in an ERP, who may have sales attributed to them, whether or not they have sold anything yet. It is not the same as a User, who signs in to Celestia. In sales reports, a sale is attributed to the Colaborador of each item.
 _Avoid_: Vendedor, Funcionário, Seller
+
+**Loja** (en: Store):
+A branch of the business as registered in an ERP. A sale belongs to the Loja where it was made, which may differ from the Colaborador's Loja.
+_Avoid_: Filial, Empresa, Branch
+
+**Vínculo do Colaborador** (en: Collaborator Link):
+The optional association of a Colaborador with one User and with the Lojas where they work, which can be more than one. Each part is independent of the other, and a User can be linked to at most one Colaborador.
+_Avoid_: Mapping, External
 
 ### Access
 
 **User** (pt-BR: **Usuário**):
-A person who signs in to Celestia with a username and password. It is not the same as a person's own account inside an ERP, which Externals link to it.
+A person who signs in to Celestia with a username and password. It is not the same as a person's own account inside an ERP.
 _Avoid_: Account, member, ERP user
 
-**Role** (pt-BR: **Perfil**):
+**Role** (pt-BR: **Grupo**):
 A named group of Permissions assigned to users. A user has exactly one Role.
-_Avoid_: Perfil de Acesso, group, profile
+_Avoid_: Perfil, Perfil de Acesso, profile
+
+**Visualização** (en: View):
+A scope in which a Plugin report can be seen, such as general, by Loja or individual. A Plugin declares each Visualização as a Permission, and the customer decides which Roles have it.
+_Avoid_: Filtro, Modo
 
 **Deactivate** (a User):
 Stop a User from signing in while keeping the User. A deactivated User is not removed.

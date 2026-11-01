@@ -15,6 +15,8 @@ import { ChevronDownIcon, XIcon, CheckIcon } from "lucide-react"
 
 const Combobox = ComboboxPrimitive.Root
 
+const TABLE_CELL_WIDTH = "w-52"
+
 function ComboboxValue({ ...props }: ComboboxPrimitive.Value.Props) {
   return <ComboboxPrimitive.Value data-slot="combobox-value" {...props} />
 }
@@ -36,13 +38,14 @@ function ComboboxTrigger({
   )
 }
 
-function ComboboxClear({ className, ...props }: ComboboxPrimitive.Clear.Props) {
+function ComboboxClear({ className, "aria-label": ariaLabel = "Limpar", ...props }: ComboboxPrimitive.Clear.Props) {
   return (
     <ComboboxPrimitive.Clear
       data-slot="combobox-clear"
       render={<InputGroupButton variant="ghost" size="icon-xs" />}
       className={cn(className)}
       {...props}
+      aria-label={ariaLabel}
     >
       <XIcon className="pointer-events-none" />
     </ComboboxPrimitive.Clear>
@@ -55,13 +58,19 @@ function ComboboxInput({
   disabled = false,
   showTrigger = true,
   showClear = false,
+  clearLabel,
+  inTableCell = false,
   ...props
 }: ComboboxPrimitive.Input.Props & {
+  /** Largura fixa, para o campo não colapsar em uma coluna de tabela. */
+  inTableCell?: boolean
   showTrigger?: boolean
   showClear?: boolean
+  /** Nome acessível do botão de limpar; padrão: "Limpar". */
+  clearLabel?: string
 }) {
   return (
-    <InputGroup className={cn("w-auto", className)}>
+    <InputGroup className={cn("w-auto", inTableCell && TABLE_CELL_WIDTH, className)}>
       <ComboboxPrimitive.Input
         render={<InputGroupInput disabled={disabled} />}
         {...props}
@@ -77,7 +86,7 @@ function ComboboxInput({
             disabled={disabled}
           />
         )}
-        {showClear && <ComboboxClear disabled={disabled} />}
+        {showClear && <ComboboxClear disabled={disabled} aria-label={clearLabel} />}
       </InputGroupAddon>
       {children}
     </InputGroup>

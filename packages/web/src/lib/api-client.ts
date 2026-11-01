@@ -1,3 +1,4 @@
+import { ApiError } from "@platform/ui/lib/api";
 import type {
   JWTAccessPayload,
   AuthTokens,
@@ -8,7 +9,6 @@ import type {
   ClosingPeriodRecord,
   ErpDriverMeta,
   Erp,
-  ErpExternalsEntry,
   ErpInput,
   AuditLogEntry,
   AuditLogFilter,
@@ -70,14 +70,14 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const errBody: { error?: string | { issues?: { path: (string | number)[]; message: string }[] } } =
+      const errBody: { error?: string | { issues?: { path: (string | number)[]; message: string }[] }; code?: string } =
         await response.json().catch(() => ({ error: response.statusText }));
       // Erros de validação (Zod) chegam como { error: { issues } }; senão { error: "mensagem" }.
       const detail =
         typeof errBody.error === "string"
           ? errBody.error
           : errBody.error?.issues?.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-      throw new Error(detail || `Erro HTTP ${response.status}`);
+      throw new ApiError(detail || `Erro HTTP ${response.status}`, response.status, errBody.code);
     }
 
     return response.json() as Promise<T>;
@@ -282,17 +282,6 @@ class ApiClient {
 
   // ─── ERPs ────────────────────────────────────────────────────────────────
   erps = {
-    listExternals: async (userId: string): Promise<ErpExternalsEntry[]> => {
-      return this.request<ErpExternalsEntry[]>(`/api/admin/erp-externals/${userId}`);
-    },
-
-    saveExternals: async (userId: string, erpId: string, values: Record<string, string>): Promise<void> => {
-      await this.request(`/api/admin/erp-externals/${userId}/${erpId}`, {
-        method: "PUT",
-        body: JSON.stringify({ values }),
-      });
-    },
-
     listDrivers: async (): Promise<ErpDriverMeta[]> => {
       return this.request<ErpDriverMeta[]>("/api/admin/erp-drivers");
     },

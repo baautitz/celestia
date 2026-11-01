@@ -1,5 +1,4 @@
 import type { FormFieldDef } from "@platform/core";
-import { INOVAFARMA_EXTERNALS } from "./externals.js";
 
 /** Campo de formulário da plataforma, compartilhado com o servidor via `@platform/core`. */
 export type DriverField = FormFieldDef;
@@ -8,7 +7,6 @@ export interface ErpDriverDef {
   id: string;
   label: string;
   fields: DriverField[];
-  externalFields: { name: string; label: string; type: "text" }[];
   createClient(values: Record<string, unknown>): {
     query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
     healthCheck?(): Promise<boolean>;
@@ -25,7 +23,7 @@ export interface InovafarmaDriverOptions {
 }
 
 /**
- * Declaração do ERP Driver InovaFarma (conexão MSSQL + externals de colaborador e loja).
+ * Declaração do ERP Driver InovaFarma (conexão MSSQL).
  */
 export function createInovafarmaDriver({ createMssqlClient }: InovafarmaDriverOptions): ErpDriverDef {
   return {
@@ -45,7 +43,6 @@ export function createInovafarmaDriver({ createMssqlClient }: InovafarmaDriverOp
         description: "Ative para servidores com certificado autoassinado.",
       },
     ],
-    externalFields: [...INOVAFARMA_EXTERNALS],
     createClient: createMssqlClient,
   };
 }
