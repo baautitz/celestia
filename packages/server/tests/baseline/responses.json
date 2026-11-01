@@ -116,6 +116,9 @@
           "closing_period:period:cancel",
           "system:erps:manage",
           "inovafarma:integration:view",
+          "inovafarma:vendas-geral:view",
+          "inovafarma:vendas-loja:view",
+          "inovafarma:vendas-individual:view",
           "inovafarma:colaboradores:view",
           "inovafarma:colaboradores:update"
         ],
@@ -298,6 +301,9 @@
         "closing_period:period:cancel",
         "system:erps:manage",
         "inovafarma:integration:view",
+        "inovafarma:vendas-geral:view",
+        "inovafarma:vendas-loja:view",
+        "inovafarma:vendas-individual:view",
         "inovafarma:colaboradores:view",
         "inovafarma:colaboradores:update"
       ],
@@ -460,6 +466,27 @@
             "label": "Visualizar módulo InovaFarma",
             "description": "Permite abrir a tela e consultar dados integrados do InovaFarma.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o InovaFarma.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:vendas-geral:view",
+            "label": "Desempenho de Vendas: Visualização Geral",
+            "description": "Permite ver o Desempenho de Vendas de todas as Lojas e de todos os Colaboradores.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para a Visualização Geral do Desempenho de Vendas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:vendas-loja:view",
+            "label": "Desempenho de Vendas: Visualização Loja",
+            "description": "Permite ver o Desempenho de Vendas das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para a Visualização Loja do Desempenho de Vendas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:vendas-individual:view",
+            "label": "Desempenho de Vendas: Visualização Individual",
+            "description": "Permite ver o Desempenho de Vendas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para a Visualização Individual do Desempenho de Vendas.",
             "module": "inovafarma"
           },
           {
@@ -637,6 +664,27 @@
             "label": "Visualizar módulo InovaFarma",
             "description": "Permite abrir a tela e consultar dados integrados do InovaFarma.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o InovaFarma.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:vendas-geral:view",
+            "label": "Desempenho de Vendas: Visualização Geral",
+            "description": "Permite ver o Desempenho de Vendas de todas as Lojas e de todos os Colaboradores.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para a Visualização Geral do Desempenho de Vendas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:vendas-loja:view",
+            "label": "Desempenho de Vendas: Visualização Loja",
+            "description": "Permite ver o Desempenho de Vendas das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para a Visualização Loja do Desempenho de Vendas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:vendas-individual:view",
+            "label": "Desempenho de Vendas: Visualização Individual",
+            "description": "Permite ver o Desempenho de Vendas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para a Visualização Individual do Desempenho de Vendas.",
             "module": "inovafarma"
           },
           {
