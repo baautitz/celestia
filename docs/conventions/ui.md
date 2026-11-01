@@ -30,6 +30,13 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 - Abas (`Tabs`): `Tabs` com só a `TabsList`, controlada por `value`/`onValueChange`; o conteúdo da aba ativa vem logo abaixo, os dois dentro de `<Stack gap="section">`. Não use `Stack padding` em volta do conteúdo (a largura estoura) nem `TabsContent`, que cola o conteúdo na lista de abas.
 - Estado de sucesso em etiqueta: `Badge variant="success"` (verde), com `destructive` para o oposto.
 
+## Revalidar depois de gravar
+
+- Toda tela que lista dados do servidor e grava (criar, editar, excluir, salvar em lote) busca a lista de novo quando a gravação termina, **deu certo ou não**. O estado local não é a verdade: status, avisos, sugestões, totais e as outras linhas dependem do que o servidor tem agora (outra pessoa pode ter gravado, e uma gravação pode afetar outras linhas).
+- Depois de uma falha, a revalidação não apaga o rascunho de quem falhou: ele continua com a `version` de quando a edição começou, e o conflito (409) segue aparecendo.
+- Atualizar só a linha gravada com a resposta do `PUT` é um adiantamento para a tela responder na hora; não substitui a revalidação. Quem carrega por `useEffect` mantém uma consulta por vez (só a última resposta vale) para que uma resposta atrasada não sobrescreva a mais nova.
+- Teste: depois da gravação, a lista volta do servidor com uma mudança que só a revalidação traz (por exemplo, outra linha que passou a Confirmada) e o teste espera ver isso na tela. Um teste com `UiProvider` real cobre a ida e volta de uma janela (`integrations/inovafarma/src/pre-vencidos-lancar.test.tsx`).
+
 ## Botões
 
 - Com texto: `size="default"` (ou omitir). Nunca `sm`, `xs` ou `lg`.
