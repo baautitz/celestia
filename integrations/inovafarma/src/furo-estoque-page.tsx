@@ -158,7 +158,6 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
     { key: "codigoMovimento", label: "Ajuste", tooltip: "Número da movimentação no InovaFarma.", value: (a) => a.codigoMovimento, searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
     { key: "loja", label: "Loja", value: (a) => nomeLoja(a.codigoLoja), sortable: true },
     { key: "colaborador", label: "Lançado por", tooltip: "Colaborador informado no Ajuste, no InovaFarma.", value: (a) => a.colaborador, searchable: true, sortable: true },
-    { key: "observacaoErp", label: "Observação no ERP", value: (a) => a.observacaoErp, searchable: true },
     { key: "quantidade", label: "Qtde", value: (a) => a.quantidade, format: "number", sortable: true },
     {
       key: "totalCusto",
@@ -274,9 +273,16 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
         loading={carregando}
         title="Ajustes de Estoque"
         emptyMessage={situacao === "pendentes" ? "Nenhum Ajuste de Estoque sem Justificativa neste período." : "Nenhum Ajuste de Estoque neste período."}
-        search={{ placeholder: "Buscar Ajuste, observação ou Motivo" }}
+        search={{ placeholder: "Buscar Ajuste, Colaborador ou Motivo" }}
         totals={(linhas) => ({ quantidade: linhas.reduce((n, a) => n + a.quantidade, 0), totalCusto: somaCusto(linhas) })}
-        renderExpanded={(a) => <DataTable columns={colunasItens} rows={a.itens} getRowId={(i) => i.produtoId} />}
+        renderExpanded={(a) => (
+          <Stack gap="field">
+            <Text variant="small" tone="muted">
+              Observação no ERP: {a.observacaoErp || "sem observação"}
+            </Text>
+            <DataTable columns={colunasItens} rows={a.itens} getRowId={(i) => i.produtoId} />
+          </Stack>
+        )}
         rowActions={
           aberto
             ? (a) => (

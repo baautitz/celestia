@@ -38,10 +38,10 @@ const renderizar = () => render(<UiProvider><FuroEstoquePage /></UiProvider>);
 describe("Furo de Estoque", () => {
   it("abre nos não justificados e soma o furo", async () => {
     renderizar();
-    expect(await screen.findByRole("cell", { name: "OBS 100" }, { timeout: 5000 })).toBeTruthy();
-    expect(screen.queryByRole("cell", { name: "OBS 200" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Justificar Ajuste 100" }, { timeout: 5000 })).toBeTruthy();
+    expect(screen.queryByRole("cell", { name: "200" })).toBeNull();
+    expect(screen.queryByText(/OBS 100/)).toBeNull();
     expect(screen.getAllByText(/50,50/).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Justificar Ajuste 100" })).toBeTruthy();
   });
 
   it("só mostra a aba Motivos com a Permission geral", async () => {
