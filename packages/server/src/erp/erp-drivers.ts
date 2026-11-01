@@ -9,8 +9,6 @@ export interface ErpDriverDef {
   label: string;
   /** Campos do formulário de cadastro; os do tipo "password" são tratados como segredo (cifrados). */
   fields: FormFieldDef[];
-  /** Externals: campos que mapeiam um User a este ERP (ID do usuário, empresa, região...), declarados pelo Plugin. */
-  externalFields: FormFieldDef[];
   createClient(values: ErpValues): ErpClient;
 }
 
@@ -43,7 +41,6 @@ const mssql: ErpDriverDef = {
       description: "Ative para servidores com certificado autoassinado.",
     },
   ],
-  externalFields: [],
   createClient: createMssqlClient,
 };
 
@@ -85,34 +82,4 @@ export function parseErpValues(
     }
   }
   return { config, secrets };
-}
-
-/**
- * Valida os Externals enviados contra os campos que o ERP Driver declara.
- * Rejeita chaves não declaradas; valores vazios são descartados.
- */
-export function parseExternals(driver: ErpDriverDef, input: Record<string, unknown>): Record<string, string | number> {
-  const declared = new Map(driver.externalFields.map((f) => [f.name, f]));
-  const result: Record<string, string | number> = {};
-  for (const key of Object.keys(input)) {
-    if (!declared.has(key)) throw new Error(`Campo '${key}' não é declarado por este ERP.`);
-  }
-  for (const field of driver.externalFields) {
-    const raw = input[field.name];
-    const empty = raw === undefined || raw === null || raw === "";
-    if (empty) {
-      if (field.required) throw new Error(`${field.label} é obrigatório.`);
-      continue;
-    }
-    if (field.type === "number") {
-      const value = Number(raw);
-      if (!Number.isFinite(value)) throw new Error(`${field.label} deve ser um número.`);
-      result[field.name] = value;
-    } else if (typeof raw === "string" || typeof raw === "number") {
-      result[field.name] = String(raw);
-    } else {
-      throw new Error(`${field.label} é inválido.`);
-    }
-  }
-  return result;
 }

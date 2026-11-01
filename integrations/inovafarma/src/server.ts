@@ -1,10 +1,9 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
-import { INOVAFARMA_EXTERNALS } from "./externals.js";
 import { createInovafarmaDriver } from "./driver.js";
 
-export { INOVAFARMA_PERMISSIONS, INOVAFARMA_EXTERNALS, createInovafarmaDriver };
+export { INOVAFARMA_PERMISSIONS, createInovafarmaDriver };
 
 /**
  * Categorias de produto somadas no Desempenho de Vendas (Qtde em unidades e Valor líquido).
@@ -61,7 +60,7 @@ export interface InovafarmaPluginDeps {
 
 /**
  * Plugin InovaFarma: módulo cliente que consome a conexão MSSQL gerenciada pela plataforma
- * e expõe rotas de consulta baseadas nos identificadores externos (codigoColaborador, codigoLoja).
+ * e expõe rotas de consulta sobre os dados do ERP.
  */
 export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafarma" }: InovafarmaPluginDeps): ModuleDef {
   return defineModule({
@@ -85,7 +84,6 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
           connected: Boolean(client),
           healthy: isHealthy,
           erpId,
-          externals: INOVAFARMA_EXTERNALS,
         });
       });
 

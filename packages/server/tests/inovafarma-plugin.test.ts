@@ -1,7 +1,7 @@
 import { TestUserStore } from "./helpers/fixtures.js";
 import { describe, it, expect } from "vitest";
 import { createPlatform } from "../src/index.js";
-import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "../src/plugins.js";
+import { integrationPlugins, integrationErpDrivers } from "../src/plugins.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import type { ErpClient, ErpClientRegistry } from "../src/erp/erp-client.js";
 
@@ -47,31 +47,20 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
     expect(entries.some((e) => e.tier === "plugin" && e.def.id === "inovafarma")).toBe(true);
   });
 
-  it("declara externals para o ERP inovafarma", () => {
-    const fields = integrationExternalFields();
-    expect(fields.inovafarma).toBeDefined();
-    expect(fields.inovafarma!.map((f) => f.name)).toEqual(["codigoColaborador", "codigoLoja"]);
-  });
-
-  it("exporta o driver InovaFarma com os campos de conexão e externals", () => {
+  it("exporta o driver InovaFarma com os campos de conexão", () => {
     const drivers = integrationErpDrivers();
     expect(drivers.inovafarma).toBeDefined();
     expect(drivers.inovafarma.label).toBe("InovaFarma");
-    expect(drivers.inovafarma.externalFields.map((f) => f.name)).toEqual(["codigoColaborador", "codigoLoja"]);
+    expect(drivers.inovafarma).not.toHaveProperty("externalFields");
   });
 
   it("serve a rota /status com a Permission e nega sem ela", async () => {
     const allowed = await boot(["inovafarma:integration:view"]);
     const ok = await allowed.platform.app.request("/api/m/inovafarma/status", { headers: allowed.headers });
     expect(ok.status).toBe(200);
-    expect(await ok.json()).toMatchObject({
-      module: "inovafarma",
-      erpId: "inovafarma",
-      externals: expect.arrayContaining([
-        expect.objectContaining({ name: "codigoColaborador" }),
-        expect.objectContaining({ name: "codigoLoja" }),
-      ]),
-    });
+    const status = await ok.json();
+    expect(status).toMatchObject({ module: "inovafarma", erpId: "inovafarma" });
+    expect(status).not.toHaveProperty("externals");
 
     const denied = await boot([]);
     expect((await denied.platform.app.request("/api/m/inovafarma/status", { headers: denied.headers })).status).toBe(403);
