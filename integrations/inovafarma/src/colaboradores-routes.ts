@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { VINCULO_ACTION, VINCULO_TARGET, type AuditService } from "./vinculo-audit.js";
+import { sugerirUsuarios } from "./sugestao-usuario.js";
 import { UsuarioJaVinculadoError, VersaoDesatualizadaError, type VinculoColaborador, type VinculoStore } from "./vinculo-store.js";
 
 /** Forma do serviço `users` do Module `iam`; o Plugin não importa `@platform/server` (ADR 0002). */
@@ -24,6 +25,7 @@ interface ColaboradorErp {
   codigoColaborador: number;
   nome: string;
   ativo: boolean;
+  codigoEmpresa: number;
 }
 
 export interface ColaboradoresRoutesDeps {
@@ -51,7 +53,7 @@ const Gravacao = z.object({ usuarioId: z.string().min(1).nullable(), lojas: z.ar
 
 // Ativo vem só de Funcionario.Ativo: DataDesligamento está preenchida em poucos inativos.
 const COLABORADORES_SQL = `
-  SELECT f.CodigoFuncionario AS codigoColaborador, c.Nome AS nome, f.Ativo AS ativo
+  SELECT f.CodigoFuncionario AS codigoColaborador, c.Nome AS nome, f.Ativo AS ativo, c.CodigoEmpresa AS codigoEmpresa
   FROM Funcionario f
   JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
   WHERE c.Eliminado = 0
@@ -72,11 +74,12 @@ interface LojaOpcao {
 type LinhaLoja = { codigoEmpresa: number; nome: string | null };
 const toLoja = (r: LinhaLoja): LojaOpcao => ({ codigo: Number(r.codigoEmpresa), nome: (r.nome || "").trim() });
 
-type LinhaErp = { codigoColaborador: number; nome: string | null; ativo: boolean | number | null };
+type LinhaErp = { codigoColaborador: number; nome: string | null; ativo: boolean | number | null; codigoEmpresa: number | null };
 const toColaborador = (r: LinhaErp): ColaboradorErp => ({
   codigoColaborador: Number(r.codigoColaborador),
   nome: (r.nome || "").trim(),
   ativo: Boolean(r.ativo),
+  codigoEmpresa: Number(r.codigoEmpresa),
 });
 
 /** Campos do vínculo em cada linha da tabela; `version` 0 = Pendente, sem vínculo gravado. */
@@ -88,6 +91,8 @@ function camposDoVinculo(vinculo: VinculoColaborador | null, usuarios: UsuarioRe
     usuario: usuarios.find((u) => u.id === usuarioId) ?? null,
     lojas: vinculo?.lojas ?? [],
     version: vinculo?.version ?? 0,
+    // Só a listagem calcula sugestões; ao desfazer um vínculo a linha fica vazia até recarregar.
+    sugestao: null as { usuarioId: string | null; lojas: number[] } | null,
   };
 }
 
@@ -134,15 +139,32 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
 
     const [vinculos, usuarios] = await Promise.all([store.list(), users.list()]);
     const porCodigo = new Map(vinculos.map((v) => [v.codigoColaborador, v]));
-    const linha = (col: ColaboradorErp, encontrado: boolean) => {
-      const vinculo = porCodigo.get(col.codigoColaborador) ?? null;
-      return { ...col, ...camposDoVinculo(vinculo, usuarios), avisos: avisosDoVinculo(vinculo, encontrado ? col : undefined, usuarios, lojas) };
-    };
     const noErp = new Set(colaboradores.map((col) => col.codigoColaborador));
+    const vinculados = new Set(vinculos.map((v) => v.usuarioId));
+    const pendentes = colaboradores.filter((col) => !porCodigo.has(col.codigoColaborador));
+    const usuarioSugerido = sugerirUsuarios(pendentes, usuarios.filter((u) => u.status === "active" && !vinculados.has(u.id)));
+    const linhasDoErp = colaboradores.map((col) => {
+      const { codigoEmpresa, ...dados } = col;
+      const vinculo = porCodigo.get(col.codigoColaborador) ?? null;
+      const sugestao = vinculo
+        ? null
+        : { usuarioId: usuarioSugerido.get(col.codigoColaborador) ?? null, lojas: lojas.some((l) => l.codigo === codigoEmpresa) ? [codigoEmpresa] : [] };
+      return { ...dados, ...camposDoVinculo(vinculo, usuarios), sugestao, avisos: avisosDoVinculo(vinculo, col, usuarios, lojas) };
+    });
     // O ERP não informa mais o nome de quem sumiu, e o vínculo não o guarda.
-    const sumidos = vinculos.filter((v) => !noErp.has(v.codigoColaborador)).map((v) => ({ codigoColaborador: v.codigoColaborador, nome: `Colaborador ${v.codigoColaborador}`, ativo: false }));
+    const sumidos = vinculos
+      .filter((v) => !noErp.has(v.codigoColaborador))
+      .map((v) => ({
+        codigoColaborador: v.codigoColaborador,
+        nome: `Colaborador ${v.codigoColaborador}`,
+        ativo: false,
+        ...camposDoVinculo(v, usuarios),
+        avisos: avisosDoVinculo(v, undefined, usuarios, lojas),
+      }));
+    // Ordem fixada no servidor: a linha não salta na tela ao ser confirmada.
+    const todas = [...linhasDoErp, ...sumidos].sort((a, b) => Number(a.confirmado) - Number(b.confirmado));
     return c.json({
-      colaboradores: [...colaboradores.map((col) => linha(col, true)), ...sumidos.map((col) => linha(col, false))],
+      colaboradores: todas,
       usuarios: usuarios
         .filter((u) => u.status === "active")
         .map(({ id, fullname, username }) => ({ id, fullname, username }))

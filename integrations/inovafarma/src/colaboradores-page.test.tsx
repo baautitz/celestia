@@ -25,7 +25,7 @@ function render(tela: ReactElement) {
   return renderTela(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
 }
 
-const pendente = { confirmado: false, usuarioId: null, usuario: null, lojas: [] as number[], version: 0, avisos: [] as { tipo: string; mensagem: string }[] };
+const pendente = { confirmado: false, usuarioId: null, usuario: null, lojas: [] as number[], version: 0, avisos: [] as { tipo: string; mensagem: string }[], sugestao: null };
 const ana = { id: "ana", fullname: "Ana Souza", username: "ana.souza" };
 const bia = { id: "bia", fullname: "Bia Lima", username: "bia.lima" };
 const lista = {
@@ -40,7 +40,7 @@ const lista = {
     { codigo: 3, nome: "Shopping" },
   ],
 };
-const vinculadoAna = { confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [] as number[], version: 3, avisos: [] as { tipo: string; mensagem: string }[] };
+const vinculadoAna = { confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [] as number[], version: 3, avisos: [] as { tipo: string; mensagem: string }[], sugestao: null };
 const listaComVinculo = {
   ...lista,
   colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna }],
@@ -298,6 +298,97 @@ describe("ColaboradoresPage", () => {
     });
   });
 
+  describe("Sugestões", () => {
+    const sugerida = (sugestao: { usuarioId: string | null; lojas: number[] }) => ({
+      ...lista,
+      colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...pendente, sugestao }],
+    });
+    const campoUsuario = (row: HTMLElement) => within(row).getByRole("combobox", { name: /^Usuário de / }) as HTMLInputElement;
+    const celula = (campo: HTMLElement) => campo.closest("td") as HTMLElement;
+    const seloUsuario = (row: HTMLElement) => within(celula(campoUsuario(row))).queryByText("Sugestão");
+    const seloLojas = (row: HTMLElement) => within(celula(within(row).getByRole("combobox", { name: /^Lojas de / }))).queryByText("Sugestão");
+
+    it("pré-preenche Usuário e Loja com o selo Sugestão, sem gravar ao carregar", async () => {
+      apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      expect(campoUsuario(row).value).toBe("Ana Souza");
+      expect(within(row).getByText("Bairro")).toBeTruthy();
+      expect(seloUsuario(row)).toBeTruthy();
+      expect(seloLojas(row)).toBeTruthy();
+      expect(within(row).getByText("Pendente")).toBeTruthy();
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("Confirmar grava a sugestão sem alteração e o selo some", async () => {
+      apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      expect(botao(row, "Confirmar").disabled).toBe(false);
+
+      apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [2], version: 1, avisos: [], sugestao: null });
+      fireEvent.click(botao(row, "Confirmar"));
+
+      expect(await within(row).findByText("Confirmado")).toBeTruthy();
+      expect(apiFetch).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ body: JSON.stringify({ usuarioId: "ana", lojas: [2], version: 0 }) }));
+      expect(seloUsuario(row)).toBeNull();
+      expect(seloLojas(row)).toBeNull();
+    });
+
+    it("sem sugestão de Usuário o campo fica vazio e sem selo, e só a Loja traz selo", async () => {
+      apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: null, lojas: [2] }));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      expect(campoUsuario(row).value).toBe("");
+      expect(seloUsuario(row)).toBeNull();
+      expect(seloLojas(row)).toBeTruthy();
+    });
+
+    it("alterar um campo tira só o selo dele", async () => {
+      apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      await escolherUsuario(row, "Bia Lima");
+      expect(seloUsuario(row)).toBeNull();
+      expect(seloLojas(row)).toBeTruthy();
+      fireEvent.click(botao(row, "Remover Bairro"));
+      await waitFor(() => expect(seloLojas(row)).toBeNull());
+    });
+
+    it("linha confirmada não mostra selo", async () => {
+      apiFetch.mockResolvedValueOnce(listaComVinculo);
+      render(<ColaboradoresPage />);
+      expect(within(await linha("ANA SOUZA")).queryByText("Sugestão")).toBeNull();
+    });
+  });
+
+  it("filtra por Pendentes e Confirmados", async () => {
+    apiFetch.mockResolvedValueOnce({
+      ...lista,
+      colaboradores: [
+        { codigoColaborador: 8, nome: "CARLA DIAS", ativo: true, ...pendente },
+        { codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna },
+      ],
+    });
+    render(<ColaboradoresPage />);
+    await screen.findByText("CARLA DIAS");
+    expect(screen.getByText("ANA SOUZA")).toBeTruthy();
+
+    const filtrar = async (nome: string) => {
+      fireEvent.click(screen.getByRole("combobox", { name: "Status" }));
+      const opcao = await screen.findByRole("option", { name: nome });
+      fireEvent.mouseMove(opcao);
+      fireEvent.click(opcao);
+    };
+    await filtrar("Pendentes");
+    await waitFor(() => expect(screen.queryByText("ANA SOUZA")).toBeNull());
+    expect(screen.getByText("CARLA DIAS")).toBeTruthy();
+
+    await filtrar("Confirmados");
+    expect(await screen.findByText("ANA SOUZA")).toBeTruthy();
+    expect(screen.queryByText("CARLA DIAS")).toBeNull();
+  });
+
   describe("Avisos", () => {
     const comAvisos = (avisos: { tipo: string; mensagem: string }[], campos: Record<string, unknown> = {}) => ({
       ...lista,
@@ -422,6 +513,33 @@ describe("rascunhos não salvos", () => {
     sair();
     await screen.findByText("Outra tela");
     expect(windows.confirm).not.toHaveBeenCalled();
+  });
+
+  describe("com sugestão", () => {
+    const sugerida = { ...lista, colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...pendente, sugestao: { usuarioId: "ana", lojas: [2] } }] };
+
+    it("só a sugestão não pede confirmação ao sair", async () => {
+      apiFetch.mockResolvedValue(sugerida);
+      render(<ColaboradoresPage />);
+      await screen.findByText("ANA SOUZA");
+      sair();
+      await screen.findByText("Outra tela");
+      expect(windows.confirm).not.toHaveBeenCalled();
+    });
+
+    it("alterar a sugestão pede confirmação, e voltar a ela não", async () => {
+      apiFetch.mockResolvedValue(sugerida);
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      await escolherUsuario(row, "Bia Lima");
+      windows.confirm.mockResolvedValue(false);
+      await expect(confirmLeave()).resolves.toBe(false);
+      expect(windows.confirm).toHaveBeenCalledTimes(1);
+
+      await escolherUsuario(row, "Ana Souza");
+      await expect(confirmLeave()).resolves.toBe(true);
+      expect(windows.confirm).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("um rascunho desfeito não pede confirmação", async () => {
