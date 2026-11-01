@@ -453,6 +453,13 @@ describe("Sugestões do Vínculo do Colaborador", () => {
     expect((await listar()).colaboradores.map((c) => c.sugestao!.usuarioId)).toEqual([null, null]);
   });
 
+  it("um Colaborador inativo não disputa a sugestão com um ativo de mesmo nome", async () => {
+    const { listar } = await boot([VIEW, UPDATE], erpCom([colaborador(7, "ANA SOUZA"), { ...colaborador(8, "ANA SOUZA", 2), ativo: false }]));
+    const { colaboradores } = await listar();
+    expect(colaboradores.find((c) => c.codigoColaborador === 7)!.sugestao!.usuarioId).toBe("ana");
+    expect(colaboradores.find((c) => c.codigoColaborador === 8)!.sugestao).toEqual({ usuarioId: null, lojas: [2] });
+  });
+
   it("considera só Usuários ativos", async () => {
     expect(await sugestaoDe("CAIO INATIVO")).toBeNull();
   });

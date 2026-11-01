@@ -145,7 +145,8 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     };
     const noErp = new Set(colaboradores.map((col) => col.codigoColaborador));
     const vinculados = new Set(vinculos.map((v) => v.usuarioId));
-    const pendentes = colaboradores.filter((col) => !estaConfirmado(col.codigoColaborador));
+    // Só os ativos disputam a sugestão: um ex-funcionário homônimo não pode tirá-la de quem está ativo.
+    const pendentes = colaboradores.filter((col) => col.ativo && !estaConfirmado(col.codigoColaborador));
     const usuarioSugerido = sugerirUsuarios(pendentes, usuarios.filter((u) => u.status === "active" && !vinculados.has(u.id)));
     const linhasDoErp = colaboradores.map((col) => {
       const { codigoEmpresa, ...dados } = col;
