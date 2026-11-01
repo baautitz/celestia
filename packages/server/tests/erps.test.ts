@@ -114,11 +114,11 @@ describe("ERPs (/api/admin/erps)", () => {
 
   it("entrega o catálogo de ERP Drivers com os campos de cada um", async () => {
     const res = await send("GET", "/api/admin/erp-drivers", await tokenOf("carlos.admin"));
-    const drivers = (await res.json()) as { id: string; label: string; fields: { name: string; type: string }[]; externalFields: { name: string }[] }[];
+    const drivers = (await res.json()) as { id: string; label: string; fields: { name: string; type: string }[] }[];
     expect(drivers.map((t) => t.id).sort()).toEqual(["inovafarma", "mssql"]);
     const inovafarma = drivers.find((d) => d.id === "inovafarma")!;
     expect(inovafarma.label).toBe("InovaFarma");
-    expect(inovafarma.externalFields.map((f) => f.name)).toEqual(["codigoColaborador", "codigoLoja"]);
+    expect(inovafarma).not.toHaveProperty("externalFields");
 
     const mssql = drivers.find((d) => d.id === "mssql")!;
     expect(mssql.label).toBe("SQL Server");
@@ -126,11 +126,11 @@ describe("ERPs (/api/admin/erps)", () => {
     expect(mssql.fields.find((f) => f.name === "password")!.type).toBe("password");
   });
 
-  it("os Externals exigem system:users:update", async () => {
+  it("não expõe mais as rotas de identificadores de ERP", async () => {
     const admin = await tokenOf("carlos.admin");
     await send("PUT", "/api/admin/erps/inovafarma", admin, body);
-    expect((await send("GET", "/api/admin/erp-externals/usr_1002", admin)).status).toBe(200);
-    expect((await send("GET", "/api/admin/erp-externals/usr_1002", await tokenOf("joao.silva"))).status).toBe(403);
+    expect((await send("GET", "/api/admin/erp-externals/usr_1002", admin)).status).toBe(404);
+    expect((await send("PUT", "/api/admin/erp-externals/usr_1002/inovafarma", admin, { values: {} })).status).toBe(404);
   });
 
   it("nega acesso a quem não tem system:erps:manage", async () => {

@@ -5,7 +5,6 @@ import { serve } from "@hono/node-server";
 import { assertEncryptionKey } from "./erp/secret-box.js";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
 import { MemoryErpStore, type ErpStore } from "./erp/erp-store.js";
-import { MemoryErpExternalsStore, type ErpExternalsStore } from "./erp/erp-externals-store.js";
 import { createErpClientFactory, type ErpClientFactory } from "./erp/erp-factory.js";
 import { ERP_DRIVERS } from "./erp/erp-drivers.js";
 import { createErpModule } from "./erp/erp-module.js";
@@ -24,7 +23,7 @@ import { loadCertificateAuthorityClient } from "./boot/certificate-authority.js"
 import { serveWebApp } from "./boot/web-app.js";
 import { NON_IAM_PERMISSIONS, SYSTEM_PERMISSION_KEYS } from "./iam/system-permissions.js";
 import { createAuthMiddleware } from "./iam/middleware.js";
-import { integrationPlugins, integrationExternalFields, integrationErpDrivers } from "./plugins.js";
+import { integrationPlugins, integrationErpDrivers } from "./plugins.js";
 import { createClosingPeriodModule } from "./closing-period/closing-period-module.js";
 import { MemoryClosingPeriodStore, type ClosingPeriodStore } from "./closing-period/closing-period-store.js";
 import type { JWTAccessPayload } from "@platform/shared";
@@ -32,7 +31,6 @@ import type { JWTAccessPayload } from "@platform/shared";
 export interface CreatePlatformAppOptions {
   erpClients?: ErpClientRegistry;
   erpStore?: ErpStore;
-  erpExternalsStore?: ErpExternalsStore;
   clientFactory?: ErpClientFactory;
   userStore?: UserStore;
   /** Autoridade certificadora dos Dispositivos. Sem ela, quem exige certificado não entra (falha fechado). */
@@ -69,7 +67,6 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   );
   const erpClients = options?.erpClients || {};
   const erpStore = options?.erpStore || new MemoryErpStore();
-  const erpExternalsStore = options?.erpExternalsStore || new MemoryErpExternalsStore();
   const extraDrivers = integrationErpDrivers();
   const allDrivers = { ...ERP_DRIVERS, ...extraDrivers };
   const clientFactory = options?.clientFactory || createErpClientFactory(allDrivers);
@@ -104,11 +101,9 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
       tier: "plugin",
       def: createErpModule({
         erpStore,
-        externalsStore: erpExternalsStore,
         clients: erpClients,
         clientFactory,
         auth,
-        externalFieldsByErp: integrationExternalFields(),
         extraDrivers,
       }),
     },
@@ -160,7 +155,6 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     let userStore: UserStore | undefined;
     const erpClients: ErpClientRegistry = {};
     let erpStore: ErpStore | undefined;
-    let erpExternalsStore: ErpExternalsStore | undefined;
     let closingPeriodStore: ClosingPeriodStore | undefined;
     let auditLog: AuditLog | undefined;
     let pluginDb: NodePgDatabase | undefined;
@@ -174,8 +168,6 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       pluginDb = db;
       userStore = new PostgresUserStore(db);
       erpStore = new PostgresErpStore(db);
-      const { PostgresErpExternalsStore } = await import("./erp/postgres-erp-externals-store.js");
-      erpExternalsStore = new PostgresErpExternalsStore(db);
       closingPeriodStore = new PostgresClosingPeriodStore(db);
       const { PostgresAuditStore } = await import("./audit/postgres-audit-store.js");
       auditLog = new AuditLog(new PostgresAuditStore(db));
@@ -193,7 +185,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     const platform = createPlatform({
       userStore,
       certificateAuthority,
-      erpStore, erpExternalsStore, closingPeriodStore,
+      erpStore, closingPeriodStore,
       erpClients,
       auditLog,
       db: pluginDb,

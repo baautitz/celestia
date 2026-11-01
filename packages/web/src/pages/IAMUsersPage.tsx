@@ -4,8 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/context/AuthContext";
-import type { User, Role, JWTAccessPayload, ErpExternalsEntry } from "@platform/shared";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@platform/ui/components/card";
+import type { User, Role, JWTAccessPayload } from "@platform/shared";
 import { Button } from "@platform/ui/components/button";
 import { Grid, PageHeader, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { Input } from "@platform/ui/components/input";
@@ -44,7 +43,6 @@ import {
   Power,
   CheckCircle2,
   Clock,
-  Database,
 } from "lucide-react";
 import { Switch } from "@platform/ui/components/switch";
 import { api } from "@/lib/api-client";
@@ -58,7 +56,6 @@ const userSchema = z.object({
   isAdmin: z.boolean(),
   allowWithoutCertificate: z.boolean(),
   password: z.string(),
-  externals: z.record(z.record(z.string())),
 });
 type UserFormValues = z.infer<typeof userSchema>;
 
@@ -87,28 +84,8 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
       isAdmin: user?.isAdmin === true,
       allowWithoutCertificate: user?.allowWithoutCertificate === true,
       password: "",
-      externals: {},
     },
   });
-  const [entries, setEntries] = useState<ErpExternalsEntry[]>([]);
-  const uiRef = useLatest(ui);
-  useEffect(() => {
-    if (!user) return;
-    api.erps
-      .listExternals(user.id)
-      .then((loaded) => {
-        setEntries(loaded);
-        form.setValue(
-          "externals",
-          Object.fromEntries(
-            loaded.map((e) => [e.erpId, Object.fromEntries(Object.entries(e.values).map(([k, v]) => [k, String(v)]))])
-          )
-        );
-      })
-      .catch((err: unknown) => {
-        uiRef.current.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao carregar os identificadores." });
-      });
-  }, [user, form, uiRef]);
   const roleId = form.watch("roleId");
   const getRoleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 
@@ -121,9 +98,6 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
           roleId: v.roleId,
           ...(currentUser?.isAdmin ? { isAdmin: v.isAdmin, allowWithoutCertificate: v.allowWithoutCertificate } : {}),
         });
-        for (const entry of entries) {
-          await api.erps.saveExternals(user.id, entry.erpId, v.externals[entry.erpId] ?? {});
-        }
         ui.feedback.notify({ type: "success", title: "Usuário atualizado com sucesso!" });
       } else {
         await api.iam.createUser({
@@ -257,58 +231,6 @@ const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUse
               />
             )}
 
-            {/* Externals: campos declarados por cada ERP (Plugin erp). */}
-            {isEditMode && (
-              <Card>
-                <CardHeader compact>
-                  <CardTitle>
-                    <Stack direction="row" align="center" gap="field" iconSize="sm" iconTone="primary">
-                      <Database />
-                      <Text variant="eyebrow" tone="muted">
-                        Identificadores nos ERPs
-                      </Text>
-                    </Stack>
-                  </CardTitle>
-                  <CardDescription>
-                    Valores que ligam o usuário aos conceitos de cada ERP.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Stack gap="section">
-                  {entries.length === 0 && (
-                    <CardDescription>Nenhum ERP cadastrado.</CardDescription>
-                  )}
-                  {entries.map((entry) => (
-                    <FieldGroup key={entry.erpId}>
-                      <FieldLabel>{entry.erpName}</FieldLabel>
-                      {entry.fields.map((f) => (
-                        <FormField
-                          key={f.name}
-                          control={form.control}
-                          name={`externals.${entry.erpId}.${f.name}`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{f.label}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type={f.type === "number" ? "number" : "text"}
-                                  placeholder="Não vinculado"
-                                  {...field}
-                                  value={field.value ?? ""}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      ))}
-                    </FieldGroup>
-                  ))}
-                  </Stack>
-                </CardContent>
-              </Card>
-            )}
-
             {!isEditMode && (
               <FormField
                 control={form.control}
@@ -425,7 +347,7 @@ export const IAMUsersPage: React.FC = () => {
       size: "small",
       title: u ? "Editar Usuário" : "Cadastrar Novo Usuário",
       description: u
-        ? "Atualize os dados, perfil e identificadores ERP do usuário."
+        ? "Atualize os dados e o perfil do usuário."
         : "Crie uma nova identidade no sistema com perfil e senha inicial.",
       content: () => <UserFormWindow user={u} roles={roles} currentUser={currentUser} />,
     });

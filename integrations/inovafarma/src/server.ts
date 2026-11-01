@@ -3,14 +3,13 @@ import type { Context, MiddlewareHandler } from "hono";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
-import { INOVAFARMA_EXTERNALS } from "./externals.js";
 import { createInovafarmaDriver } from "./driver.js";
 import { registerColaboradoresRoutes, type UsersService } from "./colaboradores-routes.js";
 import { PostgresVinculoStore } from "./postgres-vinculo-store.js";
 import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
 import { MemoryVinculoStore } from "./vinculo-store.js";
 
-export { INOVAFARMA_PERMISSIONS, INOVAFARMA_EXTERNALS, createInovafarmaDriver, PostgresVinculoStore };
+export { INOVAFARMA_PERMISSIONS, createInovafarmaDriver, PostgresVinculoStore };
 export { UsuarioJaVinculadoError, VersaoDesatualizadaError } from "./vinculo-store.js";
 
 /** Migrations do Plugin (schema Postgres "inovafarma"), na raiz do pacote: valem para `src` e para `dist`. */
@@ -73,7 +72,7 @@ export interface InovafarmaPluginDeps {
 
 /**
  * Plugin InovaFarma: módulo cliente que consome a conexão MSSQL gerenciada pela plataforma
- * e expõe rotas de consulta baseadas nos identificadores externos (codigoColaborador, codigoLoja).
+ * e expõe rotas de consulta sobre os dados do ERP.
  */
 export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafarma", db }: InovafarmaPluginDeps): ModuleDef {
   return defineModule({
@@ -112,7 +111,6 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
           connected: Boolean(client),
           healthy: isHealthy,
           erpId,
-          externals: INOVAFARMA_EXTERNALS,
         });
       });
 
