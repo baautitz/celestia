@@ -17,11 +17,15 @@
   "dependencies": {
     "@platform/core": "workspace:*",
     "@platform/ui": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.4",
     "hono": "^4.13.13",
     "lucide-react": "^1.33.0",
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",
     "typescript": "^5.6.3"
   }

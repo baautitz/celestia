@@ -36,13 +36,14 @@ function ComboboxTrigger({
   )
 }
 
-function ComboboxClear({ className, ...props }: ComboboxPrimitive.Clear.Props) {
+function ComboboxClear({ className, "aria-label": ariaLabel = "Limpar", ...props }: ComboboxPrimitive.Clear.Props) {
   return (
     <ComboboxPrimitive.Clear
       data-slot="combobox-clear"
       render={<InputGroupButton variant="ghost" size="icon-xs" />}
       className={cn(className)}
       {...props}
+      aria-label={ariaLabel}
     >
       <XIcon className="pointer-events-none" />
     </ComboboxPrimitive.Clear>
@@ -55,10 +56,13 @@ function ComboboxInput({
   disabled = false,
   showTrigger = true,
   showClear = false,
+  clearLabel,
   ...props
 }: ComboboxPrimitive.Input.Props & {
   showTrigger?: boolean
   showClear?: boolean
+  /** Nome acessível do botão de limpar; padrão: "Limpar". */
+  clearLabel?: string
 }) {
   return (
     <InputGroup className={cn("w-auto", className)}>
@@ -77,7 +81,7 @@ function ComboboxInput({
             disabled={disabled}
           />
         )}
-        {showClear && <ComboboxClear disabled={disabled} />}
+        {showClear && <ComboboxClear disabled={disabled} aria-label={clearLabel} />}
       </InputGroupAddon>
       {children}
     </InputGroup>

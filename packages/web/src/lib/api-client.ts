@@ -1,3 +1,4 @@
+import { ApiError } from "@platform/ui/lib/api";
 import type {
   JWTAccessPayload,
   AuthTokens,
@@ -76,7 +77,7 @@ class ApiClient {
         typeof errBody.error === "string"
           ? errBody.error
           : errBody.error?.issues?.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-      throw new Error(detail || `Erro HTTP ${response.status}`);
+      throw new ApiError(detail || `Erro HTTP ${response.status}`, response.status);
     }
 
     return response.json() as Promise<T>;

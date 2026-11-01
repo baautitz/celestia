@@ -39,6 +39,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { moduleId: "audit", schema: "audit" },
         { moduleId: "closing_period", schema: "closing_period" },
         { moduleId: "erp", schema: "erp" },
+        { moduleId: "inovafarma", schema: "inovafarma" },
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
@@ -53,7 +54,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       const tables = await db.execute<{ schema: string; name: string }>(sql`
         SELECT table_schema AS schema, table_name AS name
         FROM information_schema.tables
-        WHERE table_schema IN ('iam', 'audit', 'closing_period', 'erp')
+        WHERE table_schema IN ('iam', 'audit', 'closing_period', 'erp', 'inovafarma')
         ORDER BY table_schema, table_name
       `);
       expect(tables.rows).toEqual([
@@ -62,6 +63,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "erp", name: "erps" },
         { schema: "iam", name: "roles" },
         { schema: "iam", name: "users" },
+        { schema: "inovafarma", name: "vinculos_colaborador" },
       ]);
     });
 
