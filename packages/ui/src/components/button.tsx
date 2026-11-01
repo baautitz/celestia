@@ -1,3 +1,4 @@
+import type * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -25,6 +26,7 @@ const buttonVariants = cva(
         xs: "h-6 gap-1 rounded-none px-2 text-xs has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-7 gap-1 rounded-none px-2.5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        multiline: "h-auto min-h-8 flex-col items-start gap-0.5 px-2.5 py-1.5 text-left",
         icon: "size-8",
         "icon-xs": "size-6 rounded-none [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-7 rounded-none",
@@ -57,4 +59,20 @@ function Button({
   )
 }
 
-export { Button, buttonVariants }
+/** Botão de seleção múltipla que mostra um valor por linha e cresce com eles. */
+function MultiValueButton({
+  values,
+  placeholder,
+  ...props
+}: Omit<React.ComponentProps<typeof Button>, "children" | "size" | "variant"> & {
+  values: string[]
+  placeholder: string
+}) {
+  return (
+    <Button variant="outline" size="multiline" {...props}>
+      {values.length === 0 ? placeholder : values.map((value) => <span key={value}>{value}</span>)}
+    </Button>
+  )
+}
+
+export { Button, MultiValueButton, buttonVariants }
