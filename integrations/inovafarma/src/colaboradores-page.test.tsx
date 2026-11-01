@@ -47,7 +47,7 @@ const listaComVinculo = {
 };
 
 async function linha(nome: string) {
-  return (await screen.findByText(nome)).closest("tr") as HTMLElement;
+  return screen.findByRole("row", { name: new RegExp(nome) });
 }
 
 async function escolherUsuario(row: HTMLElement, nome: string) {
@@ -322,9 +322,8 @@ describe("ColaboradoresPage", () => {
       colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...pendente, sugestao }],
     });
     const campoUsuario = (row: HTMLElement) => within(row).getByRole("combobox", { name: /^Usuário de / }) as HTMLInputElement;
-    const celula = (campo: HTMLElement) => campo.closest("td") as HTMLElement;
-    const seloUsuario = (row: HTMLElement) => within(celula(campoUsuario(row))).queryByText("Sugestão");
-    const seloLojas = (row: HTMLElement) => within(celula(within(row).getByRole("combobox", { name: /^Lojas de / }))).queryByText("Sugestão");
+    const seloUsuario = (row: HTMLElement) => within(within(row).getAllByRole("cell")[2]!).queryByText("Sugestão");
+    const seloLojas = (row: HTMLElement) => within(within(row).getAllByRole("cell")[3]!).queryByText("Sugestão");
 
     it("pré-preenche Usuário e Loja com o selo Sugestão, sem gravar ao carregar", async () => {
       apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
