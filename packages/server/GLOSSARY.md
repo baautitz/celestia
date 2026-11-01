@@ -62,6 +62,10 @@ _Avoid_: Vencido, Próximo do vencimento
 A record made by a Colaborador, through their linked User, that they sold a quantity of a Pré-vencido with a given expiry date in a Loja, within an open Closing Period. The same product can be entered more than once.
 _Avoid_: Pré-vendido, Registro
 
+**Avaliação do Colaborador** (en: Collaborator Assessment):
+A record made by a manager about a Colaborador of one of their Lojas, within a Closing Period, with a description and an amount to discount from the Colaborador, which may be zero. It keeps the Loja it was made in, even if the Colaborador later changes Loja. The Colaborador sees their own Avaliações through their linked User.
+_Avoid_: Advertência, Desconto, Ocorrência
+
 ### Access
 
 **User** (pt-BR: **Usuário**):

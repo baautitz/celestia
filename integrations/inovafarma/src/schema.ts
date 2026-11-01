@@ -40,3 +40,25 @@ export const preVencidosLancamentos = inovafarmaSchema.table(
   },
   (t) => [index("pre_vencidos_lancamentos_periodo_idx").on(t.periodoId, t.codigoColaborador)],
 );
+
+export const avaliacoes = inovafarmaSchema.table(
+  "avaliacoes",
+  {
+    id: text("id").primaryKey(),
+    /** Referência lógica a `closing_period.periods`, sem FK entre Modules. */
+    periodoId: text("periodo_id").notNull(),
+    codigoColaborador: integer("codigo_colaborador").notNull(),
+    nomeColaborador: text("nome_colaborador").notNull(),
+    /** Loja do lançamento: a Avaliação não muda de Loja quando o Colaborador muda. */
+    codigoLoja: integer("codigo_loja").notNull(),
+    descricao: text("descricao").notNull(),
+    /** Valor descontado em centavos, zero ou mais. */
+    valorCentavos: integer("valor_centavos").notNull(),
+    /** Referência lógica a `iam.users`: quem lançou. */
+    criadoPor: text("criado_por").notNull(),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [index("avaliacoes_periodo_idx").on(t.periodoId, t.codigoLoja)],
+);

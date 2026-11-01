@@ -6,6 +6,10 @@ import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { createInovafarmaDriver } from "./driver.js";
 import { LOJAS_SQL, registerColaboradoresRoutes, type UsersService } from "./colaboradores-routes.js";
 import { PostgresVinculoStore } from "./postgres-vinculo-store.js";
+import { declareAvaliacaoAudit } from "./avaliacoes-audit.js";
+import { registerAvaliacoesRoutes } from "./avaliacoes-routes.js";
+import { MemoryAvaliacaoStore } from "./avaliacoes-store.js";
+import { PostgresAvaliacaoStore } from "./postgres-avaliacao-store.js";
 import { declarePreVencidoAudit } from "./pre-vencidos-audit.js";
 import { registerPreVencidosRoutes, type PeriodsService } from "./pre-vencidos-routes.js";
 import { MemoryPreVencidoStore } from "./pre-vencidos-store.js";
@@ -90,14 +94,17 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       const audit = services.use<AuditService>("audit", "log");
       declareVinculoAudit(audit);
       declarePreVencidoAudit(audit);
+      declareAvaliacaoAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
+      const users = services.use<UsersService>("iam", "users");
+      const periods = services.use<PeriodsService>("closing_period", "periods");
       registerColaboradoresRoutes({
         routes,
         permissions,
         auth,
         erpClient: () => erpClients[erpId],
         store,
-        users: services.use<UsersService>("iam", "users"),
+        users,
         audit,
       });
       registerPreVencidosRoutes({
@@ -107,7 +114,18 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         erpClient: () => erpClients[erpId],
         store: db ? new PostgresPreVencidoStore(db) : new MemoryPreVencidoStore(),
         vinculos: store,
-        periods: services.use<PeriodsService>("closing_period", "periods"),
+        periods,
+        audit,
+      });
+      registerAvaliacoesRoutes({
+        routes,
+        permissions,
+        auth,
+        erpClient: () => erpClients[erpId],
+        store: db ? new PostgresAvaliacaoStore(db) : new MemoryAvaliacaoStore(),
+        vinculos: store,
+        users,
+        periods,
         audit,
       });
 

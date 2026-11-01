@@ -8,14 +8,14 @@ describe("menu dos módulos registrados", () => {
     expect(menu[3].entries.map((e) => e.label)).toEqual(["Usuários", "Grupos", "Dispositivos", "ERPs", "Auditoria"]);
   });
 
-  it("mostra Colaboradores e Pré-vencidos na Seção InovaFarma e mantém Desempenho de Vendas em Relatórios", () => {
+  it("mostra Colaboradores, Pré-vencidos e Avaliações na Seção InovaFarma e mantém Desempenho de Vendas em Relatórios", () => {
     const menu = menuSections(() => true);
-    expect(menu.find((s) => s.label === "InovaFarma")?.entries.map((e) => e.label)).toEqual(["Colaboradores", "Pré-vencidos"]);
+    expect(menu.find((s) => s.label === "InovaFarma")?.entries.map((e) => e.label)).toEqual(["Colaboradores", "Pré-vencidos", "Avaliações"]);
     expect(menu.find((s) => s.label === "Relatórios")?.entries.map((e) => e.label)).toContain("Desempenho de Vendas");
   });
 
   it("esconde a Seção InovaFarma de quem não tem nenhuma Permission da Seção", () => {
-    const menu = menuSections((permission) => !permission.startsWith("inovafarma:colaboradores:") && !permission.startsWith("inovafarma:pre-vencidos-"));
+    const menu = menuSections((permission) => !permission.startsWith("inovafarma:colaboradores:") && !permission.startsWith("inovafarma:pre-vencidos-") && !permission.startsWith("inovafarma:avaliacoes-"));
     expect(menu.map((s) => s.label)).not.toContain("InovaFarma");
   });
 
