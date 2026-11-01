@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
-import { TrendingUp, RefreshCw, Calendar, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX } from "lucide-react";
+import { TrendingUp, RefreshCw, Calendar, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX, ClipboardCheck } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
@@ -14,6 +14,7 @@ import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imper
 import type { Trend } from "@platform/ui/components/trend";
 import { ColaboradoresPendentesBadge } from "./colaboradores-badge";
 import { ColaboradoresPage } from "./colaboradores-page";
+import { AvaliacoesPage } from "./avaliacoes-page";
 import { PreVencidosPage } from "./pre-vencidos-page";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
@@ -771,6 +772,22 @@ export const inovafarmaWebModule = defineWebModule({
       component: PreVencidosPage,
       // Quem só confere (gestor) também abre a tela; ela mostra as abas que a Permission libera.
       variants: [{ permission: "inovafarma:pre-vencidos-conferencia:view", component: PreVencidosPage }],
+    },
+    {
+      id: "inovafarma-avaliacoes",
+      label: "Avaliações",
+      title: "Avaliações",
+      icon: ClipboardCheck,
+      path: "/inovafarma/avaliacoes",
+      section: "inovafarma",
+      order: 30,
+      permission: "inovafarma:avaliacoes-individual:view",
+      component: AvaliacoesPage,
+      // Quem só gerencia também abre a tela; ela mostra as abas que a Permission libera.
+      variants: [
+        { permission: "inovafarma:avaliacoes-loja:manage", component: AvaliacoesPage },
+        { permission: "inovafarma:avaliacoes-geral:manage", component: AvaliacoesPage },
+      ],
     },
     {
       id: "inovafarma-vendas",
