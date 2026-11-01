@@ -84,7 +84,11 @@ export function createIamModule({
     prefix: "/api",
     permissions: IAM_PERMISSIONS,
     migrations: IAM_MIGRATIONS,
-    register({ routes, events, permissions }) {
+    register({ routes, events, permissions, services }) {
+      // Só estes campos saem para outros Modules (ADR 0002): nunca passwordHash, Role ou e-mail.
+      services.expose("users", {
+        list: async () => (await userStore.listUsers()).map(({ id, fullname, username, status }) => ({ id, fullname, username, status })),
+      });
       declareIamAudit(auditLog);
       permissions.registerProvider(() => extraPermissions.map((p) => ({ ...p, module: p.module ?? "system" })));
       const cancelled = (c: Context, reason: string) => c.json({ error: reason }, 409);
