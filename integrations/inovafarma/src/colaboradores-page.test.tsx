@@ -60,11 +60,12 @@ async function escolherUsuario(row: HTMLElement, nome: string) {
 }
 
 async function escolherLoja(row: HTMLElement, nome: string) {
-  fireEvent.input(within(row).getByRole("combobox", { name: /^Lojas de / }), { target: { value: nome.slice(0, 3) }, inputType: "insertText" });
-  const opcao = await screen.findByRole("option", { name: nome });
-  fireEvent.mouseMove(opcao);
+  const trigger = within(row).getByRole("button", { name: /^Lojas de / });
+  if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger);
+  const opcao = await screen.findByRole("menuitemcheckbox", { name: nome });
+  const marcada = opcao.getAttribute("aria-checked");
   fireEvent.click(opcao);
-  await within(row).findByText(nome);
+  await waitFor(() => expect(screen.getByRole("menuitemcheckbox", { name: nome }).getAttribute("aria-checked")).not.toBe(marcada));
 }
 
 const botao = (row: HTMLElement, nome: string) => within(row).getByRole("button", { name: nome }) as HTMLButtonElement;
@@ -271,7 +272,7 @@ describe("ColaboradoresPage", () => {
       expect(within(row).getByText("Centro")).toBeTruthy();
 
       fireEvent.click(botao(row, "Limpar Usuário"));
-      fireEvent.click(botao(row, "Remover Centro"));
+      await escolherLoja(row, "Centro");
       await waitFor(() => expect(within(row).queryByText("Centro")).toBeNull());
 
       apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente });
@@ -288,7 +289,7 @@ describe("ColaboradoresPage", () => {
       apiFetch.mockResolvedValueOnce(comLojas([1, 2]));
       render(<ColaboradoresPage />);
       const row = await linha("ANA SOUZA");
-      fireEvent.click(botao(row, "Remover Centro"));
+      await escolherLoja(row, "Centro");
       await waitFor(() => expect(botao(row, "Salvar").disabled).toBe(false));
       await escolherLoja(row, "Centro");
       await waitFor(() => expect(botao(row, "Salvar").disabled).toBe(true));
@@ -300,19 +301,12 @@ describe("ColaboradoresPage", () => {
       expect(within(await linha("ANA SOUZA")).getByText("Loja não encontrada (cód. 99)")).toBeTruthy();
     });
 
-    it("resume em +N as Lojas que não cabem, com os nomes no title", async () => {
-      const largura = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(200);
-      const chip = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(80);
-      try {
-        apiFetch.mockResolvedValueOnce(comLojas([1, 2, 3]));
-        render(<ColaboradoresPage />);
-        const row = await linha("ANA SOUZA");
-        const resumo = await within(row).findByText("+2");
-        expect(resumo.getAttribute("title")).toBe("Bairro, Shopping");
-      } finally {
-        largura.mockRestore();
-        chip.mockRestore();
-      }
+    it("mostra o nome de todas as Lojas selecionadas", async () => {
+      apiFetch.mockResolvedValueOnce(comLojas([1, 2, 3]));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      const lojas = within(row).getByRole("button", { name: /^Lojas de / });
+      for (const nome of ["Centro", "Bairro", "Shopping"]) expect(within(lojas).getByText(nome)).toBeTruthy();
     });
   });
 
@@ -368,7 +362,7 @@ describe("ColaboradoresPage", () => {
       await escolherUsuario(row, "Bia Lima");
       expect(seloUsuario(row)).toBeNull();
       expect(seloLojas(row)).toBeTruthy();
-      fireEvent.click(botao(row, "Remover Bairro"));
+      await escolherLoja(row, "Bairro");
       await waitFor(() => expect(seloLojas(row)).toBeNull());
     });
 
@@ -431,22 +425,14 @@ describe("ColaboradoresPage", () => {
       expect(within(await linha("ANA SOUZA")).getByText("Inativo no ERP")).toBeTruthy();
     });
 
-    it("mantém visível no Status a Loja não encontrada cujo chip foi resumido em +N", async () => {
-      const largura = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(200);
-      const chip = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(80);
-      try {
-        const avisos = [98, 99].map((codigo) => ({ tipo: "loja_nao_encontrada", mensagem: `Loja não encontrada (cód. ${codigo})` }));
-        apiFetch.mockResolvedValueOnce(comAvisos(avisos, { lojas: [98, 99] }));
-        render(<ColaboradoresPage />);
-        const row = await linha("ANA SOUZA");
-        await within(row).findByText("+1");
-        const status = within(row).getAllByRole("cell")[4]!;
-        expect(within(status).getByText("Loja não encontrada (cód. 98)")).toBeTruthy();
-        expect(within(status).getByText("Loja não encontrada (cód. 99)")).toBeTruthy();
-      } finally {
-        largura.mockRestore();
-        chip.mockRestore();
-      }
+    it("mostra no Status cada Loja não encontrada", async () => {
+      const avisos = [98, 99].map((codigo) => ({ tipo: "loja_nao_encontrada", mensagem: `Loja não encontrada (cód. ${codigo})` }));
+      apiFetch.mockResolvedValueOnce(comAvisos(avisos, { lojas: [98, 99] }));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      const status = within(row).getAllByRole("cell")[4]!;
+      expect(within(status).getByText("Loja não encontrada (cód. 98)")).toBeTruthy();
+      expect(within(status).getByText("Loja não encontrada (cód. 99)")).toBeTruthy();
     });
 
     describe("Colaborador que sumiu do ERP", () => {

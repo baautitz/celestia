@@ -2,20 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
-import { Button } from "@platform/ui/components/button";
+import { Button, MultiValueButton } from "@platform/ui/components/button";
 import {
   Combobox,
-  ComboboxChips,
-  ComboboxChipsInput,
-  ComboboxChipsResumidos,
   ComboboxContent,
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
-  ComboboxValue,
-  useComboboxAnchor,
 } from "@platform/ui/components/combobox";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
 import { Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
@@ -152,44 +148,29 @@ function LojasSelect({
   lojas: number[];
   onChange: (lojas: number[]) => void;
 }) {
-  const anchor = useComboboxAnchor();
   const items = useMemo(() => {
     const foraDoErp = row.lojas.filter((codigo) => !opcoes.some((o) => o.codigo === codigo)).map((codigo) => ({ codigo, nome: `Loja não encontrada (cód. ${codigo})` }));
     return [...foraDoErp, ...opcoes];
   }, [row.lojas, opcoes]);
-  const value = useMemo(() => items.filter((o) => lojas.includes(o.codigo)), [items, lojas]);
+  const selecionadas = items.filter((o) => lojas.includes(o.codigo));
+  const alternar = (codigo: number, marcada: boolean) =>
+    onChange((marcada ? [...lojas, codigo] : lojas.filter((l) => l !== codigo)).sort((a, b) => a - b));
 
   return (
-    <Combobox
-      multiple
-      autoHighlight
-      items={items}
-      value={value}
-      onValueChange={(selecionadas: LojaOpcao[]) => onChange(selecionadas.map((o) => o.codigo).sort((a, b) => a - b))}
-      itemToStringLabel={(item: LojaOpcao) => item.nome}
-      itemToStringValue={(item: LojaOpcao) => String(item.codigo)}
-      isItemEqualToValue={(a: LojaOpcao, b: LojaOpcao) => a.codigo === b.codigo}
-    >
-      <ComboboxChips ref={anchor} inTableCell>
-        <ComboboxValue>
-          {(selecionadas: LojaOpcao[]) => (
-            <ComboboxChipsResumidos labels={selecionadas.map((o) => o.nome)} removeLabel={(nome) => `Remover ${nome}`}>
-              <ComboboxChipsInput aria-label={`Lojas de ${row.nome}`} placeholder={selecionadas.length === 0 ? "Selecione as Lojas" : undefined} />
-            </ComboboxChipsResumidos>
-          )}
-        </ComboboxValue>
-      </ComboboxChips>
-      <ComboboxContent anchor={anchor}>
-        <ComboboxEmpty>Nenhuma Loja encontrada.</ComboboxEmpty>
-        <ComboboxList>
-          {(item: LojaOpcao) => (
-            <ComboboxItem key={item.codigo} value={item}>
-              {item.nome}
-            </ComboboxItem>
-          )}
-        </ComboboxList>
-      </ComboboxContent>
-    </Combobox>
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger
+        render={
+          <MultiValueButton aria-label={`Lojas de ${row.nome}`} values={selecionadas.map((o) => o.nome)} placeholder="Selecione as Lojas" />
+        }
+      />
+      <DropdownMenuContent>
+        {items.map((o) => (
+          <DropdownMenuCheckboxItem key={o.codigo} closeOnClick={false} checked={lojas.includes(o.codigo)} onCheckedChange={(marcada) => alternar(o.codigo, marcada)}>
+            {o.nome}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
