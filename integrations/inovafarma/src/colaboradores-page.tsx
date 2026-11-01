@@ -405,6 +405,7 @@ export function ColaboradoresPage() {
         getRowId={(r) => String(r.codigoColaborador)}
         loading={loading}
         title="Colaboradores"
+        search={{ placeholder: "Buscar por nome ou código..." }}
         emptyMessage="Nenhum Colaborador encontrado."
         striped
         bordered

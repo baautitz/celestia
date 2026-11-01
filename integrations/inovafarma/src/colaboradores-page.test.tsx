@@ -629,3 +629,20 @@ describe("rascunhos não salvos", () => {
     expect(windows.confirm).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("pesquisa de Colaboradores", () => {
+  it("encontra pelo nome e pelo código", async () => {
+    const nome = "CARLA DIAS";
+    const codigoColaborador = 12;
+    apiFetch.mockResolvedValue({ ...lista, colaboradores: [...lista.colaboradores, { codigoColaborador, nome, ativo: true, ...pendente }] });
+    render(<ColaboradoresPage />);
+    await linha("ANA SOUZA");
+    const busca = screen.getByPlaceholderText("Buscar por nome ou código...");
+    fireEvent.change(busca, { target: { value: "ana sou" } });
+    await waitFor(() => expect(screen.queryByText(nome)).toBeNull());
+    expect(screen.getByText("ANA SOUZA")).toBeTruthy();
+    fireEvent.change(busca, { target: { value: String(codigoColaborador) } });
+    expect(await screen.findByText(nome)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText("ANA SOUZA")).toBeNull());
+  });
+});
