@@ -81,9 +81,9 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
     dependsOn: ["iam", "audit"],
     permissions: INOVAFARMA_PERMISSIONS,
     migrations: INOVAFARMA_MIGRATIONS,
-    register({ moduleId, routes, permissions, services }) {
+    register({ routes, permissions, services }) {
       const audit = services.use<AuditService>("audit", "log");
-      declareVinculoAudit(audit, moduleId);
+      declareVinculoAudit(audit);
       registerColaboradoresRoutes({
         routes,
         permissions,
@@ -92,7 +92,6 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         store: db ? new PostgresVinculoStore(db) : new MemoryVinculoStore(),
         users: services.use<UsersService>("iam", "users"),
         audit,
-        plugin: moduleId,
       });
 
       const viewKey = INOVAFARMA_PERMISSIONS.keys["integration:view"];

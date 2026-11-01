@@ -23,6 +23,9 @@ export interface GravarVinculo {
 /** Registro de um vínculo desfeito: para todos os efeitos o Colaborador está "Pendente". */
 export const vinculoDesfeito = ({ usuarioId, lojas }: Pick<VinculoColaborador, "usuarioId" | "lojas">): boolean => usuarioId === null && lojas.length === 0;
 
+/** Compara listas de códigos de Lojas, ambas em ordem crescente. */
+export const mesmasLojas = (a: number[], b: number[]): boolean => a.join() === b.join();
+
 /** A `version` armazenada não é a esperada (compare-and-set falhou). */
 export class VersaoDesatualizadaError extends Error {}
 

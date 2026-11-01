@@ -36,7 +36,7 @@ interface LojaOpcao {
 }
 
 interface Aviso {
-  tipo: string;
+  tipo: "usuario_desativado" | "inativo_no_erp" | "loja_nao_encontrada" | "colaborador_nao_encontrado";
   mensagem: string;
 }
 
@@ -70,6 +70,7 @@ type Rascunho = Valores & Pick<CamposVinculo, "version">;
 
 const iniciais = ({ usuarioId, lojas, sugestao }: CamposVinculo): Valores => sugestao ?? { usuarioId, lojas };
 const mesmasLojas = (a: number[], b: number[]) => a.length === b.length && a.every((codigo) => b.includes(codigo));
+const mudou = (a: Valores, b: Valores) => a.usuarioId !== b.usuarioId || !mesmasLojas(a.lojas, b.lojas);
 
 const naoEncontrado = (c: CamposVinculo) => c.avisos.some((a) => a.tipo === "colaborador_nao_encontrado");
 
@@ -197,8 +198,8 @@ export function ColaboradoresPage() {
   const { feedback } = useUi();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
-  // Edições ainda não gravadas, por Colaborador; ficam aqui porque a célula desmonta ao trocar de página.
   const [lojas, setLojas] = useState<LojaOpcao[]>([]);
+  // Edições ainda não gravadas, por Colaborador; ficam aqui porque a célula desmonta ao trocar de página.
   const [edicoes, setEdicoes] = useState<Record<number, Rascunho>>({});
   const [salvando, setSalvando] = useState<ReadonlySet<number>>(new Set());
   const [situacao, setSituacao] = useState<Situacao>("ativos");
@@ -340,7 +341,8 @@ export function ColaboradoresPage() {
         label: "Ação",
         render: (r) => {
           const valores = valoresDe(r);
-          const alterado = valores.usuarioId !== r.usuarioId || !mesmasLojas(valores.lojas, r.lojas);
+          // Comparar com o gravado: uma sugestão ainda não confirmada pode ser confirmada.
+          const alterado = mudou(valores, r);
           // Sem o Colaborador no ERP só se pode desfazer o vínculo.
           const bloqueado = naoEncontrado(r) && (valores.usuarioId !== null || valores.lojas.length > 0);
           return (
@@ -357,9 +359,7 @@ export function ColaboradoresPage() {
     colaboradores.some((c) => {
       // Comparar com os valores iniciais: uma sugestão não confirmada não é alteração pendente.
       const edicao = edicoes[c.codigoColaborador];
-      if (edicao === undefined) return false;
-      const inicial = iniciais(c);
-      return edicao.usuarioId !== inicial.usuarioId || !mesmasLojas(edicao.lojas, inicial.lojas);
+      return edicao !== undefined && mudou(edicao, iniciais(c));
     }),
   );
 

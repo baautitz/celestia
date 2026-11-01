@@ -2,9 +2,9 @@ import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
-import { VINCULO_ACTION, VINCULO_TARGET, type AuditService } from "./vinculo-audit.js";
+import { VINCULO_ACTION, VINCULO_PLUGIN, VINCULO_TARGET, type AuditService } from "./vinculo-audit.js";
 import { sugerirUsuarios } from "./sugestao-usuario.js";
-import { UsuarioJaVinculadoError, VersaoDesatualizadaError, vinculoDesfeito, type VinculoColaborador, type VinculoStore } from "./vinculo-store.js";
+import { UsuarioJaVinculadoError, VersaoDesatualizadaError, mesmasLojas, vinculoDesfeito, type VinculoColaborador, type VinculoStore } from "./vinculo-store.js";
 
 /** Forma do serviço `users` do Module `iam`; o Plugin não importa `@platform/server` (ADR 0002). */
 export interface UsuarioResumo {
@@ -37,7 +37,6 @@ export interface ColaboradoresRoutesDeps {
   store: VinculoStore;
   users: UsersService;
   audit: AuditService;
-  plugin: string;
 }
 
 type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
@@ -118,7 +117,7 @@ function avisosDoVinculo(vinculo: VinculoColaborador | null, colaborador: Colabo
 }
 
 /** Rotas de Colaboradores: listagem com o vínculo de cada um e gravação do vínculo por linha. */
-export function registerColaboradoresRoutes({ routes, permissions, auth, erpClient, store, users, audit, plugin }: ColaboradoresRoutesDeps): void {
+export function registerColaboradoresRoutes({ routes, permissions, auth, erpClient, store, users, audit }: ColaboradoresRoutesDeps): void {
   routes.get("/colaboradores", auth, async (c: AuthContext) => {
     const colaboradoresView = INOVAFARMA_PERMISSIONS.ref("colaboradores:view");
     if (!permissions.has(c.get("user")?.permissions, colaboradoresView.key)) {
@@ -217,7 +216,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
 
     // Sem mudança não é alteração: nada a gravar nem a auditar.
     const lojasAnteriores = atual?.lojas ?? [];
-    if ((atual?.usuarioId ?? null) === usuarioId && lojas.join() === lojasAnteriores.join()) return responder(atual);
+    if ((atual?.usuarioId ?? null) === usuarioId && mesmasLojas(lojas, lojasAnteriores)) return responder(atual);
 
     // Um Usuário já gravado pode ter sido desativado e continua aceito; só um novo precisa estar ativo.
     const novo = usuarios.find((u) => u.id === usuarioId);
@@ -240,7 +239,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     const auditado = (id: string | null | undefined) => (id ? { id, fullname: usuarios.find((u) => u.id === id)?.fullname ?? null } : null);
     const lojasAuditadas = (codigos: number[]) => codigos.map((codigo) => ({ codigo, nome: lojasErp.find((l) => l.codigo === codigo)?.nome ?? null }));
     await audit.record({
-      plugin,
+      plugin: VINCULO_PLUGIN,
       action: VINCULO_ACTION,
       actor: { id: user?.sub ?? "", name: user?.fullname ?? "" },
       target: { type: VINCULO_TARGET, id: String(codigoColaborador) },
