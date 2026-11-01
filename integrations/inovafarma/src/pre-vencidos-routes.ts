@@ -153,23 +153,14 @@ export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient
     const lojasErp = podeLancar || podeConferir ? await lojasDoErp(client) : [];
     const nomeLoja = (codigo: number) => lojasErp.find((l) => l.codigo === codigo)?.nome ?? "";
 
-    let colaboradores: { codigo: number; nome: string }[] = [];
-    if (podeConferir && client) {
-      try {
-        const rows = await client.query<{ codigoColaborador: number; nome: string | null }>(COLABORADORES_SQL);
-        colaboradores = rows.map((r) => ({ codigo: Number(r.codigoColaborador), nome: (r.nome || "").trim() })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-      } catch {
-        colaboradores = [];
-      }
-    }
-
     return c.json({
       podeLancar,
       podeConferir,
       vinculado: vinculo !== null,
-      periodos: todos.filter((p) => p.status === "open"),
+      // Todos os períodos: o Colaborador consulta os fechados, mas só lança, edita e exclui nos abertos.
+      periodos: todos,
       lojas: (vinculo?.lojas ?? []).map((codigo) => ({ codigo, nome: nomeLoja(codigo) })),
-      ...(podeConferir ? { periodosConferencia: todos, lojasConferencia: lojasErp, colaboradores } : {}),
+      ...(podeConferir ? { periodosConferencia: todos, lojasConferencia: lojasErp } : {}),
     });
   });
 
@@ -277,13 +268,12 @@ export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient
     if (!periodoId) return c.json({ error: "Parâmetro 'periodoId' é obrigatório." }, 400);
     const periodo = (await periods.list()).find((p) => p.id === periodoId);
     if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
-    const filtros = { codigoLoja: c.req.query("codigoLoja"), codigoColaborador: c.req.query("codigoColaborador") };
-    if (Object.values(filtros).some((v) => v !== undefined && v !== "" && !Number.isInteger(Number(v)))) {
-      return c.json({ error: "Os filtros 'codigoLoja' e 'codigoColaborador' devem ser números inteiros." }, 400);
+    const loja = c.req.query("codigoLoja");
+    if (loja !== undefined && loja !== "" && !Number.isInteger(Number(loja))) {
+      return c.json({ error: "O filtro 'codigoLoja' deve ser um número inteiro." }, 400);
     }
-    const numero = (v: string | undefined) => (v === undefined || v === "" ? undefined : Number(v));
 
-    const lancamentos = await store.listar({ periodoId, codigoLoja: numero(filtros.codigoLoja), codigoColaborador: numero(filtros.codigoColaborador) });
+    const lancamentos = await store.listar({ periodoId, codigoLoja: loja === undefined || loja === "" ? undefined : Number(loja) });
     if (lancamentos.length === 0) return c.json([]);
 
     const client = erpClient();

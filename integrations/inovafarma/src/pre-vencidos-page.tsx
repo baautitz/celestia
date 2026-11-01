@@ -21,18 +21,18 @@ interface Periodo {
   name: string;
   startDate: string;
   endDate: string;
+  status?: "open" | "closed";
 }
 
 interface Contexto {
   podeLancar: boolean;
   podeConferir: boolean;
   vinculado: boolean;
-  /** Closing Periods abertos, o de data mais recente primeiro. */
+  /** Closing Periods, o de data mais recente primeiro; só os abertos aceitam lançar, editar e excluir. */
   periodos: Periodo[];
   lojas: LojaOpcao[];
   periodosConferencia?: Periodo[];
   lojasConferencia?: LojaOpcao[];
-  colaboradores?: { codigo: number; nome: string }[];
 }
 
 interface DetalheConferencia {
@@ -56,7 +56,7 @@ interface LinhaConferencia {
 }
 
 const validadeLabel = (validade: string) => validade.split("-").reverse().join("/");
-const periodoLabel = (p: Periodo) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})`;
+const periodoLabel = (p: Periodo) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})${p.status === "closed" ? " · fechado" : ""}`;
 
 function SeletorPeriodo({ periodos, valor, onChange }: { periodos: Periodo[]; valor: string; onChange: (id: string) => void }) {
   return (
@@ -80,7 +80,8 @@ function SeletorPeriodo({ periodos, valor, onChange }: { periodos: Periodo[]; va
 
 function MeusLancamentos({ contexto }: { contexto: Contexto }) {
   const { feedback, windows } = useUi();
-  const [periodoId, setPeriodoId] = useState(contexto.periodos[0]?.id ?? "");
+  // Abre no período aberto de data mais recente; sem nenhum aberto, no mais recente.
+  const [periodoId, setPeriodoId] = useState((contexto.periodos.find((p) => p.status !== "closed") ?? contexto.periodos[0])?.id ?? "");
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [carregando, setCarregando] = useState(false);
 
@@ -115,11 +116,12 @@ function MeusLancamentos({ contexto }: { contexto: Contexto }) {
   if (contexto.periodos.length === 0) {
     return (
       <Alert>
-        <AlertTitle>Nenhum Período de Fechamento aberto</AlertTitle>
+        <AlertTitle>Nenhum Período de Fechamento</AlertTitle>
         <AlertDescription>Os lançamentos só podem ser feitos em um Período de Fechamento aberto.</AlertDescription>
       </Alert>
     );
   }
+  const aberto = contexto.periodos.find((p) => p.id === periodoId)?.status !== "closed";
 
   const abrir = async (lancamento?: Lancamento) => {
     const resultado = await windows.open<Lancamento>({
@@ -168,11 +170,17 @@ function MeusLancamentos({ contexto }: { contexto: Contexto }) {
     <Stack gap="section">
       <Stack direction="row" align="end" justify="between" gap="section" wrap>
         <SeletorPeriodo periodos={contexto.periodos} valor={periodoId} onChange={setPeriodoId} />
-        <Button onClick={() => void abrir()}>
+        <Button disabled={!aberto} onClick={() => void abrir()}>
           <Plus />
           Novo lançamento
         </Button>
       </Stack>
+      {!aberto && (
+        <Alert>
+          <AlertTitle>Período fechado</AlertTitle>
+          <AlertDescription>Neste período você só consulta os lançamentos. Para lançar, escolha um Período de Fechamento aberto.</AlertDescription>
+        </Alert>
+      )}
       <DataTable
         columns={colunas}
         rows={lancamentos}
@@ -181,7 +189,7 @@ function MeusLancamentos({ contexto }: { contexto: Contexto }) {
         title="Meus lançamentos"
         emptyMessage="Nenhum lançamento neste período."
         search={{ placeholder: "Buscar produto" }}
-        rowActions={(l) => (
+        rowActions={aberto ? (l) => (
           <Stack direction="row" gap="tight">
             <Button size="icon" variant="ghost" aria-label={`Editar ${l.nomeProduto}`} onClick={() => void abrir(l)}>
               <Pencil />
@@ -190,7 +198,7 @@ function MeusLancamentos({ contexto }: { contexto: Contexto }) {
               <Trash2 />
             </Button>
           </Stack>
-        )}
+        ) : undefined}
       />
     </Stack>
   );
@@ -205,7 +213,6 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
   const periodos = contexto.periodosConferencia ?? [];
   const [periodoId, setPeriodoId] = useState(periodos[0]?.id ?? "");
   const [loja, setLoja] = useState(TODAS);
-  const [colaborador, setColaborador] = useState(TODAS);
   const [linhas, setLinhas] = useState<LinhaConferencia[]>([]);
   const [carregando, setCarregando] = useState(false);
 
@@ -213,13 +220,12 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
     if (!periodoId) return;
     const consulta = new URLSearchParams({ periodoId });
     if (loja !== TODAS) consulta.set("codigoLoja", loja);
-    if (colaborador !== TODAS) consulta.set("codigoColaborador", colaborador);
     setCarregando(true);
     apiFetch<LinhaConferencia[]>(`${BASE}/conferencia?${consulta}`)
       .then(setLinhas)
       .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar a Conferência.")))
       .finally(() => setCarregando(false));
-  }, [periodoId, loja, colaborador, feedback]);
+  }, [periodoId, loja, feedback]);
 
   const colunas = useMemo<DataTableColumn<LinhaConferencia>[]>(
     () => [
@@ -258,22 +264,6 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
               {(contexto.lojasConferencia ?? []).map((l) => (
                 <SelectItem key={l.codigo} value={String(l.codigo)}>
                   {l.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Stack>
-        <Stack gap="field">
-          <Label>Colaborador</Label>
-          <Select value={colaborador} onValueChange={(v) => v && setColaborador(v)}>
-            <SelectTrigger aria-label="Colaborador">
-              <SelectValue>{(v: string) => (v === TODAS ? "Todos os Colaboradores" : (contexto.colaboradores ?? []).find((c) => String(c.codigo) === v)?.nome || "Selecione")}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODAS}>Todos os Colaboradores</SelectItem>
-              {(contexto.colaboradores ?? []).map((c) => (
-                <SelectItem key={c.codigo} value={String(c.codigo)}>
-                  {c.nome}
                 </SelectItem>
               ))}
             </SelectContent>

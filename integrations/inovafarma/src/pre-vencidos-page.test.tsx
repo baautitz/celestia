@@ -52,8 +52,21 @@ describe("Tela Pré-vencidos", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/lancamentos?periodoId=p-abril")));
   });
 
+  it("sem período aberto, abre no mais recente fechado só para consulta: não lança nem edita", async () => {
+    const fechado = { id: "p-maio", name: "Maio", startDate: "2027-05-01", endDate: "2027-05-31", status: "closed" };
+    apiFetch.mockImplementation(async (url: string) => {
+      if (url.includes("/contexto")) return contexto({ periodos: [fechado] });
+      if (url.includes("periodoId=p-maio")) return [{ id: "pv_9", nomeProduto: "DIPIRONA 500MG", codigoBarra: null, codigoLoja: 1, quantidade: 2, validade: "2027-08", version: 1, periodoId: "p-maio", produtoId: "g", nomeColaborador: "ANA" }];
+      return [];
+    });
+    render(<PreVencidosPage />);
+    await screen.findByText("DIPIRONA 500MG");
+    expect((screen.getByRole("button", { name: "Novo lançamento" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: /Editar DIPIRONA/ })).toBeNull();
+  });
+
   it("mostra a aba Conferência só para quem tem a Permission", async () => {
-    apiFetch.mockImplementation(async (url: string) => (url.includes("/contexto") ? contexto({ podeLancar: false, podeConferir: true, periodosConferencia: periodos, lojasConferencia: [], colaboradores: [] }) : []));
+    apiFetch.mockImplementation(async (url: string) => (url.includes("/contexto") ? contexto({ podeLancar: false, podeConferir: true, periodosConferencia: periodos, lojasConferencia: [] }) : []));
     render(<PreVencidosPage />);
     await screen.findByRole("tab", { name: "Conferência" });
     expect(screen.queryByRole("tab", { name: "Meus Lançamentos" })).toBeNull();

@@ -77,15 +77,24 @@ async function boot() {
 type Lancamento = { id: string; version: number; nomeProduto: string; quantidade: number; [k: string]: unknown };
 
 describe("Lançamento de Pré-vencidos", () => {
-  it("o contexto traz só os Closing Periods abertos, o de data mais recente primeiro, e as Lojas do Vínculo", async () => {
+  it("o contexto traz os Closing Periods abertos e fechados, para consultar os fechados, e as Lojas do Vínculo", async () => {
     const { req, marco, abril } = await boot();
     await req("adm", "POST", `/api/closing-periods/${marco.id}/close`);
-    const aberto = await (await req("ana", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
-    expect(aberto.periodos.map((p: { id: string }) => p.id)).toEqual([abril.id]);
-    expect(aberto.lojas).toEqual([{ codigo: 1, nome: "Centro" }]);
+    const contexto = await (await req("ana", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
+    expect(contexto.periodos.map((p: { id: string; status: string }) => [p.id, p.status])).toEqual([[abril.id, "open"], [marco.id, "closed"]]);
+    expect(contexto.lojas).toEqual([{ codigo: 1, nome: "Centro" }]);
   });
 
-  it("ordena os abertos pela data de início, não pela criação", async () => {
+  it("lista os lançamentos de um período fechado, só para consulta", async () => {
+    const { lancar, req, abril } = await boot();
+    await lancar("ana", {});
+    await req("adm", "POST", `/api/closing-periods/${abril.id}/close`);
+    const lista = (await (await req("ana", "GET", `/api/m/inovafarma/pre-vencidos/lancamentos?periodoId=${abril.id}`)).json()) as Lancamento[];
+    expect(lista).toHaveLength(1);
+    expect((await lancar("ana", {})).status).toBe(409);
+  });
+
+  it("ordena os períodos pela data de início, não pela criação", async () => {
     const { req, marco, abril } = await boot();
     const { periodos } = await (await req("bia", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
     expect(periodos.map((p: { id: string }) => p.id)).toEqual([abril.id, marco.id]);
@@ -175,15 +184,13 @@ describe("Conferência de Pré-vencidos", () => {
     expect(JSON.stringify(linhas)).not.toContain(String(CODIGO_PRODUTO_SECRETO));
   });
 
-  it("filtra por Loja e por Colaborador", async () => {
+  it("filtra por Loja", async () => {
     const { lancar, req, abril } = await boot();
     vendas = [];
     await lancar("ana", {});
     await lancar("bia", { codigoLoja: 2 });
     const porLoja = (await (await req("ger", "GET", `/api/m/inovafarma/pre-vencidos/conferencia?periodoId=${abril.id}&codigoLoja=2`)).json()) as { codigoColaborador: number }[];
     expect(porLoja.map((l) => l.codigoColaborador)).toEqual([8]);
-    const porColaborador = (await (await req("ger", "GET", `/api/m/inovafarma/pre-vencidos/conferencia?periodoId=${abril.id}&codigoColaborador=7`)).json()) as { codigoColaborador: number }[];
-    expect(porColaborador.map((l) => l.codigoColaborador)).toEqual([7]);
   });
 
   it("recusa filtro que não é número, em vez de ignorá-lo", async () => {
