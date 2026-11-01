@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
+import { sugerirUsername } from "./username-sugerido";
 
 export interface GrupoOpcao {
   id: string;
@@ -36,8 +38,15 @@ export function CriarUsuarioWindow({ fullname, grupos }: { fullname: string; gru
   const { feedback } = useUi();
   const form = useForm<Valores>({
     resolver: zodResolver(schema),
-    defaultValues: { fullname, username: "", password: "", roleId: grupos[0]?.id ?? "" },
+    defaultValues: { fullname, username: sugerirUsername(fullname), password: "", roleId: "" },
   });
+
+  // O username acompanha o Nome Completo até ser digitado à mão.
+  const nomeCompleto = form.watch("fullname");
+  const { dirtyFields } = form.formState;
+  useEffect(() => {
+    if (!dirtyFields.username) form.setValue("username", sugerirUsername(nomeCompleto));
+  }, [nomeCompleto, dirtyFields.username, form]);
 
   const onSubmit = async (valores: Valores) => {
     try {

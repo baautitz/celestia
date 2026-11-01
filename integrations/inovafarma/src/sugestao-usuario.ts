@@ -1,7 +1,7 @@
 /** Partículas de nome: não contam como nome em comum. */
 const PARTICULAS = new Set(["de", "da", "do", "das", "dos", "e"]);
 
-function nomesDe(nome: string): string[] {
+export function nomesDe(nome: string): string[] {
   const normalizado = nome.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   return normalizado.split(/[^\p{L}\p{N}]+/u).filter((n) => n !== "" && !PARTICULAS.has(n));
 }
