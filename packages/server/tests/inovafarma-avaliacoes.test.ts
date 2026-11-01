@@ -14,9 +14,13 @@ const LOJAS = [
   { codigoEmpresa: 2, nome: "Bairro" },
 ];
 const COLABORADORES = [
-  { codigoColaborador: 7, nome: "ANA SOUZA", ativo: true },
-  { codigoColaborador: 8, nome: "BIA LIMA", ativo: true },
-  { codigoColaborador: 9, nome: "GIL GERENTE", ativo: true },
+  { codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, codigoEmpresa: 1 },
+  // Vinculada à Loja 2: o Vínculo vale mais que a Loja do ERP.
+  { codigoColaborador: 8, nome: "BIA LIMA", ativo: true, codigoEmpresa: 1 },
+  { codigoColaborador: 9, nome: "GIL GERENTE", ativo: true, codigoEmpresa: 1 },
+  // Sem Vínculo: valem a Loja do ERP e o estado no ERP.
+  { codigoColaborador: 10, nome: "CAIO SEM VINCULO", ativo: true, codigoEmpresa: 1 },
+  { codigoColaborador: 11, nome: "DORA INATIVA", ativo: false, codigoEmpresa: 1 },
 ];
 
 const erp: ErpClient = {
@@ -91,11 +95,21 @@ describe("Avaliações do Colaborador", () => {
     expect((await lancar("ana")).status).toBe(403);
 
     const colaboradores = await (await req("gil", "GET", "/api/m/inovafarma/avaliacoes/colaboradores")).json();
-    expect(colaboradores).toEqual([{ codigoColaborador: 7, nome: "ANA SOUZA", usuario: "ana", lojas: [1] }]);
+    expect(colaboradores).toEqual([
+      { codigoColaborador: 7, nome: "ANA SOUZA", usuario: "ana", lojas: [1] },
+      { codigoColaborador: 10, nome: "CAIO SEM VINCULO", usuario: null, lojas: [1] },
+    ]);
 
     expect((await lancar("rh", { codigoColaborador: 8, codigoLoja: 2 })).status).toBe(201);
     expect(await (await req("gil", "GET", `/api/m/inovafarma/avaliacoes?periodoId=${abril.id}`)).json()).toEqual([]);
     expect(await (await req("rh", "GET", `/api/m/inovafarma/avaliacoes?periodoId=${abril.id}`)).json()).toMatchObject([{ nomeColaborador: "BIA LIMA", lancadoPor: "rh" }]);
+  });
+
+  it("avalia Colaborador ativo sem Vínculo pela Loja do ERP, mas não o inativo sem Vínculo", async () => {
+    const { lancar } = await boot();
+    expect(await (await lancar("gil", { codigoColaborador: 10 })).json()).toMatchObject({ nomeColaborador: "CAIO SEM VINCULO", codigoLoja: 1 });
+    expect((await lancar("gil", { codigoColaborador: 11 })).status).toBe(403);
+    expect((await lancar("gil", { codigoColaborador: 10, codigoLoja: 2 })).status).toBe(403);
   });
 
   it("edita descrição e valor com controle de version e não altera em período fechado", async () => {

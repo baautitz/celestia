@@ -7,7 +7,7 @@ import { COLABORADORES_SQL, LOJAS_SQL, type UsersService } from "./colaboradores
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { PeriodoResumo, PeriodsService } from "./pre-vencidos-routes.js";
 import type { AuditService } from "./vinculo-audit.js";
-import { vinculoDesfeito, type VinculoColaborador, type VinculoStore } from "./vinculo-store.js";
+import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
 
 interface ErpQuery {
   query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
@@ -23,6 +23,20 @@ export interface AvaliacoesRoutesDeps {
   users: UsersService;
   periods: PeriodsService;
   audit: AuditService;
+}
+
+interface LinhaColaborador {
+  codigoColaborador: number;
+  nome: string | null;
+  ativo: boolean | number;
+  codigoEmpresa: number;
+}
+
+/** Colaborador que pode receber Avaliação, com as Lojas que contam para quem gerencia. */
+interface Elegivel {
+  codigoColaborador: number;
+  nome: string;
+  lojas: number[];
 }
 
 type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
@@ -71,10 +85,32 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     }
   };
 
-  /** Colaboradores que o Usuário pode avaliar: vinculados a uma Loja que ele gerencia, menos ele mesmo. */
-  const elegiveis = async (c: AuthContext, lojas: number[] | undefined): Promise<VinculoColaborador[]> => {
+  /**
+   * Colaboradores que o Usuário pode avaliar, menos ele mesmo: os de uma Loja que ele gerencia.
+   * A Loja vem do Vínculo salvo; sem Vínculo (ou sem Loja nele), da Loja do Colaborador ativo no ERP.
+   * `null` quando o ERP não responde.
+   */
+  const elegiveis = async (c: AuthContext, lojas: number[] | undefined): Promise<Elegivel[] | null> => {
+    let erp: LinhaColaborador[] = [];
+    const client = erpClient();
+    if (client) {
+      try {
+        erp = await client.query<LinhaColaborador>(COLABORADORES_SQL);
+      } catch {
+        return null;
+      }
+    }
+    const salvos = new Map((await vinculos.list()).filter((v) => v.lojas.length > 0).map((v) => [v.codigoColaborador, v]));
+    const doErp = erp.map((r) => {
+      const codigoColaborador = Number(r.codigoColaborador);
+      const nome = (r.nome || "").trim();
+      const salvo = salvos.get(codigoColaborador);
+      return { codigoColaborador, nome, lojas: salvo ? salvo.lojas : r.ativo ? [Number(r.codigoEmpresa)] : [] };
+    });
+    const noErp = new Set(doErp.map((e) => e.codigoColaborador));
+    const sumidos = [...salvos.values()].filter((v) => !noErp.has(v.codigoColaborador)).map((v) => ({ codigoColaborador: v.codigoColaborador, nome: "", lojas: v.lojas }));
     const proprio = (await vinculoDe(c))?.codigoColaborador;
-    return (await vinculos.list()).filter((v) => v.codigoColaborador !== proprio && v.lojas.some((l) => gerencia(lojas, l)));
+    return [...doErp, ...sumidos].filter((e) => e.codigoColaborador !== proprio && e.lojas.some((l) => gerencia(lojas, l)));
   };
 
   const registrar = (c: AuthContext, action: string, alvo: Avaliacao, periodo: PeriodoResumo | undefined, anterior: AtributosAvaliacao["anterior"] = null) => {
@@ -132,24 +168,15 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     if (!podeGerenciar(c)) return c.json({ error: porLoja.deniedMessage }, 403);
     const lojas = await lojasGerenciadas(c);
     const lista = await elegiveis(c, lojas);
-    if (lista.length === 0) return c.json([]);
-    const client = erpClient();
-    let nomes = new Map<number, string>();
-    if (client) {
-      try {
-        const rows = await client.query<{ codigoColaborador: number; nome: string | null }>(COLABORADORES_SQL);
-        nomes = new Map(rows.map((r) => [Number(r.codigoColaborador), (r.nome || "").trim()]));
-      } catch {
-        return c.json({ error: ERP_INDISPONIVEL }, 503);
-      }
-    }
-    const usuarios = await users.list();
+    if (lista === null) return c.json({ error: ERP_INDISPONIVEL }, 503);
+    const [usuarios, todos] = await Promise.all([users.list(), vinculos.list()]);
+    const vinculoPorCodigo = new Map(todos.map((v) => [v.codigoColaborador, v]));
     return c.json(
       lista
         .map((v) => ({
           codigoColaborador: v.codigoColaborador,
-          nome: nomes.get(v.codigoColaborador) || `Colaborador cód. ${v.codigoColaborador}`,
-          usuario: usuarios.find((u) => u.id === v.usuarioId)?.username ?? null,
+          nome: v.nome || `Colaborador cód. ${v.codigoColaborador}`,
+          usuario: usuarios.find((u) => u.id === vinculoPorCodigo.get(v.codigoColaborador)?.usuarioId)?.username ?? null,
           lojas: v.lojas.filter((l) => gerencia(lojas, l)),
         }))
         .sort((a, b) => a.nome.localeCompare(b.nome)),
@@ -180,28 +207,19 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     const lojas = await lojasGerenciadas(c);
     if (!gerencia(lojas, codigoLoja)) return c.json({ error: LOJA_FORA }, 403);
     if ((await vinculoDe(c))?.codigoColaborador === codigoColaborador) return c.json({ error: "Você não pode lançar uma Avaliação para si mesmo." }, 403);
-    const colaborador = (await elegiveis(c, lojas)).find((v) => v.codigoColaborador === codigoColaborador);
-    if (!colaborador?.lojas.includes(codigoLoja)) return c.json({ error: "O Colaborador não está vinculado à Loja informada." }, 403);
+    const lista = await elegiveis(c, lojas);
+    if (lista === null) return c.json({ error: ERP_INDISPONIVEL }, 503);
+    const colaborador = lista.find((v) => v.codigoColaborador === codigoColaborador);
+    if (!colaborador?.lojas.includes(codigoLoja)) return c.json({ error: "O Colaborador não é da Loja informada." }, 403);
 
     const periodo = (await periods.list()).find((p) => p.id === periodoId);
     if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
     if (periodo.status !== "open") return c.json({ error: PERIODO_FECHADO }, 409);
 
-    let nome = "";
-    const client = erpClient();
-    if (client) {
-      try {
-        const [linha] = await client.query<{ nome: string | null }>(`${COLABORADORES_SQL} AND f.CodigoFuncionario = @codigo`, { codigo: codigoColaborador });
-        nome = (linha?.nome ?? "").trim();
-      } catch {
-        return c.json({ error: ERP_INDISPONIVEL }, 503);
-      }
-    }
-
     const criada = await store.criar({
       periodoId,
       codigoColaborador,
-      nomeColaborador: nome || `Colaborador cód. ${codigoColaborador}`,
+      nomeColaborador: colaborador.nome || `Colaborador cód. ${codigoColaborador}`,
       codigoLoja,
       descricao,
       valorCentavos: centavos(valor),
