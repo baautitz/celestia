@@ -136,6 +136,7 @@ export const AppLayout: React.FC = () => {
                       <entry.icon />
                       <Text>{entry.label}</Text>
                     </SidebarMenuButton>
+                    {entry.badge && <entry.badge />}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
