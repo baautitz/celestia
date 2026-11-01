@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, UserPlus } from "lucide-react";
 import { avisarVinculoAlterado } from "./colaboradores-badge";
-import { CriarUsuarioWindow, type GrupoOpcao } from "./criar-usuario-window";
+import { sugerirUsername } from "./username-sugerido";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button, MultiValueButton } from "@platform/ui/components/button";
@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useLeaveGuard } from "@platform/ui/adapters/leave-guard";
 import { HeaderActions } from "@platform/ui/context/header-actions";
+import { useWebService } from "@platform/ui/contracts/web-services";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch, ApiError } from "@platform/ui/lib/api";
 
@@ -27,6 +28,11 @@ interface UsuarioOpcao {
   id: string;
   fullname: string;
   username: string;
+}
+
+/** Forma do serviço `iam:users` do módulo web IAM; o Plugin não importa `@platform/web`. */
+interface UsuariosWebService {
+  openCreate(windows: ReturnType<typeof useUi>["windows"], options: { fullname?: string; suggestUsername?: (fullname: string) => string }): Promise<UsuarioOpcao | null>;
 }
 
 interface LojaOpcao {
@@ -181,6 +187,7 @@ function LojasSelect({
 /** Página Colaboradores: lista os Colaboradores do ERP e grava de uma vez os vínculos editados. */
 export function ColaboradoresPage() {
   const { feedback, windows } = useUi();
+  const usuariosIam = useWebService<UsuariosWebService>("iam", "users");
   const [podeCriarUsuario, setPodeCriarUsuario] = useState(false);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
@@ -316,16 +323,10 @@ export function ColaboradoresPage() {
     // O Usuário criado entra só como rascunho: o vínculo continua dependendo de confirmar a linha.
     const criarUsuario = async (r: Colaborador) => {
       try {
-        const grupos = await apiFetch<GrupoOpcao[]>("/api/iam/roles");
-        const resultado = await windows.open<UsuarioOpcao>({
-          surface: "dialog",
-          size: "small",
-          title: "Criar Usuário",
-          description: `Crie o Usuário de ${r.nome}.`,
-          content: () => <CriarUsuarioWindow fullname={r.nome} grupos={grupos} />,
-        });
-        if (resultado.status !== "confirmed") return;
-        const criado = resultado.value;
+        // O mesmo cadastro da tela Usuários, oferecido pelo módulo IAM.
+        const usuario = await usuariosIam.openCreate(windows, { fullname: r.nome, suggestUsername: sugerirUsername });
+        if (!usuario) return;
+        const criado = { id: usuario.id, fullname: usuario.fullname, username: usuario.username };
         setUsuarios((atual) => [...atual, criado].sort((a, b) => a.fullname.localeCompare(b.fullname, "pt-BR")));
         editar(r, { usuarioId: criado.id });
       } catch (err: unknown) {
@@ -411,7 +412,7 @@ export function ColaboradoresPage() {
         ),
       },
     ];
-  }, [edicoes, falhas, limparFalha, lojas, opcoes, salvando, podeCriarUsuario, windows, feedback]);
+  }, [edicoes, falhas, limparFalha, lojas, opcoes, salvando, podeCriarUsuario, windows, feedback, usuariosIam]);
 
   useLeaveGuard(
     colaboradores.some((c) => {

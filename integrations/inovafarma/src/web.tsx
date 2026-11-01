@@ -746,6 +746,8 @@ function VendasComissoesPage() {
 /** Tela e item de menu do Plugin InovaFarma na seção Relatórios. */
 export const inovafarmaWebModule = defineWebModule({
   id: "inovafarma",
+  // Colaboradores cria Usuário pelo cadastro do IAM (serviço `iam:users`).
+  dependsOn: ["iam"],
   sections: [{ id: "inovafarma", label: "InovaFarma", order: 250 }],
   entries: [
     {
