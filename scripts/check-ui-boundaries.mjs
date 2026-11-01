@@ -14,6 +14,8 @@ const forbiddenTags = new Set([
   "picture", "video", "audio", "canvas", "blockquote", "br", "fieldset", "legend", "details", "summary",
 ])
 const allowedButtonSizes = new Set(["default", "icon"])
+/** Campos de data e hora nativos do navegador: a biblioteca tem DatePicker e DateRangePicker. */
+const nativeDateInputTypes = new Set(["date", "month", "week", "time", "datetime-local"])
 const violations = []
 
 for await (const rel of glob("{packages/*/src/**/*.{ts,tsx},integrations/**/*.{ts,tsx}}", { cwd: root })) {
@@ -65,6 +67,13 @@ for await (const rel of glob("{packages/*/src/**/*.{ts,tsx},integrations/**/*.{t
         if (!ts.isJsxAttribute(attr)) continue
         const name = attr.name.getText(source)
         if (name === "className" || name === "style") report(attr, `${name} em JSX fora de @platform/ui`)
+        if (name === "type" && /^[Ii]nput$/.test(tag)) {
+          const init = attr.initializer
+          const expr = init && ts.isJsxExpression(init) ? init.expression : init
+          if (expr && ts.isStringLiteralLike(expr) && nativeDateInputTypes.has(expr.text)) {
+            report(attr, `<${tag} type="${expr.text}"> nativo (use DatePicker, DateRangePicker ou MonthPicker de @platform/ui/components/*)`)
+          }
+        }
         if (/(^|[a-z])Button$/.test(tag) && name === "size") {
           const init = attr.initializer
           const expr = init && ts.isJsxExpression(init) ? init.expression : init

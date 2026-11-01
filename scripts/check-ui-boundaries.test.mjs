@@ -56,6 +56,16 @@ function runTest() {
       "",
     ].join("\n"),
   )
+  writeFileSync(
+    join(src, "native-date.tsx"),
+    [
+      'import { Input } from "@platform/ui/components/input"',
+      'export const A = () => <Input type="month" />',
+      'export const B = () => <Input type="text" />',
+      'export const C = () => <Input type="date" />',
+      "",
+    ].join("\n"),
+  )
   mkdirSync(join(root, "integrations/acme/scripts"), { recursive: true })
   writeFileSync(join(root, "integrations/acme/scripts/tool.tsx"), 'import { toast } from "sonner"\nexport const a = toast\n')
   for (const [name, content] of Object.entries(cases)) writeFileSync(join(src, name), content)
@@ -84,6 +94,8 @@ function runTest() {
   assert.match(out, /className/)
   assert.match(out, /style/)
   assert.doesNotMatch(out, /sizes\.tsx:[345] /, "size icon/default/omitido devem passar")
+  for (const line of [2, 4]) assert.match(out, new RegExp(`packages/web/src/native-date\\.tsx:${line} `), `native-date:${line} nao citado`)
+  assert.doesNotMatch(out, /native-date\.tsx:3 /, "type text deve passar")
   assert.match(out, /open declarativo/)
   assert.match(out, /onOpenChange declarativo/)
 
