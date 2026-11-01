@@ -15,6 +15,13 @@ export class DeviceNotFoundError extends Error {
   }
 }
 
+export class DeviceStillActiveError extends Error {
+  constructor() {
+    super("Revogue o Dispositivo antes de excluí-lo.");
+    this.name = "DeviceStillActiveError";
+  }
+}
+
 export type CertificateExchange =
   | { granted: true; userId: string; deviceId: string; deviceName: string }
   /** `userId` só vem quando o desafio existia. */
@@ -29,6 +36,8 @@ export interface CertificateAuthorityClient {
   getDevice(id: string): Promise<Device | null>;
   issueDevice(input: { name: string; createdBy?: string }): Promise<IssuedDevice>;
   revokeDevice(id: string, revokedBy?: string): Promise<Device>;
+  /** Apaga um Dispositivo já revogado; um ativo lança `DeviceStillActiveError`. */
+  deleteDevice(id: string): Promise<void>;
   /** Abre o desafio do login do usuário e devolve o link da CA onde o navegador apresenta o certificado. */
   createChallenge(userId: string): Promise<{ challengeId: string; verifyUrl: string }>;
   exchangeChallenge(input: { challengeId: string; code?: string }): Promise<CertificateExchange>;
@@ -60,7 +69,7 @@ export class HttpCertificateAuthorityClient implements CertificateAuthorityClien
     this.doFetch = doFetch;
   }
 
-  private async call(method: "GET" | "POST", path: string, body?: unknown): Promise<Response> {
+  private async call(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<Response> {
     let res: Response;
     try {
       res = await this.doFetch(`${this.baseUrl}${path}`, {
@@ -100,6 +109,12 @@ export class HttpCertificateAuthorityClient implements CertificateAuthorityClien
     return (await res.json()) as Device;
   }
 
+  async deleteDevice(id: string): Promise<void> {
+    const res = await this.call("DELETE", `/devices/${encodeURIComponent(id)}`);
+    if (res.status === 404) throw new DeviceNotFoundError();
+    if (res.status === 409) throw new DeviceStillActiveError();
+  }
+
   async createChallenge(userId: string): Promise<{ challengeId: string; verifyUrl: string }> {
     return (await (await this.call("POST", "/challenges", { userId })).json()) as { challengeId: string; verifyUrl: string };
   }
@@ -118,6 +133,7 @@ export const unavailableCertificateAuthority: CertificateAuthorityClient = {
   getDevice: () => Promise.reject(new CertificateAuthorityUnavailableError()),
   issueDevice: () => Promise.reject(new CertificateAuthorityUnavailableError()),
   revokeDevice: () => Promise.reject(new CertificateAuthorityUnavailableError()),
+  deleteDevice: () => Promise.reject(new CertificateAuthorityUnavailableError()),
   createChallenge: () => Promise.reject(new CertificateAuthorityUnavailableError()),
   exchangeChallenge: () => Promise.reject(new CertificateAuthorityUnavailableError()),
 };

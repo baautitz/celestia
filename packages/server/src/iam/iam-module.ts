@@ -13,7 +13,7 @@ import { getAuthenticatedUser, requirePermission } from "./middleware.js";
 import { hasPermission } from "./has-permission.js";
 import type { TokenService } from "./token-service.js";
 import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
-import { CertificateAuthorityUnavailableError, DeviceNotFoundError, type CertificateAuthorityClient } from "./certificate-authority-client.js";
+import { CertificateAuthorityUnavailableError, DeviceNotFoundError, DeviceStillActiveError, type CertificateAuthorityClient } from "./certificate-authority-client.js";
 import type { AuditLog } from "../audit/audit-log.js";
 import { DEVICE_AUDIT_TARGET, IAM_AUDIT_PLUGIN, USER_AUDIT_TARGET, declareIamAudit } from "./iam-audit.js";
 import { LoginRateLimiter } from "./login-rate-limiter.js";
@@ -300,7 +300,7 @@ export function createIamModule({
 
       // ───────── Dispositivos ─────────
       const DeviceBody = z.object({ name: z.string().trim().min(1).max(100) });
-      const auditDevice = (c: Context, action: "issue_device" | "revoke_device", device: { id: string; name: string }) =>
+      const auditDevice = (c: Context, action: "issue_device" | "revoke_device" | "delete_device", device: { id: string; name: string }) =>
         recordIamAudit(requestActor(c), action, { type: DEVICE_AUDIT_TARGET, id: device.id }, { name: device.name });
 
       const unavailable = (c: Context, err: unknown) => {
@@ -346,6 +346,24 @@ export function createIamModule({
           if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
           if (err instanceof CertificateAuthorityUnavailableError) return unavailable(c, err);
           return c.json({ error: failure(err, "Erro ao revogar o Dispositivo.") }, 400);
+        }
+      });
+
+      // Excluir apaga o registro de um Dispositivo já revogado: só Administrador.
+      routes.delete("/iam/devices/:id", auth, async (c) => {
+        if (!getAuthenticatedUser(c).isAdmin) return c.json({ error: "Somente administradores podem excluir Dispositivos." }, 403);
+        const id = c.req.param("id");
+        try {
+          const device = await certificateAuthority.getDevice(id);
+          if (!device) return c.json({ error: new DeviceNotFoundError().message }, 404);
+          await certificateAuthority.deleteDevice(id);
+          await auditDevice(c, "delete_device", device);
+          return c.json({ success: true });
+        } catch (err: unknown) {
+          if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
+          if (err instanceof DeviceStillActiveError) return c.json({ error: err.message }, 409);
+          if (err instanceof CertificateAuthorityUnavailableError) return unavailable(c, err);
+          return c.json({ error: failure(err, "Erro ao excluir o Dispositivo.") }, 400);
         }
       });
 

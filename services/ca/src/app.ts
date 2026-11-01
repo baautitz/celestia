@@ -4,7 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { DeviceCertificateAuthority } from "./authority.js";
 import { ChallengeStore } from "./challenge-store.js";
-import { DeviceNotFoundError, type DeviceStore } from "./device-store.js";
+import { DeviceNotFoundError, DeviceStillActiveError, type DeviceStore } from "./device-store.js";
 
 export const MIN_SHARED_SECRET_LENGTH = 32;
 
@@ -88,6 +88,17 @@ export function createCaApp({
       return c.json(await deviceStore.revoke(c.req.param("id"), c.req.valid("json").revokedBy));
     } catch (err: unknown) {
       if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
+      throw err;
+    }
+  });
+
+  app.delete("/devices/:id", api, async (c) => {
+    try {
+      await deviceStore.delete(c.req.param("id"));
+      return c.json({ success: true });
+    } catch (err: unknown) {
+      if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
+      if (err instanceof DeviceStillActiveError) return c.json({ error: err.message }, 409);
       throw err;
     }
   });

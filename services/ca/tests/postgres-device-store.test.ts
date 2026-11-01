@@ -3,7 +3,7 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
 import type { Pool } from "pg";
 import { assertMigrationsUpToDate, runModuleMigrations } from "@platform/core/migrations";
-import { DeviceNotFoundError, DuplicateDeviceFingerprintError } from "../src/device-store.js";
+import { DeviceNotFoundError, DeviceStillActiveError, DuplicateDeviceFingerprintError } from "../src/device-store.js";
 import { CA_MIGRATIONS } from "../src/migrations.js";
 import { PostgresDeviceStore } from "../src/postgres-device-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
@@ -58,5 +58,15 @@ describe.skipIf(!dbTestsEnabled)("Dispositivos contra Postgres real", () => {
     await store.create(input(1));
     await expect(store.create({ ...input(2), fingerprint: input(1).fingerprint })).rejects.toBeInstanceOf(DuplicateDeviceFingerprintError);
     await expect(store.revoke("nao-existe")).rejects.toBeInstanceOf(DeviceNotFoundError);
+  });
+
+  it("exclui só Dispositivo revogado", async () => {
+    const store = new PostgresDeviceStore(db);
+    const device = await store.create(input(1));
+    await expect(store.delete(device.id)).rejects.toBeInstanceOf(DeviceStillActiveError);
+    await store.revoke(device.id);
+    await store.delete(device.id);
+    expect(await store.findById(device.id)).toBeNull();
+    await expect(store.delete(device.id)).rejects.toBeInstanceOf(DeviceNotFoundError);
   });
 });
