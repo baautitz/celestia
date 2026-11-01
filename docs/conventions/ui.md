@@ -17,6 +17,8 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
   - `Stack iconTone="primary"`: colore em `primary` o ícone filho direto (ex.: ícone ao lado de um título).
   - `Stack surface="banner"`: faixa de título sem borda, com fundo suave.
   - `Stack narrow`: limita a largura a `max-w-sm` para formulários e blocos estreitos.
+  - `ComboboxChipsResumidos`: mostra os chips que cabem no combobox de múltipla escolha e resume os demais em `+N`, com os nomes no `title`.
+  - `ComboboxInput inTableCell` e `ComboboxChips inTableCell`: fixam a largura do combobox para edição dentro de uma célula de tabela.
   - `CenteredNotice`: aviso centralizado dentro da área autenticada (ex.: acesso negado); `CenteredScreen` é para telas cheias fora dela.
 - Tema: somente claro (sem theme provider).
 - Fronteira: fora de `packages/ui`, `pnpm check:ui` proíbe importar `sonner`, `@base-ui/react/*` e `@/components/ui`, e `open=`/`onOpenChange=` declarativos em Dialog/Sheet/AlertDialog/Popover.

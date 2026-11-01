@@ -13,6 +13,7 @@ Cada **Module** com persistência em Postgres declara:
    - `audit` → schema `audit` (`audit.audit_log_entries` + trigger append-only)
    - `closing_period` → schema `closing_period` (`closing_period.periods`)
    - `erp` → schema `erp` (`erp.erps`)
+   - `inovafarma` → schema `inovafarma` (`inovafarma.vinculos_colaborador`), do Plugin em `integrations/inovafarma`
 2. Sua própria pasta `src/<module>/migrations/` referenciada no `defineModule({ ..., migrations })`.
 3. Uma tabela de controle isolada em `drizzle.__migrations_<moduleId>`, gerenciada por `runModuleMigrations` (`@platform/core/migrations`).
 
@@ -44,7 +45,7 @@ Para aplicar todas as migrations na ordem do grafo de dependências (`migrationP
 pnpm db:migrate
 ```
 
-- Em um banco vazio, cria os schemas `iam`, `audit`, `closing_period` e `erp`, todas as tabelas e semeia os **Roles** iniciais.
+- Em um banco vazio, cria os schemas `iam`, `audit`, `closing_period`, `erp` e `inovafarma`, todas as tabelas e semeia os **Roles** iniciais.
 - Rodar `pnpm db:migrate` novamente quando tudo já está aplicado é idempotente e não executa nenhuma alteração.
 
 ---
