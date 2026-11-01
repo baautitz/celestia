@@ -46,7 +46,7 @@ export class PostgresVinculoStore implements VinculoStore {
               .returning()
           : await this.db
               .update(vinculosColaborador)
-              .set({ usuarioId: input.usuarioId, atualizadoPor: input.atualizadoPor, version: expectedVersion + 1, atualizadoEm })
+              .set({ usuarioId: input.usuarioId, lojas: input.lojas, atualizadoPor: input.atualizadoPor, version: expectedVersion + 1, atualizadoEm })
               .where(and(eq(vinculosColaborador.codigoColaborador, input.codigoColaborador), eq(vinculosColaborador.version, expectedVersion)))
               .returning();
     } catch (err: unknown) {

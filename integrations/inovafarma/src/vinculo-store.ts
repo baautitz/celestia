@@ -3,6 +3,8 @@ export interface VinculoColaborador {
   codigoColaborador: number;
   /** Referência lógica a `iam.users`, sem FK entre Modules. */
   usuarioId: string | null;
+  /** Códigos das Lojas onde trabalha, em ordem crescente; zero ou mais, sem Loja principal. */
+  lojas: number[];
   version: number;
   atualizadoPor: string;
   atualizadoEm: string;
@@ -11,6 +13,7 @@ export interface VinculoColaborador {
 export interface GravarVinculo {
   codigoColaborador: number;
   usuarioId: string | null;
+  lojas: number[];
   atualizadoPor: string;
 }
 

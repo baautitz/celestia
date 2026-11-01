@@ -1,0 +1,1 @@
+ALTER TABLE "inovafarma"."vinculos_colaborador" ADD COLUMN "lojas" integer[] DEFAULT '{}'::integer[] NOT NULL;
