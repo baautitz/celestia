@@ -120,7 +120,9 @@
           "inovafarma:vendas-loja:view",
           "inovafarma:vendas-individual:view",
           "inovafarma:colaboradores:view",
-          "inovafarma:colaboradores:update"
+          "inovafarma:colaboradores:update",
+          "inovafarma:pre-vencidos-lancamento:manage",
+          "inovafarma:pre-vencidos-conferencia:view"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -305,7 +307,9 @@
         "inovafarma:vendas-loja:view",
         "inovafarma:vendas-individual:view",
         "inovafarma:colaboradores:view",
-        "inovafarma:colaboradores:update"
+        "inovafarma:colaboradores:update",
+        "inovafarma:pre-vencidos-lancamento:manage",
+        "inovafarma:pre-vencidos-conferencia:view"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -501,6 +505,20 @@
             "label": "Alterar vínculos de Colaboradores",
             "description": "Permite vincular, alterar e desfazer o vínculo de um Colaborador do InovaFarma.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para alterar os vínculos dos Colaboradores do InovaFarma.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pre-vencidos-lancamento:manage",
+            "label": "Lançar Pré-vencidos",
+            "description": "Permite lançar, editar e excluir os próprios Lançamentos de Pré-vencidos no Closing Period aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para lançar Pré-vencidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pre-vencidos-conferencia:view",
+            "label": "Conferir Pré-vencidos",
+            "description": "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
             "module": "inovafarma"
           }
         ]
@@ -699,6 +717,20 @@
             "label": "Alterar vínculos de Colaboradores",
             "description": "Permite vincular, alterar e desfazer o vínculo de um Colaborador do InovaFarma.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para alterar os vínculos dos Colaboradores do InovaFarma.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pre-vencidos-lancamento:manage",
+            "label": "Lançar Pré-vencidos",
+            "description": "Permite lançar, editar e excluir os próprios Lançamentos de Pré-vencidos no Closing Period aberto.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para lançar Pré-vencidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pre-vencidos-conferencia:view",
+            "label": "Conferir Pré-vencidos",
+            "description": "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
             "module": "inovafarma"
           }
         ]
