@@ -406,7 +406,6 @@ export function ColaboradoresPage() {
         loading={loading}
         title="Colaboradores"
         emptyMessage="Nenhum Colaborador encontrado."
-        pagination={{ pageSize: 20 }}
         striped
         bordered
       />

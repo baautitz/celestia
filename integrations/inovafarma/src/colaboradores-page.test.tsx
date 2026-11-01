@@ -482,20 +482,6 @@ describe("rascunhos não salvos", () => {
     await escolherUsuario(await linha("ANA SOUZA"), "Ana Souza");
   }
 
-  it("mantém o rascunho ao trocar de página da tabela", async () => {
-    const colaboradores = Array.from({ length: 25 }, (_, i) => ({ codigoColaborador: i + 1, nome: `COLABORADOR ${String(i + 1).padStart(2, "0")}`, ativo: true, ...pendente }));
-    apiFetch.mockResolvedValue({ ...lista, colaboradores });
-    render(<ColaboradoresPage />);
-    await escolherUsuario(await linha("COLABORADOR 01"), "Ana Souza");
-
-    fireEvent.click(screen.getByRole("button", { name: /próxima/i }));
-    await screen.findByText("COLABORADOR 21");
-    expect(screen.queryByText("COLABORADOR 01")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /anterior/i }));
-
-    expect(campoUsuario(await linha("COLABORADOR 01")).value).toBe("Ana Souza");
-  }, 20_000); // Duas páginas de 20 linhas com comboboxes: lento com a suíte inteira rodando.
-
   it("mantém o rascunho ao mudar o filtro", async () => {
     await abrirComRascunho();
     fireEvent.click(screen.getByRole("combobox", { name: "Situação" }));
