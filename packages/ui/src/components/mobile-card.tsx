@@ -1,10 +1,13 @@
 import React from "react";
 import { Card, CardContent, CardFooter } from "./card";
 import { Separator } from "./separator";
+import { cn } from "../lib/utils";
 
 interface MobileCardField {
   label: string;
   value: React.ReactNode;
+  /** Ocupa a linha inteira do card (ex.: controle editável). */
+  wide?: boolean;
 }
 
 interface MobileCardProps {
@@ -36,7 +39,7 @@ export const MobileCard: React.FC<MobileCardProps> = ({
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
           {fields.map((field) => (
-            <div key={field.label} className="flex flex-col gap-0.5">
+            <div key={field.label} className={cn("flex min-w-0 flex-col gap-0.5", field.wide && "col-span-2")}>
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                 {field.label}
               </span>
@@ -55,7 +58,7 @@ export const MobileCard: React.FC<MobileCardProps> = ({
 
       {actions && (
         <>
-          <CardFooter className="justify-end">
+          <CardFooter className="justify-end py-1">
             {actions}
           </CardFooter>
         </>
