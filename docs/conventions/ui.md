@@ -71,7 +71,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 
 ## Cabeçalho
 
-- Ações primárias da página (`Atualizar`, `+ Novo...`) vão para a barra superior via `<HeaderActions>` (`packages/web/src/context/HeaderActionsContext.tsx`), liberando espaço vertical para as tabelas.
+- Ações primárias da página (`Atualizar`, `+ Novo...`) vão para a barra superior via `<HeaderActions>` (`@platform/ui/context/header-actions`, usável também por Plugins), liberando espaço vertical para as tabelas.
 
 ## Menus
 
