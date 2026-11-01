@@ -22,6 +22,7 @@ integrations/<nome>/
 - O que o Plugin precisa do servidor (ex.: o middleware de autenticação) entra por injeção: o servidor passa em `createXPlugin({ auth })`.
 - Persistência: schema Postgres próprio e migrations em `drizzle/` (`migrations` no `defineModule`). O servidor injeta o banco em `createXPlugin({ db })`; sem ele, o Plugin usa a store em memória.
 - Usuários e Audit Log vêm por `services.use`, com `dependsOn: ["iam", "audit"]` (ADR 0002): `iam` expõe `users.list()` (só `id`, `fullname`, `username`, `status`), `audit` expõe `log.declareAction()` e `log.record()` e `closing_period` expõe `periods.list()` (só `id`, `name`, `startDate`, `endDate`, `status`). Um Plugin que usa `periods` declara `closing_period` no `dependsOn` (o InovaFarma, nos Pré-vencidos).
+- No front, o mesmo vale entre módulos web: `defineWebModule({ dependsOn: ["iam"] })` e `useWebService<T>("iam", "users")` de `@platform/ui/contracts/web-services`, com o formato `T` declarado no Plugin. O módulo web `iam` expõe `users.openCreate(windows, { fullname, suggestUsername })`, que abre o mesmo cadastro da tela Usuários e resolve com o Usuário criado (ou `null`). Um `dependsOn` que não está registrado antes lança no boot.
 - Permissions seguem `<id>:<recurso>:<acao>`; rotas ficam em `/api/m/<id>` (ou no `prefix` declarado).
 
 ## Menu: Seções e posição
