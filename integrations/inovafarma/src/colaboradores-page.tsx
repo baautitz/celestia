@@ -20,6 +20,7 @@ import { Label } from "@platform/ui/components/label";
 import { Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
+import { useLeaveGuard } from "@platform/ui/adapters/leave-guard";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch, ApiError } from "@platform/ui/lib/api";
 
@@ -323,6 +324,13 @@ export function ColaboradoresPage() {
       },
     ];
   }, [edicoes, lojas, opcoes, salvando, salvar]);
+
+  useLeaveGuard(
+    colaboradores.some((c) => {
+      const edicao = edicoes[c.codigoColaborador];
+      return edicao !== undefined && (edicao.usuarioId !== c.usuarioId || !mesmasLojas(edicao.lojas, c.lojas));
+    }),
+  );
 
   const rows = useMemo(
     () => (situacao === "ativos" ? colaboradores.filter((c) => c.ativo || naoEncontrado(c)) : colaboradores),
