@@ -88,7 +88,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   beforeAll(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(T0);
-    process.env.ERP_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+    process.env.ERP_ENCRYPTION_KEY = Buffer.alloc(16, 7).toString("hex");
     await fresh();
     const login = async (username: string): Promise<string> => {
       const res = await app.request("/api/auth/login", {

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
+import { assertEncryptionKey } from "./erp/secret-box.js";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
 import { MemoryErpStore, type ErpStore } from "./erp/erp-store.js";
 import { MemoryErpExternalsStore, type ErpExternalsStore } from "./erp/erp-externals-store.js";
@@ -152,6 +153,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
   void (async () => {
     // Falha antes de qualquer outra coisa: sem a chave em comum com a CA (e, em produção, o endereço dela) o servidor não sobe.
     const certificateAuthority = loadCertificateAuthorityClient();
+    assertEncryptionKey();
     let userStore: UserStore | undefined;
     const erpClients: ErpClientRegistry = {};
     let erpStore: ErpStore | undefined;

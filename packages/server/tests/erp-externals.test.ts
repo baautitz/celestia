@@ -28,7 +28,7 @@ describe("Externals declarados pelo Plugin erp (/api/admin/erp-externals)", () =
     ((await (await loginRaw(username)).json()) as { access_token: string }).access_token;
 
   beforeEach(async () => {
-    process.env.ERP_ENCRYPTION_KEY = randomBytes(32).toString("base64");
+    process.env.ERP_ENCRYPTION_KEY = randomBytes(16).toString("hex");
     const fake: ErpClient = { query: async () => [] };
     app = createPlatformApp({
       userStore: createSeededUserStore(),
