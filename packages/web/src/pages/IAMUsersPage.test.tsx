@@ -9,9 +9,10 @@ const api = vi.hoisted(() => ({
   iam: { listUsers: vi.fn(), listRoles: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(), getPasswordPolicy: vi.fn(async () => ({ rules: [] })) },
 }));
 vi.mock("@/lib/api-client", () => ({ api }));
+const auth = vi.hoisted(() => ({ isAdmin: true }));
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({
-    user: { id: "me", sub: "me", isAdmin: true },
+    user: { id: "me", sub: "me", isAdmin: auth.isAdmin },
     hasPermission: () => true,
   }),
 }));
@@ -79,6 +80,14 @@ describe("IAMUsersPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
     await waitFor(() => expect(api.iam.deleteUser).toHaveBeenCalledWith("u1"));
     await waitFor(() => expect(api.iam.listUsers).toHaveBeenCalledTimes(2));
+  });
+
+  it("só Administrador vê Excluir, mesmo com todas as permissões", async () => {
+    auth.isAdmin = false;
+    renderPage();
+    await screen.findByText("Maria Souza");
+    expect(screen.queryByRole("button", { name: "Excluir Usuário" })).toBeNull();
+    auth.isAdmin = true;
   });
 
   it("não oferece excluir a si mesmo", async () => {

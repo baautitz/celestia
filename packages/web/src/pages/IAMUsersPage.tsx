@@ -314,7 +314,7 @@ export const IAMUsersPage: React.FC = () => {
                 <KeyRound />
               </Button>
             )}
-            {hasPermission("system:users:update") && (
+            {hasPermission("system:users:deactivate") && (
               <Button
                 variant="ghost"
                 tone={u.status === "active" ? "destructive" : "success"}
@@ -326,7 +326,7 @@ export const IAMUsersPage: React.FC = () => {
                 <Power />
               </Button>
             )}
-            {hasPermission("system:users:delete") && currentUser?.sub !== u.id && (
+            {currentUser?.isAdmin && currentUser.sub !== u.id && (
               <Button variant="ghost" tone="destructive" size="icon" aria-label="Excluir Usuário" title="Excluir Usuário" onClick={() => void handleDelete(u)}>
                 <Trash2 />
               </Button>

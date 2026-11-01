@@ -272,7 +272,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   describe("iam-grants", () => {
     it("rotas", async () => {
     // ── gestor não-admin limitado: a regra "só concede o que possui" fica congelada
-    const gPerms = ["system:users:create", "system:users:update", "system:users:reset_password", "system:users:delete", "system:roles:create", "system:roles:update", "system:roles:read"];
+    const gPerms = ["system:users:create", "system:users:update", "system:users:reset_password", "system:users:deactivate", "system:roles:create", "system:roles:update", "system:roles:read"];
     await rec("iam.grants.setup_role", "POST", "/api/iam/roles", { token: A, body: { id: "role_gestor", name: "Gestor Limitado", permissions: gPerms } });
     const mk = (username: string, roleId: string) => ({ fullname: "Usuario Grants", username, password: "Senha@456", roleId });
     tick();

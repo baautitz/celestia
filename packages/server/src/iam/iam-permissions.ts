@@ -6,7 +6,7 @@ export const IAM_PERMISSIONS = definePermissions("system", {
   "users:read": { label: "Visualizar Usuários", description: "Permite listar e visualizar o perfil e dados cadastrais dos usuários." },
   "users:update": { label: "Editar Usuários", description: "Permite alterar nome, perfil de acesso e dados cadastrais de usuários." },
   "users:reset_password": { label: "Redefinir Senha de Usuários", description: "Permite ao administrador definir uma nova senha para qualquer usuário." },
-  "users:delete": { label: "Inativar/Excluir Usuários", description: "Permite desativar ou excluir contas de usuários." },
+  "users:deactivate": { label: "Inativar Usuários", description: "Permite ativar e desativar contas de usuários. Excluir é só de Administrador." },
   "roles:create": { label: "Criar Grupos de Acesso", description: "Permite criar novos perfis/cargos de permissão." },
   "roles:read": { label: "Visualizar Grupos e Catálogo", description: "Permite listar perfis de acesso e inspecionar o catálogo de permissões." },
   "roles:update": { label: "Editar Permissões do Grupo", description: "Permite alterar quais permissões do sistema pertencem a cada grupo." },

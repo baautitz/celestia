@@ -10,6 +10,7 @@ import type { JWTAccessPayload, PermissionItem, User } from "@platform/shared";
 import { grantDeniedMessage, missingGrants } from "./can-grant.js";
 import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
+import { hasPermission } from "./has-permission.js";
 import type { TokenService } from "./token-service.js";
 import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
 import { CertificateAuthorityUnavailableError, DeviceNotFoundError, type CertificateAuthorityClient } from "./certificate-authority-client.js";
@@ -56,7 +57,7 @@ function clientIp(c: Context): string | undefined {
 }
 
 const LAST_ADMIN = LAST_ADMIN_MESSAGE;
-const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
+const ADMIN_TARGET_ONLY = "Somente administradores podem inativar outro administrador.";
 const CERTIFICATE_REQUIRED = "Dispositivo não autorizado.";
 const CERTIFICATE_EXEMPTION_ADMIN_ONLY = "Somente administradores podem alterar o acesso sem certificado.";
 const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
@@ -409,6 +410,10 @@ export function createIamModule({
           const id = c.req.param("id");
           const { isAdmin, ...body } = c.req.valid("json");
           const caller = getAuthenticatedUser(c);
+          // Ativar e desativar tem permissão própria ("Inativar Usuários"), além de editar.
+          if (body.status !== undefined && !hasPermission(caller.permissions, P["users:deactivate"])) {
+            return c.json({ error: "Acesso negado: permissões insuficientes.", required: [P["users:deactivate"]] }, 403);
+          }
           // Isentar do certificado é tão sensível quanto o flag de administrador: só administrador altera.
           if (body.allowWithoutCertificate !== undefined && !caller.isAdmin) {
             return c.json({ error: CERTIFICATE_EXEMPTION_ADMIN_ONLY }, 403);
@@ -480,13 +485,14 @@ export function createIamModule({
         },
       );
 
-      routes.delete("/iam/users/:id", auth, requirePermission(P["users:delete"]), async (c) => {
+      // Excluir é definitivo: só Administrador. Para impedir o acesso, há a inativação.
+      routes.delete("/iam/users/:id", auth, async (c) => {
         const id = c.req.param("id");
+        if (!getAuthenticatedUser(c).isAdmin) {
+          return c.json({ error: "Somente administradores podem excluir usuários." }, 403);
+        }
         if (id === getAuthenticatedUser(c).sub) {
           return c.json({ error: "Não é possível excluir a si mesmo." }, 409);
-        }
-        if (!getAuthenticatedUser(c).isAdmin && (await userStore.findById(id))?.isAdmin) {
-          return c.json({ error: ADMIN_TARGET_ONLY }, 403);
         }
         try {
           const ran = await events.run("iam.user.delete", { actorId: actorOf(c), userId: id }, () => userStore.deleteUser(id));

@@ -13,7 +13,7 @@ const quiet = { info() {}, warn() {}, error() {} };
 const json = { "Content-Type": "application/json" };
 
 async function boot() {
-  const userStore = createSeededUserStore();
+  const userStore = createSeededUserStore({ admin: true });
   const tokenService = new TokenService();
   const mod = createIamModule({
     userStore,
@@ -32,7 +32,10 @@ async function boot() {
   });
   const { accessToken } = (await login.json()) as { accessToken: string };
   const authed = { ...json, Authorization: `Bearer ${accessToken}` };
-  return { app, mod, result, authed };
+  // Excluir Usuário é só de Administrador.
+  const rootLogin = await app.request("/api/auth/login", { method: "POST", headers: json, body: JSON.stringify({ username: "test.root", password: TEST_PASSWORD }) });
+  const admin = { ...json, Authorization: `Bearer ${((await rootLogin.json()) as { accessToken: string }).accessToken}` };
+  return { app, mod, result, authed, admin };
 }
 
 describe("módulo iam: permissões declaradas", () => {
@@ -49,7 +52,7 @@ describe("módulo iam: permissões declaradas", () => {
 
 describe("módulo iam: eventos", () => {
   it("emite after em criar, alterar, reset e excluir usuário e em Roles, sem passwordHash", async () => {
-    const { app, result, authed } = await boot();
+    const { app, result, authed, admin } = await boot();
     const seen: Record<string, object> = {};
     for (const e of ["iam.user.create", "iam.user.update", "iam.user.reset_password", "iam.user.delete", "iam.role.create", "iam.role.update"]) {
       result.events.after(e, (p) => void (seen[e] = p));
@@ -63,7 +66,7 @@ describe("módulo iam: eventos", () => {
     const { id } = (await created.json()) as { id: string };
     await app.request(`/api/iam/users/${id}`, { method: "PUT", headers: authed, body: JSON.stringify({ fullname: "Outro Nome" }) });
     await app.request(`/api/iam/users/${id}/reset-password`, { method: "POST", headers: authed, body: JSON.stringify({ newPassword: "Nova@12345" }) });
-    await app.request(`/api/iam/users/${id}`, { method: "DELETE", headers: authed });
+    expect((await app.request(`/api/iam/users/${id}`, { method: "DELETE", headers: admin })).status).toBe(200);
     await app.request("/api/iam/roles", { method: "POST", headers: authed, body: JSON.stringify({ id: "r_x", name: "Grupo X", permissions: ["system:users:read"] }) });
     await app.request("/api/iam/roles/r_x", { method: "PUT", headers: authed, body: JSON.stringify({ name: "Grupo Y" }) });
 

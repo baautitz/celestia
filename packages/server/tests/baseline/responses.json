@@ -26,7 +26,7 @@
           "system:users:read",
           "system:users:update",
           "system:users:reset_password",
-          "system:users:delete",
+          "system:users:deactivate",
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
@@ -100,7 +100,7 @@
           "system:users:read",
           "system:users:update",
           "system:users:reset_password",
-          "system:users:delete",
+          "system:users:deactivate",
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
@@ -154,7 +154,7 @@
           "system:users:read",
           "system:users:update",
           "system:users:reset_password",
-          "system:users:delete",
+          "system:users:deactivate",
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
@@ -196,7 +196,7 @@
           "system:users:read",
           "system:users:update",
           "system:users:reset_password",
-          "system:users:delete",
+          "system:users:deactivate",
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
@@ -257,7 +257,7 @@
         "system:users:read",
         "system:users:update",
         "system:users:reset_password",
-        "system:users:delete",
+        "system:users:deactivate",
         "system:roles:create",
         "system:roles:read",
         "system:roles:update",
@@ -290,7 +290,7 @@
         "system:users:read",
         "system:users:update",
         "system:users:reset_password",
-        "system:users:delete",
+        "system:users:deactivate",
         "system:roles:create",
         "system:roles:read",
         "system:roles:update",
@@ -364,9 +364,9 @@
             "module": "users"
           },
           {
-            "key": "system:users:delete",
-            "label": "Inativar/Excluir Usuários",
-            "description": "Permite desativar ou excluir contas de usuários.",
+            "key": "system:users:deactivate",
+            "label": "Inativar Usuários",
+            "description": "Permite ativar e desativar contas de usuários. Excluir é só de Administrador.",
             "module": "users"
           }
         ],
@@ -597,9 +597,9 @@
             "module": "users"
           },
           {
-            "key": "system:users:delete",
-            "label": "Inativar/Excluir Usuários",
-            "description": "Permite desativar ou excluir contas de usuários.",
+            "key": "system:users:deactivate",
+            "label": "Inativar Usuários",
+            "description": "Permite ativar e desativar contas de usuários. Excluir é só de Administrador.",
             "module": "users"
           }
         ],
@@ -902,7 +902,7 @@
           "system:users:read",
           "system:users:update",
           "system:users:reset_password",
-          "system:users:delete",
+          "system:users:deactivate",
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
@@ -963,7 +963,7 @@
           "system:users:read",
           "system:users:update",
           "system:users:reset_password",
-          "system:users:delete",
+          "system:users:deactivate",
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
@@ -1291,16 +1291,13 @@
   "iam.users.delete.403": {
     "status": 403,
     "body": {
-      "error": "Acesso negado: permissões insuficientes.",
-      "required": [
-        "system:users:delete"
-      ]
+      "error": "Somente administradores podem excluir usuários."
     }
   },
   "iam.users.delete.403_target_admin": {
     "status": 403,
     "body": {
-      "error": "Somente administradores podem excluir ou inativar outro administrador."
+      "error": "Somente administradores podem excluir usuários."
     }
   },
   "iam.users.delete.ok": {
@@ -1310,9 +1307,9 @@
     }
   },
   "iam.users.delete.again": {
-    "status": 400,
+    "status": 403,
     "body": {
-      "error": "Usuário 'usr_<uuid>' não encontrado."
+      "error": "Somente administradores podem excluir usuários."
     }
   },
   "iam.users.list.after": {
@@ -1515,7 +1512,7 @@
           "system:users:read",
           "system:users:update",
           "system:users:reset_password",
-          "system:users:delete",
+          "system:users:deactivate",
           "system:roles:create",
           "system:roles:read",
           "system:roles:update",
@@ -2135,7 +2132,7 @@
         "system:users:create",
         "system:users:update",
         "system:users:reset_password",
-        "system:users:delete",
+        "system:users:deactivate",
         "system:roles:create",
         "system:roles:update",
         "system:roles:read"
@@ -2268,13 +2265,13 @@
   "iam.grants.users.update.403_inactivate_admin": {
     "status": 403,
     "body": {
-      "error": "Somente administradores podem excluir ou inativar outro administrador."
+      "error": "Somente administradores podem inativar outro administrador."
     }
   },
   "iam.grants.users.delete.403_target_admin": {
     "status": 403,
     "body": {
-      "error": "Somente administradores podem excluir ou inativar outro administrador."
+      "error": "Somente administradores podem excluir usuários."
     }
   },
   "iam.grants.users.update.403_rename_admin": {
@@ -2297,9 +2294,9 @@
     }
   },
   "iam.grants.users.delete.ok_common": {
-    "status": 200,
+    "status": 403,
     "body": {
-      "success": true
+      "error": "Somente administradores podem excluir usuários."
     }
   },
   "iam.grants.users.delete.ok_admin_by_admin": {

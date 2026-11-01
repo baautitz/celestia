@@ -105,7 +105,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
         id: "role_gestor",
         name: "Gestor",
         description: "d",
-        permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:users:delete", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read"],
+        permissions: ["system:users:create", "system:users:update", "system:users:reset_password", "system:users:deactivate", "system:roles:create", "system:roles:update", "system:roles:read", "system:users:read"],
       });
       await store.createRole({ id: "role_pequeno", name: "Pequeno", description: "d", permissions: ["system:users:read"] });
       await store.createUser({ fullname: "Gestor Grants", username: "gestor.grants", password: TEST_PASSWORD, roleId: "role_gestor" });
@@ -166,11 +166,15 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       expect((await send("POST", `/api/iam/users/${alvoAdminId}/reset-password`, admin, body)).status).toBe(200);
     });
 
-    it("não-admin não exclui nem inativa admin; admin e usuário comum permitidos", async () => {
-      const denied = await app.request(`/api/iam/users/${alvoAdminId}`, { method: "DELETE", headers: gestor });
-      expect(denied.status).toBe(403);
-      expect(((await denied.json()) as { error: string }).error).toBe("Somente administradores podem excluir ou inativar outro administrador.");
-      expect((await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, { status: "inactive" })).status).toBe(403);
+    it("não-admin não exclui ninguém nem inativa admin; admin exclui e inativa", async () => {
+      for (const alvo of [alvoAdminId, alvoComumId]) {
+        const denied = await app.request(`/api/iam/users/${alvo}`, { method: "DELETE", headers: gestor });
+        expect(denied.status).toBe(403);
+        expect(((await denied.json()) as { error: string }).error).toBe("Somente administradores podem excluir usuários.");
+      }
+      const inativar = await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, { status: "inactive" });
+      expect(inativar.status).toBe(403);
+      expect(((await inativar.json()) as { error: string }).error).toBe("Somente administradores podem inativar outro administrador.");
       for (const patch of [{ fullname: "Outro Nome" }, { email: "x@y.com" }, { roleId: "role_pequeno" }]) {
         const res = await send("PUT", `/api/iam/users/${alvoAdminId}`, gestor, patch);
         expect(res.status).toBe(403);
@@ -191,6 +195,20 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     });
   });
 
+  describe("inativar exige a permissão Inativar Usuários", () => {
+    it("quem só edita altera o nome, mas não ativa nem desativa", async () => {
+      const store = createSeededUserStore({ admin: true });
+      await store.createRole({ id: "role_edit", name: "Edit", description: "d", permissions: ["system:users:update"] });
+      await store.createUser({ fullname: "Editor", username: "editor", password: TEST_PASSWORD, roleId: "role_edit" });
+      const alvo = await store.createUser({ fullname: "Alvo", username: "alvo", password: TEST_PASSWORD, roleId: "role_edit" });
+      const editApp = createPlatformApp({ userStore: store });
+      const editor = await authHeader(editApp, "editor");
+      const put = (body: unknown) => editApp.request(`/api/iam/users/${alvo.id}`, { method: "PUT", headers: { ...editor, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      expect((await put({ fullname: "Alvo Novo" })).status).toBe(200);
+      expect((await put({ status: "inactive" })).status).toBe(403);
+    });
+  });
+
   describe("auto-exclusão e último administrador ativo", () => {
     let ger: Record<string, string>;
     let gerId = "";
@@ -199,7 +217,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
 
     beforeAll(async () => {
       const store = createSeededUserStore({ admin: true });
-      await store.createRole({ id: "role_del", name: "Del", description: "d", permissions: ["system:users:delete", "system:users:update"] });
+      await store.createRole({ id: "role_del", name: "Del", description: "d", permissions: ["system:users:deactivate", "system:users:update"] });
       const g = await store.createUser({ fullname: "Gestor Del", username: "gestor.del", password: TEST_PASSWORD, roleId: "role_del" });
       gerId = g.id;
       app = createPlatformApp({ userStore: store });
@@ -207,10 +225,11 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       root = await authHeader(app, "test.root");
     });
 
-    it("não-admin não exclui a si mesmo (409)", async () => {
-      const res = await del(gerId, ger);
+    it("admin não exclui a si mesmo (409) e não-admin não exclui nem a si (403)", async () => {
+      expect((await del(gerId, ger)).status).toBe(403);
+      const users = (await (await app.request("/api/iam/users", { headers: root })).json()) as { id: string; username: string }[];
+      const res = await del(users.find((u) => u.username === "test.root")?.id ?? "", root);
       expect(res.status).toBe(409);
-      expect(((await res.json()) as { error: string }).error).toBe("Não é possível excluir a si mesmo.");
     });
 
     it("o único admin ativo não pode inativar a si mesmo nem ser excluído (409)", async () => {
