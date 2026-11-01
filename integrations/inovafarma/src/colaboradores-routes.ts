@@ -44,8 +44,9 @@ type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: stri
 
 const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
 const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
-const VERSAO_DESATUALIZADA = "O vínculo foi alterado por outra pessoa. A linha foi recarregada.";
-const USUARIO_JA_VINCULADO = "Este Usuário já está vinculado a outro Colaborador.";
+// Os dois conflitos pedem reações diferentes da tela, que decide pelo `code`.
+const VERSAO_DESATUALIZADA = { error: "O vínculo foi alterado por outra pessoa. A linha foi recarregada.", code: "versao_desatualizada" };
+const USUARIO_JA_VINCULADO = { error: "Este Usuário já está vinculado a outro Colaborador.", code: "usuario_ja_vinculado" };
 
 const MAX_INT = 2147483647;
 const Codigo = z.coerce.number().int().min(1).max(MAX_INT);
@@ -209,7 +210,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     const atual = await store.get(codigoColaborador);
     // Sem o Colaborador no ERP só se pode desfazer um vínculo já gravado, para liberar o Usuário.
     if (!colaborador && (!atual || vinculoDesfeito(atual) || !vazio)) return c.json({ error: "Colaborador não encontrado no ERP." }, 404);
-    if ((atual?.version ?? 0) !== version) return c.json({ error: VERSAO_DESATUALIZADA }, 409);
+    if ((atual?.version ?? 0) !== version) return c.json(VERSAO_DESATUALIZADA, 409);
 
     const usuarios = await users.list();
     const responder = (vinculo: VinculoColaborador | null) => c.json({ codigoColaborador, ...camposDoVinculo(vinculo, usuarios), avisos: avisosDoVinculo(vinculo, colaborador, usuarios, lojasErp) });
@@ -231,8 +232,8 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
       if (vazio) gravado = await store.desfazer(codigoColaborador, version, user?.sub ?? "");
       else gravado = await store.gravar({ codigoColaborador, usuarioId, lojas, atualizadoPor: user?.sub ?? "" }, version);
     } catch (err: unknown) {
-      if (err instanceof VersaoDesatualizadaError) return c.json({ error: VERSAO_DESATUALIZADA }, 409);
-      if (err instanceof UsuarioJaVinculadoError) return c.json({ error: USUARIO_JA_VINCULADO }, 409);
+      if (err instanceof VersaoDesatualizadaError) return c.json(VERSAO_DESATUALIZADA, 409);
+      if (err instanceof UsuarioJaVinculadoError) return c.json(USUARIO_JA_VINCULADO, 409);
       throw err;
     }
 

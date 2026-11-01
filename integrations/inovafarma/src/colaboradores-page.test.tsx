@@ -184,13 +184,31 @@ describe("ColaboradoresPage", () => {
     const row = await linha("ANA SOUZA");
     await escolherUsuario(row, "Bia Lima");
 
-    apiFetch.mockRejectedValueOnce(new ApiError("O vínculo foi alterado por outra pessoa. A linha foi recarregada.", 409));
+    apiFetch.mockRejectedValueOnce(new ApiError("O vínculo foi alterado por outra pessoa. A linha foi recarregada.", 409, "versao_desatualizada"));
     apiFetch.mockResolvedValueOnce(listaComVinculo);
     fireEvent.click(within(row).getByRole("button", { name: "Confirmar" }));
 
     expect(await screen.findByText("Confirmado")).toBeTruthy();
     expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ description: "O vínculo foi alterado por outra pessoa. A linha foi recarregada.", type: "warning" }));
     expect((screen.getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Ana Souza");
+  });
+
+  it("no 409 de Usuário já vinculado mostra a mensagem e mantém o rascunho inteiro, sem recarregar", async () => {
+    apiFetch.mockResolvedValueOnce(lista);
+    render(<ColaboradoresPage />);
+    const row = await linha("ANA SOUZA");
+    await escolherUsuario(row, "Bia Lima");
+    await escolherLoja(row, "Shopping");
+
+    const jaVinculado = new ApiError("Este Usuário já está vinculado a outro Colaborador.", 409, "usuario_ja_vinculado");
+    apiFetch.mockRejectedValueOnce(jaVinculado);
+    fireEvent.click(botao(row, "Confirmar"));
+
+    await waitFor(() => expect(feedback.notifyError).toHaveBeenCalledWith(jaVinculado, "Vínculo não salvo"));
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect((within(row).getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Bia Lima");
+    expect(within(row).getByText("Shopping")).toBeTruthy();
+    await waitFor(() => expect(botao(row, "Confirmar").disabled).toBe(false));
   });
 
   it("em outra falha avisa e mantém a edição, sem recarregar", async () => {

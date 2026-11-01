@@ -159,7 +159,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
     await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     const res = await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "Este Usuário já está vinculado a outro Colaborador." });
+    expect(await res.json()).toEqual({ error: "Este Usuário já está vinculado a outro Colaborador.", code: "usuario_ja_vinculado" });
   });
 
   it("recusa com 409 a version desatualizada, com mensagem distinta", async () => {
@@ -167,7 +167,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
     await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     const res = await salvar(7, { usuarioId: "bia", lojas: [], version: 0 });
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "O vínculo foi alterado por outra pessoa. A linha foi recarregada." });
+    expect(await res.json()).toEqual({ error: "O vínculo foi alterado por outra pessoa. A linha foi recarregada.", code: "versao_desatualizada" });
   });
 
   it("recusa Usuário inexistente ou inativo e Colaborador fora do ERP", async () => {

@@ -246,7 +246,7 @@ export function ColaboradoresPage() {
         descartarEdicao(codigo);
       } catch (err: unknown) {
         const mensagem = err instanceof Error ? err : new Error("Erro desconhecido ao salvar o vínculo.");
-        if (err instanceof ApiError && err.status === 409) {
+        if (err instanceof ApiError && err.code === "versao_desatualizada") {
           feedback.notify({ title: "Vínculo não salvo", description: mensagem.message, type: "warning" });
           await buscar();
           descartarEdicao(codigo);
