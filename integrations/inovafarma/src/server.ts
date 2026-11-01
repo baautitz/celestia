@@ -4,7 +4,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { createInovafarmaDriver } from "./driver.js";
-import { registerColaboradoresRoutes, type UsersService } from "./colaboradores-routes.js";
+import { LOJAS_SQL, registerColaboradoresRoutes, type UsersService } from "./colaboradores-routes.js";
 import { PostgresVinculoStore } from "./postgres-vinculo-store.js";
 import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
 import { MemoryVinculoStore } from "./vinculo-store.js";
@@ -124,13 +124,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         if (!client) return c.json([]);
 
         try {
-          const sql = `
-            SELECT CodigoEmpresa AS codigoEmpresa, NomeFilial AS nome
-            FROM Config
-            WHERE NomeFilial IS NOT NULL AND LTRIM(RTRIM(NomeFilial)) <> ''
-            ORDER BY CodigoEmpresa
-          `;
-          const rows = await client.query<{ codigoEmpresa: number; nome: string }>(sql);
+          const rows = await client.query<{ codigoEmpresa: number; nome: string }>(LOJAS_SQL);
           return c.json(rows.map((r) => ({ codigoEmpresa: Number(r.codigoEmpresa), nome: (r.nome || "").trim() })));
         } catch {
           return c.json([]);

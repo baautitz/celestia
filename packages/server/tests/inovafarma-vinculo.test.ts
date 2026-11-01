@@ -12,9 +12,15 @@ const COLABORADORES = [
   { codigoColaborador: 9, nome: "BRUNO LIMA", ativo: false },
 ];
 
+const LOJAS = [
+  { codigoEmpresa: 1, nome: " Centro " },
+  { codigoEmpresa: 2, nome: "Bairro" },
+  { codigoEmpresa: 3, nome: "Shopping" },
+];
+
 const erp: ErpClient = {
-  query: async <TRow>(_sql: string, params?: Record<string, unknown>) =>
-    (params?.codigo === undefined ? COLABORADORES : COLABORADORES.filter((c) => c.codigoColaborador === params.codigo)) as TRow[],
+  query: async <TRow>(sql: string, params?: Record<string, unknown>) =>
+    sql.includes("Config") ? (LOJAS as TRow[]) : (params?.codigo === undefined ? COLABORADORES : COLABORADORES.filter((c) => c.codigoColaborador === params.codigo)) as TRow[],
 };
 
 const passwordHash = PasswordService.hash("Senha@123");
@@ -61,8 +67,9 @@ async function boot(permissions: string[] = [VIEW, UPDATE], erpClients: Record<s
     const res = await platform.app.request("/api/m/inovafarma/colaboradores", { headers });
     expect(res.status).toBe(200);
     return (await res.json()) as {
-      colaboradores: { codigoColaborador: number; confirmado: boolean; usuarioId: string | null; version: number; usuario: Record<string, unknown> | null }[];
+      colaboradores: { codigoColaborador: number; confirmado: boolean; usuarioId: string | null; lojas: number[]; version: number; usuario: Record<string, unknown> | null }[];
       usuarios: Record<string, unknown>[];
+      lojas: unknown[];
     };
   };
   const auditoria = async () => {
@@ -82,7 +89,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
   it("lista Pendente sem vínculo e oferece só Usuários ativos, sem dados além dos expostos pelo iam", async () => {
     const { listar } = await boot();
     const { colaboradores, usuarios } = await listar();
-    expect(colaboradores[0]).toEqual({ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, confirmado: false, usuarioId: null, usuario: null, version: 0 });
+    expect(colaboradores[0]).toEqual({ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, confirmado: false, usuarioId: null, usuario: null, lojas: [], version: 0 });
     expect(usuarios.map((u) => u.id)).toEqual(expect.arrayContaining(["ana", "bia"]));
     expect(usuarios.map((u) => u.id)).not.toContain("caio");
     expect(Object.keys(usuarios[0]!).sort()).toEqual(["fullname", "id", "username"]);
@@ -90,7 +97,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
 
   it("grava o vínculo, passa a Confirmado e altera com a nova version", async () => {
     const { salvar, listar } = await boot();
-    const criado = await salvar(7, { usuarioId: "ana", version: 0 });
+    const criado = await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     expect(criado.status).toBe(200);
     expect(await criado.json()).toMatchObject({ codigoColaborador: 7, confirmado: true, usuarioId: "ana", version: 1 });
     expect((await listar()).colaboradores[0]).toMatchObject({
@@ -98,62 +105,62 @@ describe("Vínculo do Colaborador com Usuário", () => {
       usuario: { id: "ana", fullname: "Ana Souza", username: "ana", status: "active" },
     });
 
-    const alterado = await salvar(7, { usuarioId: "bia", version: 1 });
+    const alterado = await salvar(7, { usuarioId: "bia", lojas: [], version: 1 });
     expect(await alterado.json()).toMatchObject({ usuarioId: "bia", version: 2 });
   });
 
   it("limpar o Usuário desfaz o vínculo, devolve a Pendente e libera o Usuário", async () => {
     const { salvar, listar } = await boot();
-    await salvar(7, { usuarioId: "ana", version: 0 });
-    const limpo = await salvar(7, { usuarioId: null, version: 1 });
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    const limpo = await salvar(7, { usuarioId: null, lojas: [], version: 1 });
     expect(limpo.status).toBe(200);
     expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, usuarioId: null, version: 0 });
-    expect((await salvar(9, { usuarioId: "ana", version: 0 })).status).toBe(200);
+    expect((await salvar(9, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(200);
   });
 
   it("nega a gravação sem a Permission, com deniedMessage em PT-BR", async () => {
     const { salvar } = await boot([VIEW]);
-    const res = await salvar(7, { usuarioId: "ana", version: 0 });
+    const res = await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "Acesso negado: o usuário não possui permissão para alterar os vínculos dos Colaboradores do InovaFarma." });
   });
 
   it("recusa com 409 o Usuário já vinculado a outro Colaborador", async () => {
     const { salvar } = await boot();
-    await salvar(7, { usuarioId: "ana", version: 0 });
-    const res = await salvar(9, { usuarioId: "ana", version: 0 });
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    const res = await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "Este Usuário já está vinculado a outro Colaborador." });
   });
 
   it("recusa com 409 a version desatualizada, com mensagem distinta", async () => {
     const { salvar } = await boot();
-    await salvar(7, { usuarioId: "ana", version: 0 });
-    const res = await salvar(7, { usuarioId: "bia", version: 0 });
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    const res = await salvar(7, { usuarioId: "bia", lojas: [], version: 0 });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "O vínculo foi alterado por outra pessoa. A linha foi recarregada." });
   });
 
   it("recusa Usuário inexistente ou inativo e Colaborador fora do ERP", async () => {
     const { salvar } = await boot();
-    expect((await salvar(7, { usuarioId: "caio", version: 0 })).status).toBe(400);
-    expect((await salvar(7, { usuarioId: "nao-existe", version: 0 })).status).toBe(400);
-    expect((await salvar(7, { usuarioId: "ana" })).status).toBe(400);
-    expect((await salvar("abc", { usuarioId: "ana", version: 0 })).status).toBe(400);
-    expect((await salvar(123, { usuarioId: "ana", version: 0 })).status).toBe(404);
+    expect((await salvar(7, { usuarioId: "caio", lojas: [], version: 0 })).status).toBe(400);
+    expect((await salvar(7, { usuarioId: "nao-existe", lojas: [], version: 0 })).status).toBe(400);
+    expect((await salvar(7, { usuarioId: "ana", lojas: [] })).status).toBe(400);
+    expect((await salvar("abc", { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(400);
+    expect((await salvar(123, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(404);
   });
 
   it("responde 503 sem conexão com o ERP", async () => {
     const { salvar } = await boot([VIEW, UPDATE], {});
-    expect((await salvar(7, { usuarioId: "ana", version: 0 })).status).toBe(503);
+    expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(503);
   });
 
   it("grava no Audit Log cada alteração, com valores anteriores, novos e resumo", async () => {
     const { salvar, auditoria } = await boot();
-    await salvar(7, { usuarioId: "ana", version: 0 });
-    await salvar(7, { usuarioId: "bia", version: 1 });
-    await salvar(7, { usuarioId: "bia", version: 2 }); // sem mudança: não é alteração
-    await salvar(7, { usuarioId: null, version: 2 });
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    await salvar(7, { usuarioId: "bia", lojas: [], version: 1 });
+    await salvar(7, { usuarioId: "bia", lojas: [], version: 2 }); // sem mudança: não é alteração
+    await salvar(7, { usuarioId: null, lojas: [], version: 2 });
 
     const entradas = await auditoria();
     expect(entradas.map((e) => e.summary).sort()).toEqual([
@@ -173,6 +180,108 @@ describe("Vínculo do Colaborador com Usuário", () => {
         anterior: { usuario: { id: "ana", fullname: "Ana Souza" } },
         novo: { usuario: { id: "bia", fullname: "Bia Lima" } },
       },
+    });
+  });
+
+  describe("Lojas", () => {
+    it("oferece as Lojas do ERP e devolve as gravadas na listagem", async () => {
+      const { salvar, listar } = await boot();
+      const res = await salvar(7, { usuarioId: "ana", lojas: [2, 1], version: 0 });
+      expect(await res.json()).toMatchObject({ confirmado: true, usuarioId: "ana", lojas: [1, 2], version: 1 });
+      const lista = await listar();
+      expect(lista.lojas).toEqual([
+        { codigo: 1, nome: "Centro" },
+        { codigo: 2, nome: "Bairro" },
+        { codigo: 3, nome: "Shopping" },
+      ]);
+      expect(lista.colaboradores[0]).toMatchObject({ lojas: [1, 2] });
+    });
+
+    it("grava só as Lojas, sem Usuário, e o Usuário continua livre", async () => {
+      const { salvar, listar } = await boot();
+      const res = await salvar(7, { usuarioId: null, lojas: [3], version: 0 });
+      expect(res.status).toBe(200);
+      expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: true, usuarioId: null, usuario: null, lojas: [3], version: 1 });
+      expect((await salvar(9, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(200);
+    });
+
+    it("Usuário e Lojas são independentes: limpar um mantém o outro", async () => {
+      const { salvar } = await boot();
+      await salvar(7, { usuarioId: "ana", lojas: [1], version: 0 });
+      expect(await (await salvar(7, { usuarioId: null, lojas: [1], version: 1 })).json()).toMatchObject({ confirmado: true, usuarioId: null, lojas: [1], version: 2 });
+      expect(await (await salvar(7, { usuarioId: "bia", lojas: [], version: 2 })).json()).toMatchObject({ confirmado: true, usuarioId: "bia", lojas: [], version: 3 });
+    });
+
+    it("limpar Usuário e Lojas desfaz o vínculo e devolve a Pendente", async () => {
+      const { salvar, listar } = await boot();
+      await salvar(7, { usuarioId: "ana", lojas: [1, 2], version: 0 });
+      expect(await (await salvar(7, { usuarioId: null, lojas: [], version: 1 })).json()).toMatchObject({ confirmado: false, usuarioId: null, lojas: [], version: 0 });
+      expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, lojas: [], version: 0 });
+    });
+
+    it("sem vínculo gravado, Usuário e Lojas vazios não criam vínculo", async () => {
+      const { salvar, auditoria } = await boot();
+      expect(await (await salvar(7, { usuarioId: null, lojas: [], version: 0 })).json()).toMatchObject({ confirmado: false, version: 0 });
+      expect(await auditoria()).toEqual([]);
+    });
+
+    it("recusa Loja fora do ERP e corpo sem lojas, mas mantém uma Loja já gravada que saiu do ERP", async () => {
+      const { salvar } = await boot();
+      expect((await salvar(7, { usuarioId: "ana", lojas: [99], version: 0 })).status).toBe(400);
+      expect((await salvar(7, { usuarioId: "ana", version: 0 })).status).toBe(400);
+
+      const saiu = LOJAS[2]!;
+      try {
+        await salvar(7, { usuarioId: "ana", lojas: [saiu.codigoEmpresa], version: 0 });
+        LOJAS.pop();
+        const res = await salvar(7, { usuarioId: "bia", lojas: [saiu.codigoEmpresa, 1], version: 1 });
+        expect(await res.json()).toMatchObject({ usuarioId: "bia", lojas: [1, 3], version: 2 });
+      } finally {
+        LOJAS.push(saiu);
+      }
+    });
+
+    it("responde 503 quando as Lojas não podem ser lidas do ERP, sem esconder a falha", async () => {
+      const semLojas: ErpClient = {
+        query: async <TRow>(sql: string) => {
+          if (sql.includes("Config")) throw new Error("fora do ar");
+          return COLABORADORES as TRow[];
+        },
+      };
+      const { salvar } = await boot([VIEW, UPDATE], { inovafarma: semLojas });
+      expect((await salvar(7, { usuarioId: "ana", lojas: [1], version: 0 })).status).toBe(503);
+    });
+
+    it("registra no Audit Log as Lojas anteriores e novas, com nome e resumo", async () => {
+      const { salvar, auditoria } = await boot();
+      await salvar(7, { usuarioId: "ana", lojas: [1], version: 0 });
+      await salvar(7, { usuarioId: "ana", lojas: [2, 3], version: 1 });
+      await salvar(7, { usuarioId: "ana", lojas: [3, 2], version: 2 }); // mesma escolha: não é alteração
+      await salvar(7, { usuarioId: null, lojas: [], version: 2 });
+
+      const entradas = await auditoria();
+      expect(entradas).toHaveLength(3);
+      const alteracao = entradas.find((e) => e.summary.startsWith("Alterou"));
+      expect(alteracao?.summary).toBe('Alterou as Lojas do Colaborador "ANA SOUZA" (cód. 7) de "Centro" para "Bairro", "Shopping".');
+      expect(alteracao?.attributes).toMatchObject({
+        anterior: { usuario: { id: "ana" }, lojas: [{ codigo: 1, nome: "Centro" }] },
+        novo: { usuario: { id: "ana" }, lojas: [{ codigo: 2, nome: "Bairro" }, { codigo: 3, nome: "Shopping" }] },
+      });
+      expect(entradas.map((e) => e.summary)).toEqual(
+        expect.arrayContaining([
+          'Vinculou o Colaborador "ANA SOUZA" (cód. 7) ao Usuário "Ana Souza" e às Lojas "Centro".',
+          'Desfez o vínculo do Colaborador "ANA SOUZA" (cód. 7) com o Usuário "Ana Souza" e as Lojas "Bairro", "Shopping".',
+        ]),
+      );
+    });
+
+    it("no resumo, alterar Usuário e Lojas juntos cita os dois", async () => {
+      const { salvar, auditoria } = await boot();
+      await salvar(7, { usuarioId: "ana", lojas: [1], version: 0 });
+      await salvar(7, { usuarioId: "bia", lojas: [], version: 1 });
+      expect((await auditoria()).map((e) => e.summary)).toContain(
+        'Alterou o Usuário do Colaborador "ANA SOUZA" (cód. 7) de "Ana Souza" para "Bia Lima" e as Lojas de "Centro" para nenhuma.',
+      );
     });
   });
 });

@@ -47,7 +47,7 @@ const USUARIO_JA_VINCULADO = "Este Usuário já está vinculado a outro Colabora
 
 const MAX_INT = 2147483647;
 const Codigo = z.coerce.number().int().min(1).max(MAX_INT);
-const Gravacao = z.object({ usuarioId: z.string().min(1).nullable(), version: z.number().int().min(0) });
+const Gravacao = z.object({ usuarioId: z.string().min(1).nullable(), lojas: z.array(Codigo), version: z.number().int().min(0) });
 
 // Ativo vem só de Funcionario.Ativo: DataDesligamento está preenchida em poucos inativos.
 const COLABORADORES_SQL = `
@@ -56,6 +56,21 @@ const COLABORADORES_SQL = `
   JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
   WHERE c.Eliminado = 0
 `;
+
+/** Mesma origem da rota /lojas; aqui a falha não é engolida, vira 503. */
+export const LOJAS_SQL = `
+  SELECT CodigoEmpresa AS codigoEmpresa, NomeFilial AS nome
+  FROM Config
+  WHERE NomeFilial IS NOT NULL AND LTRIM(RTRIM(NomeFilial)) <> ''
+  ORDER BY CodigoEmpresa
+`;
+
+interface LojaOpcao {
+  codigo: number;
+  nome: string;
+}
+type LinhaLoja = { codigoEmpresa: number; nome: string | null };
+const toLoja = (r: LinhaLoja): LojaOpcao => ({ codigo: Number(r.codigoEmpresa), nome: (r.nome || "").trim() });
 
 type LinhaErp = { codigoColaborador: number; nome: string | null; ativo: boolean | number | null };
 const toColaborador = (r: LinhaErp): ColaboradorErp => ({
@@ -71,6 +86,7 @@ function camposDoVinculo(vinculo: VinculoColaborador | null, usuarios: UsuarioRe
     confirmado: vinculo !== null,
     usuarioId,
     usuario: usuarios.find((u) => u.id === usuarioId) ?? null,
+    lojas: vinculo?.lojas ?? [],
     version: vinculo?.version ?? 0,
   };
 }
@@ -87,8 +103,11 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
 
     let colaboradores: ColaboradorErp[];
+    let lojas: LojaOpcao[];
     try {
-      colaboradores = (await client.query<LinhaErp>(`${COLABORADORES_SQL} ORDER BY c.Nome`)).map(toColaborador);
+      const [linhas, linhasLojas] = await Promise.all([client.query<LinhaErp>(`${COLABORADORES_SQL} ORDER BY c.Nome`), client.query<LinhaLoja>(LOJAS_SQL)]);
+      colaboradores = linhas.map(toColaborador);
+      lojas = linhasLojas.map(toLoja);
     } catch {
       return c.json({ error: ERP_INDISPONIVEL }, 503);
     }
@@ -101,6 +120,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
         .filter((u) => u.status === "active")
         .map(({ id, fullname, username }) => ({ id, fullname, username }))
         .sort((a, b) => a.fullname.localeCompare(b.fullname, "pt-BR")),
+      lojas,
     });
   });
 
@@ -114,35 +134,47 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     if (!codigo.success || !body.success) return c.json({ error: "Dados do vínculo inválidos." }, 400);
     const codigoColaborador = codigo.data;
     const { usuarioId, version } = body.data;
+    const lojas = [...new Set(body.data.lojas)].sort((a, b) => a - b);
+    const vazio = usuarioId === null && lojas.length === 0;
 
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
     let colaborador: ColaboradorErp | undefined;
+    let lojasErp: LojaOpcao[];
     try {
-      const rows = await client.query<LinhaErp>(`${COLABORADORES_SQL} AND f.CodigoFuncionario = @codigo`, { codigo: codigoColaborador });
+      const [rows, linhasLojas] = await Promise.all([
+        client.query<LinhaErp>(`${COLABORADORES_SQL} AND f.CodigoFuncionario = @codigo`, { codigo: codigoColaborador }),
+        client.query<LinhaLoja>(LOJAS_SQL),
+      ]);
       colaborador = rows[0] && toColaborador(rows[0]);
+      lojasErp = linhasLojas.map(toLoja);
     } catch {
       return c.json({ error: ERP_INDISPONIVEL }, 503);
     }
 
     const atual = await store.get(codigoColaborador);
     // Sem o Colaborador no ERP só se pode desfazer um vínculo já gravado, para liberar o Usuário.
-    if (!colaborador && (!atual || usuarioId !== null)) return c.json({ error: "Colaborador não encontrado no ERP." }, 404);
+    if (!colaborador && (!atual || !vazio)) return c.json({ error: "Colaborador não encontrado no ERP." }, 404);
     if ((atual?.version ?? 0) !== version) return c.json({ error: VERSAO_DESATUALIZADA }, 409);
 
     const usuarios = await users.list();
     const responder = (vinculo: VinculoColaborador | null) => c.json({ codigoColaborador, ...camposDoVinculo(vinculo, usuarios) });
 
     // Sem mudança não é alteração: nada a gravar nem a auditar.
-    if ((atual?.usuarioId ?? null) === usuarioId) return responder(atual);
+    const lojasAnteriores = atual?.lojas ?? [];
+    if ((atual?.usuarioId ?? null) === usuarioId && lojas.join() === lojasAnteriores.join()) return responder(atual);
 
     const novo = usuarios.find((u) => u.id === usuarioId);
     if (usuarioId !== null && novo?.status !== "active") return c.json({ error: "Usuário não encontrado ou inativo." }, 400);
 
+    // Uma Loja já gravada pode ter saído do ERP e continua aceita; só uma nova precisa existir lá.
+    const lojaValida = (codigo: number) => lojasAnteriores.includes(codigo) || lojasErp.some((l) => l.codigo === codigo);
+    if (!lojas.every(lojaValida)) return c.json({ error: "Loja não encontrada no ERP." }, 400);
+
     let gravado: VinculoColaborador | null = null;
     try {
-      if (usuarioId === null) await store.remover(codigoColaborador, version);
-      else gravado = await store.gravar({ codigoColaborador, usuarioId, atualizadoPor: user?.sub ?? "" }, version);
+      if (vazio) await store.remover(codigoColaborador, version);
+      else gravado = await store.gravar({ codigoColaborador, usuarioId, lojas, atualizadoPor: user?.sub ?? "" }, version);
     } catch (err: unknown) {
       if (err instanceof VersaoDesatualizadaError) return c.json({ error: VERSAO_DESATUALIZADA }, 409);
       if (err instanceof UsuarioJaVinculadoError) return c.json({ error: USUARIO_JA_VINCULADO }, 409);
@@ -150,6 +182,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     }
 
     const auditado = (id: string | null | undefined) => (id ? { id, fullname: usuarios.find((u) => u.id === id)?.fullname ?? null } : null);
+    const lojasAuditadas = (codigos: number[]) => codigos.map((codigo) => ({ codigo, nome: lojasErp.find((l) => l.codigo === codigo)?.nome ?? null }));
     await audit.record({
       plugin,
       action: VINCULO_ACTION,
@@ -158,8 +191,8 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
       attributes: {
         codigoColaborador,
         nomeColaborador: colaborador?.nome ?? null,
-        anterior: { usuario: auditado(atual?.usuarioId) },
-        novo: { usuario: auditado(usuarioId) },
+        anterior: { usuario: auditado(atual?.usuarioId), lojas: lojasAuditadas(lojasAnteriores) },
+        novo: { usuario: auditado(usuarioId), lojas: lojasAuditadas(lojas) },
       },
     });
     return responder(gravado);

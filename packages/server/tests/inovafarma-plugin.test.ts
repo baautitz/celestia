@@ -73,6 +73,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
     it("lista todo Funcionario com Cadastro não eliminado, com Cód., nome e situação no ERP", async () => {
       let consulta = "";
       const client = mockErpClient(async (sql) => {
+        if (sql.includes("Config")) return [];
         consulta = sql;
         return [
           { codigoColaborador: 7, nome: " ANA SOUZA ", ativo: true },
