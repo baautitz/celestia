@@ -115,8 +115,36 @@ describe("Vínculo do Colaborador com Usuário", () => {
     await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     const limpo = await salvar(7, { usuarioId: null, lojas: [], version: 1 });
     expect(limpo.status).toBe(200);
-    expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, usuarioId: null, version: 0 });
+    expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, usuarioId: null, version: 2 });
     expect((await salvar(9, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(200);
+  });
+
+  it("a version sobrevive ao desfazer: quem ficou para trás recebe 409 depois de outro recriar o vínculo", async () => {
+    const { salvar } = await boot();
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    await salvar(7, { usuarioId: null, lojas: [], version: 1 });
+    expect((await salvar(7, { usuarioId: "bia", lojas: [], version: 2 })).status).toBe(200);
+    expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 1 })).status).toBe(409);
+    expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(409);
+  });
+
+  it("um vínculo desfeito volta a receber sugestões, e confirmá-lo usa a version listada", async () => {
+    const { salvar, listar, auditoria } = await boot();
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    await salvar(7, { usuarioId: null, lojas: [], version: 1 });
+    const pendente = (await listar()).colaboradores.find((c) => c.codigoColaborador === 7)!;
+    expect(pendente).toMatchObject({ confirmado: false, version: 2, avisos: [], sugestao: { usuarioId: "ana", lojas: [] } });
+
+    expect(await (await salvar(7, { usuarioId: "ana", lojas: [], version: pendente.version })).json()).toMatchObject({ confirmado: true, version: 3 });
+    expect((await auditoria()).map((e) => e.summary)).toContain('Vinculou o Colaborador "ANA SOUZA" (cód. 7) ao Usuário "Ana Souza".');
+  });
+
+  it("desfazer de novo um vínculo já desfeito não é alteração", async () => {
+    const { salvar, auditoria } = await boot();
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    await salvar(7, { usuarioId: null, lojas: [], version: 1 });
+    expect(await (await salvar(7, { usuarioId: null, lojas: [], version: 2 })).json()).toMatchObject({ confirmado: false, version: 2 });
+    expect(await auditoria()).toHaveLength(2);
   });
 
   it("nega a gravação sem a Permission, com deniedMessage em PT-BR", async () => {
@@ -216,8 +244,8 @@ describe("Vínculo do Colaborador com Usuário", () => {
     it("limpar Usuário e Lojas desfaz o vínculo e devolve a Pendente", async () => {
       const { salvar, listar } = await boot();
       await salvar(7, { usuarioId: "ana", lojas: [1, 2], version: 0 });
-      expect(await (await salvar(7, { usuarioId: null, lojas: [], version: 1 })).json()).toMatchObject({ confirmado: false, usuarioId: null, lojas: [], version: 0 });
-      expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, lojas: [], version: 0 });
+      expect(await (await salvar(7, { usuarioId: null, lojas: [], version: 1 })).json()).toMatchObject({ confirmado: false, usuarioId: null, lojas: [], version: 2 });
+      expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, lojas: [], version: 2 });
     });
 
     it("sem vínculo gravado, Usuário e Lojas vazios não criam vínculo", async () => {
@@ -347,6 +375,20 @@ describe("Vínculo do Colaborador com Usuário", () => {
         expect(await desfeito.json()).toMatchObject({ confirmado: false, avisos: [] });
         expect(linha(await listar(), 9)).toBeUndefined();
         expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(200);
+      } finally {
+        COLABORADORES.push(sumiu);
+      }
+    });
+
+    it("um vínculo desfeito de quem sumiu do ERP não vira linha nem aceita nova gravação", async () => {
+      const { salvar, listar } = await boot();
+      const sumiu = COLABORADORES[1]!;
+      await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
+      await salvar(9, { usuarioId: null, lojas: [], version: 1 });
+      COLABORADORES.pop();
+      try {
+        expect(linha(await listar(), 9)).toBeUndefined();
+        expect((await salvar(9, { usuarioId: null, lojas: [], version: 2 })).status).toBe(404);
       } finally {
         COLABORADORES.push(sumiu);
       }

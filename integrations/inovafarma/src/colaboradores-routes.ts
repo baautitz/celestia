@@ -4,7 +4,7 @@ import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { VINCULO_ACTION, VINCULO_TARGET, type AuditService } from "./vinculo-audit.js";
 import { sugerirUsuarios } from "./sugestao-usuario.js";
-import { UsuarioJaVinculadoError, VersaoDesatualizadaError, type VinculoColaborador, type VinculoStore } from "./vinculo-store.js";
+import { UsuarioJaVinculadoError, VersaoDesatualizadaError, vinculoDesfeito, type VinculoColaborador, type VinculoStore } from "./vinculo-store.js";
 
 /** Forma do serviço `users` do Module `iam`; o Plugin não importa `@platform/server` (ADR 0002). */
 export interface UsuarioResumo {
@@ -82,11 +82,11 @@ const toColaborador = (r: LinhaErp): ColaboradorErp => ({
   codigoEmpresa: Number(r.codigoEmpresa),
 });
 
-/** Campos do vínculo em cada linha da tabela; `version` 0 = Pendente, sem vínculo gravado. */
+/** Campos do vínculo em cada linha da tabela; um vínculo desfeito é Pendente, mas mantém a `version`. */
 function camposDoVinculo(vinculo: VinculoColaborador | null, usuarios: UsuarioResumo[]) {
   const usuarioId = vinculo?.usuarioId ?? null;
   return {
-    confirmado: vinculo !== null,
+    confirmado: vinculo !== null && !vinculoDesfeito(vinculo),
     usuarioId,
     usuario: usuarios.find((u) => u.id === usuarioId) ?? null,
     lojas: vinculo?.lojas ?? [],
@@ -104,7 +104,7 @@ interface Aviso {
 
 /** O que mudou fora da tela desde a gravação do vínculo; o vínculo é mantido e a pessoa decide o que fazer. */
 function avisosDoVinculo(vinculo: VinculoColaborador | null, colaborador: ColaboradorErp | undefined, usuarios: UsuarioResumo[], lojas: LojaOpcao[]): Aviso[] {
-  if (!vinculo) return [];
+  if (!vinculo || vinculoDesfeito(vinculo)) return [];
   const avisos: Aviso[] = [];
   if (!colaborador) avisos.push({ tipo: "colaborador_nao_encontrado", mensagem: "Não encontrado no ERP" });
   else if (!colaborador.ativo) avisos.push({ tipo: "inativo_no_erp", mensagem: "Inativo no ERP" });
@@ -139,21 +139,25 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
 
     const [vinculos, usuarios] = await Promise.all([store.list(), users.list()]);
     const porCodigo = new Map(vinculos.map((v) => [v.codigoColaborador, v]));
+    const estaConfirmado = (codigo: number) => {
+      const vinculo = porCodigo.get(codigo);
+      return vinculo !== undefined && !vinculoDesfeito(vinculo);
+    };
     const noErp = new Set(colaboradores.map((col) => col.codigoColaborador));
     const vinculados = new Set(vinculos.map((v) => v.usuarioId));
-    const pendentes = colaboradores.filter((col) => !porCodigo.has(col.codigoColaborador));
+    const pendentes = colaboradores.filter((col) => !estaConfirmado(col.codigoColaborador));
     const usuarioSugerido = sugerirUsuarios(pendentes, usuarios.filter((u) => u.status === "active" && !vinculados.has(u.id)));
     const linhasDoErp = colaboradores.map((col) => {
       const { codigoEmpresa, ...dados } = col;
       const vinculo = porCodigo.get(col.codigoColaborador) ?? null;
-      const sugestao = vinculo
+      const sugestao = estaConfirmado(col.codigoColaborador)
         ? null
         : { usuarioId: usuarioSugerido.get(col.codigoColaborador) ?? null, lojas: lojas.some((l) => l.codigo === codigoEmpresa) ? [codigoEmpresa] : [] };
       return { ...dados, ...camposDoVinculo(vinculo, usuarios), sugestao, avisos: avisosDoVinculo(vinculo, col, usuarios, lojas) };
     });
     // O ERP não informa mais o nome de quem sumiu, e o vínculo não o guarda.
     const sumidos = vinculos
-      .filter((v) => !noErp.has(v.codigoColaborador))
+      .filter((v) => !noErp.has(v.codigoColaborador) && !vinculoDesfeito(v))
       .map((v) => ({
         codigoColaborador: v.codigoColaborador,
         nome: `Colaborador ${v.codigoColaborador}`,
@@ -203,7 +207,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
 
     const atual = await store.get(codigoColaborador);
     // Sem o Colaborador no ERP só se pode desfazer um vínculo já gravado, para liberar o Usuário.
-    if (!colaborador && (!atual || !vazio)) return c.json({ error: "Colaborador não encontrado no ERP." }, 404);
+    if (!colaborador && (!atual || vinculoDesfeito(atual) || !vazio)) return c.json({ error: "Colaborador não encontrado no ERP." }, 404);
     if ((atual?.version ?? 0) !== version) return c.json({ error: VERSAO_DESATUALIZADA }, 409);
 
     const usuarios = await users.list();
@@ -221,9 +225,9 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     const lojaValida = (codigo: number) => lojasAnteriores.includes(codigo) || lojasErp.some((l) => l.codigo === codigo);
     if (!lojas.every(lojaValida)) return c.json({ error: "Loja não encontrada no ERP." }, 400);
 
-    let gravado: VinculoColaborador | null = null;
+    let gravado: VinculoColaborador;
     try {
-      if (vazio) await store.remover(codigoColaborador, version);
+      if (vazio) gravado = await store.desfazer(codigoColaborador, version, user?.sub ?? "");
       else gravado = await store.gravar({ codigoColaborador, usuarioId, lojas, atualizadoPor: user?.sub ?? "" }, version);
     } catch (err: unknown) {
       if (err instanceof VersaoDesatualizadaError) return c.json({ error: VERSAO_DESATUALIZADA }, 409);

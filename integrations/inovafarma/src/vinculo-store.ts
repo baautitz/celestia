@@ -1,4 +1,7 @@
-/** Vínculo do Colaborador: a existência do registro é o que torna o Colaborador "Confirmado". */
+/**
+ * Vínculo do Colaborador. Um registro com Usuário ou Lojas torna o Colaborador "Confirmado".
+ * Desfazer mantém o registro vazio, só para a `version` continuar crescendo: recriar o vínculo não a reinicia.
+ */
 export interface VinculoColaborador {
   codigoColaborador: number;
   /** Referência lógica a `iam.users`, sem FK entre Modules. */
@@ -17,20 +20,23 @@ export interface GravarVinculo {
   atualizadoPor: string;
 }
 
+/** Registro de um vínculo desfeito: para todos os efeitos o Colaborador está "Pendente". */
+export const vinculoDesfeito = ({ usuarioId, lojas }: Pick<VinculoColaborador, "usuarioId" | "lojas">): boolean => usuarioId === null && lojas.length === 0;
+
 /** A `version` armazenada não é a esperada (compare-and-set falhou). */
 export class VersaoDesatualizadaError extends Error {}
 
 /** O Usuário já está em outro vínculo. */
 export class UsuarioJaVinculadoError extends Error {}
 
-/** Persistência dos vínculos. `expectedVersion` 0 significa que ainda não há vínculo gravado. */
+/** Persistência dos vínculos. `expectedVersion` 0 significa que ainda não há registro. */
 export interface VinculoStore {
   list(): Promise<VinculoColaborador[]>;
   get(codigoColaborador: number): Promise<VinculoColaborador | null>;
   /** Cria ou altera de forma atômica; lança `VersaoDesatualizadaError` ou `UsuarioJaVinculadoError`. */
   gravar(input: GravarVinculo, expectedVersion: number): Promise<VinculoColaborador>;
-  /** Desfaz o vínculo de forma atômica; lança `VersaoDesatualizadaError`. */
-  remover(codigoColaborador: number, expectedVersion: number): Promise<void>;
+  /** Esvazia o registro de forma atômica, incrementando a `version`; lança `VersaoDesatualizadaError`, também se não há registro. */
+  desfazer(codigoColaborador: number, expectedVersion: number, atualizadoPor: string): Promise<VinculoColaborador>;
 }
 
 export class MemoryVinculoStore implements VinculoStore {
@@ -55,9 +61,9 @@ export class MemoryVinculoStore implements VinculoStore {
     return vinculo;
   }
 
-  async remover(codigoColaborador: number, expectedVersion: number): Promise<void> {
-    this.assertVersao(codigoColaborador, expectedVersion);
-    this.vinculos.delete(codigoColaborador);
+  async desfazer(codigoColaborador: number, expectedVersion: number, atualizadoPor: string): Promise<VinculoColaborador> {
+    if (expectedVersion === 0) throw new VersaoDesatualizadaError();
+    return this.gravar({ codigoColaborador, usuarioId: null, lojas: [], atualizadoPor }, expectedVersion);
   }
 
   private assertVersao(codigoColaborador: number, expectedVersion: number): void {
