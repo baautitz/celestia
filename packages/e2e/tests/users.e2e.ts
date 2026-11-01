@@ -13,7 +13,7 @@ test("cadastra um usuario, redefine a senha e o desativa", async ({ page }) => {
   await sheet.getByLabel("E-mail").fill(`${username}@empresa.com`);
   await sheet.getByRole("combobox", { name: "Perfil de Acesso" }).click();
   await page.getByRole("option", { name: "Operadores" }).click();
-  await sheet.getByLabel("Senha Inicial").fill("Senha@123");
+  await sheet.getByLabel("Senha Inicial", { exact: true }).fill("Senha@123");
   await sheet.getByRole("button", { name: "Cadastrar Usuário" }).click();
 
   await expect(page.getByText("Usuário cadastrado com sucesso!")).toBeVisible();
@@ -22,7 +22,7 @@ test("cadastra um usuario, redefine a senha e o desativa", async ({ page }) => {
 
   await row.getByRole("button", { name: "Redefinir Senha" }).click();
   const reset = page.getByRole("dialog", { name: "Redefinir Senha" });
-  await reset.getByLabel("Nova Senha").fill("Outra@1234");
+  await reset.getByLabel("Nova Senha", { exact: true }).fill("Outra@1234");
   await reset.getByRole("button", { name: "Salvar Senha" }).click();
   await expect(page.getByText(`Senha de ${username} redefinida com sucesso!`)).toBeVisible();
 
@@ -41,7 +41,7 @@ test("rejeita senha fora da politica", async ({ page }) => {
   await sheet.getByLabel("Nome de Usuário").fill("maria.souza");
   await sheet.getByRole("combobox", { name: "Perfil de Acesso" }).click();
   await page.getByRole("option", { name: "Operadores" }).click();
-  await sheet.getByLabel("Senha Inicial").fill("fraca");
+  await sheet.getByLabel("Senha Inicial", { exact: true }).fill("fraca");
   await sheet.getByRole("button", { name: "Cadastrar Usuário" }).click();
 
   await expect(page.getByRole("row", { name: /maria\.souza/ })).toHaveCount(0);

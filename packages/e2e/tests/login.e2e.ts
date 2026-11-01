@@ -5,7 +5,7 @@ test.describe("login", () => {
   test("rejeita senha incorreta e permanece na tela de login", async ({ page }) => {
     await page.goto("/");
     await page.getByLabel("Usuário").fill(ADMIN_USERNAME);
-    await page.getByLabel("Senha").fill("Errada@123");
+    await page.getByLabel("Senha", { exact: true }).fill("Errada@123");
     await page.getByRole("button", { name: "Entrar" }).click();
 
     await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible();
@@ -22,7 +22,7 @@ test.describe("login", () => {
   test("entra com credenciais validas e sai da tela de login", async ({ page }) => {
     await page.goto("/");
     await page.getByLabel("Usuário").fill(ADMIN_USERNAME);
-    await page.getByLabel("Senha").fill(ADMIN_PASSWORD);
+    await page.getByLabel("Senha", { exact: true }).fill(ADMIN_PASSWORD);
     await page.getByRole("button", { name: "Entrar" }).click();
 
     await expect(page.getByRole("button", { name: "Entrar" })).toBeHidden();

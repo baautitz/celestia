@@ -12,6 +12,7 @@ import {
 import { useLatest } from "../hooks/use-latest";
 import { Input } from "../components/input";
 import { MoneyInput } from "../components/money-input";
+import { PasswordInput } from "../components/password-input";
 import { Textarea } from "../components/textarea";
 import { Switch } from "../components/switch";
 import { DatePicker } from "../components/date-picker";
@@ -133,8 +134,7 @@ const PasswordField: React.FC<FieldProps<FieldOf<"password">>> = ({ field, form 
       <FormItem>
         <FormLabel>{field.label}</FormLabel>
         <FormControl>
-          <Input
-            type="password"
+          <PasswordInput
             autoComplete="new-password"
             placeholder={field.placeholder}
             value={String(rhf.value ?? "")}

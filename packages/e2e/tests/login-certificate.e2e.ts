@@ -5,7 +5,7 @@ import { loginAsAdmin, openMenu } from "./helpers";
 const signIn = async (page: import("@playwright/test").Page) => {
   await page.goto("/");
   await page.getByLabel("Usuário").fill(CERT_USERNAME);
-  await page.getByLabel("Senha").fill(CERT_PASSWORD);
+  await page.getByLabel("Senha", { exact: true }).fill(CERT_PASSWORD);
   await page.getByRole("button", { name: "Entrar" }).click();
 };
 
