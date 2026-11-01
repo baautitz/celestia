@@ -189,6 +189,28 @@ describe("ColaboradoresPage", () => {
     expect(apiFetch.mock.calls.slice(1).map(([url]) => url)).toEqual(["/api/m/inovafarma/colaboradores/7/vinculo", "/api/m/inovafarma/colaboradores"]);
   });
 
+  it("mover um Usuário de um Colaborador para outro grava primeiro quem o libera, qualquer que seja a ordem da tabela", async () => {
+    const bruno = { codigoColaborador: 9, nome: "BRUNO LIMA", ativo: true, ...vinculadoAna, usuarioId: "bia", usuario: { ...bia, status: "active" }, version: 2 };
+    const ana7 = { codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...pendente };
+    apiFetch.mockResolvedValueOnce(revalidada([ana7, bruno]));
+    render(<ColaboradoresPage />);
+    await escolherUsuario(await linha("ANA SOUZA"), "Bia Lima");
+    fireEvent.click(within(await linha("BRUNO LIMA")).getByRole("button", { name: "Limpar Usuário" }));
+
+    apiFetch.mockResolvedValueOnce({ codigoColaborador: 9, ...pendente, version: 3 });
+    apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, lojas: [], version: 1, avisos: [], sugestao: null });
+    apiFetch.mockResolvedValueOnce(revalidada([{ ...ana7, confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, version: 1 }, { ...bruno, ...pendente, version: 3 }]));
+    fireEvent.click(salvarTudo());
+
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "2 vínculos salvos" })));
+    // O Colaborador 9 (que libera a Usuária Bia) vai antes do 7 (que a recebe), embora o 7 venha antes na tabela.
+    expect(apiFetch.mock.calls.slice(1).map(([url]) => url)).toEqual([
+      "/api/m/inovafarma/colaboradores/9/vinculo",
+      "/api/m/inovafarma/colaboradores/7/vinculo",
+      "/api/m/inovafarma/colaboradores",
+    ]);
+  });
+
   it("limpar o campo e salvar desfaz o vínculo e devolve a Pendente", async () => {
     apiFetch.mockResolvedValueOnce(listaComVinculo);
     render(<ColaboradoresPage />);

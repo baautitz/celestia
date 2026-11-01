@@ -273,8 +273,11 @@ export function ColaboradoresPage() {
     setSalvandoTudo(true);
     setFalhas({});
     const erros: { row: Colaborador; erro: Error }[] = [];
-    // Uma a uma e na ordem da tabela: dois Colaboradores com o mesmo Usuário falham de forma previsível.
-    for (const { row, edicao } of pendentes) {
+    // Uma a uma e na ordem da tabela, mas quem libera um Usuário vai antes: mover um Usuário de um Colaborador para outro
+    // só funciona gravando primeiro quem o larga. Dois Colaboradores com o mesmo Usuário seguem falhando de forma previsível.
+    const libera = ({ row, edicao }: { row: Colaborador; edicao: Rascunho }) => row.usuarioId !== null && edicao.usuarioId !== row.usuarioId;
+    const emOrdem = [...pendentes].sort((a, b) => Number(libera(b)) - Number(libera(a)));
+    for (const { row, edicao } of emOrdem) {
       const erro = await gravar(row, edicao);
       if (erro) erros.push({ row, erro });
     }
