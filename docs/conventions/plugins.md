@@ -21,7 +21,7 @@ integrations/<nome>/
 - Um Plugin importa apenas `@platform/core`, `@platform/ui`, bibliotecas de terceiros e arquivos da própria pasta. Importar `@platform/server`, `@platform/web` ou qualquer caminho fora da pasta falha em `pnpm check:plugins`.
 - O que o Plugin precisa do servidor (ex.: o middleware de autenticação) entra por injeção: o servidor passa em `createXPlugin({ auth })`.
 - Persistência: schema Postgres próprio e migrations em `drizzle/` (`migrations` no `defineModule`). O servidor injeta o banco em `createXPlugin({ db })`; sem ele, o Plugin usa a store em memória.
-- Usuários e Audit Log vêm por `services.use`, com `dependsOn: ["iam", "audit"]` (ADR 0002): `iam` expõe `users.list()` (só `id`, `fullname`, `username`, `status`) e `audit` expõe `log.declareAction()` e `log.record()`.
+- Usuários e Audit Log vêm por `services.use`, com `dependsOn: ["iam", "audit"]` (ADR 0002): `iam` expõe `users.list()` (só `id`, `fullname`, `username`, `status`), `audit` expõe `log.declareAction()` e `log.record()` e `closing_period` expõe `periods.list()` (só `id`, `name`, `startDate`, `endDate`, `status`). Um Plugin que usa `periods` declara `closing_period` no `dependsOn` (o InovaFarma, nos Pré-vencidos).
 - Permissions seguem `<id>:<recurso>:<acao>`; rotas ficam em `/api/m/<id>` (ou no `prefix` declarado).
 
 ## Menu: Seções e posição

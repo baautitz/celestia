@@ -23,6 +23,13 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 - Tema: somente claro (sem theme provider).
 - Fronteira: fora de `packages/ui`, `pnpm check:ui` proíbe importar `sonner`, `@base-ui/react/*` e `@/components/ui`, e `open=`/`onOpenChange=` declarativos em Dialog/Sheet/AlertDialog/Popover.
 
+## Listas de opções
+
+- `Select`: a lista abre com no mínimo a largura do campo e cresce até o espaço disponível na tela; opções longas quebram em mais de uma linha, nunca são cortadas. Não limite a largura da lista por `className`.
+- Escolha entre resultados de uma busca (produto, usuário, cadastro grande) usa `Combobox`, não `Select`. Quando os resultados vêm do servidor, o campo é um só: `filter={null}`, `inputValue`/`onInputValueChange` controlados, busca com espera curta (cerca de 300 ms) a partir do mínimo de caracteres, e um único resultado já fica escolhido. Sem botão "Buscar" nem segundo campo. Exemplo: `integrations/inovafarma/src/pre-vencido-window.tsx`.
+- Abas (`Tabs`): `Tabs` com só a `TabsList`, controlada por `value`/`onValueChange`; o conteúdo da aba ativa vem logo abaixo, os dois dentro de `<Stack gap="section">`. Não use `Stack padding` em volta do conteúdo (a largura estoura) nem `TabsContent`, que cola o conteúdo na lista de abas.
+- Estado de sucesso em etiqueta: `Badge variant="success"` (verde), com `destructive` para o oposto.
+
 ## Botões
 
 - Com texto: `size="default"` (ou omitir). Nunca `sm`, `xs` ou `lg`.
@@ -33,6 +40,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 
 - `<Form>`, `<FormField>`, `<FormItem>`, `<FormLabel>`, `<FormControl>`, `<FormMessage>` com `react-hook-form` e `zodResolver`.
 - Rótulos sempre com `<Label>`, nunca `<label>`.
+- Datas: `<DatePicker />` (dia), `<DateRangePicker />` (intervalo) e `<MonthPicker />` (mês e ano, valor `AAAA-MM`) de `@platform/ui/components/*`. Nunca `<Input type="date" | "month" | "week" | "time" | "datetime-local" />`, que abre o seletor nativo do navegador; `pnpm check:ui` rejeita. Falta um tipo de campo? Crie o componente na biblioteca em vez de usar o nativo.
 - Dinheiro: `<MoneyInput />` (máscara em centavos, `R$ 0,00`). Nunca `<Input type="number" step="0.01" />`.
 - Busca e inputs com ícone: `InputGroup`, `InputGroupAddon`, `InputGroupInput`. Nunca `<div className="relative">` com ícone absoluto.
 
