@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
-import { TrendingUp, RefreshCw, Calendar, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal } from "lucide-react";
+import { TrendingUp, RefreshCw, Calendar, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
@@ -21,6 +21,19 @@ interface Loja {
   codigoEmpresa: number;
   nome: string;
 }
+
+/** Escopo do relatório; o servidor decide quais o Usuário tem (Permission e vínculo). */
+type Visualizacao = "geral" | "loja" | "individual";
+
+interface VisualizacaoDisponivel {
+  id: Visualizacao;
+  /** Lojas que a Visualização permite filtrar; vazio em Individual. */
+  lojas: Loja[];
+}
+
+const VISUALIZACAO_LABEL: Record<Visualizacao, string> = { geral: "Geral", loja: "Loja", individual: "Individual" };
+
+const SEM_VISUALIZACAO = "Seu perfil não possui nenhuma visualização disponível.";
 
 type Categoria = "vitaminas" | "genericos" | "similares" | "incentivos" | "totalFoco";
 type CategoriaTotais = Record<Categoria, { quantidade: number; valor: number }>;
@@ -252,12 +265,13 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
 interface Filtros {
   periodId: string;
   loja: string;
+  visualizacao: Visualizacao;
 }
 
 const periodLabel = (p: ClosingPeriod) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})`;
 
-const lojaLabel = (lojas: Loja[], loja: string) =>
-  loja === "all" ? "Todas as Filiais" : lojas.find((l) => String(l.codigoEmpresa) === loja)?.nome || `Filial ${loja}`;
+const lojaLabel = (lojas: Loja[], loja: string, visualizacao: Visualizacao = "geral") =>
+  loja === "all" ? (visualizacao === "loja" ? "Todas as minhas Lojas" : "Todas as Filiais") : lojas.find((l) => String(l.codigoEmpresa) === loja)?.nome || `Filial ${loja}`;
 
 function StatusBadge({ status }: { status: ClosingPeriod["status"] }) {
   return (
@@ -285,18 +299,36 @@ function FiltroSelect({ icon, label, children }: { icon: ReactNode; label: strin
 /** Seletores de Período de Fechamento e Filial, na barra do desktop e no drawer do celular. */
 function FiltrosCampos({
   periods,
-  lojas,
+  visualizacoes,
   value,
   onChange,
 }: {
   periods: ClosingPeriod[];
-  lojas: Loja[];
+  visualizacoes: VisualizacaoDisponivel[];
   value: Filtros;
   onChange: (next: Filtros) => void;
 }) {
   const period = periods.find((p) => p.id === value.periodId);
+  const lojas = visualizacoes.find((v) => v.id === value.visualizacao)?.lojas ?? [];
   return (
     <>
+      {visualizacoes.length > 1 && (
+        <FiltroSelect icon={<Eye />} label="Visualização">
+          <Select value={value.visualizacao} onValueChange={(val) => val && onChange({ ...value, visualizacao: val as Visualizacao, loja: "all" })}>
+            <SelectTrigger>
+              <SelectValue>{VISUALIZACAO_LABEL[value.visualizacao]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {visualizacoes.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {VISUALIZACAO_LABEL[v.id]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FiltroSelect>
+      )}
+
       <FiltroSelect icon={<Calendar />} label="Período de Fechamento">
         <Select value={value.periodId} onValueChange={(val) => val && onChange({ ...value, periodId: val })}>
           <SelectTrigger>
@@ -319,32 +351,34 @@ function FiltrosCampos({
         </Select>
       </FiltroSelect>
 
-      <FiltroSelect icon={<Store />} label="Filial / Loja">
-        <Select value={value.loja} onValueChange={(val) => val && onChange({ ...value, loja: val })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Todas as Filiais">{lojaLabel(lojas, value.loja)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as Filiais</SelectItem>
-            {lojas.map((l) => (
-              <SelectItem key={l.codigoEmpresa} value={String(l.codigoEmpresa)}>
-                {l.codigoEmpresa} - {l.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FiltroSelect>
+      {value.visualizacao !== "individual" && (
+        <FiltroSelect icon={<Store />} label="Filial / Loja">
+          <Select value={value.loja} onValueChange={(val) => val && onChange({ ...value, loja: val })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todas as Filiais">{lojaLabel(lojas, value.loja, value.visualizacao)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{lojaLabel(lojas, "all", value.visualizacao)}</SelectItem>
+              {lojas.map((l) => (
+                <SelectItem key={l.codigoEmpresa} value={String(l.codigoEmpresa)}>
+                  {l.codigoEmpresa} - {l.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FiltroSelect>
+      )}
     </>
   );
 }
 
 /** Filtros no drawer do celular: só valem ao tocar em Aplicar, para não consultar o ERP a cada troca. */
-function FiltrosDrawer({ periods, lojas, initial }: { periods: ClosingPeriod[]; lojas: Loja[]; initial: Filtros }) {
+function FiltrosDrawer({ periods, visualizacoes, initial }: { periods: ClosingPeriod[]; visualizacoes: VisualizacaoDisponivel[]; initial: Filtros }) {
   const { resolve } = useWindow<Filtros>();
   const [draft, setDraft] = useState(initial);
   return (
     <>
-      <FiltrosCampos periods={periods} lojas={lojas} value={draft} onChange={setDraft} />
+      <FiltrosCampos periods={periods} visualizacoes={visualizacoes} value={draft} onChange={setDraft} />
       <WindowActions>
         <WindowCancelButton />
         <Button onClick={() => resolve(draft)}>Aplicar</Button>
@@ -357,7 +391,9 @@ function VendasComissoesPage() {
   const ui = useUi();
   const [periods, setPeriods] = useState<ClosingPeriod[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
-  const [lojas, setLojas] = useState<Loja[]>([]);
+  // null enquanto carrega; vazio quando o Usuário não tem nenhuma Visualização disponível.
+  const [visualizacoes, setVisualizacoes] = useState<VisualizacaoDisponivel[] | null>(null);
+  const [visualizacao, setVisualizacao] = useState<Visualizacao>("geral");
   const [selectedLoja, setSelectedLoja] = useState<string>("all");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -369,19 +405,24 @@ function VendasComissoesPage() {
   useEffect(() => {
     async function initFilters() {
       try {
-        const [periodsData, lojasData] = await Promise.all([
+        const [periodsData, visualizacoesData] = await Promise.all([
           apiFetch<ClosingPeriod[]>("/api/closing-periods").catch((err) => {
             console.error("Erro ao buscar períodos:", err);
             return [] as ClosingPeriod[];
           }),
-          apiFetch<Loja[]>("/api/m/inovafarma/lojas").catch((err) => {
-            console.error("Erro ao buscar lojas:", err);
-            return [] as Loja[];
-          }),
+          apiFetch<{ visualizacoes: VisualizacaoDisponivel[] }>("/api/m/inovafarma/relatorios/vendas-colaborador/visualizacoes")
+            .then((r) => r.visualizacoes)
+            .catch((err) => {
+              console.error("Erro ao buscar visualizações:", err);
+              return [] as VisualizacaoDisponivel[];
+            }),
         ]);
 
         setPeriods(periodsData);
-        setLojas(lojasData);
+        setVisualizacoes(visualizacoesData);
+        // A mais ampla que o Usuário tem; o servidor entrega em ordem Geral, Loja, Individual.
+        if (visualizacoesData[0]) setVisualizacao(visualizacoesData[0].id);
+        else setLoading(false);
 
         if (periodsData.length > 0) {
           const initial = periodsData.find((p) => p.status === "open") || periodsData[0];
@@ -400,7 +441,7 @@ function VendasComissoesPage() {
   const selectedPeriod = periods.find((p) => p.id === selectedPeriodId);
 
   const fetchRelatorio = useCallback(async () => {
-    if (!selectedPeriod) {
+    if (!selectedPeriod || !visualizacoes?.length) {
       setLoading(false);
       return;
     }
@@ -408,8 +449,8 @@ function VendasComissoesPage() {
     setError(null);
     try {
       const fetchVendas = (dataInicio: string, dataFim: string) => {
-        const params = new URLSearchParams({ dataInicio, dataFim });
-        if (selectedLoja !== "all") {
+        const params = new URLSearchParams({ dataInicio, dataFim, visualizacao });
+        if (visualizacao !== "individual" && selectedLoja !== "all") {
           params.append("codigoEmpresa", selectedLoja);
         }
         return apiFetch<RelatorioVendas>(`/api/m/inovafarma/relatorios/vendas-colaborador?${params.toString()}`);
@@ -441,27 +482,30 @@ function VendasComissoesPage() {
     } finally {
       setLoading(false);
     }
-  }, [periods, selectedPeriod, selectedLoja]);
+  }, [periods, selectedPeriod, selectedLoja, visualizacao, visualizacoes]);
 
   useEffect(() => {
     if (selectedPeriodId) {
       void fetchRelatorio();
     }
-  }, [selectedPeriodId, selectedLoja, fetchRelatorio]);
+  }, [selectedPeriodId, selectedLoja, visualizacao, fetchRelatorio]);
 
-  const selectedLojaLabel = lojaLabel(lojas, selectedLoja);
+  const lojas = visualizacoes?.find((v) => v.id === visualizacao)?.lojas ?? [];
+  // Individual não filtra por Loja: o rótulo mostra o escopo da Visualização.
+  const selectedLojaLabel = visualizacao === "individual" ? "Individual" : lojaLabel(lojas, selectedLoja, visualizacao);
 
-  const filtros: Filtros = { periodId: selectedPeriodId, loja: selectedLoja };
+  const filtros: Filtros = { periodId: selectedPeriodId, loja: selectedLoja, visualizacao };
   const applyFiltros = (next: Filtros) => {
     setSelectedPeriodId(next.periodId);
     setSelectedLoja(next.loja);
+    setVisualizacao(next.visualizacao);
   };
 
   const openFiltros = async () => {
     const result = await ui.windows.open<Filtros>({
       surface: "drawer",
       title: "Filtros",
-      content: () => <FiltrosDrawer periods={periods} lojas={lojas} initial={filtros} />,
+      content: () => <FiltrosDrawer periods={periods} visualizacoes={visualizacoes ?? []} initial={filtros} />,
     });
     if (result.status === "confirmed") applyFiltros(result.value);
   };
@@ -477,6 +521,16 @@ function VendasComissoesPage() {
       ? { current: pick(resumo), previous: pick(anterior.resumo), label: anterior.label, format, favorable }
       : undefined;
 
+  if (visualizacoes?.length === 0) {
+    return (
+      <Alert>
+        <AlertCircle />
+        <AlertTitle>{SEM_VISUALIZACAO}</AlertTitle>
+        <AlertDescription>Peça a um gestor para ajustar as permissões ou o vínculo do seu Colaborador.</AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <Stack gap="section">
       {/* Barra de Filtros (desktop) */}
@@ -490,7 +544,7 @@ function VendasComissoesPage() {
           surface="card"
         >
           <Stack direction="row" wrap align="end" gap="section" grow>
-            <FiltrosCampos periods={periods} lojas={lojas} value={filtros} onChange={applyFiltros} />
+            <FiltrosCampos periods={periods} visualizacoes={visualizacoes ?? []} value={filtros} onChange={applyFiltros} />
 
             {selectedPeriod && (
               <Stack direction="row" align="center" gap="field" height="control" surface="muted">
@@ -712,8 +766,13 @@ export const inovafarmaWebModule = defineWebModule({
       path: "/inovafarma/vendas",
       section: "reports",
       order: 10,
-      permission: "inovafarma:integration:view",
+      permission: "inovafarma:vendas-geral:view",
       component: VendasComissoesPage,
+      // Quem só tem Loja ou Individual também abre a tela; ela mostra a Visualização que o servidor liberar.
+      variants: [
+        { permission: "inovafarma:vendas-loja:view", component: VendasComissoesPage },
+        { permission: "inovafarma:vendas-individual:view", component: VendasComissoesPage },
+      ],
     },
   ],
 });

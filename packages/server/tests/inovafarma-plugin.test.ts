@@ -188,7 +188,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
           },
         ];
     });
-    const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: mockClient });
+    const { platform, headers } = await boot(["inovafarma:vendas-geral:view"], { inovafarma: mockClient });
     const res = await platform.app.request(
       "/api/m/inovafarma/relatorios/vendas-colaborador?dataInicio=2026-10-01&dataFim=2026-10-31",
       { headers }
@@ -222,6 +222,99 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       participacaoPercent: (10000 / 15000) * 100,
       cadastroPercent: 40,
       categorias: expect.any(Object),
+    });
+  });
+
+  describe("Visualizações do Desempenho de Vendas", () => {
+    const RELATORIO = "/api/m/inovafarma/relatorios/vendas-colaborador";
+    const PERIODO = "dataInicio=2026-10-01&dataFim=2026-10-31";
+    const sqls: { sql: string; params?: Record<string, unknown> }[] = [];
+    const erp = mockErpClient(async (sql, params) => {
+      if (sql.includes("FROM Funcionario")) return [{ codigoColaborador: 7, nome: "ANA", ativo: true }];
+      if (sql.includes("Config")) return [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }, { codigoEmpresa: 3, nome: "Norte" }];
+      sqls.push({ sql, params });
+      return sql.includes("totalVendasGeral") ? [{ totalVendasGeral: 0, totalVendasComCadastro: 0 }] : [];
+    });
+
+    /** Boot com o Usuário "u" vinculado ao Colaborador 7 nas Lojas 1 e 2 (ou sem vínculo). */
+    async function bootVinculado(permissions: string[], vinculado = true) {
+      const ctx = await boot([...permissions, "inovafarma:colaboradores:update"], { inovafarma: erp });
+      if (vinculado) {
+        const res = await ctx.platform.app.request("/api/m/inovafarma/colaboradores/7/vinculo", {
+          method: "PUT",
+          headers: { ...ctx.headers, "content-type": "application/json" },
+          body: JSON.stringify({ usuarioId: "u", lojas: [1, 2], version: 0 }),
+        });
+        expect(res.status).toBe(200);
+      }
+      sqls.length = 0;
+      return ctx;
+    }
+
+    it("lista as disponíveis em ordem Geral, Loja, Individual, com as Lojas que cada uma permite filtrar", async () => {
+      const { platform, headers } = await bootVinculado([
+        "inovafarma:vendas-individual:view",
+        "inovafarma:vendas-geral:view",
+        "inovafarma:vendas-loja:view",
+      ]);
+      const res = await platform.app.request(`${RELATORIO}/visualizacoes`, { headers });
+      expect(await res.json()).toEqual({
+        visualizacoes: [
+          { id: "geral", lojas: [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }, { codigoEmpresa: 3, nome: "Norte" }] },
+          { id: "loja", lojas: [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }] },
+          { id: "individual", lojas: [] },
+        ],
+      });
+    });
+
+    it("Loja e Individual exigem vínculo; sem ele só resta o que a Permission liberar sem vínculo", async () => {
+      const { platform, headers } = await bootVinculado(["inovafarma:vendas-loja:view", "inovafarma:vendas-individual:view"], false);
+      expect(await (await platform.app.request(`${RELATORIO}/visualizacoes`, { headers })).json()).toEqual({ visualizacoes: [] });
+      const res = await platform.app.request(`${RELATORIO}?${PERIODO}`, { headers });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: "Seu perfil não possui nenhuma visualização disponível." });
+      expect(sqls).toEqual([]);
+    });
+
+    it("nega uma Visualização que o Usuário não tem, sem cair para outra", async () => {
+      const { platform, headers } = await bootVinculado(["inovafarma:vendas-individual:view"]);
+      const res = await platform.app.request(`${RELATORIO}?${PERIODO}&visualizacao=geral`, { headers });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        error: "Acesso negado: o usuário não possui permissão para a Visualização Geral do Desempenho de Vendas.",
+      });
+      expect((await platform.app.request(`${RELATORIO}?${PERIODO}&visualizacao=xyz`, { headers })).status).toBe(400);
+    });
+
+    it("Loja filtra pelas Lojas do vínculo, de qualquer vendedor, e recusa Loja fora do vínculo", async () => {
+      const { platform, headers } = await bootVinculado(["inovafarma:vendas-loja:view"]);
+      expect((await platform.app.request(`${RELATORIO}?${PERIODO}`, { headers })).status).toBe(200);
+      expect(sqls[0]?.sql).toContain("v.CodigoEmpresa IN (@loja0, @loja1)");
+      expect(sqls[0]?.sql).not.toContain("@codigoColaborador");
+      expect(sqls[0]?.params).toMatchObject({ loja0: 1, loja1: 2 });
+
+      sqls.length = 0;
+      expect((await platform.app.request(`${RELATORIO}?${PERIODO}&codigoEmpresa=2`, { headers })).status).toBe(200);
+      expect(sqls[0]?.params).toMatchObject({ loja0: 2 });
+
+      sqls.length = 0;
+      expect((await platform.app.request(`${RELATORIO}?${PERIODO}&codigoEmpresa=3`, { headers })).status).toBe(403);
+      expect(sqls).toEqual([]);
+    });
+
+    it("Individual filtra pelo Colaborador vinculado, em qualquer Loja", async () => {
+      const { platform, headers } = await bootVinculado(["inovafarma:vendas-individual:view"]);
+      expect((await platform.app.request(`${RELATORIO}?${PERIODO}&codigoColaborador=99`, { headers })).status).toBe(200);
+      expect(sqls[0]?.sql).toContain("vp.CodigoFuncionario = @codigoColaborador");
+      expect(sqls[0]?.sql).not.toContain("CodigoEmpresa");
+      expect(sqls[0]?.params).toMatchObject({ codigoColaborador: 7 });
+    });
+
+    it("Geral não filtra por vendedor nem por Loja, salvo a Loja pedida", async () => {
+      const { platform, headers } = await bootVinculado(["inovafarma:vendas-geral:view"]);
+      expect((await platform.app.request(`${RELATORIO}?${PERIODO}`, { headers })).status).toBe(200);
+      expect(sqls[0]?.sql).not.toContain("@codigoColaborador");
+      expect(sqls[0]?.sql).not.toContain("CodigoEmpresa = @");
     });
   });
 
@@ -279,7 +372,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
           },
         ];
     });
-    const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: mockClient });
+    const { platform, headers } = await boot(["inovafarma:vendas-geral:view"], { inovafarma: mockClient });
     const res = await platform.app.request(
       "/api/m/inovafarma/relatorios/vendas-colaborador?dataInicio=2026-10-01&dataFim=2026-10-31",
       { headers }
