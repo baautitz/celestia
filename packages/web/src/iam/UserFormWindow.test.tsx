@@ -1,0 +1,67 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { UiProvider, useUi } from "@platform/ui/imperative/provider";
+import { Button } from "@platform/ui/components/button";
+import { usersWebService } from "./UserFormWindow";
+
+const api = vi.hoisted(() => ({ iam: { listRoles: vi.fn(), createUser: vi.fn(), getPasswordPolicy: vi.fn() } }));
+vi.mock("@/lib/api-client", () => ({ api }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { sub: "me", isAdmin: false } }) }));
+
+const criado = { id: "u9", fullname: "ANA SOUZA", username: "ana_souza" };
+let resultado: unknown;
+
+function Abrir() {
+  const { windows } = useUi();
+  const sugerir = (nome: string) => nome.toLowerCase().split(" ").join("_");
+  return <Button onClick={() => void usersWebService.openCreate(windows, { fullname: "ANA SOUZA", suggestUsername: sugerir }).then((u) => (resultado = u))}>Abrir</Button>;
+}
+
+beforeEach(() => {
+  resultado = undefined;
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: (query: string) => ({
+      matches: false, media: query, onchange: null,
+      addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+    }),
+  });
+  api.iam.listRoles.mockResolvedValue([{ id: "gestor", name: "Gestor", permissions: [] }]);
+  api.iam.createUser.mockResolvedValue(criado);
+  api.iam.getPasswordPolicy.mockResolvedValue({ rules: [{ label: "8 caracteres", pattern: "^[\\s\\S]{8,}$" }, { label: "1 especial", pattern: "[^A-Za-z0-9]" }] });
+});
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe("serviço iam:users", () => {
+  it("abre o cadastro de Usuário com o nome e o username sugerido, sem e-mail, e devolve o Usuário criado", async () => {
+    render(
+      <UiProvider>
+        <Abrir />
+      </UiProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    expect(((await screen.findByLabelText("Nome de Usuário")) as HTMLInputElement).value).toBe("ana_souza");
+    expect((screen.getByLabelText("Nome Completo") as HTMLInputElement).value).toBe("ANA SOUZA");
+    // A lista de requisitos vem da política do IAM e fica verde conforme a senha cumpre cada regra.
+    const requisito = async (label: string) => (await screen.findByText(label)).closest("[role=listitem]")!.getAttribute("data-ok");
+    fireEvent.change(screen.getByLabelText("Senha Inicial"), { target: { value: "abc" } });
+    expect(await requisito("8 caracteres")).toBe("false");
+    expect(await requisito("1 especial")).toBe("false");
+    fireEvent.change(screen.getByLabelText("Senha Inicial"), { target: { value: "Senha@123" } });
+    expect(await requisito("8 caracteres")).toBe("true");
+    expect(await requisito("1 especial")).toBe("true");
+    // O perfil não vem escolhido: sem ele, o cadastro não sai.
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar Usuário" }));
+    expect(await screen.findByText("Selecione o perfil de acesso.")).toBeTruthy();
+    expect(api.iam.createUser).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("combobox", { name: "Perfil de Acesso" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Gestor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar Usuário" }));
+    await waitFor(() => expect(resultado).toEqual(criado));
+    expect(api.iam.createUser).toHaveBeenCalledWith(expect.objectContaining({ fullname: "ANA SOUZA", username: "ana_souza", email: undefined, password: "Senha@123", roleId: "gestor" }));
+  });
+});

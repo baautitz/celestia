@@ -16,7 +16,11 @@ export default defineConfig({
     baseURL: `http://localhost:${WEB_PORT}`,
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: "**/mobile.e2e.ts" },
+    // Tela de iPhone no Chromium: o WebKit não é instalado na CI.
+    { name: "mobile", use: { ...devices["iPhone 13"], defaultBrowserType: "chromium" }, testMatch: "**/mobile.e2e.ts" },
+  ],
   webServer: [
     {
       // Backend com stores em memoria e um administrador semeado (sem Postgres).

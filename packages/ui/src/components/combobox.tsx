@@ -15,7 +15,7 @@ import { ChevronDownIcon, XIcon, CheckIcon } from "lucide-react"
 
 const Combobox = ComboboxPrimitive.Root
 
-const TABLE_CELL_WIDTH = "w-52"
+const TABLE_CELL_WIDTH = "w-full lg:w-52"
 
 function ComboboxValue({ ...props }: ComboboxPrimitive.Value.Props) {
   return <ComboboxPrimitive.Value data-slot="combobox-value" {...props} />
@@ -62,7 +62,7 @@ function ComboboxInput({
   inTableCell = false,
   ...props
 }: ComboboxPrimitive.Input.Props & {
-  /** Largura fixa, para o campo não colapsar em uma coluna de tabela. */
+  /** Largura fixa, para o campo não colapsar em uma coluna de tabela; no celular ocupa a largura toda. */
   inTableCell?: boolean
   showTrigger?: boolean
   showClear?: boolean

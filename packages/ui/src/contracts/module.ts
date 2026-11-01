@@ -36,6 +36,10 @@ export interface MenuSection {
 
 export interface WebModule {
   id: string
+  /** Módulos de que este depende (como no `defineModule` do servidor): só eles podem ser chamados por `useWebService`. */
+  dependsOn?: string[]
+  /** Serviços oferecidos a outros módulos, por nome; obtidos com `useWebService(id, nome)`. */
+  services?: Record<string, unknown>
   /** Seções do Menu declaradas pelo módulo; o `id` é único entre todos os módulos. */
   sections?: MenuSection[]
   entries: NavEntry[]

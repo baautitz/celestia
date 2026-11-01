@@ -175,7 +175,7 @@ class ApiClient {
     createUser: async (user: {
       fullname: string;
       username: string;
-      email: string;
+      email?: string;
       password: string;
       roleId: string;
       allowWithoutCertificate?: boolean;
@@ -219,6 +219,14 @@ class ApiClient {
 
     revokeDevice: async (id: string): Promise<Device> => {
       return this.request<Device>(`/api/iam/devices/${id}/revoke`, { method: "POST" });
+    },
+
+    deleteDevice: async (id: string): Promise<{ success: boolean }> => {
+      return this.request<{ success: boolean }>(`/api/iam/devices/${id}`, { method: "DELETE" });
+    },
+
+    getPasswordPolicy: async (): Promise<{ rules: { label: string; pattern: string }[] }> => {
+      return this.request("/api/iam/password-policy");
     },
 
     listRoles: async (): Promise<Role[]> => {

@@ -18,7 +18,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
   - `Stack surface="banner"`: faixa de título sem borda, com fundo suave.
   - `Stack narrow`: limita a largura a `max-w-sm` para formulários e blocos estreitos.
   - `MultiValueButton`: botão de seleção múltipla que mostra um valor por linha, como o seletor de Lojas em célula de tabela.
-  - `ComboboxInput inTableCell`: fixa a largura do combobox para edição dentro de uma célula de tabela.
+  - `ComboboxInput inTableCell`: fixa a largura do combobox para edição dentro de uma célula de tabela (no celular, ocupa a largura toda).
   - `CenteredNotice`: aviso centralizado dentro da área autenticada (ex.: acesso negado); `CenteredScreen` é para telas cheias fora dela.
 - Tema: somente claro (sem theme provider).
 - Fronteira: fora de `packages/ui`, `pnpm check:ui` proíbe importar `sonner`, `@base-ui/react/*` e `@/components/ui`, e `open=`/`onOpenChange=` declarativos em Dialog/Sheet/AlertDialog/Popover.
@@ -49,6 +49,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 - Rótulos sempre com `<Label>`, nunca `<label>`.
 - Datas: `<DatePicker />` (dia), `<DateRangePicker />` (intervalo) e `<MonthPicker />` (mês e ano, valor `AAAA-MM`) de `@platform/ui/components/*`. Nunca `<Input type="date" | "month" | "week" | "time" | "datetime-local" />`, que abre o seletor nativo do navegador; `pnpm check:ui` rejeita. Falta um tipo de campo? Crie o componente na biblioteca em vez de usar o nativo.
 - Dinheiro: `<MoneyInput />` (máscara em centavos, `R$ 0,00`). Nunca `<Input type="number" step="0.01" />`.
+- Senha: `<PasswordInput />` (olho para mostrar e esconder). Nunca `<Input type="password" />`; `pnpm check:ui` rejeita.
 - Busca e inputs com ícone: `InputGroup`, `InputGroupAddon`, `InputGroupInput`. Nunca `<div className="relative">` com ícone absoluto.
 
 ## UI imperativa (`useUi()`)
@@ -67,6 +68,8 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 ## Tabelas
 
 - `DataTable` de `@platform/ui/data-table/data-table`: desktop renderiza `<Table>`, mobile renderiza `<MobileCard>` via `useIsMobile()`.
+- Coluna com controle editável (combobox, seletor de Lojas) usa `mobileWide: true`: no `MobileCard` ocupa a linha inteira em vez de meia coluna. No celular, a busca ocupa a largura do card.
+- Campos de texto têm 16px no celular (12px do `md` para cima): abaixo disso o Safari do iPhone dá zoom ao focar. Não reduza a fonte de `Input`/`Textarea` por `className`. O E2E `packages/e2e/tests/mobile.e2e.ts` confere isso e que nenhuma página fica mais larga que a tela.
 - Impressão: a prop opcional `print={{ orientation?, description? }}` liga o botão "Imprimir". Use em relatórios e registros (ex.: relatório InovaFarma, Audit Log), não em cadastros. O papel traz todas as linhas da busca e da ordenação atuais, sem paginação, sempre como tabela, com fundos, cabeçalho repetido por folha e rodapé "Emitido em" / "Página X de Y" (este só no Chrome/Edge). A escala reduz a tabela até caber na largura da folha A4. `orientation` padrão é `"portrait"`; use `"landscape"` para tabelas largas. `description` substitui a descrição no papel, por exemplo com os filtros ativos que a tela mostra fora da tabela. O botão fica desabilitado durante o carregamento, sem linhas ou com paginação no servidor.
 - Comparação: a prop opcional `compare` da coluna devolve `{ previous, label, favorable? }` (ex.: o mesmo Colaborador no Período de Fechamento anterior). Requer `value` numérico e `format` numérico. No desktop, a célula inteira abre um tooltip compartilhado pela tabela (atual, anterior e variação), que não captura o mouse. No `MobileCard`, aparece uma linha abaixo do valor (`▲ 8,1% · 381`). Na impressão, nada aparece. Valores em `percent` comparam em p.p.; os demais, em variação percentual. Sem base (anterior zero), a comparação some.
 - Totalizador: a prop opcional `totals` do `DataTable` exibe uma linha final com totais que **quem usa a tabela calcula**; o `DataTable` nunca soma. É um objeto `{ [key da coluna]: valor }` (modo `manual` ou tabela sem busca; recalcule a cada resposta do servidor) ou uma função `(linhasFiltradas) => objeto` (modo local: recebe as linhas da busca atual, de todas as páginas, então o total acompanha a busca; em `manual` ela só vê a página recebida). Cada valor usa o `format` da própria coluna; colunas sem entrada ficam em branco. A primeira coluna sempre mostra o rótulo "Total" (um valor dela em `totals` é ignorado). A linha vem logo após a última linha, em negrito e com borda superior destacada, sem ficar fixa na rolagem. Some com a tabela carregando ou vazia. No papel, aparece no fim da tabela impressa; no `MobileCard`, vira um card final "Total" só com as colunas que têm valor. A prop opcional `totalsCompare` (`{ [key da coluna]: { previous, label, favorable? } }`, o mesmo formato do `compare` da coluna) compara cada total com o anterior (ex.: o total do Período anterior): tooltip na célula do desktop e linha abaixo do valor no card "Total" do `MobileCard`; na impressão, nada aparece. Veja o termo Totalizador em `packages/ui/GLOSSARY.md`.

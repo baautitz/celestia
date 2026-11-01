@@ -3,7 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CreateDeviceInput, Device } from "@platform/shared";
 import { devices } from "./schema.js";
-import { DeviceNotFoundError, DuplicateDeviceFingerprintError, type DeviceStore } from "./device-store.js";
+import { DeviceNotFoundError, DeviceStillActiveError, DuplicateDeviceFingerprintError, type DeviceStore } from "./device-store.js";
 
 type DeviceRow = typeof devices.$inferSelect;
 
@@ -71,5 +71,13 @@ export class PostgresDeviceStore implements DeviceStore {
     const existing = await this.findById(id);
     if (!existing) throw new DeviceNotFoundError();
     return existing;
+  }
+
+  async delete(id: string): Promise<void> {
+    // Só apaga revogado, na mesma instrução: um Dispositivo ativo nunca some por corrida.
+    const apagados = await this.db.delete(devices).where(and(eq(devices.id, id), eq(devices.status, "revoked"))).returning({ id: devices.id });
+    if (apagados.length > 0) return;
+    if (!(await this.findById(id))) throw new DeviceNotFoundError();
+    throw new DeviceStillActiveError();
   }
 }

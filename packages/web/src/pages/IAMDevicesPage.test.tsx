@@ -6,12 +6,12 @@ import { HeaderActionsProvider, useHeaderActions } from "@/context/HeaderActions
 import { IAMDevicesPage } from "./IAMDevicesPage";
 
 const api = vi.hoisted(() => ({
-  iam: { listDevices: vi.fn(), issueDevice: vi.fn(), revokeDevice: vi.fn() },
+  iam: { listDevices: vi.fn(), issueDevice: vi.fn(), revokeDevice: vi.fn(), deleteDevice: vi.fn() },
 }));
 vi.mock("@/lib/api-client", () => ({ api }));
-const permissions = vi.hoisted(() => ({ granted: new Set<string>() }));
+const permissions = vi.hoisted(() => ({ granted: new Set<string>(), isAdmin: false }));
 vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ user: { id: "me", isAdmin: false }, hasPermission: (p: string) => permissions.granted.has(p) }),
+  useAuth: () => ({ user: { id: "me", isAdmin: permissions.isAdmin }, hasPermission: (p: string) => permissions.granted.has(p) }),
 }));
 
 const active = { id: "d1", name: "Caixa 1", status: "active", fingerprint: "a".repeat(64), serial: "01", notAfter: "2036-01-01T00:00:00.000Z", createdAt: "2026-10-30T12:00:00.000Z" };
@@ -19,6 +19,7 @@ const revoked = { ...active, id: "d2", name: "Celular antigo", status: "revoked"
 
 beforeEach(() => {
   permissions.granted = new Set(["system:devices:read", "system:devices:create", "system:devices:revoke"]);
+  permissions.isAdmin = false;
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => ({
@@ -125,6 +126,23 @@ describe("IAMDevicesPage", () => {
     await screen.findByText(/Revogar o certificado do Dispositivo "Caixa 1"\?/);
     fireEvent.click(screen.getByRole("button", { name: "Revogar" }));
     await waitFor(() => expect(api.iam.revokeDevice).toHaveBeenCalledWith("d1"));
+  });
+
+  it("só Administrador exclui, e só o Dispositivo revogado", async () => {
+    renderPage();
+    await screen.findByText("Celular antigo");
+    expect(screen.queryByRole("button", { name: "Excluir Dispositivo" })).toBeNull();
+    cleanup();
+
+    permissions.isAdmin = true;
+    api.iam.deleteDevice.mockResolvedValue({ success: true });
+    renderPage();
+    const botoes = await screen.findAllByRole("button", { name: "Excluir Dispositivo" });
+    expect(botoes).toHaveLength(1);
+    fireEvent.click(botoes[0]!);
+    await screen.findByText(/Excluir o Dispositivo revogado "Celular antigo"\?/);
+    fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
+    await waitFor(() => expect(api.iam.deleteDevice).toHaveBeenCalledWith("d2"));
   });
 
   it("encerra o carregamento sem quebrar quando a API falha", async () => {

@@ -14,6 +14,7 @@ export function declareIamAudit(auditLog: AuditLog): void {
 
   declare("issue_device", Device, (a) => `Emitiu o certificado do Dispositivo "${a.name}".`);
   declare("revoke_device", Device, (a) => `Revogou o Dispositivo "${a.name}".`);
+  declare("delete_device", Device, (a) => `Excluiu o Dispositivo revogado "${a.name}".`);
   declare("login_with_device", z.object({ username: z.string(), deviceName: z.string() }), (a) => `Entrou pelo Dispositivo "${a.deviceName}".`);
   declare(
     "deny_login_without_certificate",

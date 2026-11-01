@@ -76,6 +76,8 @@ export interface DataTableColumn<TRow> {
   skeletonClassName?: string;
   /** Papel no MobileCard; colunas sem papel viram campos. */
   mobileRole?: "primary" | "secondary" | "hidden";
+  /** Ocupa a linha inteira do MobileCard; use em colunas com controle editável. */
+  mobileWide?: boolean;
   /**
    * Valor anterior da célula (ex.: o mesmo Colaborador no Período anterior); `undefined` = sem comparação.
    * Tooltip no desktop, linha abaixo do valor no MobileCard e nada na impressão. Requer `value` numérico.
@@ -502,10 +504,10 @@ export function DataTable<TRow>({
             {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
           </div>
           {(search || printButton) && (
-            <div className="flex items-center gap-2">
+            <div className={cn("flex items-center gap-2", isMobile && "w-full")}>
               {printButton}
               {search && (
-                <InputGroup className={search.className ?? "w-72"}>
+                <InputGroup className={isMobile ? "flex-1" : (search.className ?? "w-72")}>
                   <InputGroupInput
                     type="search"
                     placeholder={search.placeholder ?? "Buscar..."}
@@ -548,7 +550,7 @@ export function DataTable<TRow>({
                   key={getRowId(row)}
                   primary={text(primaryCol, row)}
                   secondary={secondaryCol ? text(secondaryCol, row) : undefined}
-                  fields={fieldCols.map((c) => ({ label: mobileLabel(c), value: mobileCell(c, row) }))}
+                  fields={fieldCols.map((c) => ({ label: mobileLabel(c), value: mobileCell(c, row), wide: c.mobileWide }))}
                   actions={
                     renderExpanded ? (
                       <>

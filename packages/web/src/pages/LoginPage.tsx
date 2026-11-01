@@ -13,6 +13,7 @@ import {
 } from "@platform/ui/components/card";
 import { FieldGroup, Field, FieldLabel, FieldError } from "@platform/ui/components/field";
 import { Input } from "@platform/ui/components/input";
+import { PasswordInput } from "@platform/ui/components/password-input";
 import { Button } from "@platform/ui/components/button";
 import { CenteredScreen, Stack } from "@platform/ui/components/layout";
 import { useUi } from "@platform/ui/imperative/provider";
@@ -90,10 +91,9 @@ export const LoginPage: React.FC = () => {
 
               <Field data-invalid={!!errors.password}>
                 <FieldLabel htmlFor="password">Senha</FieldLabel>
-                <Input
+                <PasswordInput
                   {...register("password")}
                   id="password"
-                  type="password"
                   autoComplete="current-password"
                   aria-invalid={!!errors.password}
                 />

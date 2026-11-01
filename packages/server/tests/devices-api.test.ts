@@ -129,4 +129,25 @@ describe("Dispositivos (/api/iam/devices)", () => {
     expect(serialized).not.toContain(created.password);
     expect(serialized).not.toContain(created.pfx);
   });
+
+  it("só Administrador exclui, só Dispositivo revogado, e grava no Audit Log", async () => {
+    const { issue, as, ca, auditLog } = await setup();
+    const created = (await (await issue("gestor.disp")).json()) as Issued;
+    const excluir = (username: string, id = created.device.id) => as(username).request(`/api/iam/devices/${id}`, { method: "DELETE" });
+
+    expect((await excluir("gestor.disp")).status).toBe(403);
+    const ativo = await excluir("test.root");
+    expect(ativo.status).toBe(409);
+    expect(((await ativo.json()) as { error: string }).error).toBe("Revogue o Dispositivo antes de excluí-lo.");
+
+    await as("gestor.disp").request(`/api/iam/devices/${created.device.id}/revoke`, { method: "POST" });
+    expect((await excluir("test.root")).status).toBe(200);
+    expect(await ca.deviceStore.findById(created.device.id)).toBeNull();
+    // Sem o registro, o certificado continua sem acesso.
+    expect(await ca.deviceStore.findActiveByFingerprint(created.device.fingerprint)).toBeNull();
+    expect((await excluir("test.root")).status).toBe(404);
+
+    const entry = (await auditLog.list({ plugin: "iam" })).find((e) => e.action === "delete_device");
+    expect(entry?.summary).toBe('Excluiu o Dispositivo revogado "Caixa 1".');
+  });
 });

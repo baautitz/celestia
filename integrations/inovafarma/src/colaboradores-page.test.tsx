@@ -14,6 +14,8 @@ vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof
 const feedback = vi.hoisted(() => ({ notify: vi.fn(), notifyError: vi.fn() }));
 const windows = vi.hoisted(() => ({ confirm: vi.fn(), open: vi.fn() }));
 vi.mock("@platform/ui/imperative/provider", () => ({ useUi: () => ({ feedback, windows }) }));
+const usuariosIam = vi.hoisted(() => ({ openCreate: vi.fn() }));
+vi.mock("@platform/ui/contracts/web-services", () => ({ useWebService: () => usuariosIam }));
 
 /** Onde o AppLayout mostraria as ações da página. */
 const CabecalhoSlot = () => <>{useHeaderActions().actions}</>;
@@ -766,10 +768,12 @@ describe("criar Usuário pela tela", () => {
 
   it("o Usuário criado entra como rascunho e só grava ao confirmar", async () => {
     apiFetch.mockResolvedValue({ ...lista, podeCriarUsuario: true });
-    windows.open.mockResolvedValue({ status: "confirmed", value: { id: "novo", fullname: "Novo Usuário", username: "novo" } });
+    usuariosIam.openCreate.mockResolvedValue({ id: "novo", fullname: "Novo Usuário", username: "novo" });
     render(<ColaboradoresPage />);
     const row = await linha("ANA SOUZA");
     fireEvent.click(within(row).getByRole("button", { name: nome }));
+    // O cadastro é o do IAM, com o nome do Colaborador e a sugestão de username.
+    expect(usuariosIam.openCreate).toHaveBeenCalledWith(windows, expect.objectContaining({ fullname: "ANA SOUZA", suggestUsername: expect.any(Function) }));
     await waitFor(() => expect(within(row).getByRole<HTMLInputElement>("combobox", { name: /^Usuário de / }).value).toBe("Novo Usuário"));
     expect(apiFetch).not.toHaveBeenCalledWith(expect.stringContaining("/vinculo"), expect.anything());
   });

@@ -15,7 +15,7 @@ import { DataTable } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { useWindow, WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { formatDate } from "@platform/ui/lib/format";
-import { CheckCircle2, Ban, Copy, Download, MoreHorizontal, MonitorSmartphone, RefreshCw } from "lucide-react";
+import { CheckCircle2, Ban, Copy, Download, MoreHorizontal, MonitorSmartphone, RefreshCw, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
@@ -129,7 +129,7 @@ const CertificateIssuedWindow: React.FC<{ issued: IssuedDevice }> = ({ issued })
 };
 
 export const IAMDevicesPage: React.FC = () => {
-  const { hasPermission } = useAuth();
+  const { user: currentUser, hasPermission } = useAuth();
   const ui = useUi();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
@@ -184,6 +184,23 @@ export const IAMDevicesPage: React.FC = () => {
       ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao revogar o Dispositivo." });
       fetchData();
     }
+  };
+
+  const handleDelete = async (device: Device) => {
+    const confirmed = await ui.windows.confirm({
+      title: "Excluir Dispositivo",
+      description: `Excluir o Dispositivo revogado "${device.name}"? Ele sai da lista; o certificado continua sem acesso.`,
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await api.iam.deleteDevice(device.id);
+      ui.feedback.notify({ type: "success", title: "Dispositivo excluído." });
+    } catch (err: unknown) {
+      ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao excluir o Dispositivo." });
+    }
+    fetchData();
   };
 
   const canCreate = hasPermission("system:devices:create");
@@ -276,9 +293,9 @@ export const IAMDevicesPage: React.FC = () => {
             skeletonClassName: "h-4 w-24",
           },
         ]}
-        rowActions={(d) =>
-          hasPermission("system:devices:revoke") && d.status === "active" ? (
-            <Stack direction="row" justify="end" gap="tight">
+        rowActions={(d) => (
+          <Stack direction="row" justify="end" gap="tight">
+            {hasPermission("system:devices:revoke") && d.status === "active" && (
               <Button
                 variant="ghost"
                 tone="destructive"
@@ -289,9 +306,14 @@ export const IAMDevicesPage: React.FC = () => {
               >
                 <Ban />
               </Button>
-            </Stack>
-          ) : null
-        }
+            )}
+            {currentUser?.isAdmin && d.status === "revoked" && (
+              <Button variant="ghost" tone="destructive" size="icon" aria-label="Excluir Dispositivo" title="Excluir Dispositivo" onClick={() => void handleDelete(d)}>
+                <Trash2 />
+              </Button>
+            )}
+          </Stack>
+        )}
       />
     </Stack>
   );

@@ -10,13 +10,14 @@ import type { JWTAccessPayload, PermissionItem, User } from "@platform/shared";
 import { grantDeniedMessage, missingGrants } from "./can-grant.js";
 import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
+import { hasPermission } from "./has-permission.js";
 import type { TokenService } from "./token-service.js";
 import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
-import { CertificateAuthorityUnavailableError, DeviceNotFoundError, type CertificateAuthorityClient } from "./certificate-authority-client.js";
+import { CertificateAuthorityUnavailableError, DeviceNotFoundError, DeviceStillActiveError, type CertificateAuthorityClient } from "./certificate-authority-client.js";
 import type { AuditLog } from "../audit/audit-log.js";
 import { DEVICE_AUDIT_TARGET, IAM_AUDIT_PLUGIN, USER_AUDIT_TARGET, declareIamAudit } from "./iam-audit.js";
 import { LoginRateLimiter } from "./login-rate-limiter.js";
-import { PasswordService, PasswordPolicySchema } from "./password-service.js";
+import { PASSWORD_RULES, PasswordService, PasswordPolicySchema } from "./password-service.js";
 
 /** Pasta de migrations do Module `iam` (schema Postgres "iam"). */
 export const IAM_MIGRATIONS = { folder: resolve(import.meta.dirname, "migrations"), schema: "iam" };
@@ -56,7 +57,7 @@ function clientIp(c: Context): string | undefined {
 }
 
 const LAST_ADMIN = LAST_ADMIN_MESSAGE;
-const ADMIN_TARGET_ONLY = "Somente administradores podem excluir ou inativar outro administrador.";
+const ADMIN_TARGET_ONLY = "Somente administradores podem inativar outro administrador.";
 const CERTIFICATE_REQUIRED = "Dispositivo não autorizado.";
 const CERTIFICATE_EXEMPTION_ADMIN_ONLY = "Somente administradores podem alterar o acesso sem certificado.";
 const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
@@ -263,6 +264,11 @@ export function createIamModule({
 
       routes.get("/auth/me", auth, async (c) => c.json(c.get("user")));
 
+      // A tela mostra o que a senha já cumpre; a validação continua no servidor.
+      routes.get("/iam/password-policy", auth, (c) =>
+        c.json({ rules: PASSWORD_RULES.map(({ label, pattern }) => ({ label, pattern: pattern.source })) }),
+      );
+
       // ───────── Users e Roles ─────────
       const actorOf = (c: Context): string => getAuthenticatedUser(c).sub;
       const failure = (err: unknown, fallback: string): string => (err instanceof Error ? err.message : fallback);
@@ -294,7 +300,7 @@ export function createIamModule({
 
       // ───────── Dispositivos ─────────
       const DeviceBody = z.object({ name: z.string().trim().min(1).max(100) });
-      const auditDevice = (c: Context, action: "issue_device" | "revoke_device", device: { id: string; name: string }) =>
+      const auditDevice = (c: Context, action: "issue_device" | "revoke_device" | "delete_device", device: { id: string; name: string }) =>
         recordIamAudit(requestActor(c), action, { type: DEVICE_AUDIT_TARGET, id: device.id }, { name: device.name });
 
       const unavailable = (c: Context, err: unknown) => {
@@ -340,6 +346,24 @@ export function createIamModule({
           if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
           if (err instanceof CertificateAuthorityUnavailableError) return unavailable(c, err);
           return c.json({ error: failure(err, "Erro ao revogar o Dispositivo.") }, 400);
+        }
+      });
+
+      // Excluir apaga o registro de um Dispositivo já revogado: só Administrador.
+      routes.delete("/iam/devices/:id", auth, async (c) => {
+        if (!getAuthenticatedUser(c).isAdmin) return c.json({ error: "Somente administradores podem excluir Dispositivos." }, 403);
+        const id = c.req.param("id");
+        try {
+          const device = await certificateAuthority.getDevice(id);
+          if (!device) return c.json({ error: new DeviceNotFoundError().message }, 404);
+          await certificateAuthority.deleteDevice(id);
+          await auditDevice(c, "delete_device", device);
+          return c.json({ success: true });
+        } catch (err: unknown) {
+          if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
+          if (err instanceof DeviceStillActiveError) return c.json({ error: err.message }, 409);
+          if (err instanceof CertificateAuthorityUnavailableError) return unavailable(c, err);
+          return c.json({ error: failure(err, "Erro ao excluir o Dispositivo.") }, 400);
         }
       });
 
@@ -404,6 +428,10 @@ export function createIamModule({
           const id = c.req.param("id");
           const { isAdmin, ...body } = c.req.valid("json");
           const caller = getAuthenticatedUser(c);
+          // Ativar e desativar tem permissão própria ("Inativar Usuários"), além de editar.
+          if (body.status !== undefined && !hasPermission(caller.permissions, P["users:deactivate"])) {
+            return c.json({ error: "Acesso negado: permissões insuficientes.", required: [P["users:deactivate"]] }, 403);
+          }
           // Isentar do certificado é tão sensível quanto o flag de administrador: só administrador altera.
           if (body.allowWithoutCertificate !== undefined && !caller.isAdmin) {
             return c.json({ error: CERTIFICATE_EXEMPTION_ADMIN_ONLY }, 403);
@@ -475,13 +503,14 @@ export function createIamModule({
         },
       );
 
-      routes.delete("/iam/users/:id", auth, requirePermission(P["users:delete"]), async (c) => {
+      // Excluir é definitivo: só Administrador. Para impedir o acesso, há a inativação.
+      routes.delete("/iam/users/:id", auth, async (c) => {
         const id = c.req.param("id");
+        if (!getAuthenticatedUser(c).isAdmin) {
+          return c.json({ error: "Somente administradores podem excluir usuários." }, 403);
+        }
         if (id === getAuthenticatedUser(c).sub) {
           return c.json({ error: "Não é possível excluir a si mesmo." }, 409);
-        }
-        if (!getAuthenticatedUser(c).isAdmin && (await userStore.findById(id))?.isAdmin) {
-          return c.json({ error: ADMIN_TARGET_ONLY }, 403);
         }
         try {
           const ran = await events.run("iam.user.delete", { actorId: actorOf(c), userId: id }, () => userStore.deleteUser(id));

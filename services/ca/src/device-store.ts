@@ -15,6 +15,13 @@ export class DuplicateDeviceFingerprintError extends Error {
   }
 }
 
+export class DeviceStillActiveError extends Error {
+  constructor() {
+    super("Revogue o Dispositivo antes de excluí-lo.");
+    this.name = "DeviceStillActiveError";
+  }
+}
+
 export interface DeviceStore {
   create(input: CreateDeviceInput): Promise<Device>;
   /** Do mais novo para o mais antigo, incluindo os revogados. */
@@ -24,6 +31,11 @@ export interface DeviceStore {
   findById(id: string): Promise<Device | null>;
   /** Definitivo e idempotente: revogar de novo devolve o registro sem alterar data nem autor. */
   revoke(id: string, revokedBy?: string): Promise<Device>;
+  /**
+   * Apaga um Dispositivo já revogado; um ativo lança `DeviceStillActiveError`.
+   * Sem o registro o certificado continua recusado: o login só aceita Dispositivo ativo encontrado.
+   */
+  delete(id: string): Promise<void>;
 }
 
 export class MemoryDeviceStore implements DeviceStore {
@@ -72,5 +84,12 @@ export class MemoryDeviceStore implements DeviceStore {
       device.revokedBy = revokedBy;
     }
     return { ...device };
+  }
+
+  async delete(id: string): Promise<void> {
+    const device = this.devices.get(id);
+    if (!device) throw new DeviceNotFoundError();
+    if (device.status === "active") throw new DeviceStillActiveError();
+    this.devices.delete(id);
   }
 }
