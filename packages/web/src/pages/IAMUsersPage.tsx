@@ -33,6 +33,7 @@ import {
   MoreHorizontal,
   Edit2,
   Power,
+  Trash2,
   CheckCircle2,
   Clock,
 } from "lucide-react";
@@ -164,6 +165,23 @@ export const IAMUsersPage: React.FC = () => {
       ui.feedback.notify({ type: "error", title: msg });
       fetchData();
     }
+  };
+
+  const handleDelete = async (user: User) => {
+    const ok = await ui.windows.confirm({
+      title: "Excluir Usuário",
+      description: `Excluir ${user.fullname} (${user.username})? A exclusão não pode ser desfeita; para só impedir o acesso, desative o Usuário.`,
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await api.iam.deleteUser(user.id);
+      ui.feedback.notify({ type: "success", title: `Usuário ${user.username} excluído.` });
+    } catch (err: unknown) {
+      ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Erro ao excluir usuário" });
+    }
+    fetchData();
   };
 
   const getRoleName = (roleId: string) => {
@@ -306,6 +324,11 @@ export const IAMUsersPage: React.FC = () => {
                 onClick={() => handleToggleStatus(u)}
               >
                 <Power />
+              </Button>
+            )}
+            {hasPermission("system:users:delete") && currentUser?.sub !== u.id && (
+              <Button variant="ghost" tone="destructive" size="icon" aria-label="Excluir Usuário" title="Excluir Usuário" onClick={() => void handleDelete(u)}>
+                <Trash2 />
               </Button>
             )}
           </Stack>

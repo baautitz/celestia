@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAsAdmin, openMenu } from "./helpers";
 
-test("cadastra um usuario, redefine a senha e o desativa", async ({ page }) => {
+test("cadastra um usuario, redefine a senha, o desativa e o exclui", async ({ page }) => {
   const username = `carlos.${Date.now().toString(36)}`;
   await loginAsAdmin(page);
   await openMenu(page, "Usuários");
@@ -29,6 +29,11 @@ test("cadastra um usuario, redefine a senha e o desativa", async ({ page }) => {
   await row.getByRole("button", { name: "Desativar Usuário" }).click();
   await expect(page.getByText(`Usuário ${username} desativado.`)).toBeVisible();
   await expect(row.getByRole("button", { name: "Ativar Usuário" })).toBeVisible();
+
+  await row.getByRole("button", { name: "Excluir Usuário" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
+  await expect(page.getByText(`Usuário ${username} excluído.`)).toBeVisible();
+  await expect(row).toHaveCount(0);
 });
 
 test("rejeita senha fora da politica", async ({ page }) => {

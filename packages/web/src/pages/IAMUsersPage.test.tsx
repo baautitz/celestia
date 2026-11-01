@@ -6,12 +6,12 @@ import { HeaderActionsProvider } from "@/context/HeaderActionsContext";
 import { IAMUsersPage } from "./IAMUsersPage";
 
 const api = vi.hoisted(() => ({
-  iam: { listUsers: vi.fn(), listRoles: vi.fn(), updateUser: vi.fn(), getPasswordPolicy: vi.fn(async () => ({ rules: [] })) },
+  iam: { listUsers: vi.fn(), listRoles: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(), getPasswordPolicy: vi.fn(async () => ({ rules: [] })) },
 }));
 vi.mock("@/lib/api-client", () => ({ api }));
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({
-    user: { id: "me", isAdmin: true },
+    user: { id: "me", sub: "me", isAdmin: true },
     hasPermission: () => true,
   }),
 }));
@@ -70,6 +70,22 @@ describe("IAMUsersPage", () => {
     fireEvent.change(await screen.findByLabelText("E-mail"), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar Alterações" }));
     await waitFor(() => expect(api.iam.updateUser).toHaveBeenCalledWith("u1", expect.objectContaining({ email: undefined })));
+  });
+
+  it("exclui o Usuário depois de confirmar e recarrega a lista", async () => {
+    api.iam.deleteUser.mockResolvedValue({ success: true });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Excluir Usuário" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
+    await waitFor(() => expect(api.iam.deleteUser).toHaveBeenCalledWith("u1"));
+    await waitFor(() => expect(api.iam.listUsers).toHaveBeenCalledTimes(2));
+  });
+
+  it("não oferece excluir a si mesmo", async () => {
+    api.iam.listUsers.mockResolvedValue([{ ...user, id: "me" }]);
+    renderPage();
+    await screen.findByText("Maria Souza");
+    expect(screen.queryByRole("button", { name: "Excluir Usuário" })).toBeNull();
   });
 
   it("mostra quem acessa sem certificado na lista", async () => {
