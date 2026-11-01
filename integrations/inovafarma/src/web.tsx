@@ -749,8 +749,8 @@ export const inovafarmaWebModule = defineWebModule({
   // Colaboradores cria Usuário pelo cadastro do IAM (serviço `iam:users`).
   dependsOn: ["iam"],
   sections: [
-    // Trabalho do dia a dia de quem lança, no topo do menu.
-    { id: "inovafarma-lancamentos", label: "Lançamentos", order: 50 },
+    // Trabalho do dia a dia de quem lança, logo abaixo de Fechamento.
+    { id: "inovafarma-lancamentos", label: "Lançamentos", order: 150 },
     { id: "inovafarma", label: "InovaFarma", order: 250 },
   ],
   entries: [

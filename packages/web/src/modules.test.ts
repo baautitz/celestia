@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { menuSections } from "./modules";
 
 describe("menu dos módulos registrados", () => {
-  it("mantém a ordem: Lançamentos, Fechamento, Relatórios, InovaFarma, Administração & IAM", () => {
+  it("mantém a ordem: Fechamento, Lançamentos, Relatórios, InovaFarma, Administração & IAM", () => {
     const menu = menuSections(() => true);
-    expect(menu.map((s) => s.label)).toEqual(["Lançamentos", "Fechamento", "Relatórios", "InovaFarma", "Administração & IAM"]);
+    expect(menu.map((s) => s.label)).toEqual(["Fechamento", "Lançamentos", "Relatórios", "InovaFarma", "Administração & IAM"]);
     expect(menu[4].entries.map((e) => e.label)).toEqual(["Usuários", "Grupos", "Dispositivos", "ERPs", "Auditoria"]);
   });
 
