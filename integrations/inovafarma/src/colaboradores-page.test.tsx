@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render as renderTela, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { createMemoryRouter, Link, RouterProvider } from "react-router-dom";
+import { confirmLeave } from "@platform/ui/adapters/leave-guard";
 import { ApiError } from "@platform/ui/lib/api";
 import { ColaboradoresPage } from "./colaboradores-page";
 
@@ -8,7 +11,19 @@ const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
 
 const feedback = vi.hoisted(() => ({ notify: vi.fn(), notifyError: vi.fn() }));
-vi.mock("@platform/ui/imperative/provider", () => ({ useUi: () => ({ feedback }) }));
+const windows = vi.hoisted(() => ({ confirm: vi.fn() }));
+vi.mock("@platform/ui/imperative/provider", () => ({ useUi: () => ({ feedback, windows }) }));
+
+/** Monta a tela num roteador de dados, com um link para outra tela, como no app. */
+function render(tela: ReactElement) {
+  // O roteador de dados cria um Request com o AbortSignal do jsdom, que o Request do Node recusa.
+  vi.stubGlobal("Request", class { constructor(readonly url: string, init?: RequestInit) { Object.assign(this, init); } });
+  const router = createMemoryRouter([
+    { path: "/", element: <><Link to="/outra">Ir para outra tela</Link>{tela}</> },
+    { path: "/outra", element: "Outra tela" },
+  ]);
+  return renderTela(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
+}
 
 const pendente = { confirmado: false, usuarioId: null, usuario: null, lojas: [] as number[], version: 0 };
 const ana = { id: "ana", fullname: "Ana Souza", username: "ana.souza" };
@@ -281,5 +296,127 @@ describe("ColaboradoresPage", () => {
         chip.mockRestore();
       }
     });
+  });
+});
+
+describe("rascunhos não salvos", () => {
+  const sair = () => fireEvent.click(screen.getByRole("link", { name: "Ir para outra tela" }));
+  const campoUsuario = (row: HTMLElement) => within(row).getByRole("combobox", { name: /^Usuário de / }) as HTMLInputElement;
+
+  async function abrirComRascunho() {
+    apiFetch.mockResolvedValue(lista);
+    render(<ColaboradoresPage />);
+    await escolherUsuario(await linha("ANA SOUZA"), "Ana Souza");
+  }
+
+  it("mantém o rascunho ao trocar de página da tabela", async () => {
+    const colaboradores = Array.from({ length: 25 }, (_, i) => ({ codigoColaborador: i + 1, nome: `COLABORADOR ${String(i + 1).padStart(2, "0")}`, ativo: true, ...pendente }));
+    apiFetch.mockResolvedValue({ ...lista, colaboradores });
+    render(<ColaboradoresPage />);
+    await escolherUsuario(await linha("COLABORADOR 01"), "Ana Souza");
+
+    fireEvent.click(screen.getByRole("button", { name: /próxima/i }));
+    await screen.findByText("COLABORADOR 21");
+    expect(screen.queryByText("COLABORADOR 01")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /anterior/i }));
+
+    expect(campoUsuario(await linha("COLABORADOR 01")).value).toBe("Ana Souza");
+  }, 20_000); // Duas páginas de 20 linhas com comboboxes: lento com a suíte inteira rodando.
+
+  it("mantém o rascunho ao mudar o filtro", async () => {
+    await abrirComRascunho();
+    fireEvent.click(screen.getByRole("combobox", { name: "Situação" }));
+    const todos = await screen.findByRole("option", { name: "Todos" });
+    fireEvent.mouseMove(todos);
+    fireEvent.click(todos);
+    await screen.findByText("BRUNO LIMA");
+    expect(campoUsuario(await linha("ANA SOUZA")).value).toBe("Ana Souza");
+  });
+
+  it("confirmar uma linha não afeta o rascunho da outra", async () => {
+    const duasAtivas = { ...lista, colaboradores: lista.colaboradores.map((c) => ({ ...c, ativo: true })) };
+    apiFetch.mockResolvedValue(duasAtivas);
+    render(<ColaboradoresPage />);
+    await escolherUsuario(await linha("ANA SOUZA"), "Ana Souza");
+    await escolherUsuario(await linha("BRUNO LIMA"), "Bia Lima");
+
+    apiFetch.mockResolvedValue(vinculadoAna);
+    fireEvent.click(botao(await linha("ANA SOUZA"), "Confirmar"));
+    await within(await linha("ANA SOUZA")).findByText("Confirmado");
+
+    expect(campoUsuario(await linha("BRUNO LIMA")).value).toBe("Bia Lima");
+    expect(botao(await linha("BRUNO LIMA"), "Confirmar").disabled).toBe(false);
+  });
+
+  it("sem alterações, sai sem pedir confirmação", async () => {
+    apiFetch.mockResolvedValue(lista);
+    render(<ColaboradoresPage />);
+    await screen.findByText("ANA SOUZA");
+    sair();
+    await screen.findByText("Outra tela");
+    expect(windows.confirm).not.toHaveBeenCalled();
+  });
+
+  it("um rascunho desfeito não pede confirmação", async () => {
+    await abrirComRascunho();
+    fireEvent.click(within(await linha("ANA SOUZA")).getByRole("button", { name: "Limpar Usuário" }));
+    await waitFor(async () => expect(campoUsuario(await linha("ANA SOUZA")).value).toBe(""));
+    sair();
+    await screen.findByText("Outra tela");
+    expect(windows.confirm).not.toHaveBeenCalled();
+  });
+
+  it("com alterações, confirmar a saída descarta o rascunho e sai", async () => {
+    await abrirComRascunho();
+    windows.confirm.mockResolvedValue(true);
+    sair();
+    await screen.findByText("Outra tela");
+    expect(windows.confirm).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("ANA SOUZA")).toBeNull();
+  });
+
+  it("com alterações, cancelar a saída fica na tela com o rascunho", async () => {
+    await abrirComRascunho();
+    windows.confirm.mockResolvedValue(false);
+    sair();
+    await waitFor(() => expect(windows.confirm).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(screen.queryByText("Outra tela")).toBeNull();
+    expect(campoUsuario(await linha("ANA SOUZA")).value).toBe("Ana Souza");
+  });
+
+  it("depois de gravar, sai sem pedir confirmação", async () => {
+    await abrirComRascunho();
+    apiFetch.mockResolvedValue(vinculadoAna);
+    fireEvent.click(botao(await linha("ANA SOUZA"), "Confirmar"));
+    await within(await linha("ANA SOUZA")).findByText("Confirmado");
+    sair();
+    await screen.findByText("Outra tela");
+    expect(windows.confirm).not.toHaveBeenCalled();
+  });
+
+  it("avisa o navegador ao fechar ou recarregar só com alterações", async () => {
+    const fechar = () => {
+      const evento = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(evento);
+      return evento.defaultPrevented;
+    };
+    await abrirComRascunho();
+    expect(fechar()).toBe(true);
+    cleanup();
+    expect(fechar()).toBe(false);
+  });
+
+  it("encerrar a sessão pergunta antes só se houver alterações", async () => {
+    apiFetch.mockResolvedValue(lista);
+    render(<ColaboradoresPage />);
+    await screen.findByText("ANA SOUZA");
+    await expect(confirmLeave()).resolves.toBe(true);
+    expect(windows.confirm).not.toHaveBeenCalled();
+
+    await escolherUsuario(await linha("ANA SOUZA"), "Ana Souza");
+    windows.confirm.mockResolvedValue(false);
+    await expect(confirmLeave()).resolves.toBe(false);
+    expect(windows.confirm).toHaveBeenCalledTimes(1);
   });
 });
