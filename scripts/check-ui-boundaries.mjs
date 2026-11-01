@@ -73,6 +73,9 @@ for await (const rel of glob("{packages/*/src/**/*.{ts,tsx},integrations/**/*.{t
           if (expr && ts.isStringLiteralLike(expr) && nativeDateInputTypes.has(expr.text)) {
             report(attr, `<${tag} type="${expr.text}"> nativo (use DatePicker, DateRangePicker ou MonthPicker de @platform/ui/components/*)`)
           }
+          if (expr && ts.isStringLiteralLike(expr) && expr.text === "password") {
+            report(attr, `<${tag} type="password"> (use PasswordInput de @platform/ui/components/password-input)`)
+          }
         }
         if (/(^|[a-z])Button$/.test(tag) && name === "size") {
           const init = attr.initializer

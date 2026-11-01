@@ -49,6 +49,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 - Rótulos sempre com `<Label>`, nunca `<label>`.
 - Datas: `<DatePicker />` (dia), `<DateRangePicker />` (intervalo) e `<MonthPicker />` (mês e ano, valor `AAAA-MM`) de `@platform/ui/components/*`. Nunca `<Input type="date" | "month" | "week" | "time" | "datetime-local" />`, que abre o seletor nativo do navegador; `pnpm check:ui` rejeita. Falta um tipo de campo? Crie o componente na biblioteca em vez de usar o nativo.
 - Dinheiro: `<MoneyInput />` (máscara em centavos, `R$ 0,00`). Nunca `<Input type="number" step="0.01" />`.
+- Senha: `<PasswordInput />` (olho para mostrar e esconder). Nunca `<Input type="password" />`; `pnpm check:ui` rejeita.
 - Busca e inputs com ícone: `InputGroup`, `InputGroupAddon`, `InputGroupInput`. Nunca `<div className="relative">` com ícone absoluto.
 
 ## UI imperativa (`useUi()`)
