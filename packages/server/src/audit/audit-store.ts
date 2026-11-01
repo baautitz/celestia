@@ -11,6 +11,9 @@ export interface LogEntry {
   attributes: Record<string, unknown>;
   schemaVersion: number;
   summary: string;
+  /** Dispositivo da sessão de quem agiu; nulo sem certificado e nas entradas anteriores a esta coluna. */
+  deviceId: string | null;
+  deviceName: string | null;
 }
 
 export interface AuditFilter {

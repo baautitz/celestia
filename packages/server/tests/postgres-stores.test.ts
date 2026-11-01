@@ -44,8 +44,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); o erp tem a inicial e a que apaga a tabela legada; o inovafarma tem a inicial, a das Lojas e a dos Lançamentos de Pré-vencidos; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : item.moduleId === "erp" ? 2 : item.moduleId === "inovafarma" ? 3 : 1);
+        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas e a dos Lançamentos de Pré-vencidos; os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 3 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 

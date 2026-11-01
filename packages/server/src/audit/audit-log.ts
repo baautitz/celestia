@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { z } from "zod";
 import type { AuditFilter, AuditStore, LogEntry } from "./audit-store.js";
+import { currentDevice, type RequestDevice } from "./request-device.js";
 
 export interface AuditActionDef<S extends z.ZodTypeAny = z.ZodTypeAny> {
   plugin: string;
@@ -19,6 +20,8 @@ export interface RecordInput {
   target: { type: string; id: string };
   attributes: unknown;
   occurredAt?: Date;
+  /** Dispositivo explícito (o do login, que ainda não tem sessão); senão, o da requisição em andamento. */
+  device?: RequestDevice;
 }
 
 /** Audit Log único do sistema (ADR 0001). Plugins declaram o schema de cada ação e gravam entradas. */
@@ -37,6 +40,7 @@ export class AuditLog {
     const def = this.actions.get(`${input.plugin}:${input.action}`);
     if (!def) throw new Error(`Ação de auditoria "${input.plugin}:${input.action}" não declarada.`);
     const attributes: Record<string, unknown> = def.schema.parse(input.attributes);
+    const device = input.device ?? currentDevice();
     const entry: LogEntry = {
       id: randomUUID(),
       occurredAt: input.occurredAt ?? new Date(),
@@ -49,6 +53,8 @@ export class AuditLog {
       attributes,
       schemaVersion: def.schemaVersion,
       summary: def.summary(attributes),
+      deviceId: device?.id ?? null,
+      deviceName: device?.name ?? null,
     };
     await this.store.append(entry);
     return entry;

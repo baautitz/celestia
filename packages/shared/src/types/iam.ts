@@ -41,6 +41,9 @@ export interface JWTAccessPayload {
   role: string;            // ID da Role (ex: "role_colaborador")
   permissions: string[];   // Lista de permissões do usuário
   isAdmin?: boolean;       // Administrador: o servidor expande para todas as permissões válidas
+  /** Dispositivo cujo certificado abriu a sessão; ausente quando o Usuário entra sem certificado. */
+  deviceId?: string;
+  deviceName?: string;
   iat?: number;
   exp?: number;
 }

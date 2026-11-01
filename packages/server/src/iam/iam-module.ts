@@ -93,8 +93,8 @@ export function createIamModule({
       permissions.registerProvider(() => extraPermissions.map((p) => ({ ...p, module: p.module ?? "system" })));
       const cancelled = (c: Context, reason: string) => c.json({ error: reason }, 409);
       const P = IAM_PERMISSIONS.keys;
-      const recordIamAudit = (actor: { id: string; name: string }, action: string, target: { type: string; id: string }, attributes: Record<string, unknown>) =>
-        auditLog.record({ plugin: IAM_AUDIT_PLUGIN, action, actor, target, attributes });
+      const recordIamAudit = (actor: { id: string; name: string }, action: string, target: { type: string; id: string }, attributes: Record<string, unknown>, device?: { id: string; name: string }) =>
+        auditLog.record({ plugin: IAM_AUDIT_PLUGIN, action, actor, target, attributes, device });
       const requestActor = (c: Context) => {
         const caller = getAuthenticatedUser(c);
         return { id: caller.sub, name: caller.fullname };
@@ -105,7 +105,7 @@ export function createIamModule({
         const role = await userStore.getRole(user.roleId);
         let tokens: { accessToken: string; refreshToken: string; payload: JWTAccessPayload } | undefined;
         const ran = await events.run("iam.login", { userId: user.id, username: user.username }, async () => {
-          const access = await tokenService.generateAccessToken(user, role || undefined);
+          const access = await tokenService.generateAccessToken(user, role || undefined, usedDevice);
           const refresh = await tokenService.generateRefreshToken(user, usedDevice?.id);
           tokens = { accessToken: access.token, refreshToken: refresh.token, payload: access.payload };
         });
@@ -113,7 +113,7 @@ export function createIamModule({
         if (!tokens) return c.json({ error: "Credenciais inválidas." }, 401);
         const { accessToken, refreshToken, payload } = tokens;
         if (usedDevice) {
-          await recordIamAudit({ id: user.id, name: user.fullname }, "login_with_device", { type: DEVICE_AUDIT_TARGET, id: usedDevice.id }, { username: user.username, deviceName: usedDevice.name });
+          await recordIamAudit({ id: user.id, name: user.fullname }, "login_with_device", { type: DEVICE_AUDIT_TARGET, id: usedDevice.id }, { username: user.username, deviceName: usedDevice.name }, usedDevice);
         }
 
         setCookie(c, "refresh_token", refreshToken, refreshCookie());
@@ -211,9 +211,11 @@ export function createIamModule({
 
             // A sessão continua enquanto o Dispositivo que a abriu seguir ativo; o certificado não é pedido de novo.
             // Quem exige certificado e tem uma sessão sem Dispositivo não renova (falha fechado).
+            let sessionDevice: { id: string; name: string } | undefined;
             if (refreshPayload.deviceId) {
               const device = await certificateAuthority.getDevice(refreshPayload.deviceId);
               if (!device || device.status !== "active") return c.json({ error: CERTIFICATE_REQUIRED }, 401);
+              sessionDevice = { id: device.id, name: device.name };
             } else if (!user.allowWithoutCertificate) {
               return c.json({ error: CERTIFICATE_REQUIRED }, 401);
             }
@@ -222,6 +224,7 @@ export function createIamModule({
             const { token: newAccessToken, payload: userPayload } = await tokenService.generateAccessToken(
               user,
               role || undefined,
+              sessionDevice,
             );
             const { token: newRefreshToken } = await tokenService.generateRefreshToken(user, refreshPayload.deviceId);
 

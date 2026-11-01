@@ -18,6 +18,9 @@ export const auditLogEntries = auditSchema.table(
     attributes: jsonb("attributes").$type<Record<string, unknown>>().notNull().default({}),
     schemaVersion: integer("schema_version").notNull(),
     summary: text("summary").notNull(),
+    // Dispositivo da sessão; sem FK (a CA é outro serviço) e nulo nas entradas antigas e nas sessões sem certificado.
+    deviceId: text("device_id"),
+    deviceName: text("device_name"),
   },
   (t) => [index("audit_log_target_idx").on(t.targetType, t.targetId), index("audit_log_occurred_idx").on(t.occurredAt)],
 );

@@ -49,7 +49,7 @@ export class TokenService {
   /**
    * Gera o Access Token (JWT de 5 minutos) com todos os claims de autorização stateless.
    */
-  async generateAccessToken(user: User, role?: Role): Promise<{ token: string; payload: JWTAccessPayload }> {
+  async generateAccessToken(user: User, role?: Role, device?: { id: string; name: string }): Promise<{ token: string; payload: JWTAccessPayload }> {
     const now = Math.floor(Date.now() / 1000);
     const exp = now + this.accessTtl;
 
@@ -61,6 +61,7 @@ export class TokenService {
       role: user.roleId,
       permissions: role?.permissions || [],
       ...(user.isAdmin ? { isAdmin: true } : {}),
+      ...(device ? { deviceId: device.id, deviceName: device.name } : {}),
       iat: now,
       exp,
     };
@@ -113,6 +114,7 @@ export class TokenService {
       email: typeof email === "string" ? email : undefined,
       permissions,
       ...(claims.isAdmin === true ? { isAdmin: true } : {}),
+      ...(typeof claims.deviceId === "string" && typeof claims.deviceName === "string" ? { deviceId: claims.deviceId, deviceName: claims.deviceName } : {}),
       iat: claims.iat,
       exp: claims.exp,
     };

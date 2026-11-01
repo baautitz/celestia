@@ -2,6 +2,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { hasPermission } from "./has-permission.js";
 import type { TokenService } from "./token-service.js";
 import type { JWTAccessPayload } from "@platform/shared";
+import { runWithDevice } from "../audit/request-device.js";
 
 // Estende as variáveis de contexto do Hono
 declare module "hono" {
@@ -25,7 +26,8 @@ export function createAuthMiddleware(
     try {
       const payload = await tokenService.verifyAccessToken(token);
       c.set("user", transform(payload));
-      await next();
+      const device = payload.deviceId && payload.deviceName ? { id: payload.deviceId, name: payload.deviceName } : undefined;
+      await runWithDevice(device, next);
     } catch {
       return c.json({ error: "Falha na autenticação: token expirado ou inválido." }, 401);
     }

@@ -41,6 +41,13 @@ const columns: DataTableColumn<AuditLogEntry>[] = [
     skeletonClassName: "h-4 w-28",
   },
   {
+    key: "device",
+    label: "Dispositivo",
+    value: (e) => e.deviceName ?? "",
+    render: (e) => e.deviceName ?? "—",
+    skeletonClassName: "h-4 w-24",
+  },
+  {
     key: "plugin",
     label: "Plugin",
     value: (e) => e.plugin,

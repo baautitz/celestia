@@ -220,6 +220,48 @@ describe("Audit Log do acesso por certificado", () => {
     expect(entry?.summary).toBe('Entrou pelo Dispositivo "Caixa 1".');
   });
 
+  describe("Dispositivo no Audit Log", () => {
+    const criarPeriodo = (app: ReturnType<typeof createPlatformApp>, accessToken: string) =>
+      app.request("/api/closing-periods", {
+        method: "POST",
+        headers: { ...JSON_HEADERS, Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ name: "Out/2026", startDate: "2026-10-01", endDate: "2026-10-31" }),
+      });
+
+    it("a sessão aberta por um Dispositivo grava o Dispositivo em cada entrada, inclusive depois de renovar", async () => {
+      const auditLog = new AuditLog(new MemoryAuditStore());
+      const { userStore, device, app, loginWithCertificate, refresh } = await setup({ auditLog });
+      await userStore.createRole({ id: "role_p", name: "P", description: "d", permissions: ["closing_period:period:create"] });
+      await userStore.createUser({ fullname: "Quem Cria", username: "quem.cria", password: TEST_PASSWORD, roleId: "role_p", allowWithoutCertificate: false });
+
+      const entrou = (await (await loginWithCertificate("quem.cria", device.fingerprint)).json()) as { accessToken: string; refreshToken: string };
+      expect((await criarPeriodo(app, entrou.accessToken)).status).toBe(201);
+
+      const renovado = (await (await refresh(entrou.refreshToken)).json()) as { accessToken: string };
+      await app.request("/api/closing-periods", { method: "POST", headers: { ...JSON_HEADERS, Authorization: `Bearer ${renovado.accessToken}` }, body: JSON.stringify({ name: "Nov/2026", startDate: "2026-11-01", endDate: "2026-11-30" }) });
+
+      const entradas = await auditLog.list({ plugin: "closing_period" });
+      expect(entradas).toHaveLength(2);
+      expect(entradas.every((e) => e.deviceId === device.id && e.deviceName === "Caixa 1")).toBe(true);
+    });
+
+    it("o login pelo Dispositivo grava o Dispositivo, e quem entra sem certificado fica sem Dispositivo", async () => {
+      const auditLog = new AuditLog(new MemoryAuditStore());
+      const { userStore, device, app, login, loginWithCertificate } = await setup({ auditLog });
+      await userStore.createRole({ id: "role_p", name: "P", description: "d", permissions: ["closing_period:period:create"] });
+      await userStore.createUser({ fullname: "Sem Dispositivo", username: "sem.disp", password: TEST_PASSWORD, roleId: "role_p", allowWithoutCertificate: true });
+
+      await loginWithCertificate("com.cert", device.fingerprint);
+      const [loginEntry] = await auditLog.list({ plugin: "iam" });
+      expect(loginEntry).toMatchObject({ action: "login_with_device", deviceId: device.id, deviceName: "Caixa 1" });
+
+      const sem = (await (await login("sem.disp")).json()) as { accessToken: string };
+      expect((await criarPeriodo(app, sem.accessToken)).status).toBe(201);
+      const [entrada] = await auditLog.list({ plugin: "closing_period" });
+      expect(entrada).toMatchObject({ deviceId: null, deviceName: null });
+    });
+  });
+
   it("registra quando a opção de acesso sem certificado muda, e só quando muda", async () => {
     const userStore = createSeededUserStore({ admin: true });
     await userStore.createRole({ id: "role_a", name: "A", description: "d", permissions: [] });

@@ -11,6 +11,9 @@ export interface AuditLogEntry {
   attributes: Record<string, unknown>;
   schemaVersion: number;
   summary: string;
+  /** Dispositivo da sessão de quem agiu; nulo quando a sessão não usou certificado (e nas entradas antigas). */
+  deviceId: string | null;
+  deviceName: string | null;
 }
 
 export interface AuditLogFilter {
