@@ -40,6 +40,7 @@ interface CamposVinculo {
   usuario: (UsuarioOpcao & { status: string }) | null;
   lojas: number[];
   version: number;
+  sugestao: Pick<CamposVinculo, "usuarioId" | "lojas"> | null;
 }
 
 interface Colaborador extends CamposVinculo {
@@ -57,12 +58,20 @@ interface ListaColaboradores {
 /** Valores editáveis de uma linha: os gravados ou o rascunho ainda não salvo. */
 type Valores = Pick<CamposVinculo, "usuarioId" | "lojas">;
 
-const gravados = ({ usuarioId, lojas }: CamposVinculo): Valores => ({ usuarioId, lojas });
+const iniciais = ({ usuarioId, lojas, sugestao }: CamposVinculo): Valores => sugestao ?? { usuarioId, lojas };
 const mesmasLojas = (a: number[], b: number[]) => a.length === b.length && a.every((codigo) => b.includes(codigo));
+
+function SeloSugestao() {
+  return <Badge variant="outline">Sugestão</Badge>;
+}
 
 type Situacao = "ativos" | "todos";
 
 const SITUACAO_LABEL: Record<Situacao, string> = { ativos: "Ativos", todos: "Todos" };
+
+type FiltroStatus = "todos" | "pendentes" | "confirmados";
+
+const STATUS_LABEL: Record<FiltroStatus, string> = { todos: "Todos", pendentes: "Pendentes", confirmados: "Confirmados" };
 
 interface OpcaoUsuario {
   value: string;
@@ -181,6 +190,7 @@ export function ColaboradoresPage() {
   const [edicoes, setEdicoes] = useState<Record<number, Valores>>({});
   const [salvando, setSalvando] = useState<ReadonlySet<number>>(new Set());
   const [situacao, setSituacao] = useState<Situacao>("ativos");
+  const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("todos");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -245,9 +255,9 @@ export function ColaboradoresPage() {
   const opcoes = useMemo(() => usuarios.map(paraOpcao), [usuarios]);
 
   const columns = useMemo<DataTableColumn<Colaborador>[]>(() => {
-    const valoresDe = (r: Colaborador): Valores => edicoes[r.codigoColaborador] ?? gravados(r);
+    const valoresDe = (r: Colaborador): Valores => edicoes[r.codigoColaborador] ?? iniciais(r);
     const editar = (r: Colaborador, alteracao: Partial<Valores>) =>
-      setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? gravados(r)), ...alteracao } }));
+      setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? iniciais(r)), ...alteracao } }));
     return [
       {
         key: "codigoColaborador",
@@ -271,12 +281,29 @@ export function ColaboradoresPage() {
       {
         key: "usuario",
         label: "Usuário",
-        render: (r) => <UsuarioSelect row={r} opcoes={opcoes} usuarioId={valoresDe(r).usuarioId} onChange={(usuarioId) => editar(r, { usuarioId })} />,
+        render: (r) => {
+          const { usuarioId } = valoresDe(r);
+          return (
+            <Stack gap="field" align="start">
+              <UsuarioSelect row={r} opcoes={opcoes} usuarioId={usuarioId} onChange={(novo) => editar(r, { usuarioId: novo })} />
+              {usuarioId !== null && usuarioId === r.sugestao?.usuarioId && <SeloSugestao />}
+            </Stack>
+          );
+        },
       },
       {
         key: "lojas",
         label: "Lojas",
-        render: (r) => <LojasSelect row={r} opcoes={lojas} lojas={valoresDe(r).lojas} onChange={(selecionadas) => editar(r, { lojas: selecionadas })} />,
+        render: (r) => {
+          const valores = valoresDe(r).lojas;
+          const sugeridas = r.sugestao?.lojas ?? [];
+          return (
+            <Stack gap="field" align="start">
+              <LojasSelect row={r} opcoes={lojas} lojas={valores} onChange={(selecionadas) => editar(r, { lojas: selecionadas })} />
+              {sugeridas.length > 0 && mesmasLojas(valores, sugeridas) && <SeloSugestao />}
+            </Stack>
+          );
+        },
       },
       {
         key: "status",
@@ -300,8 +327,11 @@ export function ColaboradoresPage() {
   }, [edicoes, lojas, opcoes, salvando, salvar]);
 
   const rows = useMemo(
-    () => (situacao === "ativos" ? colaboradores.filter((c) => c.ativo) : colaboradores),
-    [colaboradores, situacao],
+    () =>
+      colaboradores.filter(
+        (c) => (situacao === "todos" || c.ativo) && (filtroStatus === "todos" || c.confirmado === (filtroStatus === "confirmados")),
+      ),
+    [colaboradores, situacao, filtroStatus],
   );
 
   if (error) {
@@ -333,6 +363,19 @@ export function ColaboradoresPage() {
             <SelectContent>
               <SelectItem value="ativos">{SITUACAO_LABEL.ativos}</SelectItem>
               <SelectItem value="todos">{SITUACAO_LABEL.todos}</SelectItem>
+            </SelectContent>
+          </Select>
+        </Stack>
+        <Stack gap="field" grow narrow>
+          <Label htmlFor="colaboradores-status">Status</Label>
+          <Select value={filtroStatus} onValueChange={(val) => val && setFiltroStatus(val as FiltroStatus)}>
+            <SelectTrigger id="colaboradores-status">
+              <SelectValue>{STATUS_LABEL[filtroStatus]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">{STATUS_LABEL.todos}</SelectItem>
+              <SelectItem value="pendentes">{STATUS_LABEL.pendentes}</SelectItem>
+              <SelectItem value="confirmados">{STATUS_LABEL.confirmados}</SelectItem>
             </SelectContent>
           </Select>
         </Stack>
