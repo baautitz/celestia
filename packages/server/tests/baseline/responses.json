@@ -115,7 +115,8 @@
           "closing_period:period:reopen",
           "closing_period:period:cancel",
           "system:erps:manage",
-          "inovafarma:integration:view"
+          "inovafarma:integration:view",
+          "inovafarma:colaboradores:view"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -295,7 +296,8 @@
         "closing_period:period:reopen",
         "closing_period:period:cancel",
         "system:erps:manage",
-        "inovafarma:integration:view"
+        "inovafarma:integration:view",
+        "inovafarma:colaboradores:view"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -456,6 +458,13 @@
             "label": "Visualizar módulo InovaFarma",
             "description": "Permite abrir a tela e consultar dados integrados do InovaFarma.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o InovaFarma.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:colaboradores:view",
+            "label": "Visualizar Colaboradores",
+            "description": "Permite abrir a página Colaboradores e consultar os Colaboradores do InovaFarma.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar os Colaboradores do InovaFarma.",
             "module": "inovafarma"
           }
         ]
@@ -619,6 +628,13 @@
             "label": "Visualizar módulo InovaFarma",
             "description": "Permite abrir a tela e consultar dados integrados do InovaFarma.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar o InovaFarma.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:colaboradores:view",
+            "label": "Visualizar Colaboradores",
+            "description": "Permite abrir a página Colaboradores e consultar os Colaboradores do InovaFarma.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para visualizar os Colaboradores do InovaFarma.",
             "module": "inovafarma"
           }
         ]

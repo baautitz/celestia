@@ -7,4 +7,9 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite abrir a tela e consultar dados integrados do InovaFarma.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para visualizar o InovaFarma.",
   },
+  "colaboradores:view": {
+    label: "Visualizar Colaboradores",
+    description: "Permite abrir a página Colaboradores e consultar os Colaboradores do InovaFarma.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para visualizar os Colaboradores do InovaFarma.",
+  },
 });

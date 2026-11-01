@@ -112,6 +112,40 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         }
       });
 
+      routes.get("/colaboradores", auth, async (c: Context<{ Variables: { user?: { permissions?: string[] } } }>) => {
+        const colaboradoresView = INOVAFARMA_PERMISSIONS.ref("colaboradores:view");
+        if (!permissions.has(c.get("user")?.permissions, colaboradoresView.key)) {
+          return c.json({ error: colaboradoresView.deniedMessage }, 403);
+        }
+
+        const client = erpClients[erpId];
+        if (!client) {
+          return c.json({ error: "Conexão com ERP InovaFarma não configurada ou inativa." }, 503);
+        }
+
+        // Ativo vem só de Funcionario.Ativo: DataDesligamento está preenchida em poucos inativos.
+        const sql = `
+          SELECT f.CodigoFuncionario AS codigoColaborador, c.Nome AS nome, f.Ativo AS ativo
+          FROM Funcionario f
+          JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
+          WHERE c.Eliminado = 0
+          ORDER BY c.Nome
+        `;
+
+        try {
+          const rows = await client.query<{ codigoColaborador: number; nome: string | null; ativo: boolean | number | null }>(sql);
+          return c.json({
+            colaboradores: rows.map((r) => ({
+              codigoColaborador: Number(r.codigoColaborador),
+              nome: (r.nome || "").trim(),
+              ativo: Boolean(r.ativo),
+            })),
+          });
+        } catch {
+          return c.json({ error: "ERP InovaFarma indisponível. Tente novamente em instantes." }, 503);
+        }
+      });
+
       routes.get("/relatorios/vendas-colaborador", auth, async (c: Context<{ Variables: { user?: { permissions?: string[] } } }>) => {
         const user = c.get("user");
         if (!permissions.has(user?.permissions, viewKey)) {
