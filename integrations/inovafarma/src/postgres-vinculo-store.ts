@@ -58,11 +58,8 @@ export class PostgresVinculoStore implements VinculoStore {
     return toRecord(row);
   }
 
-  async remover(codigoColaborador: number, expectedVersion: number): Promise<void> {
-    const removidos = await this.db
-      .delete(vinculosColaborador)
-      .where(and(eq(vinculosColaborador.codigoColaborador, codigoColaborador), eq(vinculosColaborador.version, expectedVersion)))
-      .returning({ codigo: vinculosColaborador.codigoColaborador });
-    if (removidos.length !== 1) throw new VersaoDesatualizadaError();
+  async desfazer(codigoColaborador: number, expectedVersion: number, atualizadoPor: string): Promise<VinculoColaborador> {
+    if (expectedVersion === 0) throw new VersaoDesatualizadaError();
+    return this.gravar({ codigoColaborador, usuarioId: null, lojas: [], atualizadoPor }, expectedVersion);
   }
 }

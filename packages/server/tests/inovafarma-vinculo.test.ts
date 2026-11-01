@@ -115,8 +115,36 @@ describe("Vínculo do Colaborador com Usuário", () => {
     await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     const limpo = await salvar(7, { usuarioId: null, lojas: [], version: 1 });
     expect(limpo.status).toBe(200);
-    expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, usuarioId: null, version: 0 });
+    expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, usuarioId: null, version: 2 });
     expect((await salvar(9, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(200);
+  });
+
+  it("a version sobrevive ao desfazer: quem ficou para trás recebe 409 depois de outro recriar o vínculo", async () => {
+    const { salvar } = await boot();
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    await salvar(7, { usuarioId: null, lojas: [], version: 1 });
+    expect((await salvar(7, { usuarioId: "bia", lojas: [], version: 2 })).status).toBe(200);
+    expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 1 })).status).toBe(409);
+    expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(409);
+  });
+
+  it("um vínculo desfeito volta a receber sugestões, e confirmá-lo usa a version listada", async () => {
+    const { salvar, listar, auditoria } = await boot();
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    await salvar(7, { usuarioId: null, lojas: [], version: 1 });
+    const pendente = (await listar()).colaboradores.find((c) => c.codigoColaborador === 7)!;
+    expect(pendente).toMatchObject({ confirmado: false, version: 2, avisos: [], sugestao: { usuarioId: "ana", lojas: [] } });
+
+    expect(await (await salvar(7, { usuarioId: "ana", lojas: [], version: pendente.version })).json()).toMatchObject({ confirmado: true, version: 3 });
+    expect((await auditoria()).map((e) => e.summary)).toContain('Vinculou o Colaborador "ANA SOUZA" (cód. 7) ao Usuário "Ana Souza".');
+  });
+
+  it("desfazer de novo um vínculo já desfeito não é alteração", async () => {
+    const { salvar, auditoria } = await boot();
+    await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+    await salvar(7, { usuarioId: null, lojas: [], version: 1 });
+    expect(await (await salvar(7, { usuarioId: null, lojas: [], version: 2 })).json()).toMatchObject({ confirmado: false, version: 2 });
+    expect(await auditoria()).toHaveLength(2);
   });
 
   it("nega a gravação sem a Permission, com deniedMessage em PT-BR", async () => {
@@ -131,7 +159,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
     await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     const res = await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "Este Usuário já está vinculado a outro Colaborador." });
+    expect(await res.json()).toEqual({ error: "Este Usuário já está vinculado a outro Colaborador.", code: "usuario_ja_vinculado" });
   });
 
   it("recusa com 409 a version desatualizada, com mensagem distinta", async () => {
@@ -139,7 +167,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
     await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     const res = await salvar(7, { usuarioId: "bia", lojas: [], version: 0 });
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "O vínculo foi alterado por outra pessoa. A linha foi recarregada." });
+    expect(await res.json()).toEqual({ error: "O vínculo foi alterado por outra pessoa. A linha foi recarregada.", code: "versao_desatualizada" });
   });
 
   it("recusa Usuário inexistente ou inativo e Colaborador fora do ERP", async () => {
@@ -216,8 +244,8 @@ describe("Vínculo do Colaborador com Usuário", () => {
     it("limpar Usuário e Lojas desfaz o vínculo e devolve a Pendente", async () => {
       const { salvar, listar } = await boot();
       await salvar(7, { usuarioId: "ana", lojas: [1, 2], version: 0 });
-      expect(await (await salvar(7, { usuarioId: null, lojas: [], version: 1 })).json()).toMatchObject({ confirmado: false, usuarioId: null, lojas: [], version: 0 });
-      expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, lojas: [], version: 0 });
+      expect(await (await salvar(7, { usuarioId: null, lojas: [], version: 1 })).json()).toMatchObject({ confirmado: false, usuarioId: null, lojas: [], version: 2 });
+      expect((await listar()).colaboradores[0]).toMatchObject({ confirmado: false, lojas: [], version: 2 });
     });
 
     it("sem vínculo gravado, Usuário e Lojas vazios não criam vínculo", async () => {
@@ -300,6 +328,20 @@ describe("Vínculo do Colaborador com Usuário", () => {
       });
     });
 
+    it("um Usuário desativado que não mudou não impede salvar só as Lojas", async () => {
+      const { salvar, userStore } = await boot();
+      await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+      await userStore.updateUser("ana", { status: "inactive" });
+      const res = await salvar(7, { usuarioId: "ana", lojas: [1], version: 1 });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ usuarioId: "ana", lojas: [1], version: 2 });
+    });
+
+    it("um Usuário desativado continua recusado em outro Colaborador", async () => {
+      const { salvar } = await boot();
+      expect((await salvar(9, { usuarioId: "caio", lojas: [], version: 0 })).status).toBe(400);
+    });
+
     it("avisa Colaborador inativo só quando tem vínculo", async () => {
       const { salvar, listar } = await boot();
       expect(linha(await listar(), 9)?.avisos).toEqual([]);
@@ -333,6 +375,20 @@ describe("Vínculo do Colaborador com Usuário", () => {
         expect(await desfeito.json()).toMatchObject({ confirmado: false, avisos: [] });
         expect(linha(await listar(), 9)).toBeUndefined();
         expect((await salvar(7, { usuarioId: "ana", lojas: [], version: 0 })).status).toBe(200);
+      } finally {
+        COLABORADORES.push(sumiu);
+      }
+    });
+
+    it("um vínculo desfeito de quem sumiu do ERP não vira linha nem aceita nova gravação", async () => {
+      const { salvar, listar } = await boot();
+      const sumiu = COLABORADORES[1]!;
+      await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
+      await salvar(9, { usuarioId: null, lojas: [], version: 1 });
+      COLABORADORES.pop();
+      try {
+        expect(linha(await listar(), 9)).toBeUndefined();
+        expect((await salvar(9, { usuarioId: null, lojas: [], version: 2 })).status).toBe(404);
       } finally {
         COLABORADORES.push(sumiu);
       }
@@ -395,6 +451,13 @@ describe("Sugestões do Vínculo do Colaborador", () => {
   it("deixa vazio quando o mesmo Usuário serviria a dois Colaboradores", async () => {
     const { listar } = await boot([VIEW, UPDATE], erpCom([colaborador(7, "ANA SOUZA"), colaborador(8, "ANA SOUZA")]));
     expect((await listar()).colaboradores.map((c) => c.sugestao!.usuarioId)).toEqual([null, null]);
+  });
+
+  it("um Colaborador inativo não disputa a sugestão com um ativo de mesmo nome", async () => {
+    const { listar } = await boot([VIEW, UPDATE], erpCom([colaborador(7, "ANA SOUZA"), { ...colaborador(8, "ANA SOUZA", 2), ativo: false }]));
+    const { colaboradores } = await listar();
+    expect(colaboradores.find((c) => c.codigoColaborador === 7)!.sugestao!.usuarioId).toBe("ana");
+    expect(colaboradores.find((c) => c.codigoColaborador === 8)!.sugestao).toEqual({ usuarioId: null, lojas: [2] });
   });
 
   it("considera só Usuários ativos", async () => {

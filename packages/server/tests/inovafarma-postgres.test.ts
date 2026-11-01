@@ -33,15 +33,28 @@ describe.skipIf(!dbTestsEnabled)("Vínculos do Colaborador contra Postgres real"
     expect((await store.get(7))?.usuarioId).toBe("bia");
     expect(await store.list()).toHaveLength(1);
 
-    await store.remover(7, 2);
-    expect(await store.get(7)).toBeNull();
+    await store.desfazer(7, 2, "outro");
+    expect(await store.get(7)).toMatchObject({ usuarioId: null, lojas: [], version: 3, atualizadoPor: "outro" });
+  });
+
+  it("desfazer mantém a linha com a version: recriar exige a version nova e o Usuário fica livre", async () => {
+    await gravar(7, "ana", 0, [1]);
+    expect(await store.desfazer(7, 1, "autor")).toMatchObject({ usuarioId: null, lojas: [], version: 2 });
+    await expect(gravar(7, "ana", 0)).rejects.toBeInstanceOf(VersaoDesatualizadaError);
+    await expect(gravar(7, "ana", 1)).rejects.toBeInstanceOf(VersaoDesatualizadaError);
+    expect(await gravar(9, "ana", 0)).toMatchObject({ usuarioId: "ana", version: 1 });
+    expect(await gravar(7, "bia", 2, [2])).toMatchObject({ usuarioId: "bia", lojas: [2], version: 3 });
+  });
+
+  it("não desfaz um vínculo que nunca existiu", async () => {
+    await expect(store.desfazer(7, 0, "autor")).rejects.toBeInstanceOf(VersaoDesatualizadaError);
   });
 
   it("recusa a version desatualizada ao criar, alterar e desfazer", async () => {
     await gravar(7, "ana", 0);
     await expect(gravar(7, "bia", 0)).rejects.toBeInstanceOf(VersaoDesatualizadaError);
     await expect(gravar(7, "bia", 5)).rejects.toBeInstanceOf(VersaoDesatualizadaError);
-    await expect(store.remover(7, 5)).rejects.toBeInstanceOf(VersaoDesatualizadaError);
+    await expect(store.desfazer(7, 5, "autor")).rejects.toBeInstanceOf(VersaoDesatualizadaError);
     expect((await store.get(7))?.usuarioId).toBe("ana");
   });
 

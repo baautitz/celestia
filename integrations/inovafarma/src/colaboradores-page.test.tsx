@@ -47,7 +47,7 @@ const listaComVinculo = {
 };
 
 async function linha(nome: string) {
-  return (await screen.findByText(nome)).closest("tr") as HTMLElement;
+  return screen.findByRole("row", { name: new RegExp(nome) });
 }
 
 async function escolherUsuario(row: HTMLElement, nome: string) {
@@ -184,13 +184,31 @@ describe("ColaboradoresPage", () => {
     const row = await linha("ANA SOUZA");
     await escolherUsuario(row, "Bia Lima");
 
-    apiFetch.mockRejectedValueOnce(new ApiError("O vínculo foi alterado por outra pessoa. A linha foi recarregada.", 409));
+    apiFetch.mockRejectedValueOnce(new ApiError("O vínculo foi alterado por outra pessoa. A linha foi recarregada.", 409, "versao_desatualizada"));
     apiFetch.mockResolvedValueOnce(listaComVinculo);
     fireEvent.click(within(row).getByRole("button", { name: "Confirmar" }));
 
     expect(await screen.findByText("Confirmado")).toBeTruthy();
     expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ description: "O vínculo foi alterado por outra pessoa. A linha foi recarregada.", type: "warning" }));
     expect((screen.getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Ana Souza");
+  });
+
+  it("no 409 de Usuário já vinculado mostra a mensagem e mantém o rascunho inteiro, sem recarregar", async () => {
+    apiFetch.mockResolvedValueOnce(lista);
+    render(<ColaboradoresPage />);
+    const row = await linha("ANA SOUZA");
+    await escolherUsuario(row, "Bia Lima");
+    await escolherLoja(row, "Shopping");
+
+    const jaVinculado = new ApiError("Este Usuário já está vinculado a outro Colaborador.", 409, "usuario_ja_vinculado");
+    apiFetch.mockRejectedValueOnce(jaVinculado);
+    fireEvent.click(botao(row, "Confirmar"));
+
+    await waitFor(() => expect(feedback.notifyError).toHaveBeenCalledWith(jaVinculado, "Vínculo não salvo"));
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect((within(row).getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Bia Lima");
+    expect(within(row).getByText("Shopping")).toBeTruthy();
+    await waitFor(() => expect(botao(row, "Confirmar").disabled).toBe(false));
   });
 
   it("em outra falha avisa e mantém a edição, sem recarregar", async () => {
@@ -304,9 +322,8 @@ describe("ColaboradoresPage", () => {
       colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...pendente, sugestao }],
     });
     const campoUsuario = (row: HTMLElement) => within(row).getByRole("combobox", { name: /^Usuário de / }) as HTMLInputElement;
-    const celula = (campo: HTMLElement) => campo.closest("td") as HTMLElement;
-    const seloUsuario = (row: HTMLElement) => within(celula(campoUsuario(row))).queryByText("Sugestão");
-    const seloLojas = (row: HTMLElement) => within(celula(within(row).getByRole("combobox", { name: /^Lojas de / }))).queryByText("Sugestão");
+    const seloUsuario = (row: HTMLElement) => within(within(row).getAllByRole("cell")[2]!).queryByText("Sugestão");
+    const seloLojas = (row: HTMLElement) => within(within(row).getAllByRole("cell")[3]!).queryByText("Sugestão");
 
     it("pré-preenche Usuário e Loja com o selo Sugestão, sem gravar ao carregar", async () => {
       apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
@@ -414,10 +431,22 @@ describe("ColaboradoresPage", () => {
       expect(within(await linha("ANA SOUZA")).getByText("Inativo no ERP")).toBeTruthy();
     });
 
-    it("mostra Loja não encontrada uma única vez, no chip", async () => {
-      apiFetch.mockResolvedValueOnce(comAvisos([{ tipo: "loja_nao_encontrada", mensagem: "Loja não encontrada (cód. 99)" }], { lojas: [99] }));
-      render(<ColaboradoresPage />);
-      expect(within(await linha("ANA SOUZA")).getAllByText("Loja não encontrada (cód. 99)")).toHaveLength(1);
+    it("mantém visível no Status a Loja não encontrada cujo chip foi resumido em +N", async () => {
+      const largura = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(200);
+      const chip = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(80);
+      try {
+        const avisos = [98, 99].map((codigo) => ({ tipo: "loja_nao_encontrada", mensagem: `Loja não encontrada (cód. ${codigo})` }));
+        apiFetch.mockResolvedValueOnce(comAvisos(avisos, { lojas: [98, 99] }));
+        render(<ColaboradoresPage />);
+        const row = await linha("ANA SOUZA");
+        await within(row).findByText("+1");
+        const status = within(row).getAllByRole("cell")[4]!;
+        expect(within(status).getByText("Loja não encontrada (cód. 98)")).toBeTruthy();
+        expect(within(status).getByText("Loja não encontrada (cód. 99)")).toBeTruthy();
+      } finally {
+        largura.mockRestore();
+        chip.mockRestore();
+      }
     });
 
     describe("Colaborador que sumiu do ERP", () => {
@@ -540,6 +569,29 @@ describe("rascunhos não salvos", () => {
       await expect(confirmLeave()).resolves.toBe(true);
       expect(windows.confirm).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("um rascunho guarda a version de quando começou: recarregar por conflito em outra linha não a atualiza", async () => {
+    const ativas = lista.colaboradores.map((c) => ({ ...c, ativo: true }));
+    apiFetch.mockResolvedValueOnce({ ...lista, colaboradores: ativas });
+    render(<ColaboradoresPage />);
+    await escolherUsuario(await linha("ANA SOUZA"), "Ana Souza");
+    await escolherUsuario(await linha("BRUNO LIMA"), "Bia Lima");
+
+    apiFetch.mockRejectedValueOnce(new ApiError("Alterado.", 409, "versao_desatualizada"));
+    apiFetch.mockResolvedValueOnce({ ...lista, colaboradores: ativas.map((c) => ({ ...c, version: 5 })) });
+    fireEvent.click(botao(await linha("ANA SOUZA"), "Confirmar"));
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalled());
+    await waitFor(async () => expect(campoUsuario(await linha("ANA SOUZA")).value).toBe(""));
+
+    apiFetch.mockRejectedValueOnce(new ApiError("Alterado.", 409, "versao_desatualizada"));
+    apiFetch.mockResolvedValueOnce({ ...lista, colaboradores: ativas.map((c) => ({ ...c, version: 5 })) });
+    fireEvent.click(botao(await linha("BRUNO LIMA"), "Confirmar"));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
+      "/api/m/inovafarma/colaboradores/9/vinculo",
+      expect.objectContaining({ body: JSON.stringify({ usuarioId: "bia", lojas: [], version: 0 }) }),
+    ));
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalledTimes(2));
   });
 
   it("um rascunho desfeito não pede confirmação", async () => {

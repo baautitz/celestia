@@ -36,7 +36,7 @@ interface LojaOpcao {
 }
 
 interface Aviso {
-  tipo: string;
+  tipo: "usuario_desativado" | "inativo_no_erp" | "loja_nao_encontrada" | "colaborador_nao_encontrado";
   mensagem: string;
 }
 
@@ -65,8 +65,12 @@ interface ListaColaboradores {
 /** Valores editáveis de uma linha: os gravados ou o rascunho ainda não salvo. */
 type Valores = Pick<CamposVinculo, "usuarioId" | "lojas">;
 
+/** A `version` é a de quando a edição começou: recarregar a lista não pode esconder um conflito. */
+type Rascunho = Valores & Pick<CamposVinculo, "version">;
+
 const iniciais = ({ usuarioId, lojas, sugestao }: CamposVinculo): Valores => sugestao ?? { usuarioId, lojas };
 const mesmasLojas = (a: number[], b: number[]) => a.length === b.length && a.every((codigo) => b.includes(codigo));
+const mudou = (a: Valores, b: Valores) => a.usuarioId !== b.usuarioId || !mesmasLojas(a.lojas, b.lojas);
 
 const naoEncontrado = (c: CamposVinculo) => c.avisos.some((a) => a.tipo === "colaborador_nao_encontrado");
 
@@ -194,9 +198,9 @@ export function ColaboradoresPage() {
   const { feedback } = useUi();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
-  // Edições ainda não gravadas, por Colaborador; ficam aqui porque a célula desmonta ao trocar de página.
   const [lojas, setLojas] = useState<LojaOpcao[]>([]);
-  const [edicoes, setEdicoes] = useState<Record<number, Valores>>({});
+  // Edições ainda não gravadas, por Colaborador; ficam aqui porque a célula desmonta ao trocar de página.
+  const [edicoes, setEdicoes] = useState<Record<number, Rascunho>>({});
   const [salvando, setSalvando] = useState<ReadonlySet<number>>(new Set());
   const [situacao, setSituacao] = useState<Situacao>("ativos");
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("todos");
@@ -230,14 +234,14 @@ export function ColaboradoresPage() {
   }, []);
 
   const salvar = useCallback(
-    async (row: Colaborador, valores: Valores) => {
+    async (row: Colaborador, rascunho: Rascunho) => {
       const codigo = row.codigoColaborador;
       setSalvando((atual) => new Set(atual).add(codigo));
       try {
         const salvo = await apiFetch<CamposVinculo>(`/api/m/inovafarma/colaboradores/${codigo}/vinculo`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ usuarioId: valores.usuarioId, lojas: valores.lojas, version: row.version }),
+          body: JSON.stringify({ usuarioId: rascunho.usuarioId, lojas: rascunho.lojas, version: rascunho.version }),
         });
         // Sem o vínculo, quem sumiu do ERP não tem mais por que ser linha da tabela.
         setColaboradores((atual) =>
@@ -246,7 +250,7 @@ export function ColaboradoresPage() {
         descartarEdicao(codigo);
       } catch (err: unknown) {
         const mensagem = err instanceof Error ? err : new Error("Erro desconhecido ao salvar o vínculo.");
-        if (err instanceof ApiError && err.status === 409) {
+        if (err instanceof ApiError && err.code === "versao_desatualizada") {
           feedback.notify({ title: "Vínculo não salvo", description: mensagem.message, type: "warning" });
           await buscar();
           descartarEdicao(codigo);
@@ -267,9 +271,10 @@ export function ColaboradoresPage() {
   const opcoes = useMemo(() => usuarios.map(paraOpcao), [usuarios]);
 
   const columns = useMemo<DataTableColumn<Colaborador>[]>(() => {
-    const valoresDe = (r: Colaborador): Valores => edicoes[r.codigoColaborador] ?? iniciais(r);
+    const novoRascunho = (r: Colaborador): Rascunho => ({ ...iniciais(r), version: r.version });
+    const valoresDe = (r: Colaborador): Rascunho => edicoes[r.codigoColaborador] ?? novoRascunho(r);
     const editar = (r: Colaborador, alteracao: Partial<Valores>) =>
-      setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? iniciais(r)), ...alteracao } }));
+      setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? novoRascunho(r)), ...alteracao } }));
     return [
       {
         key: "codigoColaborador",
@@ -323,14 +328,11 @@ export function ColaboradoresPage() {
         render: (r) => (
           <Stack direction="row" wrap gap="field">
             <Badge variant={r.confirmado ? "default" : "outline"}>{r.confirmado ? "Confirmado" : "Pendente"}</Badge>
-            {/* A Loja não encontrada já aparece no próprio chip. */}
-            {r.avisos
-              .filter((a) => a.tipo !== "loja_nao_encontrada")
-              .map((a) => (
-                <Badge key={a.tipo} variant="destructive">
-                  {a.mensagem}
-                </Badge>
-              ))}
+            {r.avisos.map((a) => (
+              <Badge key={a.mensagem} variant="destructive">
+                {a.mensagem}
+              </Badge>
+            ))}
           </Stack>
         ),
       },
@@ -339,7 +341,8 @@ export function ColaboradoresPage() {
         label: "Ação",
         render: (r) => {
           const valores = valoresDe(r);
-          const alterado = valores.usuarioId !== r.usuarioId || !mesmasLojas(valores.lojas, r.lojas);
+          // Comparar com o gravado: uma sugestão ainda não confirmada pode ser confirmada.
+          const alterado = mudou(valores, r);
           // Sem o Colaborador no ERP só se pode desfazer o vínculo.
           const bloqueado = naoEncontrado(r) && (valores.usuarioId !== null || valores.lojas.length > 0);
           return (
@@ -356,9 +359,7 @@ export function ColaboradoresPage() {
     colaboradores.some((c) => {
       // Comparar com os valores iniciais: uma sugestão não confirmada não é alteração pendente.
       const edicao = edicoes[c.codigoColaborador];
-      if (edicao === undefined) return false;
-      const inicial = iniciais(c);
-      return edicao.usuarioId !== inicial.usuarioId || !mesmasLojas(edicao.lojas, inicial.lojas);
+      return edicao !== undefined && mudou(edicao, iniciais(c));
     }),
   );
 

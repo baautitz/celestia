@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { mesmasLojas } from "./vinculo-store.js";
 
+export const VINCULO_PLUGIN = "inovafarma";
 export const VINCULO_ACTION = "vinculo_update";
 export const VINCULO_TARGET = "colaborador";
 
@@ -34,7 +36,7 @@ function resumo({ codigoColaborador, nomeColaborador, anterior, novo }: Atributo
   }
 
   const mudouUsuario = anterior.usuario?.id !== novo.usuario?.id;
-  const mudouLojas = anterior.lojas.map((l) => l.codigo).join() !== novo.lojas.map((l) => l.codigo).join();
+  const mudouLojas = !mesmasLojas(anterior.lojas.map((l) => l.codigo), novo.lojas.map((l) => l.codigo));
   const deUsuario = `de ${nomeUsuario(anterior)} para ${nomeUsuario(novo)}`;
   const deLojas = `de ${nomesLojas(anterior)} para ${nomesLojas(novo)}`;
   if (mudouUsuario && mudouLojas) return `Alterou o Usuário do ${colaborador} ${deUsuario} e as Lojas ${deLojas}.`;
@@ -49,6 +51,6 @@ export interface AuditService {
 }
 
 /** Declara no Audit Log o schema da ação de alteração do vínculo (ADR 0001). */
-export function declareVinculoAudit(audit: AuditService, plugin: string): void {
-  audit.declareAction({ plugin, action: VINCULO_ACTION, schemaVersion: 2, schema: Atributos, summary: resumo });
+export function declareVinculoAudit(audit: AuditService): void {
+  audit.declareAction({ plugin: VINCULO_PLUGIN, action: VINCULO_ACTION, schemaVersion: 1, schema: Atributos, summary: resumo });
 }
