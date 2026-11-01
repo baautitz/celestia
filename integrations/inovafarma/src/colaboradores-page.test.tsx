@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render as renderTela, screen, waitFor, within 
 import type { ReactElement } from "react";
 import { createMemoryRouter, Link, RouterProvider } from "react-router-dom";
 import { confirmLeave } from "@platform/ui/adapters/leave-guard";
+import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { ApiError } from "@platform/ui/lib/api";
 import { ColaboradoresPage } from "./colaboradores-page";
 
@@ -14,12 +15,15 @@ const feedback = vi.hoisted(() => ({ notify: vi.fn(), notifyError: vi.fn() }));
 const windows = vi.hoisted(() => ({ confirm: vi.fn(), open: vi.fn() }));
 vi.mock("@platform/ui/imperative/provider", () => ({ useUi: () => ({ feedback, windows }) }));
 
+/** Onde o AppLayout mostraria as ações da página. */
+const CabecalhoSlot = () => <>{useHeaderActions().actions}</>;
+
 /** Monta a tela num roteador de dados, com um link para outra tela, como no app. */
 function render(tela: ReactElement) {
   // O roteador de dados cria um Request com o AbortSignal do jsdom, que o Request do Node recusa.
   vi.stubGlobal("Request", class { constructor(readonly url: string, init?: RequestInit) { Object.assign(this, init); } });
   const router = createMemoryRouter([
-    { path: "/", element: <><Link to="/outra">Ir para outra tela</Link>{tela}</> },
+    { path: "/", element: <HeaderActionsProvider><Link to="/outra">Ir para outra tela</Link><CabecalhoSlot />{tela}</HeaderActionsProvider> },
     { path: "/outra", element: "Outra tela" },
   ]);
   return renderTela(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
@@ -69,6 +73,8 @@ async function escolherLoja(row: HTMLElement, nome: string) {
 }
 
 const botao = (row: HTMLElement, nome: string) => within(row).getByRole("button", { name: nome }) as HTMLButtonElement;
+/** O botão único de salvar, no cabeçalho da página. */
+const salvarTudo = () => screen.getByRole("button", { name: /^Salvar \(/ }) as HTMLButtonElement;
 
 beforeEach(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -124,7 +130,7 @@ describe("ColaboradoresPage", () => {
     render(<ColaboradoresPage />);
     const row = await linha("ANA SOUZA");
     expect(within(row).getByText("Pendente")).toBeTruthy();
-    const confirmar = within(row).getByRole("button", { name: "Confirmar" }) as HTMLButtonElement;
+    const confirmar = salvarTudo();
     expect(confirmar.disabled).toBe(true);
 
     await escolherUsuario(row, "Bia Lima");
@@ -148,7 +154,7 @@ describe("ColaboradoresPage", () => {
     await escolherUsuario(row, "Bia Lima");
 
     apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, version: 1 });
-    fireEvent.click(within(row).getByRole("button", { name: "Confirmar" }));
+    fireEvent.click(salvarTudo());
 
     expect(await within(row).findByText("Confirmado")).toBeTruthy();
     expect(apiFetch).toHaveBeenLastCalledWith("/api/m/inovafarma/colaboradores/7/vinculo", {
@@ -156,7 +162,7 @@ describe("ColaboradoresPage", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ usuarioId: "bia", lojas: [], version: 0 }),
     });
-    expect((within(row).getByRole("button", { name: "Salvar" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((salvarTudo()).disabled).toBe(true);
   });
 
   it("limpar o campo e salvar desfaz o vínculo e devolve a Pendente", async () => {
@@ -168,7 +174,7 @@ describe("ColaboradoresPage", () => {
 
     fireEvent.click(within(row).getByRole("button", { name: "Limpar Usuário" }));
     apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente });
-    const salvar = within(row).getByRole("button", { name: "Salvar" }) as HTMLButtonElement;
+    const salvar = salvarTudo();
     await waitFor(() => expect(salvar.disabled).toBe(false));
     fireEvent.click(salvar);
 
@@ -187,10 +193,10 @@ describe("ColaboradoresPage", () => {
 
     apiFetch.mockRejectedValueOnce(new ApiError("O vínculo foi alterado por outra pessoa. A linha foi recarregada.", 409, "versao_desatualizada"));
     apiFetch.mockResolvedValueOnce(listaComVinculo);
-    fireEvent.click(within(row).getByRole("button", { name: "Confirmar" }));
+    fireEvent.click(salvarTudo());
 
     expect(await screen.findByText("Confirmado")).toBeTruthy();
-    expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ description: "O vínculo foi alterado por outra pessoa. A linha foi recarregada.", type: "warning" }));
+    expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "0 salvos, 1 não salvos", description: "ANA SOUZA: O vínculo foi alterado por outra pessoa. A linha foi recarregada.", type: "warning" }));
     expect((screen.getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Ana Souza");
   });
 
@@ -203,13 +209,14 @@ describe("ColaboradoresPage", () => {
 
     const jaVinculado = new ApiError("Este Usuário já está vinculado a outro Colaborador.", 409, "usuario_ja_vinculado");
     apiFetch.mockRejectedValueOnce(jaVinculado);
-    fireEvent.click(botao(row, "Confirmar"));
+    fireEvent.click(salvarTudo());
 
-    await waitFor(() => expect(feedback.notifyError).toHaveBeenCalledWith(jaVinculado, "Vínculo não salvo"));
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ description: "ANA SOUZA: Este Usuário já está vinculado a outro Colaborador." })));
     expect(apiFetch).toHaveBeenCalledTimes(2);
+    expect(within(row).getByText("Não salvo")).toBeTruthy();
     expect((within(row).getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Bia Lima");
     expect(within(row).getByText("Shopping")).toBeTruthy();
-    await waitFor(() => expect(botao(row, "Confirmar").disabled).toBe(false));
+    await waitFor(() => expect(salvarTudo().disabled).toBe(false));
   });
 
   it("em outra falha avisa e mantém a edição, sem recarregar", async () => {
@@ -220,9 +227,9 @@ describe("ColaboradoresPage", () => {
 
     const negado = new ApiError("Acesso negado.", 403);
     apiFetch.mockRejectedValueOnce(negado);
-    fireEvent.click(within(row).getByRole("button", { name: "Confirmar" }));
+    fireEvent.click(salvarTudo());
 
-    await waitFor(() => expect(feedback.notifyError).toHaveBeenCalledWith(negado, expect.any(String)));
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "0 salvos, 1 não salvos", description: "ANA SOUZA: Acesso negado." })));
     expect(apiFetch).toHaveBeenCalledTimes(2);
     expect((within(row).getByRole("combobox", { name: "Usuário de ANA SOUZA" }) as HTMLInputElement).value).toBe("Bia Lima");
   });
@@ -238,14 +245,14 @@ describe("ColaboradoresPage", () => {
       await escolherLoja(row, "Centro");
 
       apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente, confirmado: true, lojas: [1, 2], version: 1 });
-      fireEvent.click(botao(row, "Confirmar"));
+      fireEvent.click(salvarTudo());
 
       expect(await within(row).findByText("Confirmado")).toBeTruthy();
       expect(apiFetch).toHaveBeenLastCalledWith(
         "/api/m/inovafarma/colaboradores/7/vinculo",
         expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [1, 2], version: 0 }) }),
       );
-      expect(botao(row, "Salvar").disabled).toBe(true);
+      expect(salvarTudo().disabled).toBe(true);
     });
 
     it("grava Usuário e Lojas juntos", async () => {
@@ -256,7 +263,7 @@ describe("ColaboradoresPage", () => {
       await escolherLoja(row, "Shopping");
 
       apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, lojas: [3], version: 1 });
-      fireEvent.click(botao(row, "Confirmar"));
+      fireEvent.click(salvarTudo());
 
       expect(await within(row).findByText("Confirmado")).toBeTruthy();
       expect(apiFetch).toHaveBeenLastCalledWith(
@@ -276,7 +283,7 @@ describe("ColaboradoresPage", () => {
       await waitFor(() => expect(within(row).queryByText("Centro")).toBeNull());
 
       apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente });
-      fireEvent.click(botao(row, "Salvar"));
+      fireEvent.click(salvarTudo());
 
       expect(await within(row).findByText("Pendente")).toBeTruthy();
       expect(apiFetch).toHaveBeenLastCalledWith(
@@ -290,9 +297,9 @@ describe("ColaboradoresPage", () => {
       render(<ColaboradoresPage />);
       const row = await linha("ANA SOUZA");
       await escolherLoja(row, "Centro");
-      await waitFor(() => expect(botao(row, "Salvar").disabled).toBe(false));
+      await waitFor(() => expect(salvarTudo().disabled).toBe(false));
       await escolherLoja(row, "Centro");
-      await waitFor(() => expect(botao(row, "Salvar").disabled).toBe(true));
+      await waitFor(() => expect(salvarTudo().disabled).toBe(true));
     });
 
     it("mantém visível uma Loja gravada que saiu do ERP", async () => {
@@ -331,17 +338,27 @@ describe("ColaboradoresPage", () => {
       expect(apiFetch).toHaveBeenCalledTimes(1);
     });
 
-    it("Confirmar grava a sugestão sem alteração e o selo some", async () => {
+    it("o Salvar geral não grava uma sugestão que ninguém editou", async () => {
       apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
       render(<ColaboradoresPage />);
       const row = await linha("ANA SOUZA");
-      expect(botao(row, "Confirmar").disabled).toBe(false);
+      expect(salvarTudo().textContent).toBe("Salvar (0)");
+      expect(salvarTudo().disabled).toBe(true);
+      expect(within(row).getByText("Pendente")).toBeTruthy();
+    });
 
-      apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [2], version: 1, avisos: [], sugestao: null });
-      fireEvent.click(botao(row, "Confirmar"));
+    it("editar a sugestão e salvar confirma o vínculo e o selo some", async () => {
+      apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      await escolherLoja(row, "Shopping");
+      await waitFor(() => expect(salvarTudo().disabled).toBe(false));
+
+      apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [2, 3], version: 1, avisos: [], sugestao: null });
+      fireEvent.click(salvarTudo());
 
       expect(await within(row).findByText("Confirmado")).toBeTruthy();
-      expect(apiFetch).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ body: JSON.stringify({ usuarioId: "ana", lojas: [2], version: 0 }) }));
+      expect(apiFetch).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ body: JSON.stringify({ usuarioId: "ana", lojas: [2, 3], version: 0 }) }));
       expect(seloUsuario(row)).toBeNull();
       expect(seloLojas(row)).toBeNull();
     });
@@ -449,10 +466,10 @@ describe("ColaboradoresPage", () => {
         render(<ColaboradoresPage />);
         const row = await linha("ANA SOUZA");
         fireEvent.click(botao(row, "Limpar Usuário"));
-        await waitFor(() => expect(botao(row, "Salvar").disabled).toBe(false));
+        await waitFor(() => expect(salvarTudo().disabled).toBe(false));
 
         apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, ...pendente });
-        fireEvent.click(botao(row, "Salvar"));
+        fireEvent.click(salvarTudo());
 
         await waitFor(() => expect(screen.queryByText("ANA SOUZA")).toBeNull());
         expect(apiFetch).toHaveBeenLastCalledWith(
@@ -466,7 +483,23 @@ describe("ColaboradoresPage", () => {
         render(<ColaboradoresPage />);
         const row = await linha("ANA SOUZA");
         await escolherUsuario(row, "Bia Lima");
-        expect(botao(row, "Salvar").disabled).toBe(true);
+        expect(salvarTudo().disabled).toBe(true);
+      });
+
+      it("o Salvar geral avisa quando pula uma linha bloqueada e grava as demais", async () => {
+        const outra = { codigoColaborador: 8, nome: "CARLA DIAS", ativo: true, ...pendente };
+        const { colaboradores, ...resto } = orfao();
+        apiFetch.mockResolvedValueOnce({ ...resto, colaboradores: [...colaboradores, outra] });
+        render(<ColaboradoresPage />);
+        await escolherUsuario(await linha("ANA SOUZA"), "Bia Lima");
+        await escolherUsuario(await linha("CARLA DIAS"), "Ana Souza");
+        expect(salvarTudo().textContent).toBe("Salvar (1)");
+
+        apiFetch.mockResolvedValueOnce({ confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [], version: 1, avisos: [], sugestao: null });
+        fireEvent.click(salvarTudo());
+
+        await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "1 vínculo salvo", type: "warning", description: expect.stringContaining("1 sem o Colaborador no ERP") })));
+        expect(apiFetch).toHaveBeenCalledTimes(2);
       });
     });
   });
@@ -492,19 +525,50 @@ describe("rascunhos não salvos", () => {
     expect(campoUsuario(await linha("ANA SOUZA")).value).toBe("Ana Souza");
   });
 
-  it("confirmar uma linha não afeta o rascunho da outra", async () => {
+  it("salvar grava de uma vez todas as linhas editadas, filtradas ou não", async () => {
     const duasAtivas = { ...lista, colaboradores: lista.colaboradores.map((c) => ({ ...c, ativo: true })) };
-    apiFetch.mockResolvedValue(duasAtivas);
+    apiFetch.mockResolvedValueOnce(duasAtivas);
+    render(<ColaboradoresPage />);
+    await escolherUsuario(await linha("ANA SOUZA"), "Ana Souza");
+    await escolherUsuario(await linha("BRUNO LIMA"), "Bia Lima");
+    expect(salvarTudo().textContent).toBe("Salvar (2)");
+
+    // Com Confirmados no filtro as duas linhas somem da tabela, mas os rascunhos continuam valendo.
+    fireEvent.click(screen.getByRole("combobox", { name: "Status" }));
+    const confirmados = await screen.findByRole("option", { name: "Confirmados" });
+    fireEvent.mouseMove(confirmados);
+    fireEvent.click(confirmados);
+    await waitFor(() => expect(screen.queryByText("ANA SOUZA")).toBeNull());
+    expect(salvarTudo().textContent).toBe("Salvar (2)");
+
+    apiFetch.mockResolvedValueOnce({ ...vinculadoAna, version: 1 });
+    apiFetch.mockResolvedValueOnce({ confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, lojas: [], version: 1, avisos: [], sugestao: null });
+    fireEvent.click(salvarTudo());
+
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "2 vínculos salvos", type: "success" })));
+    expect(apiFetch.mock.calls.slice(1).map(([url]) => url)).toEqual([
+      "/api/m/inovafarma/colaboradores/7/vinculo",
+      "/api/m/inovafarma/colaboradores/9/vinculo",
+    ]);
+    expect(salvarTudo().textContent).toBe("Salvar (0)");
+  });
+
+  it("numa falha parcial grava as outras, marca a que falhou e mantém o rascunho dela", async () => {
+    const duasAtivas = { ...lista, colaboradores: lista.colaboradores.map((c) => ({ ...c, ativo: true })) };
+    apiFetch.mockResolvedValueOnce(duasAtivas);
     render(<ColaboradoresPage />);
     await escolherUsuario(await linha("ANA SOUZA"), "Ana Souza");
     await escolherUsuario(await linha("BRUNO LIMA"), "Bia Lima");
 
-    apiFetch.mockResolvedValue(vinculadoAna);
-    fireEvent.click(botao(await linha("ANA SOUZA"), "Confirmar"));
-    await within(await linha("ANA SOUZA")).findByText("Confirmado");
+    apiFetch.mockRejectedValueOnce(new ApiError("Acesso negado.", 403));
+    apiFetch.mockResolvedValueOnce({ confirmado: true, usuarioId: "bia", usuario: { ...bia, status: "active" }, lojas: [], version: 1, avisos: [], sugestao: null });
+    fireEvent.click(salvarTudo());
 
-    expect(campoUsuario(await linha("BRUNO LIMA")).value).toBe("Bia Lima");
-    expect(botao(await linha("BRUNO LIMA"), "Confirmar").disabled).toBe(false);
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalledWith(expect.objectContaining({ title: "1 salvos, 1 não salvos", description: "ANA SOUZA: Acesso negado." })));
+    expect(within(await linha("ANA SOUZA")).getByText("Não salvo")).toBeTruthy();
+    expect(campoUsuario(await linha("ANA SOUZA")).value).toBe("Ana Souza");
+    expect(within(await linha("BRUNO LIMA")).getByText("Confirmado")).toBeTruthy();
+    expect(salvarTudo().textContent).toBe("Salvar (1)");
   });
 
   it("sem alterações, sai sem pedir confirmação", async () => {
@@ -551,15 +615,16 @@ describe("rascunhos não salvos", () => {
     await escolherUsuario(await linha("BRUNO LIMA"), "Bia Lima");
 
     apiFetch.mockRejectedValueOnce(new ApiError("Alterado.", 409, "versao_desatualizada"));
+    apiFetch.mockRejectedValueOnce(new ApiError("Acesso negado.", 403));
     apiFetch.mockResolvedValueOnce({ ...lista, colaboradores: ativas.map((c) => ({ ...c, version: 5 })) });
-    fireEvent.click(botao(await linha("ANA SOUZA"), "Confirmar"));
-    await waitFor(() => expect(feedback.notify).toHaveBeenCalled());
+    fireEvent.click(salvarTudo());
+    await waitFor(() => expect(feedback.notify).toHaveBeenCalledTimes(1));
     await waitFor(async () => expect(campoUsuario(await linha("ANA SOUZA")).value).toBe(""));
+    expect(campoUsuario(await linha("BRUNO LIMA")).value).toBe("Bia Lima");
 
-    apiFetch.mockRejectedValueOnce(new ApiError("Alterado.", 409, "versao_desatualizada"));
-    apiFetch.mockResolvedValueOnce({ ...lista, colaboradores: ativas.map((c) => ({ ...c, version: 5 })) });
-    fireEvent.click(botao(await linha("BRUNO LIMA"), "Confirmar"));
-    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
+    apiFetch.mockRejectedValueOnce(new ApiError("Acesso negado.", 403));
+    fireEvent.click(salvarTudo());
+    await waitFor(() => expect(apiFetch).toHaveBeenLastCalledWith(
       "/api/m/inovafarma/colaboradores/9/vinculo",
       expect.objectContaining({ body: JSON.stringify({ usuarioId: "bia", lojas: [], version: 0 }) }),
     ));
@@ -597,7 +662,7 @@ describe("rascunhos não salvos", () => {
   it("depois de gravar, sai sem pedir confirmação", async () => {
     await abrirComRascunho();
     apiFetch.mockResolvedValue(vinculadoAna);
-    fireEvent.click(botao(await linha("ANA SOUZA"), "Confirmar"));
+    fireEvent.click(salvarTudo());
     await within(await linha("ANA SOUZA")).findByText("Confirmado");
     sair();
     await screen.findByText("Outra tela");

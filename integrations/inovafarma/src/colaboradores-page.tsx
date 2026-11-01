@@ -19,6 +19,7 @@ import { Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useLeaveGuard } from "@platform/ui/adapters/leave-guard";
+import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch, ApiError } from "@platform/ui/lib/api";
 
@@ -74,7 +75,7 @@ const mudou = (a: Valores, b: Valores) => a.usuarioId !== b.usuarioId || !mesmas
 const naoEncontrado = (c: CamposVinculo) => c.avisos.some((a) => a.tipo === "colaborador_nao_encontrado");
 
 function SeloSugestao() {
-  return <Badge variant="outline">Sugestão</Badge>;
+  return <Badge variant="info">Sugestão</Badge>;
 }
 
 type Situacao = "ativos" | "todos";
@@ -177,7 +178,7 @@ function LojasSelect({
   );
 }
 
-/** Página Colaboradores: lista os Colaboradores do ERP e grava o vínculo de cada um na própria linha. */
+/** Página Colaboradores: lista os Colaboradores do ERP e grava de uma vez os vínculos editados. */
 export function ColaboradoresPage() {
   const { feedback, windows } = useUi();
   const [podeCriarUsuario, setPodeCriarUsuario] = useState(false);
@@ -187,6 +188,8 @@ export function ColaboradoresPage() {
   // Edições ainda não gravadas, por Colaborador; ficam aqui porque a célula desmonta ao trocar de página.
   const [edicoes, setEdicoes] = useState<Record<number, Rascunho>>({});
   const [salvando, setSalvando] = useState<ReadonlySet<number>>(new Set());
+  // Motivo da última falha ao gravar, por Colaborador; some quando a linha é editada de novo ou gravada.
+  const [falhas, setFalhas] = useState<Record<number, string>>({});
   const [situacao, setSituacao] = useState<Situacao>("ativos");
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("todos");
   const [loading, setLoading] = useState(true);
@@ -219,8 +222,13 @@ export function ColaboradoresPage() {
     setEdicoes(({ [codigo]: _descartada, ...resto }) => resto);
   }, []);
 
-  const salvar = useCallback(
-    async (row: Colaborador, rascunho: Rascunho) => {
+  const limparFalha = useCallback((codigo: number) => {
+    setFalhas(({ [codigo]: _limpa, ...resto }) => resto);
+  }, []);
+
+  /** Grava uma linha; devolve o erro em vez de avisar, para o resumo ser um só. */
+  const gravar = useCallback(
+    async (row: Colaborador, rascunho: Rascunho): Promise<Error | null> => {
       const codigo = row.codigoColaborador;
       setSalvando((atual) => new Set(atual).add(codigo));
       try {
@@ -234,16 +242,9 @@ export function ColaboradoresPage() {
           naoEncontrado(row) && !salvo.confirmado ? atual.filter((c) => c.codigoColaborador !== codigo) : atual.map((c) => (c.codigoColaborador === codigo ? { ...c, ...salvo } : c)),
         );
         descartarEdicao(codigo);
-        avisarVinculoAlterado();
+        return null;
       } catch (err: unknown) {
-        const mensagem = err instanceof Error ? err : new Error("Erro desconhecido ao salvar o vínculo.");
-        if (err instanceof ApiError && err.code === "versao_desatualizada") {
-          feedback.notify({ title: "Vínculo não salvo", description: mensagem.message, type: "warning" });
-          await buscar();
-          descartarEdicao(codigo);
-        } else {
-          feedback.notifyError(mensagem, "Vínculo não salvo");
-        }
+        return err instanceof Error ? err : new Error("Erro desconhecido ao salvar o vínculo.");
       } finally {
         setSalvando((atual) => {
           const proximo = new Set(atual);
@@ -252,16 +253,63 @@ export function ColaboradoresPage() {
         });
       }
     },
-    [buscar, descartarEdicao, feedback],
+    [descartarEdicao],
   );
+
+  // Só o que foi editado e difere do gravado; sem o Colaborador no ERP só se pode desfazer o vínculo.
+  const { pendentes, bloqueados } = useMemo(() => {
+    const alterados = colaboradores.flatMap((c) => {
+      const edicao = edicoes[c.codigoColaborador];
+      return edicao !== undefined && mudou(edicao, c) ? [{ row: c, edicao }] : [];
+    });
+    const estaBloqueado = ({ row, edicao }: { row: Colaborador; edicao: Rascunho }) =>
+      naoEncontrado(row) && (edicao.usuarioId !== null || edicao.lojas.length > 0);
+    return { pendentes: alterados.filter((a) => !estaBloqueado(a)), bloqueados: alterados.filter(estaBloqueado) };
+  }, [colaboradores, edicoes]);
+
+  const [salvandoTudo, setSalvandoTudo] = useState(false);
+
+  const salvarTudo = useCallback(async () => {
+    setSalvandoTudo(true);
+    setFalhas({});
+    const erros: { row: Colaborador; erro: Error }[] = [];
+    // Uma a uma e na ordem da tabela: dois Colaboradores com o mesmo Usuário falham de forma previsível.
+    for (const { row, edicao } of pendentes) {
+      const erro = await gravar(row, edicao);
+      if (erro) erros.push({ row, erro });
+    }
+    const salvos = pendentes.length - erros.length;
+    if (salvos > 0) avisarVinculoAlterado();
+    const desatualizados = erros.filter(({ erro }) => erro instanceof ApiError && erro.code === "versao_desatualizada");
+    if (desatualizados.length > 0) {
+      await buscar();
+      desatualizados.forEach(({ row }) => descartarEdicao(row.codigoColaborador));
+    }
+    setFalhas(Object.fromEntries(erros.filter((e) => !desatualizados.includes(e)).map(({ row, erro }) => [row.codigoColaborador, erro.message])));
+    const pulados = bloqueados.length > 0 ? ` ${bloqueados.length} sem o Colaborador no ERP só aceitam desfazer o vínculo e não foram gravados.` : "";
+    if (erros.length === 0) {
+      feedback.notify({ type: bloqueados.length > 0 ? "warning" : "success", title: `${salvos} ${salvos === 1 ? "vínculo salvo" : "vínculos salvos"}`, description: pulados.trim() || undefined });
+    } else {
+      feedback.notify({
+        type: "warning",
+        title: `${salvos} salvos, ${erros.length} não salvos`,
+        description: `${erros.map(({ row, erro }) => `${row.nome}: ${erro.message}`).join("\n")}${pulados}`,
+      });
+    }
+    setSalvandoTudo(false);
+  }, [pendentes, bloqueados, gravar, buscar, descartarEdicao, feedback]);
 
   const opcoes = useMemo(() => usuarios.map(paraOpcao), [usuarios]);
 
   const columns = useMemo<DataTableColumn<Colaborador>[]>(() => {
     const novoRascunho = (r: Colaborador): Rascunho => ({ ...iniciais(r), version: r.version });
     const valoresDe = (r: Colaborador): Rascunho => edicoes[r.codigoColaborador] ?? novoRascunho(r);
-    const editar = (r: Colaborador, alteracao: Partial<Valores>) =>
+    const editar = (r: Colaborador, alteracao: Partial<Valores>) => {
+      // Uma linha em gravação não aceita edição: ao terminar, o rascunho seria descartado.
+      if (salvando.has(r.codigoColaborador)) return;
+      limparFalha(r.codigoColaborador);
       setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? novoRascunho(r)), ...alteracao } }));
+    };
     // O Usuário criado entra só como rascunho: o vínculo continua dependendo de confirmar a linha.
     const criarUsuario = async (r: Colaborador) => {
       try {
@@ -345,7 +393,12 @@ export function ColaboradoresPage() {
         label: "Status",
         render: (r) => (
           <Stack direction="row" wrap gap="field">
-            <Badge variant={r.confirmado ? "default" : "outline"}>{r.confirmado ? "Confirmado" : "Pendente"}</Badge>
+            <Badge variant={r.confirmado ? "success" : "warning"}>{r.confirmado ? "Confirmado" : "Pendente"}</Badge>
+            {falhas[r.codigoColaborador] && (
+              <Badge variant="destructive" title={falhas[r.codigoColaborador]}>
+                Não salvo
+              </Badge>
+            )}
             {r.avisos.map((a) => (
               <Badge key={a.mensagem} variant="destructive">
                 {a.mensagem}
@@ -354,24 +407,8 @@ export function ColaboradoresPage() {
           </Stack>
         ),
       },
-      {
-        key: "acao",
-        label: "Ação",
-        render: (r) => {
-          const valores = valoresDe(r);
-          // Comparar com o gravado: uma sugestão ainda não confirmada pode ser confirmada.
-          const alterado = mudou(valores, r);
-          // Sem o Colaborador no ERP só se pode desfazer o vínculo.
-          const bloqueado = naoEncontrado(r) && (valores.usuarioId !== null || valores.lojas.length > 0);
-          return (
-            <Button variant="outline" disabled={!alterado || bloqueado || salvando.has(r.codigoColaborador)} onClick={() => void salvar(r, valores)}>
-              {r.confirmado ? "Salvar" : "Confirmar"}
-            </Button>
-          );
-        },
-      },
     ];
-  }, [edicoes, lojas, opcoes, salvando, salvar, podeCriarUsuario, windows, feedback]);
+  }, [edicoes, falhas, limparFalha, lojas, opcoes, salvando, podeCriarUsuario, windows, feedback]);
 
   useLeaveGuard(
     colaboradores.some((c) => {
@@ -408,6 +445,11 @@ export function ColaboradoresPage() {
 
   return (
     <Stack gap="section">
+      <HeaderActions>
+        <Button disabled={pendentes.length === 0 || salvandoTudo} onClick={() => void salvarTudo()}>
+          {salvandoTudo ? "Salvando…" : `Salvar (${pendentes.length})`}
+        </Button>
+      </HeaderActions>
       <Stack direction="row" wrap align="end" gap="section" surface="card">
         <Stack gap="field" grow narrow>
           <Label htmlFor="colaboradores-situacao">Situação</Label>

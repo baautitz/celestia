@@ -9,6 +9,7 @@
     "./forms/*": "./src/forms/*.tsx",
     "./lib/*": "./src/lib/*.ts",
     "./hooks/*": "./src/hooks/*.ts",
+    "./context/*": "./src/context/*.tsx",
     "./contracts/*": "./src/contracts/*.ts",
     "./contracts/module": "./src/contracts/module.ts",
     "./data-table/*": "./src/data-table/*.tsx",
