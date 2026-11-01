@@ -657,12 +657,27 @@ describe("pesquisa de Colaboradores", () => {
     apiFetch.mockResolvedValue({ ...lista, colaboradores: [...lista.colaboradores, { codigoColaborador, nome, ativo: true, ...pendente }] });
     render(<ColaboradoresPage />);
     await linha("ANA SOUZA");
-    const busca = screen.getByPlaceholderText("Buscar por nome ou código...");
+    const busca = screen.getByPlaceholderText("Buscar por nome, código ou usuário...");
     fireEvent.change(busca, { target: { value: "ana sou" } });
     await waitFor(() => expect(screen.queryByText(nome)).toBeNull());
     expect(screen.getByText("ANA SOUZA")).toBeTruthy();
     fireEvent.change(busca, { target: { value: String(codigoColaborador) } });
     expect(await screen.findByText(nome)).toBeTruthy();
     await waitFor(() => expect(screen.queryByText("ANA SOUZA")).toBeNull());
+  });
+
+  it("encontra pelo Usuário vinculado", async () => {
+    apiFetch.mockResolvedValue({
+      ...lista,
+      colaboradores: [
+        { codigoColaborador: 7, nome: "DAVI REIS", ativo: true, ...pendente },
+        { codigoColaborador: 12, nome: "CARLA DIAS", ativo: true, ...vinculadoAna },
+      ],
+    });
+    render(<ColaboradoresPage />);
+    await linha("DAVI REIS");
+    fireEvent.change(screen.getByPlaceholderText("Buscar por nome, código ou usuário..."), { target: { value: "ana souza" } });
+    await waitFor(() => expect(screen.queryByText("DAVI REIS")).toBeNull());
+    expect(screen.getByText("CARLA DIAS")).toBeTruthy();
   });
 });

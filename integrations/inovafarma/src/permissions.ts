@@ -7,6 +7,21 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite abrir a tela e consultar dados integrados do InovaFarma.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para visualizar o InovaFarma.",
   },
+  "vendas-geral:view": {
+    label: "Desempenho de Vendas: Visualização Geral",
+    description: "Permite ver o Desempenho de Vendas de todas as Lojas e de todos os Colaboradores.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para a Visualização Geral do Desempenho de Vendas.",
+  },
+  "vendas-loja:view": {
+    label: "Desempenho de Vendas: Visualização Loja",
+    description: "Permite ver o Desempenho de Vendas das Lojas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para a Visualização Loja do Desempenho de Vendas.",
+  },
+  "vendas-individual:view": {
+    label: "Desempenho de Vendas: Visualização Individual",
+    description: "Permite ver o Desempenho de Vendas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para a Visualização Individual do Desempenho de Vendas.",
+  },
   "colaboradores:view": {
     label: "Visualizar Colaboradores",
     description: "Permite abrir a página Colaboradores e consultar os Colaboradores do InovaFarma.",

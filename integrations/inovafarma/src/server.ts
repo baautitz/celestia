@@ -8,6 +8,7 @@ import { LOJAS_SQL, registerColaboradoresRoutes, type UsersService } from "./col
 import { PostgresVinculoStore } from "./postgres-vinculo-store.js";
 import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
 import { MemoryVinculoStore } from "./vinculo-store.js";
+import { SEM_VISUALIZACAO, VISUALIZACAO_PERMISSION, VISUALIZACOES, visualizacoesDoUsuario, type Visualizacao } from "./visualizacoes.js";
 
 export { INOVAFARMA_PERMISSIONS, createInovafarmaDriver, PostgresVinculoStore };
 export { UsuarioJaVinculadoError, VersaoDesatualizadaError } from "./vinculo-store.js";
@@ -84,12 +85,13 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
     register({ routes, permissions, services }) {
       const audit = services.use<AuditService>("audit", "log");
       declareVinculoAudit(audit);
+      const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
       registerColaboradoresRoutes({
         routes,
         permissions,
         auth,
         erpClient: () => erpClients[erpId],
-        store: db ? new PostgresVinculoStore(db) : new MemoryVinculoStore(),
+        store,
         users: services.use<UsersService>("iam", "users"),
         audit,
       });
@@ -130,10 +132,45 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         }
       });
 
-      routes.get("/relatorios/vendas-colaborador", auth, async (c: Context<{ Variables: { user?: { permissions?: string[] } } }>) => {
+      type ReportContext = Context<{ Variables: { user?: { sub?: string; permissions?: string[] } } }>;
+
+      /** Visualizações do Usuário: a Permission de cada uma e, para Loja e Individual, o vínculo do #53. */
+      const visualizacoesDe = async (c: ReportContext) => {
         const user = c.get("user");
-        if (!permissions.has(user?.permissions, viewKey)) {
-          return c.json({ error: INOVAFARMA_PERMISSIONS.items[0]?.deniedMessage ?? "Acesso negado." }, 403);
+        const vinculo = user?.sub ? ((await store.list()).find((v) => v.usuarioId === user.sub) ?? null) : null;
+        return visualizacoesDoUsuario(user?.permissions, vinculo, (p, k) => permissions.has(p, k));
+      };
+
+      const lojasDoErp = async (client: ErpQueryClient | undefined) => {
+        if (!client) return [];
+        try {
+          const rows = await client.query<{ codigoEmpresa: number; nome: string }>(LOJAS_SQL);
+          return rows.map((r) => ({ codigoEmpresa: Number(r.codigoEmpresa), nome: (r.nome || "").trim() }));
+        } catch {
+          return [];
+        }
+      };
+
+      // A tela decide o que mostrar por aqui: Visualizações disponíveis e as Lojas que cada uma permite filtrar.
+      routes.get("/relatorios/vendas-colaborador/visualizacoes", auth, async (c: ReportContext) => {
+        const { disponiveis, lojas } = await visualizacoesDe(c);
+        const lojasErp = disponiveis.some((v) => v !== "individual") ? await lojasDoErp(erpClients[erpId]) : [];
+        const lojasDe = (v: Visualizacao) =>
+          v === "geral" ? lojasErp : v === "loja" ? lojas.map((codigoEmpresa) => lojasErp.find((l) => l.codigoEmpresa === codigoEmpresa) ?? { codigoEmpresa, nome: "" }) : [];
+        return c.json({ visualizacoes: disponiveis.map((id) => ({ id, lojas: lojasDe(id) })) });
+      });
+
+      routes.get("/relatorios/vendas-colaborador", auth, async (c: ReportContext) => {
+        const { disponiveis, lojas: lojasVinculo, codigoColaborador } = await visualizacoesDe(c);
+        if (disponiveis.length === 0) return c.json({ error: SEM_VISUALIZACAO }, 403);
+        const pedida = c.req.query("visualizacao") ?? disponiveis[0];
+        if (!VISUALIZACOES.includes(pedida as Visualizacao)) {
+          return c.json({ error: "Parâmetro 'visualizacao' deve ser geral, loja ou individual." }, 400);
+        }
+        const visualizacao = pedida as Visualizacao;
+        if (!disponiveis.includes(visualizacao)) {
+          const item = INOVAFARMA_PERMISSIONS.items.find((i) => i.key === VISUALIZACAO_PERMISSION[visualizacao]);
+          return c.json({ error: item?.deniedMessage ?? SEM_VISUALIZACAO }, 403);
         }
 
         const client = erpClients[erpId];
@@ -155,10 +192,24 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
           dataFim: `${dataFim} 23:59:59`,
         };
 
+        // Loja: toda venda feita nas Lojas do vínculo, de qualquer vendedor. Individual: toda venda do
+        // Colaborador, em qualquer Loja: quem vendeu fora das suas Lojas continua no próprio Individual.
         let filtroEmpresa = "";
-        if (codigoEmpresa && !Number.isNaN(Number(codigoEmpresa))) {
+        const lojaPedida = codigoEmpresa && !Number.isNaN(Number(codigoEmpresa)) ? Number(codigoEmpresa) : null;
+        if (visualizacao === "loja") {
+          if (lojaPedida !== null && !lojasVinculo.includes(lojaPedida)) {
+            return c.json({ error: "A Loja informada não está vinculada ao seu Colaborador." }, 403);
+          }
+          const permitidas = lojaPedida === null ? lojasVinculo : [lojaPedida];
+          filtroEmpresa = `AND v.CodigoEmpresa IN (${permitidas.map((_, i) => `@loja${i}`).join(", ")})`;
+          permitidas.forEach((codigo, i) => (params[`loja${i}`] = codigo));
+        } else if (lojaPedida !== null) {
           filtroEmpresa = "AND v.CodigoEmpresa = @codigoEmpresa";
-          params.codigoEmpresa = Number(codigoEmpresa);
+          params.codigoEmpresa = lojaPedida;
+        }
+        if (visualizacao === "individual") {
+          filtroEmpresa += " AND vp.CodigoFuncionario = @codigoColaborador";
+          params.codigoColaborador = codigoColaborador;
         }
 
         // Como no relatório oficial do InovaFarma: vendas sem caixa aberto (CodigoAbertura nulo) ficam fora,
