@@ -300,6 +300,20 @@ describe("Vínculo do Colaborador com Usuário", () => {
       });
     });
 
+    it("um Usuário desativado que não mudou não impede salvar só as Lojas", async () => {
+      const { salvar, userStore } = await boot();
+      await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
+      await userStore.updateUser("ana", { status: "inactive" });
+      const res = await salvar(7, { usuarioId: "ana", lojas: [1], version: 1 });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ usuarioId: "ana", lojas: [1], version: 2 });
+    });
+
+    it("um Usuário desativado continua recusado em outro Colaborador", async () => {
+      const { salvar } = await boot();
+      expect((await salvar(9, { usuarioId: "caio", lojas: [], version: 0 })).status).toBe(400);
+    });
+
     it("avisa Colaborador inativo só quando tem vínculo", async () => {
       const { salvar, listar } = await boot();
       expect(linha(await listar(), 9)?.avisos).toEqual([]);

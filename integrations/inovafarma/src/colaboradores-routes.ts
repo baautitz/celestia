@@ -213,8 +213,9 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     const lojasAnteriores = atual?.lojas ?? [];
     if ((atual?.usuarioId ?? null) === usuarioId && lojas.join() === lojasAnteriores.join()) return responder(atual);
 
+    // Um Usuário já gravado pode ter sido desativado e continua aceito; só um novo precisa estar ativo.
     const novo = usuarios.find((u) => u.id === usuarioId);
-    if (usuarioId !== null && novo?.status !== "active") return c.json({ error: "Usuário não encontrado ou inativo." }, 400);
+    if (usuarioId !== null && usuarioId !== atual?.usuarioId && novo?.status !== "active") return c.json({ error: "Usuário não encontrado ou inativo." }, 400);
 
     // Uma Loja já gravada pode ter saído do ERP e continua aceita; só uma nova precisa existir lá.
     const lojaValida = (codigo: number) => lojasAnteriores.includes(codigo) || lojasErp.some((l) => l.codigo === codigo);
