@@ -122,7 +122,10 @@
           "inovafarma:colaboradores:view",
           "inovafarma:colaboradores:update",
           "inovafarma:pre-vencidos-lancamento:manage",
-          "inovafarma:pre-vencidos-conferencia:view"
+          "inovafarma:pre-vencidos-conferencia:view",
+          "inovafarma:avaliacoes-individual:view",
+          "inovafarma:avaliacoes-loja:manage",
+          "inovafarma:avaliacoes-geral:manage"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -309,7 +312,10 @@
         "inovafarma:colaboradores:view",
         "inovafarma:colaboradores:update",
         "inovafarma:pre-vencidos-lancamento:manage",
-        "inovafarma:pre-vencidos-conferencia:view"
+        "inovafarma:pre-vencidos-conferencia:view",
+        "inovafarma:avaliacoes-individual:view",
+        "inovafarma:avaliacoes-loja:manage",
+        "inovafarma:avaliacoes-geral:manage"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -519,6 +525,27 @@
             "label": "Conferir Pré-vencidos",
             "description": "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:avaliacoes-individual:view",
+            "label": "Avaliações: Visualização Individual",
+            "description": "Permite ver as Avaliações recebidas pelo Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver as próprias Avaliações.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:avaliacoes-loja:manage",
+            "label": "Avaliações: Gerenciar por Loja",
+            "description": "Permite lançar, editar, excluir e ver as Avaliações dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar as Avaliações da Loja.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:avaliacoes-geral:manage",
+            "label": "Avaliações: Gerenciar todas",
+            "description": "Permite lançar, editar, excluir e ver as Avaliações dos Colaboradores de todas as Lojas.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar as Avaliações de todas as Lojas.",
             "module": "inovafarma"
           }
         ]
@@ -731,6 +758,27 @@
             "label": "Conferir Pré-vencidos",
             "description": "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:avaliacoes-individual:view",
+            "label": "Avaliações: Visualização Individual",
+            "description": "Permite ver as Avaliações recebidas pelo Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver as próprias Avaliações.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:avaliacoes-loja:manage",
+            "label": "Avaliações: Gerenciar por Loja",
+            "description": "Permite lançar, editar, excluir e ver as Avaliações dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar as Avaliações da Loja.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:avaliacoes-geral:manage",
+            "label": "Avaliações: Gerenciar todas",
+            "description": "Permite lançar, editar, excluir e ver as Avaliações dos Colaboradores de todas as Lojas.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar as Avaliações de todas as Lojas.",
             "module": "inovafarma"
           }
         ]

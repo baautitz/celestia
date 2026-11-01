@@ -42,4 +42,19 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
   },
+  "avaliacoes-individual:view": {
+    label: "Avaliações: Visualização Individual",
+    description: "Permite ver as Avaliações recebidas pelo Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver as próprias Avaliações.",
+  },
+  "avaliacoes-loja:manage": {
+    label: "Avaliações: Gerenciar por Loja",
+    description: "Permite lançar, editar, excluir e ver as Avaliações dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerenciar as Avaliações da Loja.",
+  },
+  "avaliacoes-geral:manage": {
+    label: "Avaliações: Gerenciar todas",
+    description: "Permite lançar, editar, excluir e ver as Avaliações dos Colaboradores de todas as Lojas.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerenciar as Avaliações de todas as Lojas.",
+  },
 });

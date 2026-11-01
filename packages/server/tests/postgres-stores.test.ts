@@ -12,6 +12,7 @@ import { LastAdminError } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
 import { PostgresPreVencidoStore } from "../../../integrations/inovafarma/src/postgres-pre-vencido-store.js";
+import { PostgresAvaliacaoStore } from "../../../integrations/inovafarma/src/postgres-avaliacao-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
 
@@ -44,8 +45,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas e a dos Lançamentos de Pré-vencidos; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 3 : 1);
+        // O iam tem a inicial e as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA); o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos e a das Avaliações; os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 5 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 4 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -64,6 +65,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "erp", name: "erps" },
         { schema: "iam", name: "roles" },
         { schema: "iam", name: "users" },
+        { schema: "inovafarma", name: "avaliacoes" },
         { schema: "inovafarma", name: "pre_vencidos_lancamentos" },
         { schema: "inovafarma", name: "vinculos_colaborador" },
       ]);
@@ -115,7 +117,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_lancamentos CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_lancamentos, inovafarma.avaliacoes CASCADE`);
     });
 
     describe("Users e Roles", () => {
@@ -275,6 +277,27 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         expect(await store.excluir(criado.id, 1)).toBe(false);
         expect(await store.excluir(criado.id, 2)).toBe(true);
         expect(await store.get(criado.id)).toBeNull();
+      });
+    });
+
+    describe("Avaliações do Colaborador", () => {
+      const nova = { periodoId: "p1", codigoColaborador: 7, nomeColaborador: "ANA", codigoLoja: 1, descricao: "Atraso", valorCentavos: 1250, criadoPor: "gil" };
+
+      it("cria, lista pelo período e pelas Lojas, edita e exclui com a version", async () => {
+        const store = new PostgresAvaliacaoStore(db);
+        const criada = await store.criar(nova);
+        await store.criar({ ...nova, codigoLoja: 2, valorCentavos: 0 });
+        expect(criada).toMatchObject({ version: 1, valorCentavos: 1250 });
+        expect(await store.listar({ periodoId: "p1", lojas: [1] })).toHaveLength(1);
+        expect(await store.listar({ periodoId: "p1", lojas: [] })).toHaveLength(0);
+        expect(await store.listar({ periodoId: "p1" })).toHaveLength(2);
+        expect(await store.listar({ periodoId: "p1", codigoColaborador: 8 })).toHaveLength(0);
+
+        expect(await store.atualizar(criada.id, { descricao: "Falta", valorCentavos: 0 }, 99)).toBeNull();
+        expect(await store.atualizar(criada.id, { descricao: "Falta", valorCentavos: 0 }, 1)).toMatchObject({ descricao: "Falta", valorCentavos: 0, version: 2 });
+        expect(await store.excluir(criada.id, 1)).toBe(false);
+        expect(await store.excluir(criada.id, 2)).toBe(true);
+        expect(await store.get(criada.id)).toBeNull();
       });
     });
 
