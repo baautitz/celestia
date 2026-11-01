@@ -22,7 +22,7 @@ const userSchema = z.object({
   username: z.string().min(1, "Informe o nome de usuário."),
   // Opcional: em branco, o Usuário fica sem e-mail.
   email: z.string().trim().pipe(z.literal("").or(z.string().email("E-mail inválido."))),
-  roleId: z.string().min(1),
+  roleId: z.string().min(1, "Selecione o perfil de acesso."),
   isAdmin: z.boolean(),
   allowWithoutCertificate: z.boolean(),
   password: z.string(),
@@ -50,7 +50,8 @@ export const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, cur
       fullname: user?.fullname ?? fullname ?? "",
       username: user?.username ?? (fullname && suggestUsername ? suggestUsername(fullname) : ""),
       email: user?.email ?? "",
-      roleId: user?.roleId ?? (roles[0]?.id || "role_operador"),
+      // No cadastro nada vem escolhido: o perfil é sempre uma escolha consciente.
+      roleId: user?.roleId ?? "",
       isAdmin: user?.isAdmin === true,
       allowWithoutCertificate: user?.allowWithoutCertificate === true,
       password: "",

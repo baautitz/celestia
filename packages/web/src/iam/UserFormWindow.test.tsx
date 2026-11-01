@@ -46,6 +46,12 @@ describe("serviço iam:users", () => {
     expect(((await screen.findByLabelText("Nome de Usuário")) as HTMLInputElement).value).toBe("ana_souza");
     expect((screen.getByLabelText("Nome Completo") as HTMLInputElement).value).toBe("ANA SOUZA");
     fireEvent.change(screen.getByLabelText("Senha Inicial"), { target: { value: "Senha@123" } });
+    // O perfil não vem escolhido: sem ele, o cadastro não sai.
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar Usuário" }));
+    expect(await screen.findByText("Selecione o perfil de acesso.")).toBeTruthy();
+    expect(api.iam.createUser).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("combobox", { name: "Perfil de Acesso" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Gestor" }));
     fireEvent.click(screen.getByRole("button", { name: "Cadastrar Usuário" }));
     await waitFor(() => expect(resultado).toEqual(criado));
     expect(api.iam.createUser).toHaveBeenCalledWith(expect.objectContaining({ fullname: "ANA SOUZA", username: "ana_souza", email: undefined, password: "Senha@123", roleId: "gestor" }));
