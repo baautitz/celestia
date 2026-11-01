@@ -8,14 +8,19 @@ describe("menu dos módulos registrados", () => {
     expect(menu[3].entries.map((e) => e.label)).toEqual(["Usuários", "Grupos", "Dispositivos", "ERPs", "Auditoria"]);
   });
 
-  it("mostra Colaboradores na Seção InovaFarma e mantém Desempenho de Vendas em Relatórios", () => {
+  it("mostra Colaboradores e Pré-vencidos na Seção InovaFarma e mantém Desempenho de Vendas em Relatórios", () => {
     const menu = menuSections(() => true);
-    expect(menu.find((s) => s.label === "InovaFarma")?.entries.map((e) => e.label)).toEqual(["Colaboradores"]);
+    expect(menu.find((s) => s.label === "InovaFarma")?.entries.map((e) => e.label)).toEqual(["Colaboradores", "Pré-vencidos"]);
     expect(menu.find((s) => s.label === "Relatórios")?.entries.map((e) => e.label)).toContain("Desempenho de Vendas");
   });
 
-  it("esconde a Seção InovaFarma de quem não tem a Permission de Colaboradores", () => {
-    const menu = menuSections((permission) => permission !== "inovafarma:colaboradores:view");
+  it("esconde a Seção InovaFarma de quem não tem nenhuma Permission da Seção", () => {
+    const menu = menuSections((permission) => !permission.startsWith("inovafarma:colaboradores:") && !permission.startsWith("inovafarma:pre-vencidos-"));
     expect(menu.map((s) => s.label)).not.toContain("InovaFarma");
+  });
+
+  it("quem só confere Pré-vencidos vê só essa entrada na Seção InovaFarma", () => {
+    const menu = menuSections((permission) => permission === "inovafarma:pre-vencidos-conferencia:view");
+    expect(menu.find((s) => s.label === "InovaFarma")?.entries.map((e) => e.label)).toEqual(["Pré-vencidos"]);
   });
 });
