@@ -5,7 +5,7 @@ ENV PNPM_STORE_DIR=/pnpm/store
 RUN corepack enable
 WORKDIR /repo
 # As dependências só dependem do lockfile: esta camada fica em cache até ele mudar.
-COPY pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch --store-dir $PNPM_STORE_DIR
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
