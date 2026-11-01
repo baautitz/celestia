@@ -8,6 +8,8 @@ import { useRouterNavigation } from "@platform/ui/adapters/navigation-router";
 import { setApiFetch } from "@platform/ui/lib/api";
 import { api } from "./lib/api-client";
 import { App } from "./App";
+import { webServices } from "./modules";
+import { WebServicesProvider } from "@platform/ui/contracts/web-services";
 import "./index.css";
 
 // Conecta o transporte autenticado da plataforma ao helper da UI (usado por Plugins)
@@ -23,13 +25,15 @@ const router = createBrowserRouter(
     {
       path: "*",
       element: (
-        <AuthProvider>
-          <RouterUiProvider>
-            <HeaderActionsProvider>
-              <App />
-            </HeaderActionsProvider>
-          </RouterUiProvider>
-        </AuthProvider>
+        <WebServicesProvider services={webServices}>
+          <AuthProvider>
+            <RouterUiProvider>
+              <HeaderActionsProvider>
+                <App />
+              </HeaderActionsProvider>
+            </RouterUiProvider>
+          </AuthProvider>
+        </WebServicesProvider>
       ),
     },
   ],

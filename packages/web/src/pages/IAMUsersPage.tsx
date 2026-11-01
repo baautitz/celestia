@@ -4,12 +4,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/context/AuthContext";
-import type { User, Role, JWTAccessPayload } from "@platform/shared";
+import type { User, Role } from "@platform/shared";
 import { Button } from "@platform/ui/components/button";
-import { Grid, PageHeader, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
-import { Input } from "@platform/ui/components/input";
+import { PageHeader, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { Badge } from "@platform/ui/components/badge";
-import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription } from "@platform/ui/components/field";
+import { FieldGroup } from "@platform/ui/components/field";
 import {
   Form,
   FormControl,
@@ -18,13 +17,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@platform/ui/components/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@platform/ui/components/select";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -44,224 +36,17 @@ import {
   CheckCircle2,
   Clock,
 } from "lucide-react";
-import { Switch } from "@platform/ui/components/switch";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
+import { UserFormWindow, userFormWindowTexts } from "@/iam/UserFormWindow";
+import { PasswordInput } from "@platform/ui/components/password-input";
 
-const userSchema = z.object({
-  fullname: z.string().min(1, "Informe o nome completo."),
-  username: z.string().min(1, "Informe o nome de usuário."),
-  // Opcional: em branco, o Usuário fica sem e-mail.
-  email: z.string().trim().pipe(z.literal("").or(z.string().email("E-mail inválido."))),
-  roleId: z.string().min(1),
-  isAdmin: z.boolean(),
-  allowWithoutCertificate: z.boolean(),
-  password: z.string(),
-});
-type UserFormValues = z.infer<typeof userSchema>;
 
 const resetSchema = z.object({
   newPassword: z.string().min(1, "Informe a nova senha."),
 });
 type ResetFormValues = z.infer<typeof resetSchema>;
 
-interface UserFormWindowProps {
-  user: User | null;
-  roles: Role[];
-  currentUser: JWTAccessPayload | null;
-}
-
-const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, currentUser }) => {
-  const { resolve } = useWindow<boolean>();
-  const ui = useUi();
-  const isEditMode = user !== null;
-  const form = useForm<UserFormValues>({
-    resolver: zodResolver(userSchema),
-    defaultValues: {
-      fullname: user?.fullname ?? "",
-      username: user?.username ?? "",
-      email: user?.email ?? "",
-      roleId: user?.roleId ?? (roles[0]?.id || "role_operador"),
-      isAdmin: user?.isAdmin === true,
-      allowWithoutCertificate: user?.allowWithoutCertificate === true,
-      password: "",
-    },
-  });
-  const roleId = form.watch("roleId");
-  const getRoleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
-
-  const onSubmit = async (v: UserFormValues) => {
-    try {
-      if (user) {
-        await api.iam.updateUser(user.id, {
-          fullname: v.fullname.trim(),
-          email: v.email.trim() || undefined,
-          roleId: v.roleId,
-          ...(currentUser?.isAdmin ? { isAdmin: v.isAdmin, allowWithoutCertificate: v.allowWithoutCertificate } : {}),
-        });
-        ui.feedback.notify({ type: "success", title: "Usuário atualizado com sucesso!" });
-      } else {
-        await api.iam.createUser({
-          fullname: v.fullname.trim(),
-          username: v.username.trim(),
-          email: v.email.trim() || undefined,
-          password: v.password,
-          roleId: v.roleId,
-          ...(currentUser?.isAdmin && v.allowWithoutCertificate ? { allowWithoutCertificate: true } : {}),
-        });
-        ui.feedback.notify({ type: "success", title: "Usuário cadastrado com sucesso!" });
-      }
-      resolve(true);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Falha ao salvar usuário";
-      ui.feedback.notify({ type: "error", title: msg });
-    }
-  };
-
-  const submitting = form.formState.isSubmitting;
-
-  return (
-    <>
-      <Form {...form}>
-        <form id="user-form" noValidate onSubmit={form.handleSubmit(onSubmit)}>
-          <FieldGroup>
-            <FormField
-              control={form.control}
-              name="fullname"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome Completo</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Carlos Silva" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Grid columns={2}>
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome de Usuário</FormLabel>
-                    <FormControl>
-                      <Input placeholder="carlos.silva" disabled={isEditMode} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>E-mail</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="carlos@empresa.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </Grid>
-
-            <FormField
-              control={form.control}
-              name="roleId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Perfil de Acesso</FormLabel>
-                  <Select value={field.value} onValueChange={(val: string | null) => val && field.onChange(val)}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o perfil">
-                          {roleId ? getRoleName(roleId) : undefined}
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {roles.map((r) => (
-                        <SelectItem key={r.id} value={r.id}>
-                          {r.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {isEditMode && currentUser?.isAdmin && (
-              <FormField
-                control={form.control}
-                name="isAdmin"
-                render={({ field }) => (
-                  <Field orientation="horizontal">
-                    <FieldContent>
-                      <FieldLabel htmlFor="u-admin">Administrador</FieldLabel>
-                      <FieldDescription>Ignora a matriz de permissões e tem acesso total.</FieldDescription>
-                    </FieldContent>
-                    <Switch
-                      id="u-admin"
-                      checked={field.value}
-                      disabled={user?.id === currentUser.sub}
-                      onCheckedChange={(checked: boolean) => field.onChange(checked)}
-                    />
-                  </Field>
-                )}
-              />
-            )}
-
-            {currentUser?.isAdmin && (
-              <FormField
-                control={form.control}
-                name="allowWithoutCertificate"
-                render={({ field }) => (
-                  <Field orientation="horizontal">
-                    <FieldContent>
-                      <FieldLabel htmlFor="u-no-cert">Permitir acesso sem certificado</FieldLabel>
-                      <FieldDescription>Entra só com a senha, sem o certificado de um Dispositivo homologado.</FieldDescription>
-                    </FieldContent>
-                    <Switch id="u-no-cert" checked={field.value} onCheckedChange={(checked: boolean) => field.onChange(checked)} />
-                  </Field>
-                )}
-              />
-            )}
-
-            {!isEditMode && (
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Senha Inicial</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
-                    </FormControl>
-                    <Text variant="tiny" tone="muted">
-                      Requer: 1 maiúscula, 1 minúscula, 1 número e 1 especial.
-                    </Text>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-          </FieldGroup>
-        </form>
-      </Form>
-      <WindowActions>
-        <WindowCancelButton />
-        <Button type="submit" form="user-form" disabled={submitting}>
-          {submitting ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Cadastrar Usuário"}
-        </Button>
-      </WindowActions>
-    </>
-  );
-};
 
 const ResetPasswordWindow: React.FC<{ user: User }> = ({ user }) => {
   const { resolve } = useWindow<boolean>();
@@ -294,7 +79,7 @@ const ResetPasswordWindow: React.FC<{ user: User }> = ({ user }) => {
                 <FormItem>
                   <FormLabel>Nova Senha</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
+                    <PasswordInput autoComplete="new-password" placeholder="Mínimo 8 caracteres (Aa1@)" {...field} />
                   </FormControl>
                   <Text variant="tiny" tone="muted">
                     Requer 1 maiúscula, 1 minúscula, 1 número e 1 especial.
@@ -343,13 +128,10 @@ export const IAMUsersPage: React.FC = () => {
   }, [fetchDataRef]);
 
   const openUserWindow = async (u: User | null) => {
-    const result = await ui.windows.open<boolean>({
+    const result = await ui.windows.open<User>({
       surface: "dialog",
       size: "small",
-      title: u ? "Editar Usuário" : "Cadastrar Novo Usuário",
-      description: u
-        ? "Atualize os dados e o perfil do usuário."
-        : "Crie uma nova identidade no sistema com perfil e senha inicial.",
+      ...userFormWindowTexts(u),
       content: () => <UserFormWindow user={u} roles={roles} currentUser={currentUser} />,
     });
     if (result.status === "confirmed") fetchData();

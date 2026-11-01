@@ -1,12 +1,17 @@
 import type { NavEntry, WebModule } from "@platform/ui/contracts/module";
 import { buildMenu } from "./lib/menu";
+import { buildWebServices } from "@platform/ui/contracts/web-services";
 import { coreModule } from "./modules/core";
+import { iamModule } from "./modules/iam";
 import { auditModule } from "./modules/audit";
 import { closingPeriodModule } from "./modules/closing-period";
 import { inovafarmaWebModule } from "@integrations/inovafarma/web";
 
 // Registro estático: um import explícito por módulo, a ordem visual vem das Seções e `order` (lib/menu.ts).
-export const modules: WebModule[] = [coreModule, closingPeriodModule, auditModule, inovafarmaWebModule];
+export const modules: WebModule[] = [coreModule, iamModule, closingPeriodModule, auditModule, inovafarmaWebModule];
+
+/** Serviços entre módulos web; lança no boot se um `dependsOn` não estiver registrado antes. */
+export const webServices = buildWebServices(modules);
 
 export const allEntries: NavEntry[] = modules.flatMap((m) => m.entries);
 
