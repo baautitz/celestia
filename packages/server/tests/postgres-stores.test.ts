@@ -13,6 +13,7 @@ import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
 import { PostgresPreVencidoStore } from "../../../integrations/inovafarma/src/postgres-pre-vencido-store.js";
 import { PostgresAvaliacaoStore } from "../../../integrations/inovafarma/src/postgres-avaliacao-store.js";
+import { PostgresFuroEstoqueStore } from "../../../integrations/inovafarma/src/postgres-furo-estoque-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
 
@@ -46,7 +47,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
         // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA) e a que troca Excluir por Inativar Usuários; o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos e a das Avaliações; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 6 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 4 : 1);
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 6 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 5 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -66,6 +67,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "iam", name: "roles" },
         { schema: "iam", name: "users" },
         { schema: "inovafarma", name: "avaliacoes" },
+        { schema: "inovafarma", name: "justificativas_ajuste" },
+        { schema: "inovafarma", name: "motivos_ajuste" },
         { schema: "inovafarma", name: "pre_vencidos_lancamentos" },
         { schema: "inovafarma", name: "vinculos_colaborador" },
       ]);
@@ -117,7 +120,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_lancamentos, inovafarma.avaliacoes CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_lancamentos, inovafarma.avaliacoes, inovafarma.justificativas_ajuste CASCADE`);
     });
 
     describe("Users e Roles", () => {
@@ -298,6 +301,26 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         expect(await store.excluir(criada.id, 1)).toBe(false);
         expect(await store.excluir(criada.id, 2)).toBe(true);
         expect(await store.get(criada.id)).toBeNull();
+      });
+    });
+
+    describe("Furo de Estoque", () => {
+      it("semeia os Motivos, aceita uma Justificativa por Ajuste e edita e exclui com a version", async () => {
+        const store = new PostgresFuroEstoqueStore(db);
+        const motivos = await store.listarMotivos();
+        expect(motivos.map((m) => m.nome)).toContain("Vencido");
+        await expect(store.criarMotivo("vencido")).rejects.toThrow();
+
+        const nova = { periodoId: "p1", codigoMovimento: 100, codigoLoja: 1, motivoId: "mot_vencido", observacao: null, criadoPor: "gil" };
+        const criada = await store.justificar(nova);
+        expect(criada).toMatchObject({ version: 1, codigoMovimento: 100 });
+        expect(await store.justificar(nova)).toBeNull();
+        expect(await store.listarJustificativas("p1")).toHaveLength(1);
+
+        expect(await store.atualizarJustificativa(criada!.id, { motivoId: "mot_troca", observacao: "x" }, 99)).toBeNull();
+        expect(await store.atualizarJustificativa(criada!.id, { motivoId: "mot_troca", observacao: "x" }, 1)).toMatchObject({ motivoId: "mot_troca", version: 2 });
+        expect(await store.excluirJustificativa(criada!.id, 1)).toBe(false);
+        expect(await store.excluirJustificativa(criada!.id, 2)).toBe(true);
       });
     });
 

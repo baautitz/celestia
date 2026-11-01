@@ -125,7 +125,9 @@
           "inovafarma:pre-vencidos-conferencia:view",
           "inovafarma:avaliacoes-individual:view",
           "inovafarma:avaliacoes-loja:manage",
-          "inovafarma:avaliacoes-geral:manage"
+          "inovafarma:avaliacoes-geral:manage",
+          "inovafarma:furo-estoque-loja:manage",
+          "inovafarma:furo-estoque-geral:manage"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -315,7 +317,9 @@
         "inovafarma:pre-vencidos-conferencia:view",
         "inovafarma:avaliacoes-individual:view",
         "inovafarma:avaliacoes-loja:manage",
-        "inovafarma:avaliacoes-geral:manage"
+        "inovafarma:avaliacoes-geral:manage",
+        "inovafarma:furo-estoque-loja:manage",
+        "inovafarma:furo-estoque-geral:manage"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -546,6 +550,20 @@
             "label": "Avaliações: Gerenciar todas",
             "description": "Permite lançar, editar, excluir e ver as Avaliações dos Colaboradores de todas as Lojas.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar as Avaliações de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:furo-estoque-loja:manage",
+            "label": "Furo de Estoque: Justificar por Loja",
+            "description": "Permite ver e justificar os Ajustes de Estoque das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque da Loja.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:furo-estoque-geral:manage",
+            "label": "Furo de Estoque: Justificar todas e gerenciar Motivos",
+            "description": "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
             "module": "inovafarma"
           }
         ]
@@ -779,6 +797,20 @@
             "label": "Avaliações: Gerenciar todas",
             "description": "Permite lançar, editar, excluir e ver as Avaliações dos Colaboradores de todas as Lojas.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar as Avaliações de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:furo-estoque-loja:manage",
+            "label": "Furo de Estoque: Justificar por Loja",
+            "description": "Permite ver e justificar os Ajustes de Estoque das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque da Loja.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:furo-estoque-geral:manage",
+            "label": "Furo de Estoque: Justificar todas e gerenciar Motivos",
+            "description": "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
             "module": "inovafarma"
           }
         ]

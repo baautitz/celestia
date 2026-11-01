@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgSchema, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 /** Um schema Postgres por Module. */
 export const inovafarmaSchema = pgSchema("inovafarma");
@@ -61,4 +61,39 @@ export const avaliacoes = inovafarmaSchema.table(
     atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
   },
   (t) => [index("avaliacoes_periodo_idx").on(t.periodoId, t.codigoLoja)],
+);
+
+export const motivosAjuste = inovafarmaSchema.table(
+  "motivos_ajuste",
+  {
+    id: text("id").primaryKey(),
+    nome: text("nome").notNull(),
+    ativo: boolean("ativo").notNull().default(true),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("motivos_ajuste_nome_unique").on(sql`lower(${t.nome})`)],
+);
+
+export const justificativasAjuste = inovafarmaSchema.table(
+  "justificativas_ajuste",
+  {
+    id: text("id").primaryKey(),
+    /** Referência lógica a `closing_period.periods`, sem FK entre Modules. */
+    periodoId: text("periodo_id").notNull(),
+    /** `Estoque_Movimentacao.CodigoMovimento` no ERP: um Ajuste de Estoque tem no máximo uma Justificativa. */
+    codigoMovimento: integer("codigo_movimento").notNull().unique("justificativas_ajuste_codigo_movimento_unique"),
+    codigoLoja: integer("codigo_loja").notNull(),
+    motivoId: text("motivo_id")
+      .notNull()
+      .references(() => motivosAjuste.id),
+    observacao: text("observacao"),
+    /** Referência lógica a `iam.users`: quem justificou. */
+    criadoPor: text("criado_por").notNull(),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [index("justificativas_ajuste_periodo_idx").on(t.periodoId)],
 );

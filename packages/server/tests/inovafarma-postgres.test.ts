@@ -82,7 +82,7 @@ describe.skipIf(!dbTestsEnabled)("Vínculos do Colaborador contra Postgres real"
   it("não há FK entre o vínculo e iam.users", async () => {
     const fks = await db.execute(sql`
       SELECT 1 FROM information_schema.table_constraints
-      WHERE table_schema = 'inovafarma' AND constraint_type = 'FOREIGN KEY'
+      WHERE table_schema = 'inovafarma' AND table_name = 'vinculos_colaborador' AND constraint_type = 'FOREIGN KEY'
     `);
     expect(fks.rows).toEqual([]);
   });

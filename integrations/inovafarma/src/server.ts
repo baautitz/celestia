@@ -10,6 +10,10 @@ import { declareAvaliacaoAudit } from "./avaliacoes-audit.js";
 import { registerAvaliacoesRoutes } from "./avaliacoes-routes.js";
 import { MemoryAvaliacaoStore } from "./avaliacoes-store.js";
 import { PostgresAvaliacaoStore } from "./postgres-avaliacao-store.js";
+import { declareFuroEstoqueAudit } from "./furo-estoque-audit.js";
+import { registerFuroEstoqueRoutes } from "./furo-estoque-routes.js";
+import { MemoryFuroEstoqueStore } from "./furo-estoque-store.js";
+import { PostgresFuroEstoqueStore } from "./postgres-furo-estoque-store.js";
 import { declarePreVencidoAudit } from "./pre-vencidos-audit.js";
 import { registerPreVencidosRoutes, type PeriodsService } from "./pre-vencidos-routes.js";
 import { MemoryPreVencidoStore } from "./pre-vencidos-store.js";
@@ -95,6 +99,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declareVinculoAudit(audit);
       declarePreVencidoAudit(audit);
       declareAvaliacaoAudit(audit);
+      declareFuroEstoqueAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
       const users = services.use<UsersService>("iam", "users");
       const periods = services.use<PeriodsService>("closing_period", "periods");
@@ -123,6 +128,17 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         auth,
         erpClient: () => erpClients[erpId],
         store: db ? new PostgresAvaliacaoStore(db) : new MemoryAvaliacaoStore(),
+        vinculos: store,
+        users,
+        periods,
+        audit,
+      });
+      registerFuroEstoqueRoutes({
+        routes,
+        permissions,
+        auth,
+        erpClient: () => erpClients[erpId],
+        store: db ? new PostgresFuroEstoqueStore(db) : new MemoryFuroEstoqueStore(),
         vinculos: store,
         users,
         periods,
