@@ -403,6 +403,17 @@ function totalCellText(
   return col.key in totals ? formatValue(totals[col.key], col.format) : "";
 }
 
+/**
+ * Linha do corpo memorizada: selecionar ou expandir uma linha só redesenha as linhas cujo `deps` mudou
+ * (a que ganhou e a que perdeu o destaque), não a tabela inteira. `deps` lista tudo de que a linha depende.
+ */
+const MemoRow = React.memo(
+  function MemoRow({ render }: { render: () => React.ReactNode; deps: readonly unknown[] }) {
+    return <>{render()}</>;
+  },
+  (a, b) => a.deps.length === b.deps.length && a.deps.every((d, i) => Object.is(d, b.deps[i])),
+);
+
 export function DataTable<TRow>({
   columns,
   rows,
@@ -1046,7 +1057,11 @@ export function DataTable<TRow>({
                         renderExpanded !== undefined && isExpanded(id);
                       const selected = selectedId === id;
                       return (
-                        <React.Fragment key={id}>
+                        <MemoRow
+                          key={id}
+                          deps={[row, selected, expanded, columns, frozenUntil, frozenLeft, striped, rowActions, renderExpanded, getRowId]}
+                          render={() => (
+                        <React.Fragment>
                           <TableRow
                             data-state={selected ? "selected" : undefined}
                             aria-selected={selected}
@@ -1128,6 +1143,8 @@ export function DataTable<TRow>({
                             </TableRow>
                           )}
                         </React.Fragment>
+                          )}
+                        />
                       );
                     })
                   )}
