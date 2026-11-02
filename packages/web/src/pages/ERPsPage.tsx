@@ -292,6 +292,7 @@ export const ERPsPage: React.FC = () => {
     },
     {
       key: "driver",
+      centered: true,
       label: "ERP Driver",
       value: (e) => driverLabel(e.driver),
       render: (e) => <Badge variant="secondary">{driverLabel(e.driver)}</Badge>,
@@ -299,6 +300,7 @@ export const ERPsPage: React.FC = () => {
     },
     {
       key: "updatedAt",
+      centered: true,
       label: "Atualizado em",
       value: (e) => formatDate(e.updatedAt),
       cellClassName: "text-xs text-muted-foreground",

@@ -256,12 +256,13 @@ export const IAMDevicesPage: React.FC = () => {
             label: "Nome",
             value: (d) => d.name,
             searchable: true,
-            cellClassName: "font-medium",
+            cellClassName: "font-mono font-semibold",
             skeletonClassName: "h-4 w-40",
             mobileRole: "primary",
           },
           {
             key: "status",
+            centered: true,
             label: "Estado",
             value: (d) => d.status,
             render: (d) =>
@@ -280,6 +281,7 @@ export const IAMDevicesPage: React.FC = () => {
           },
           {
             key: "notAfter",
+            centered: true,
             label: "Validade",
             value: (d) => formatDate(d.notAfter),
             cellClassName: "text-xs text-muted-foreground",
@@ -288,6 +290,7 @@ export const IAMDevicesPage: React.FC = () => {
           },
           {
             key: "createdAt",
+            centered: true,
             label: "Emitido em",
             value: (d) => formatDate(d.createdAt),
             cellClassName: "text-xs text-muted-foreground",

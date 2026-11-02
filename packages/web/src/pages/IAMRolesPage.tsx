@@ -294,6 +294,7 @@ export const IAMRolesPage: React.FC = () => {
     },
     {
       key: "permissions",
+      centered: true,
       label: "Permissões Ativas",
       mobileLabel: "Permissões",
       value: (r) => (r.permissions.includes("*") ? "Acesso Total (*)" : `${r.permissions.length} ${r.permissions.length === 1 ? "permissão" : "permissões"}`),
