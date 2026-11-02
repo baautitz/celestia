@@ -1,65 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import * as asn1js from "asn1js";
-import {
-  AlgorithmIdentifier,
-  Attribute,
-  AttributeTypeAndValue,
-  AuthenticatedSafe,
-  BasicConstraints,
-  CertBag,
-  Certificate,
-  EncryptedContentInfo,
-  Extension,
-  ExtKeyUsage,
-  PBES2Params,
-  PBKDF2Params,
-  PFX,
-  PKCS8ShroudedKeyBag,
-  PrivateKeyInfo,
-  SafeBag,
-  SafeContents,
-  setEngine,
-  CryptoEngine,
-} from "pkijs";
-
-const PBES2_OID = "1.2.840.113549.1.5.13";
-/** Tamanho do salt do PBKDF2 do .pfx. O pkijs usa 64 bytes, que a libksba (gpgsm, Kleopatra) recusa; 16 é o padrão do OpenSSL. */
-const PBES2_SALT_BYTES = 16;
-
-/** Igual ao motor do pkijs, só que o PBES2 do .pfx usa um salt de 16 bytes, aceito por todos os importadores. */
-class CelestiaCryptoEngine extends CryptoEngine {
-  override async encryptEncryptedContentInfo(parameters: Parameters<CryptoEngine["encryptEncryptedContentInfo"]>[0]): Promise<EncryptedContentInfo> {
-    const contentOid = this.getOIDByAlgorithm(parameters.contentEncryptionAlgorithm, true, "contentEncryptionAlgorithm");
-    const hmacOid = this.getOIDByAlgorithm({ name: "HMAC", hash: { name: parameters.hmacHashAlgorithm } } as Algorithm, true, "hmacHashAlgorithm");
-    const iv = this.getRandomValues(new Uint8Array(16));
-    const salt = this.getRandomValues(new Uint8Array(PBES2_SALT_BYTES));
-    const passwordKey = await this.importKey("raw", new Uint8Array(parameters.password), "PBKDF2", false, ["deriveKey"]);
-    const derivedKey = await this.deriveKey(
-      { name: "PBKDF2", hash: { name: parameters.hmacHashAlgorithm }, salt, iterations: parameters.iterationCount },
-      passwordKey,
-      parameters.contentEncryptionAlgorithm,
-      false,
-      ["encrypt"],
-    );
-    const encrypted = await this.encrypt({ name: parameters.contentEncryptionAlgorithm.name, iv }, derivedKey, new Uint8Array(parameters.contentToEncrypt));
-    const pbkdf2 = new PBKDF2Params({
-      salt: new asn1js.OctetString({ valueHex: toArrayBuffer(salt) }),
-      iterationCount: parameters.iterationCount,
-      prf: new AlgorithmIdentifier({ algorithmId: hmacOid, algorithmParams: new asn1js.Null() }),
-    });
-    const pbes2 = new PBES2Params({
-      keyDerivationFunc: new AlgorithmIdentifier({ algorithmId: this.getOIDByAlgorithm({ name: "PBKDF2" }, true, "PBKDF2"), algorithmParams: pbkdf2.toSchema() }),
-      encryptionScheme: new AlgorithmIdentifier({ algorithmId: contentOid, algorithmParams: new asn1js.OctetString({ valueHex: toArrayBuffer(iv) }) }),
-    });
-    return new EncryptedContentInfo({
-      contentType: parameters.contentType,
-      contentEncryptionAlgorithm: new AlgorithmIdentifier({ algorithmId: PBES2_OID, algorithmParams: pbes2.toSchema() }),
-      encryptedContent: new asn1js.OctetString({ valueHex: encrypted }),
-    });
-  }
-}
-
-setEngine("celestia", new CelestiaCryptoEngine({ name: "celestia", crypto: globalThis.crypto }));
+import forge from "node-forge";
+import { AttributeTypeAndValue, BasicConstraints, Certificate, Extension, ExtKeyUsage } from "pkijs";
 
 const subtle = globalThis.crypto.subtle;
 const RSA = { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" } as const;
@@ -73,10 +15,6 @@ const OID = {
   keyUsage: "2.5.29.15",
   extKeyUsage: "2.5.29.37",
   clientAuth: "1.3.6.1.5.5.7.3.2",
-  keyBag: "1.2.840.113549.1.12.10.1.2",
-  certBag: "1.2.840.113549.1.12.10.1.3",
-  friendlyName: "1.2.840.113549.1.9.20",
-  localKeyId: "1.2.840.113549.1.9.21",
 };
 
 export interface CertificateAuthorityMaterial {
@@ -195,7 +133,7 @@ export class DeviceCertificateAuthority {
       isCa: true,
     });
     return {
-      certificatePem: toPem("CERTIFICATE", cert.toSchema(true).toBER(false)),
+      certificatePem: toPem("CERTIFICATE", cert.toSchema().toBER(false)),
       privateKeyPem: toPem("PRIVATE KEY", await subtle.exportKey("pkcs8", pair.privateKey)),
     };
   }
@@ -221,9 +159,9 @@ export class DeviceCertificateAuthority {
       isCa: false,
     });
 
-    const der = cert.toSchema(true).toBER(false);
+    const der = cert.toSchema().toBER(false);
     const password = randomBytes(18).toString("base64url");
-    const pfx = await buildPfx({ cert, privateKey: pair.privateKey, password, friendlyName: options.name });
+    const pfx = await buildPfx({ cert, caCertificate: this.caCertificate, privateKey: pair.privateKey, password, friendlyName: options.name });
 
     return {
       pfx: new Uint8Array(pfx),
@@ -235,65 +173,44 @@ export class DeviceCertificateAuthority {
   }
 }
 
-/** Liga a chave ao certificado dentro do .pfx e dá um nome legível; sem isso Windows, macOS e iOS não importam o par. */
-const bagAttributes = (friendlyName: string, localKeyId: ArrayBuffer) => [
-  new Attribute({ type: OID.friendlyName, values: [new asn1js.BmpString({ value: friendlyName })] }),
-  new Attribute({ type: OID.localKeyId, values: [new asn1js.OctetString({ valueHex: localKeyId })] }),
-];
-
+/**
+ * Empacota chave e certificado num .pfx no formato legado (PBE-SHA1-3DES + MAC HMAC-SHA1 do PKCS#12), o único que
+ * o Windows (crypt32/certmgr) importa em todas as versões; iOS, macOS e Linux também o aceitam. O PBES2/AES-256 com
+ * MAC PBKDF2 gerado antes era recusado pelo Windows ("senha incorreta"/arquivo inválido).
+ */
 async function buildPfx(params: {
   cert: Certificate;
+  /** Certificado da CA, embutido no .pfx para o Windows já confiar na cadeia sem instalar a CA à mão. */
+  caCertificate: Certificate;
   privateKey: CryptoKey;
   password: string;
   friendlyName: string;
 }): Promise<ArrayBuffer> {
-  const attributes = () => bagAttributes(params.friendlyName, localKeyId);
-  const localKeyId = toArrayBuffer(randomBytes(20));
-  const passwordBuffer = toArrayBuffer(Buffer.from(params.password, "utf8"));
-  const encryption = {
-    password: passwordBuffer,
-    contentEncryptionAlgorithm: { name: "AES-CBC", length: 256, iv: new Uint8Array(randomBytes(16)) },
-    hmacHashAlgorithm: "SHA-256",
-    iterationCount: 100000,
+  const certDer = Buffer.from(params.cert.toSchema().toBER(false)).toString("binary");
+  const keyDer = Buffer.from(await subtle.exportKey("pkcs8", params.privateKey)).toString("binary");
+  const caDer = Buffer.from(params.caCertificate.toSchema().toBER(false)).toString("binary");
+  const cert = forge.pki.certificateFromAsn1(forge.asn1.fromDer(certDer));
+  const caCert = forge.pki.certificateFromAsn1(forge.asn1.fromDer(caDer));
+  const key = forge.pki.privateKeyFromAsn1(forge.asn1.fromDer(keyDer));
+  // O forge reescreve o certificado ao empacotar (acrescenta parâmetros NULL ao algoritmo), o que invalida a assinatura.
+  // Por isso os bytes DER originais, exatamente como a CA assinou, entram no .pfx sem passar pela reserialização.
+  const originals = new Map<object, string>([[cert, certDer], [caCert, caDer]]);
+  const original = forge.pki.certificateToAsn1;
+  forge.pki.certificateToAsn1 = (c) => {
+    const der = originals.get(c);
+    return der ? forge.asn1.fromDer(der) : original(c);
   };
-
-  const privateKeyInfo = new PrivateKeyInfo({
-    schema: asn1js.fromBER(await subtle.exportKey("pkcs8", params.privateKey)).result,
-  });
-  const keyBag = new PKCS8ShroudedKeyBag({ parsedValue: privateKeyInfo });
-  await keyBag.makeInternalValues(encryption);
-
-  const pfx = new PFX({
-    parsedValue: {
-      integrityMode: 0,
-      authenticatedSafe: new AuthenticatedSafe({
-        parsedValue: {
-          safeContents: [
-            {
-              privacyMode: 0,
-              value: new SafeContents({ safeBags: [new SafeBag({ bagId: OID.keyBag, bagValue: keyBag, bagAttributes: attributes() })] }),
-            },
-            {
-              privacyMode: 1,
-              value: new SafeContents({
-                safeBags: [new SafeBag({
-                    bagId: OID.certBag,
-                    bagValue: new CertBag({ parsedValue: params.cert }),
-                    bagAttributes: attributes(),
-                  }),],
-              }),
-            },
-          ],
-        },
-      }),
-    },
-  });
-  await pfx.parsedValue!.authenticatedSafe!.makeInternalValues({ safeContents: [{}, encryption] });
-  await pfx.makeInternalValues({
-    password: passwordBuffer,
-    iterations: 100000,
-    pbkdf2HashAlgorithm: { name: "SHA-256" } as Algorithm,
-    hmacHashAlgorithm: "SHA-256",
-  });
-  return pfx.toSchema().toBER(false);
+  let p12: forge.asn1.Asn1;
+  try {
+    p12 = forge.pkcs12.toPkcs12Asn1(key, [cert, caCert], params.password, {
+      algorithm: "3des",
+      friendlyName: params.friendlyName,
+      generateLocalKeyId: true,
+      useMac: true,
+      count: 2048,
+    });
+  } finally {
+    forge.pki.certificateToAsn1 = original;
+  }
+  return toArrayBuffer(Buffer.from(forge.asn1.toDer(p12).getBytes(), "binary"));
 }
