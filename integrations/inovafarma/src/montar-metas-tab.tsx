@@ -367,7 +367,7 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
   return (
     <Stack gap="section">
       <HeaderActions>
-        <Button disabled={!montagem || montagem.somenteLeitura || montagem.tiposDisponiveis.length === 0} onClick={() => void adicionar()}>
+        <Button disabled={!montagem || montagem.somenteLeitura || !montagem.tiposDisponiveis?.length} onClick={() => void adicionar()}>
           <Plus />
           Adicionar Meta
         </Button>
