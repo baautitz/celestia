@@ -824,6 +824,7 @@ export const inovafarmaWebModule = defineWebModule({
         { permission: "inovafarma:metas:manage", component: MetasPage },
         { permission: "inovafarma:metas-geral:view", component: MetasPage },
         { permission: "inovafarma:metas-loja:view", component: MetasPage },
+        { permission: "inovafarma:metas-individual:view", component: MetasPage },
       ],
     },
     {
