@@ -1,7 +1,7 @@
 import { COLABORADORES_SQL } from "./colaboradores-routes.js";
 import { META_TARGET, METAS_ACTIONS, METAS_PLUGIN } from "./metas-audit.js";
 import type { Meta, MetaStore } from "./metas-store.js";
-import { copiarMeta, novaMeta, pendentes, periodoAtualizadoPorUltimo, type ColaboradorAtivo } from "./montar-metas.js";
+import { copiarMeta, pendentes, periodoAtualizadoPorUltimo, type ColaboradorAtivo } from "./montar-metas.js";
 import type { PeriodoResumo } from "./pre-vencidos-routes.js";
 import type { ErpQueryClient } from "./server.js";
 import type { TipoMeta } from "./tipos-meta.js";
@@ -24,10 +24,7 @@ export const metasVisiveis = <M extends Pick<Meta, "tipoId">>(doPeriodo: M[], ti
     return tipo && (periodo.status !== "open" || tipo.ativo) ? [{ meta, tipo }] : [];
   });
 
-/**
- * As Metas de um Período aberto acompanham os Tipos de Meta ativos: no primeiro acesso, copia as Metas do Período
- * atualizado por último; depois, todo Tipo ativo sem Meta no Período ganha a sua, com todos os Colaboradores ativos.
- */
+/** Cópia automática: no primeiro acesso, um Período aberto sem Metas recebe as do Período atualizado por último. */
 export function metasDoPeriodo({ erpClient, tipos, metas, audit }: MetasDoPeriodoDeps) {
   const registrar = (actor: Ator, action: string, meta: Meta, attributes: Record<string, unknown>) =>
     audit.record({ plugin: METAS_PLUGIN, action, actor, target: { type: META_TARGET, id: meta.id }, attributes });
@@ -72,7 +69,7 @@ export function metasDoPeriodo({ erpClient, tipos, metas, audit }: MetasDoPeriod
   };
 
   /**
-   * Prepara as Metas de um Período aberto (cópia automática e uma Meta por Tipo ativo). Um Período fechado não muda.
+   * Prepara as Metas de um Período aberto (cópia automática). Um Período fechado não muda.
    * Devolve `null` se o ERP não responde (sem os Colaboradores ativos não dá para criar Participantes).
    */
   const preparar = async (actor: Ator, periodo: PeriodoResumo, todos: PeriodoResumo[]) => {
@@ -81,13 +78,6 @@ export function metasDoPeriodo({ erpClient, tipos, metas, audit }: MetasDoPeriod
     if (periodo.status !== "open") return { ativos, copiadoDe: null };
     let copiadoDe: string | null = null;
     if ((await metas.listar([periodo.id])).length === 0) copiadoDe = (await copiar(actor, periodo, todos, ativos))?.name ?? null;
-    const existentes = new Set((await metas.listar([periodo.id])).map((m) => m.tipoId));
-    for (const tipo of (await tipos.listar()).filter((t) => t.ativo && !existentes.has(t.id))) {
-      const criada = await metas.criar(novaMeta(periodo.id, tipo, ativos));
-      // Outro acesso simultâneo já criou esta Meta.
-      if (!criada) continue;
-      await registrar(actor, METAS_ACTIONS.criar, criada, { tipo: tipo.nome, periodo: periodo.name, participantes: criada.participantes.length });
-    }
     return { ativos, copiadoDe };
   };
 

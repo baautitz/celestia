@@ -126,6 +126,8 @@ describe("Metas: Montar Metas", () => {
   const abrir = async () => {
     renderizar();
     fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
+    // Cada Meta é uma linha que expande para os Participantes.
+    fireEvent.click(await screen.findByRole("button", { name: "CMV" }));
     return screen.findByRole("switch", { name: "BIA participa da Meta CMV" });
   };
 

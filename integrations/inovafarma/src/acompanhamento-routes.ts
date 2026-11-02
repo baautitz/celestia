@@ -274,7 +274,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
    */
   async function apuracaoDe(periodo: PeriodoResumo, ator: { id: string; name: string }): Promise<{ apuracao: ApuracaoPeriodo; congelada: boolean }> {
     if (periodo.status === "open") {
-      // Igual ao Montar Metas: cópia automática e uma Meta por Tipo de Meta ativo.
+      // Igual ao Montar Metas: a cópia automática no primeiro acesso ao Período.
       if (!(await montagem.preparar(ator, periodo, await periods.list()))) throw new Error(erpClient() ? ERP_INDISPONIVEL : SEM_CONEXAO);
       return { apuracao: await apurar(periodo), congelada: false };
     }

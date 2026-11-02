@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListChecks, Pencil, Target } from "lucide-react";
+import { ChevronDown, ListChecks, Pencil, Plus, Target } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@platform/ui/components/collapsible";
 import { Label } from "@platform/ui/components/label";
-import { Stack } from "@platform/ui/components/layout";
+import { Stack, Text } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Switch } from "@platform/ui/components/switch";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
+import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
 import { AlvoInput, rotuloAlvo } from "./alvo-input";
 import { DefinirAlvoWindow } from "./alvo-padrao-window";
-import { formatarValor, indicadorPorId } from "./indicadores";
+import { formatarValor, indicadorPorId, type IndicadorId } from "./indicadores";
 import { ListaProdutosWindow } from "./lista-produtos-window";
 import type { Meta } from "./metas-store";
 import type { TipoMetaComPremio } from "./tipo-meta-window";
@@ -53,10 +55,67 @@ interface Montagem {
   copiadoDe: string | null;
   colaboradores: Colaborador[];
   metas: MetaVista[];
+  tiposDisponiveis: { id: string; nome: string; indicador: IndicadorId }[];
 }
 
 const usaAlvo = (t: TipoMetaComPremio) => !t.semAlvo && t.indicador !== "lista-produtos";
 const periodoInicial = (periodos: PeriodoMetas[]) => (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
+
+/** Adicionar Meta: escolhe um ou vários Tipos de Meta ativos de uma vez; cada um vira uma Meta do Período. */
+function AdicionarMetaWindow({ periodoId, tipos }: { periodoId: string; tipos: Montagem["tiposDisponiveis"] }) {
+  const { resolve } = useWindow<true>();
+  const { feedback } = useUi();
+  const [marcados, setMarcados] = useState<string[]>([]);
+  const [enviando, setEnviando] = useState(false);
+  const adicionar = async () => {
+    if (marcados.length === 0) return feedback.notifyError(new Error("Escolha ao menos um Tipo de Meta."));
+    setEnviando(true);
+    try {
+      for (const tipoId of marcados) await apiFetch(BASE, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ periodoId, tipoId }) });
+      feedback.notify({ type: "success", title: marcados.length === 1 ? "Meta adicionada." : `${marcados.length} Metas adicionadas.` });
+      resolve(true);
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao adicionar a Meta."));
+      resolve(true);
+    } finally {
+      setEnviando(false);
+    }
+  };
+  return (
+    <>
+      <Stack gap="section">
+        <Stack direction="row" gap="field" wrap>
+          <Button type="button" variant="outline" onClick={() => setMarcados(tipos.map((t) => t.id))}>
+            Selecionar todos
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setMarcados([])}>
+            Desmarcar todos
+          </Button>
+        </Stack>
+        <Stack gap="field">
+          {tipos.map((t) => (
+            <Stack key={t.id} direction="row" gap="field" align="center">
+              <Switch
+                checked={marcados.includes(t.id)}
+                onCheckedChange={(on: boolean) => setMarcados((m) => (on ? [...m, t.id] : m.filter((id) => id !== t.id)))}
+                aria-label={t.nome}
+              />
+              <Text variant="small">
+                {t.nome} · {indicadorPorId(t.indicador).nome}
+              </Text>
+            </Stack>
+          ))}
+        </Stack>
+      </Stack>
+      <WindowActions>
+        <WindowCancelButton />
+        <Button type="button" disabled={enviando} onClick={() => void adicionar()}>
+          Adicionar
+        </Button>
+      </WindowActions>
+    </>
+  );
+}
 
 function AlvoParticipanteWindow({ meta, codigoColaborador }: { meta: MetaVista; codigoColaborador: number }) {
   const { resolve } = useWindow<MetaVista>();
@@ -197,7 +256,19 @@ function MetaDoPeriodo({
     });
 
   const descricao = [meta.tipo.premio, meta.pendentes ? `${meta.pendentes} pendente${meta.pendentes === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
+  const resumo = [indicador.nome, descricao, `${meta.participantes.length} Participante${meta.participantes.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
   return (
+    <Collapsible>
+      <Stack direction="row" gap="field" align="center" wrap>
+        <CollapsibleTrigger render={<Button variant="ghost" />}>
+          <ChevronDown />
+          {meta.tipo.nome}
+        </CollapsibleTrigger>
+        <Text variant="small" tone="muted">
+          {resumo}
+        </Text>
+      </Stack>
+      <CollapsibleContent>
     <Stack gap="field">
       {!somenteLeitura && (
         <Stack direction="row" gap="field" justify="end" wrap>
@@ -227,8 +298,7 @@ function MetaDoPeriodo({
         columns={colunas}
         rows={linhas}
         getRowId={(c) => String(c.codigoColaborador)}
-        title={`${meta.tipo.nome} (${meta.participantes.length} Participante${meta.participantes.length === 1 ? "" : "s"})`}
-        description={descricao}
+        title="Participantes"
         emptyMessage="Nenhum Colaborador nesta Loja."
         search={{ placeholder: "Buscar Colaborador" }}
         rowActions={(c) =>
@@ -240,12 +310,14 @@ function MetaDoPeriodo({
         }
       />
     </Stack>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
 /** Aba Montar Metas: as Metas de cada Período, com Participantes, Alvos e Lista de Produtos. */
 export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; lojas: LojaMetas[] }) {
-  const { feedback } = useUi();
+  const { feedback, windows } = useUi();
   const [periodoId, setPeriodoId] = useState(() => periodoInicial(periodos));
   const [loja, setLoja] = useState(TODAS);
   const [montagem, setMontagem] = useState<Montagem | null>(null);
@@ -268,6 +340,17 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
     void carregar();
   }, [carregar]);
 
+  const adicionar = async () => {
+    if (!montagem) return;
+    const r = await windows.open<true>({
+      surface: "sheet",
+      title: "Adicionar Meta",
+      description: `Escolha os Tipos de Meta de ${periodo?.name ?? "o Período"}. Todos os Colaboradores ativos entram como Participantes.`,
+      content: () => <AdicionarMetaWindow periodoId={periodoId} tipos={montagem.tiposDisponiveis} />,
+    });
+    if (r.status === "confirmed") void carregar();
+  };
+
   const atualizar = (meta: MetaVista) => setMontagem((m) => m && { ...m, metas: m.metas.map((x) => (x.id === meta.id ? meta : x)) });
 
 
@@ -283,6 +366,12 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
   const colaboradores = (montagem?.colaboradores ?? []).filter((c) => loja === TODAS || c.lojas.includes(Number(loja)));
   return (
     <Stack gap="section">
+      <HeaderActions>
+        <Button disabled={!montagem || montagem.somenteLeitura || montagem.tiposDisponiveis.length === 0} onClick={() => void adicionar()}>
+          <Plus />
+          Adicionar Meta
+        </Button>
+      </HeaderActions>
       <Stack direction="row" align="end" gap="section" wrap>
         <Stack gap="field">
           <Label>Período de Fechamento</Label>
@@ -327,7 +416,7 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
         <Alert>
           <AlertTitle>Nenhuma Meta neste Período</AlertTitle>
           <AlertDescription>
-            {montagem.somenteLeitura ? "Este Período fechou sem Metas." : "Cadastre um Tipo de Meta ativo para ele virar Meta neste Período."}
+            {montagem.somenteLeitura ? "Este Período fechou sem Metas." : "Use Adicionar Meta para escolher os Tipos de Meta deste Período."}
           </AlertDescription>
         </Alert>
       )}

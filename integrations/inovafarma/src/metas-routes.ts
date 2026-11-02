@@ -123,7 +123,8 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     if (!preparo) return c.json({ error: ERP_INDISPONIVEL }, 503);
     const { ativos, copiadoDe } = preparo;
 
-    const doPeriodo = metasVisiveis(await metas.listar([periodo.id]), await tipos.listar(), periodo);
+    const todosTipos = await tipos.listar();
+    const doPeriodo = metasVisiveis(await metas.listar([periodo.id]), todosTipos, periodo);
     const lojas = await lojasConfirmadas();
     // Os Participantes que saíram do ERP depois de entrar na Meta continuam na lista.
     const pessoas = new Map<number, ColaboradorAtivo & { ativo: boolean }>(ativos.map((a) => [a.codigoColaborador, { ...a, ativo: true }]));
@@ -135,6 +136,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       copiadoDe,
       colaboradores: [...pessoas.values()].sort((a, b) => a.nome.localeCompare(b.nome)).map((p) => ({ ...p, lojas: lojas.get(p.codigoColaborador) ?? [] })),
       metas: doPeriodo.map(({ meta, tipo }) => comTipo(meta, tipo)).sort((a, b) => a.tipo.nome.localeCompare(b.tipo.nome)),
+      tiposDisponiveis: todosTipos.filter((t) => t.ativo && !doPeriodo.some(({ meta }) => meta.tipoId === t.id)).map((t) => ({ id: t.id, nome: t.nome, indicador: t.indicador })),
     });
   });
 
