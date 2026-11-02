@@ -31,6 +31,14 @@ describe("Apuração de um Participante", () => {
     expect(r.resultado).toBe("CMV 25% · Meta: até 30% · ✓ 5 p.p. abaixo");
   });
 
+  it("em que menor é melhor, sem vendas no Período não é Atingida nem paga", () => {
+    const semVendas = (d: DadosColaborador) => apurarParticipante(tipo({ indicador: "cmv", regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: null, teto: null } }), null, ana(30), d);
+    for (const d of [dados(), dados({ indicadores: { cmv: 0 } })]) {
+      expect(semVendas(d)).toMatchObject({ atingimento: 0, atingida: false, premioCentavos: 0 });
+      expect(semVendas(d).resultado).toBe("CMV sem vendas · Meta: até 30%");
+    }
+  });
+
   it("paga a maior Faixa alcançada", () => {
     const faixas = tipo({ regra: { tipo: "faixas", faixas: [{ atingimento: 100, valorCentavos: 10000 }, { atingimento: 80, valorCentavos: 5000 }, { atingimento: 120, valorCentavos: 15000 }] } });
     expect(apurarParticipante(faixas, null, ana(100), dados({ indicadores: { "foco-qtd": 110 } })).premioCentavos).toBe(10000);

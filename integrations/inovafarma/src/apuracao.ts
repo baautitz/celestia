@@ -85,7 +85,11 @@ export function apurarParticipante(tipo: TipoApurado, lista: ListaProdutos | nul
     const atual = `${nomeCurto(indicador)} ${comUnidade(indicador, realizado)}`;
     if (tipo.semAlvo) resultado = `${nomeCurto(indicador)} ${formatarValor(indicador, realizado)}`;
     else if (alvo === null) resultado = `${atual} · Alvo pendente`;
-    else {
+    else if (indicador.direcao === "menor" && realizado <= 0) {
+      // Sem vendas não há CMV: não é o melhor resultado possível, a Meta não é Atingida.
+      atingimento = 0;
+      resultado = `${nomeCurto(indicador)} sem vendas · Meta: até ${formatarValor(indicador, alvo)}`;
+    } else {
       atingimento = calcularAtingimento(indicador, realizado, alvo);
       const folga = Math.abs(realizado - alvo);
       resultado =

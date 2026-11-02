@@ -51,6 +51,9 @@ async function boot() {
   // Unidades vendidas de cada produto da Lista, por Colaborador.
   const produtos: { codigoColaborador: number; produtoId: string; quantidade: number }[] = [];
   const handlers = new Map<string, (p: object) => unknown>();
+  const antes = new Map<string, (ctx: { payload: object; cancel(reason: string): void }) => unknown>();
+  const registros: { action: string; actor: { id: string; name: string }; attributes: unknown }[] = [];
+  const erp = { falha: false };
   const auth: MiddlewareHandler = async (c, next) => {
     const sub = c.req.header("x-user") ?? "";
     const permissions = { gil: [GERAL], lia: [LOJA], ana: [MINHAS], zoe: [MINHAS] }[sub] ?? [];
@@ -73,14 +76,21 @@ async function boot() {
     routes: app,
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
     auth,
-    events: { after: (event, handler) => (handlers.set(event, handler as (p: object) => unknown), () => undefined) },
+    events: {
+      after: (event, handler) => (handlers.set(event, handler as (p: object) => unknown), () => undefined),
+      before: (event, handler) => (antes.set(event, handler as never), () => undefined),
+    },
+    audit: { declareAction: () => undefined, record: async (r) => registros.push(r) },
+    users: { list: async () => [{ id: "gil", fullname: "Gil Gestor", username: "gil", status: "active" }] },
     erpClient: () => ({
-      query: async <T,>(sql: string) =>
-        (sql.includes("totalCmv")
+      query: async <T,>(sql: string) => {
+        if (erp.falha) throw new Error("ERP fora do ar");
+        return (sql.includes("totalCmv")
           ? [...vendas].map(([codigoColaborador, v]) => ({ codigoColaborador, ...v }))
           : sql.includes("produtoId")
             ? produtos
-            : [{ codigoEmpresa: 10, nome: "Centro" }]) as T[],
+            : [{ codigoEmpresa: 10, nome: "Centro" }]) as T[];
+      },
     }),
     tipos,
     metas,
@@ -92,12 +102,20 @@ async function boot() {
   });
   const res = (who: string, query: string) => app.request(`/metas/acompanhamento?periodoId=maio${query}`, { headers: { "x-user": who } });
   const ver = async (who: string, query = "") => (await (await res(who, query)).json()) as Acompanhamento;
+  /** Como o EventBus: `before` pode recusar; senão a transição acontece e roda o `after`. Devolve o motivo da recusa. */
   const evento = async (event: string, status: PeriodoResumo["status"]) => {
-    periodos[0] = { ...periodos[0]!, status };
-    await handlers.get(event)?.({ periodId: "maio", name: "Maio", startDate: "2027-05-01", endDate: "2027-05-31" });
+    const payload = { actorId: "gil", periodId: "maio", name: "Maio", startDate: "2027-05-01", endDate: "2027-05-31" };
+    let motivo: string | undefined;
+    await antes.get(event)?.({ payload, cancel: (r) => (motivo ??= r) });
+    if (motivo) return motivo;
+    periodos[0] = { ...periodos[0], status };
+    await handlers.get(event)?.(payload);
+    return undefined;
   };
+  /** Fecha o Período sem passar pelo Plugin: como um fechamento anterior à Apuração gravada. */
+  const fecharSemPlugin = () => (periodos[0] = { ...periodos[0], status: "closed" });
   const minhas = (who: string, periodoId = "maio") => app.request(`/metas/minhas?periodoId=${periodoId}`, { headers: { "x-user": who } });
-  return { res, ver, vendas, produtos, minhas, evento, tipos, metas, avaliacoesStore, participantes };
+  return { res, ver, vendas, produtos, minhas, evento, fecharSemPlugin, erp, registros, tipos, metas, avaliacoesStore, participantes };
 }
 
 describe("Acompanhamento das Metas", () => {
@@ -112,6 +130,16 @@ describe("Acompanhamento das Metas", () => {
     expect(totais).toEqual([
       { codigoColaborador: 1, nome: "ANA", premioCentavos: 10000 },
       { codigoColaborador: 2, nome: "BIA", premioCentavos: 0 },
+    ]);
+  });
+
+  it("não paga o CMV a quem não vendeu no Período, sem linha no ERP ou com líquido zero", async () => {
+    const { ver, vendas } = await boot();
+    vendas.delete(1);
+    vendas.set(2, { totalLiquido: 0, totalCmv: 0, quantidadeVendas: 0 });
+    expect((await ver("gil")).linhas.map((l) => [l.nome, l.atingimento, l.premioCentavos])).toEqual([
+      ["ANA", 0, 0],
+      ["BIA", 0, 0],
     ]);
   });
 
@@ -148,6 +176,35 @@ describe("Acompanhamento das Metas", () => {
     const reaberta = await ver("gil");
     expect(reaberta.congelada).toBe(false);
     expect(reaberta.linhas[0]!.premioCentavos).toBe(0);
+  });
+
+  it("recusa o fechamento com o ERP indisponível, sem gravar Apuração", async () => {
+    const { evento, erp, registros } = await boot();
+    erp.falha = true;
+    expect(await evento("closing_period.close", "closed")).toBe(
+      "Não foi possível apurar as Metas do Período no ERP InovaFarma: o Período não pode ser fechado agora. Tente novamente em instantes.",
+    );
+    expect(registros).toEqual([]);
+  });
+
+  it("registra no Audit Log a Apuração gravada no fechamento e a descartada na reabertura", async () => {
+    const { evento, registros } = await boot();
+    await evento("closing_period.close", "closed");
+    await evento("closing_period.reopen", "open");
+    expect(registros.map((r) => [r.action, r.actor, r.attributes])).toEqual([
+      ["apuracao_metas_freeze", { id: "gil", name: "Gil Gestor" }, { periodo: "Maio", origem: "fechamento", metas: 1, participantes: 2, premioCentavos: 10000 }],
+      ["apuracao_metas_discard", { id: "gil", name: "Gil Gestor" }, { periodo: "Maio" }],
+    ]);
+  });
+
+  it("grava e registra na primeira consulta a Apuração de um Período fechado sem ela", async () => {
+    const { ver, fecharSemPlugin, registros } = await boot();
+    fecharSemPlugin();
+    expect((await ver("gil")).congelada).toBe(true);
+    await ver("gil");
+    expect(registros.map((r) => [r.action, r.attributes])).toEqual([
+      ["apuracao_metas_freeze", { periodo: "Maio", origem: "consulta", metas: 1, participantes: 2, premioCentavos: 10000 }],
+    ]);
   });
 });
 
@@ -186,6 +243,14 @@ describe("Minhas Metas", () => {
     await avaliacoesStore.criar({ periodoId: "maio", codigoColaborador: 1, nomeColaborador: "ANA", codigoLoja: 10, descricao: "Atraso", valorCentavos: 5000, criadoPor: "x" });
     const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
     expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true, realizado: "R$ 150,00", alvo: "R$ 200,00", premioCentavos: 15000 });
+  });
+
+  it("esconde o Saldo da Meta de Avaliações quando o Tipo não mostra o Prêmio", async () => {
+    const { minhas, tipos, metas } = await boot();
+    const tipo = await tipos.criar({ ...avaliacoes, exibicao: "progresso", mostrarPremio: false });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [], lista: null });
+    const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
+    expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true });
   });
 
   it("só libera ao Usuário com a Permission e um Colaborador vinculado, e só as Metas de que ele é Participante", async () => {

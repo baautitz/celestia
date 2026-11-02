@@ -44,6 +44,12 @@ export interface Meta {
 export type NovaMeta = Pick<Meta, "periodoId" | "tipoId" | "participantes" | "excluidos" | "lista">;
 export type DadosMeta = Pick<Meta, "participantes" | "excluidos" | "lista">;
 
+export interface AplicacaoAlvo {
+  id: string;
+  codigos: number[];
+  expectedVersion: number;
+}
+
 export interface MetaStore {
   /** Metas dos Closing Periods pedidos, com os Participantes em ordem de nome. */
   listar(periodoIds: string[]): Promise<Meta[]>;
@@ -52,6 +58,8 @@ export interface MetaStore {
   criar(nova: NovaMeta): Promise<Meta | null>;
   /** Define o mesmo Alvo para os Participantes pedidos. Compare-and-set pela `version`; null se a Meta mudou ou sumiu. */
   definirAlvo(id: string, codigos: number[], alvo: number | null, expectedVersion: number): Promise<Meta | null>;
+  /** `definirAlvo` em várias Metas, todas ou nenhuma: null se alguma mudou ou sumiu, e aí nenhuma é gravada. */
+  definirAlvos(aplicacoes: AplicacaoAlvo[], alvo: number | null): Promise<Meta[] | null>;
   /** Grava Participantes, excluídos e Lista de Produtos de uma vez. Compare-and-set pela `version`; null se a Meta mudou ou sumiu. */
   atualizar(id: string, dados: DadosMeta, expectedVersion: number): Promise<Meta | null>;
 }
@@ -79,12 +87,19 @@ export class MemoryMetaStore implements MetaStore {
   }
 
   async definirAlvo(id: string, codigos: number[], alvo: number | null, expectedVersion: number): Promise<Meta | null> {
-    const atual = this.metas.get(id);
-    if (!atual || atual.version !== expectedVersion) return null;
-    const participantes = atual.participantes.map((p) => (codigos.includes(p.codigoColaborador) ? { ...p, alvo } : p));
-    const atualizada = { ...atual, participantes, version: atual.version + 1, atualizadoEm: new Date().toISOString() };
-    this.metas.set(id, atualizada);
-    return atualizada;
+    return (await this.definirAlvos([{ id, codigos, expectedVersion }], alvo))?.[0] ?? null;
+  }
+
+  async definirAlvos(aplicacoes: AplicacaoAlvo[], alvo: number | null): Promise<Meta[] | null> {
+    if (!aplicacoes.every((a) => this.metas.get(a.id)?.version === a.expectedVersion)) return null;
+    const agora = new Date().toISOString();
+    return aplicacoes.map(({ id, codigos }) => {
+      const atual = this.metas.get(id) as Meta;
+      const participantes = atual.participantes.map((p) => (codigos.includes(p.codigoColaborador) ? { ...p, alvo } : p));
+      const atualizada = { ...atual, participantes, version: atual.version + 1, atualizadoEm: agora };
+      this.metas.set(id, atualizada);
+      return atualizada;
+    });
   }
 
   async atualizar(id: string, dados: DadosMeta, expectedVersion: number): Promise<Meta | null> {

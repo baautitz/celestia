@@ -45,10 +45,11 @@ export const indicadorPorId = (id: IndicadorId): Indicador => INDICADORES.find((
 
 /**
  * Atingimento em %: Realizado ÷ Alvo; quando menor é melhor, Alvo ÷ Realizado (ficar abaixo do Alvo passa de 100%).
+ * Quando menor é melhor, Realizado zero é falta de vendas, não o melhor resultado: Atingimento 0.
  * A interface nunca mostra essa conta.
  */
 export function atingimento(indicador: Indicador, realizado: number, alvo: number): number {
-  if (indicador.direcao === "menor") return realizado <= 0 ? (alvo > 0 ? Infinity : 0) : (alvo / realizado) * 100;
+  if (indicador.direcao === "menor") return realizado > 0 ? (alvo / realizado) * 100 : 0;
   return alvo > 0 ? (realizado / alvo) * 100 : 0;
 }
 

@@ -241,7 +241,9 @@ describe("Montar Metas", () => {
       visualizacoes: [],
     });
     // Minhas Metas só com um Colaborador vinculado ao Usuário (fail-closed).
-    expect((await req("ana", "GET", "/metas/contexto")).status).toBe(403);
+    const negado = await req("ana", "GET", "/metas/contexto");
+    expect(negado.status).toBe(403);
+    expect(await negado.json()).toEqual({ error: "Acesso negado: o usuário não possui nenhuma permissão das Metas (Tipos de Meta, Montar Metas, Acompanhamento ou Minhas Metas)." });
     expect(await json("bia", "GET", "/metas/contexto")).toMatchObject({
       abas: { tipos: false, montar: false, acompanhamento: false, minhas: true },
       periodos: [{ id: "maio" }, { id: "abril" }, { id: "marco" }],
