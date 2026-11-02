@@ -62,6 +62,7 @@ interface ColaboradorItem {
   quantidadeVendas: number;
   totalBruto: number;
   totalDesconto: number;
+  descontoPercent: number;
   totalLiquido: number;
   totalCmv: number;
   cmvPercent: number;
@@ -76,6 +77,7 @@ interface ResumoVendas {
   totalLiquidoGeral: number;
   totalBrutoGeral: number;
   totalDescontoGeral: number;
+  descontoPercentGeral: number;
   totalCmvGeral: number;
   cmvPercentGeral: number;
   cadastroPercentGeral: number;
@@ -98,6 +100,7 @@ interface Anterior {
 /** Colunas e KPIs em que subir é ruim (`down`) ou só acompanha as vendas (`neutral`). */
 const FAVORABLE = {
   totalDesconto: "down",
+  descontoPercent: "down",
   totalCmv: "neutral",
   cmvPercent: "down",
 } satisfies Partial<Record<keyof ColaboradorItem, Trend["favorable"]>>;
@@ -174,6 +177,16 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     tooltip: "Soma dos descontos concedidos nos itens.",
     value: (r) => r.totalDesconto,
     format: "decimal",
+    sortable: true,
+    firstSort: "desc",
+    cellClassName: "text-right font-mono",
+  },
+  {
+    key: "descontoPercent",
+    label: "Descontos (%)",
+    tooltip: "Descontos divididos pelo Total Bruto.",
+    value: (r) => r.descontoPercent,
+    format: "percent",
     sortable: true,
     firstSort: "desc",
     cellClassName: "text-right font-mono",
@@ -645,11 +658,15 @@ function VendasComissoesPage() {
           label="Descontos"
           trend={trend((r) => r.totalDescontoGeral, "currency", FAVORABLE.totalDesconto)}
           value={formatCurrency(resumo?.totalDescontoGeral)}
-          hint={
-            resumo && resumo.totalBrutoGeral > 0
-              ? `${formatPercent((resumo.totalDescontoGeral / resumo.totalBrutoGeral) * 100)} do Total Bruto`
-              : "-"
-          }
+          icon={<TrendingUp />}
+          tone="primary"
+        />
+        <KpiCard
+          loading={loading}
+          label="Descontos (%)"
+          trend={trend((r) => r.descontoPercentGeral, "percent", FAVORABLE.descontoPercent)}
+          value={resumo ? formatPercent(resumo.descontoPercentGeral) : "-"}
+          hint="do Total Bruto"
           icon={<TrendingUp />}
           tone="primary"
         />
