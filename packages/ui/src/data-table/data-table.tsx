@@ -774,7 +774,7 @@ export function DataTable<TRow>({
         ) : (
           <>
             <div className={bordered ? "border border-border" : undefined}>
-              <Table containerClassName={scroll === "page" ? "max-h-none" : undefined}>
+              <Table containerClassName={scroll === "page" ? "max-h-none!" : undefined}>
                 <TableHeader>
                   <GroupHeaderRow
                     columns={columns}
