@@ -52,6 +52,13 @@ describe("Apuração de um Participante", () => {
     expect(r).toMatchObject({ atingida: true, premioCentavos: 10000 });
   });
 
+  it("Pré-vencidos sem lançamento no Período avisa em vez de mostrar zero", () => {
+    const r = apurarParticipante(tipo({ indicador: "pre-vencidos" }), null, ana(50), dados());
+    expect(r).toMatchObject({ atingida: false, premioCentavos: 0, aviso: "Nenhum Pré-vencido lançado no Período" });
+    expect(r.resultado).toBe("Nenhum Pré-vencido lançado no Período · Meta: 50");
+    expect(apurarParticipante(tipo({ indicador: "pre-vencidos" }), null, ana(50), dados({ indicadores: { "pre-vencidos": 0 } })).aviso).toBeUndefined();
+  });
+
   it("paga a maior Faixa alcançada", () => {
     const faixas = tipo({ regra: { tipo: "faixas", faixas: [{ atingimento: 100, valorCentavos: 10000 }, { atingimento: 80, valorCentavos: 5000 }, { atingimento: 120, valorCentavos: 15000 }] } });
     expect(apurarParticipante(faixas, null, ana(100), dados({ indicadores: { "foco-qtd": 110 } })).premioCentavos).toBe(10000);

@@ -16,6 +16,8 @@ export interface MinhaMeta {
   falta?: string;
   /** Contagem: produtos batidos da Lista, como "19/20 produtos". */
   contagem?: string;
+  /** O que falta para haver Realizado (ex.: nenhum Pré-vencido lançado). */
+  aviso?: string;
   /** Só se o Tipo mostra o Prêmio; na Exibição Atingida / Não atingida, só com a Meta atingida. */
   premioCentavos?: number;
 }
@@ -35,6 +37,7 @@ export function minhaMeta(metaId: string, tipo: TipoApuracao, r: ResultadoPartic
       if (falta > 0 && tipo.indicador !== "avaliacoes") meta.falta = diferenca(indicador, falta);
     }
   }
+  if (r.aviso) meta.aviso = r.aviso;
   if (tipo.exibicao === "contagem") meta.contagem = `${r.realizado}/${r.totalProdutos ?? 0} produtos`;
   if (tipo.mostrarPremio && (tipo.exibicao !== "atingida" || r.atingida === true)) meta.premioCentavos = r.premioCentavos;
   return meta;
