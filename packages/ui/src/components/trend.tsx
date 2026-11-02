@@ -92,7 +92,7 @@ function TrendTooltip({ trend, title, children }: TrendDetailProps & { children:
   if (!describeTrend(trend)) return children
   return (
     <Tooltip disableHoverablePopup>
-      <TooltipTrigger render={children} />
+      <TooltipTrigger closeOnClick={false} render={children} />
       <TrendDetail trend={trend} title={title} />
     </Tooltip>
   )
@@ -126,7 +126,8 @@ function TrendTooltipTrigger({
   children,
 }: TrendDetailProps & { handle: TrendTooltipHandle; children: React.ReactElement }) {
   if (!describeTrend(trend)) return children
-  return <TooltipTrigger handle={handle} payload={{ trend, title }} render={children} />
+  // `closeOnClick={false}`: clicar na célula (selecionar/expandir a linha) não fecha o detalhe.
+  return <TooltipTrigger handle={handle} payload={{ trend, title }} closeOnClick={false} render={children} />
 }
 
 /**

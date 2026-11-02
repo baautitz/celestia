@@ -414,6 +414,18 @@ describe("comparação com o anterior", () => {
     expect(screen.getByText("▲ 12,2%")).toBeTruthy();
   });
 
+  it("mantém o detalhe aberto ao clicar na célula (selecionar a linha)", async () => {
+    setViewport(1280);
+    render(<DataTable columns={comparedColumns} rows={sellers} getRowId={(r) => r.id} />);
+    const cell = screen.getByRole("cell", { name: "12.340,00" });
+    await userEvent.hover(cell);
+    expect(await screen.findByText("▲ 12,2%")).toBeTruthy();
+
+    await userEvent.click(cell);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.getByText("▲ 12,2%")).toBeTruthy();
+  });
+
   it("troca o detalhe ao passar para outra célula comparada", async () => {
     setViewport(1280);
     previous["2"] = 1000;
