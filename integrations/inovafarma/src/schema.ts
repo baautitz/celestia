@@ -1,5 +1,9 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, pgSchema, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, doublePrecision, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import type { IndicadorId } from "./indicadores.js";
+import type { MetaApurada } from "./apuracao-store.js";
+import type { ListaProdutos } from "./metas-store.js";
+import type { Exibicao, RegraPremio } from "./tipos-meta.js";
 
 /** Um schema Postgres por Module. */
 export const inovafarmaSchema = pgSchema("inovafarma");
@@ -97,3 +101,68 @@ export const justificativasAjuste = inovafarmaSchema.table(
   },
   (t) => [index("justificativas_ajuste_periodo_idx").on(t.periodoId)],
 );
+
+export const tiposMeta = inovafarmaSchema.table(
+  "tipos_meta",
+  {
+    id: text("id").primaryKey(),
+    nome: text("nome").notNull(),
+    /** Id do Indicador fixo no código do Plugin (`indicadores.ts`). */
+    indicador: text("indicador").$type<IndicadorId>().notNull(),
+    exibicao: text("exibicao").$type<Exibicao>().notNull(),
+    mostrarPremio: boolean("mostrar_premio").notNull(),
+    semAlvo: boolean("sem_alvo").notNull(),
+    /** Regra do Prêmio validada por `RegraPremio` (R$ em centavos). */
+    regra: jsonb("regra").$type<RegraPremio>().notNull(),
+    /** Na unidade do Indicador (R$ em centavos). */
+    alvoPadrao: doublePrecision("alvo_padrao"),
+    ativo: boolean("ativo").notNull().default(true),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("tipos_meta_nome_unique").on(sql`lower(${t.nome})`)],
+);
+
+export const metas = inovafarmaSchema.table(
+  "metas",
+  {
+    id: text("id").primaryKey(),
+    /** Referência lógica a `closing_period.periods`, sem FK entre Modules. */
+    periodoId: text("periodo_id").notNull(),
+    tipoId: text("tipo_id")
+      .notNull()
+      .references(() => tiposMeta.id),
+    /** Colaboradores desmarcados da Meta, para a cópia automática não os incluir de novo. */
+    excluidos: jsonb("excluidos").$type<number[]>().notNull().default([]),
+    /** Lista de Produtos (só no Indicador Lista de Produtos). */
+    lista: jsonb("lista").$type<ListaProdutos>(),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("metas_periodo_tipo_unique").on(t.periodoId, t.tipoId)],
+);
+
+export const metasParticipantes = inovafarmaSchema.table(
+  "metas_participantes",
+  {
+    metaId: text("meta_id")
+      .notNull()
+      .references(() => metas.id, { onDelete: "cascade" }),
+    codigoColaborador: integer("codigo_colaborador").notNull(),
+    nome: text("nome").notNull(),
+    /** Na unidade do Indicador do Tipo de Meta (R$ em centavos); null: pendente. */
+    alvo: doublePrecision("alvo"),
+  },
+  (t) => [primaryKey({ columns: [t.metaId, t.codigoColaborador] })],
+);
+
+/** Apuração das Metas gravada no fechamento do Closing Period (ADR 0007); a reabertura a apaga. */
+export const apuracoesMetas = inovafarmaSchema.table("apuracoes_metas", {
+  /** Referência lógica a `closing_period.periods`, sem FK entre Modules. */
+  periodoId: text("periodo_id").primaryKey(),
+  /** Metas com o Tipo de Meta e o resultado de cada Participante, como estavam no fechamento. */
+  metas: jsonb("metas").$type<MetaApurada[]>().notNull(),
+  apuradoEm: timestamp("apurado_em").notNull(),
+});

@@ -67,4 +67,29 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
   },
+  "tipos-meta:manage": {
+    label: "Metas: Gerenciar Tipos de Meta",
+    description: "Permite cadastrar, alterar, ativar e desativar os Tipos de Meta e aplicar o Alvo padrão às Metas dos Períodos abertos.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerenciar os Tipos de Meta.",
+  },
+  "metas:manage": {
+    label: "Metas: Montar Metas",
+    description: "Permite montar as Metas de cada Período de Fechamento: Tipos, Participantes, Alvos e Lista de Produtos.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para montar as Metas.",
+  },
+  "metas-geral:view": {
+    label: "Metas: Acompanhamento de todas as Lojas",
+    description: "Permite ver o Acompanhamento das Metas de todos os Colaboradores: Realizado, Atingimento e Prêmio.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas de todas as Lojas.",
+  },
+  "metas-loja:view": {
+    label: "Metas: Acompanhamento por Loja",
+    description: "Permite ver o Acompanhamento das Metas dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas da Loja.",
+  },
+  "metas-individual:view": {
+    label: "Metas: Minhas Metas",
+    description: "Permite ver as Metas do Colaborador vinculado ao Usuário, na Exibição escolhida no Tipo de Meta.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver as próprias Metas.",
+  },
 });

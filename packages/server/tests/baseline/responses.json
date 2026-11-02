@@ -127,7 +127,12 @@
           "inovafarma:avaliacoes-loja:manage",
           "inovafarma:avaliacoes-geral:manage",
           "inovafarma:furo-estoque-loja:manage",
-          "inovafarma:furo-estoque-geral:manage"
+          "inovafarma:furo-estoque-geral:manage",
+          "inovafarma:tipos-meta:manage",
+          "inovafarma:metas:manage",
+          "inovafarma:metas-geral:view",
+          "inovafarma:metas-loja:view",
+          "inovafarma:metas-individual:view"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -319,7 +324,12 @@
         "inovafarma:avaliacoes-loja:manage",
         "inovafarma:avaliacoes-geral:manage",
         "inovafarma:furo-estoque-loja:manage",
-        "inovafarma:furo-estoque-geral:manage"
+        "inovafarma:furo-estoque-geral:manage",
+        "inovafarma:tipos-meta:manage",
+        "inovafarma:metas:manage",
+        "inovafarma:metas-geral:view",
+        "inovafarma:metas-loja:view",
+        "inovafarma:metas-individual:view"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -564,6 +574,41 @@
             "label": "Furo de Estoque: Justificar todas e gerenciar Motivos",
             "description": "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:tipos-meta:manage",
+            "label": "Metas: Gerenciar Tipos de Meta",
+            "description": "Permite cadastrar, alterar, ativar e desativar os Tipos de Meta e aplicar o Alvo padrão às Metas dos Períodos abertos.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar os Tipos de Meta.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas:manage",
+            "label": "Metas: Montar Metas",
+            "description": "Permite montar as Metas de cada Período de Fechamento: Tipos, Participantes, Alvos e Lista de Produtos.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para montar as Metas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-geral:view",
+            "label": "Metas: Acompanhamento de todas as Lojas",
+            "description": "Permite ver o Acompanhamento das Metas de todos os Colaboradores: Realizado, Atingimento e Prêmio.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-loja:view",
+            "label": "Metas: Acompanhamento por Loja",
+            "description": "Permite ver o Acompanhamento das Metas dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas da Loja.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-individual:view",
+            "label": "Metas: Minhas Metas",
+            "description": "Permite ver as Metas do Colaborador vinculado ao Usuário, na Exibição escolhida no Tipo de Meta.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver as próprias Metas.",
             "module": "inovafarma"
           }
         ]
@@ -811,6 +856,41 @@
             "label": "Furo de Estoque: Justificar todas e gerenciar Motivos",
             "description": "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:tipos-meta:manage",
+            "label": "Metas: Gerenciar Tipos de Meta",
+            "description": "Permite cadastrar, alterar, ativar e desativar os Tipos de Meta e aplicar o Alvo padrão às Metas dos Períodos abertos.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar os Tipos de Meta.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas:manage",
+            "label": "Metas: Montar Metas",
+            "description": "Permite montar as Metas de cada Período de Fechamento: Tipos, Participantes, Alvos e Lista de Produtos.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para montar as Metas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-geral:view",
+            "label": "Metas: Acompanhamento de todas as Lojas",
+            "description": "Permite ver o Acompanhamento das Metas de todos os Colaboradores: Realizado, Atingimento e Prêmio.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-loja:view",
+            "label": "Metas: Acompanhamento por Loja",
+            "description": "Permite ver o Acompanhamento das Metas dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas da Loja.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-individual:view",
+            "label": "Metas: Minhas Metas",
+            "description": "Permite ver as Metas do Colaborador vinculado ao Usuário, na Exibição escolhida no Tipo de Meta.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver as próprias Metas.",
             "module": "inovafarma"
           }
         ]
