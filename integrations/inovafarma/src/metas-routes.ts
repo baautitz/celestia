@@ -2,14 +2,15 @@ import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { colaboradorDasMinhasMetas, visualizacoesDasMetas } from "./acompanhamento-routes.js";
-import { COLABORADORES_SQL, LOJAS_SQL } from "./colaboradores-routes.js";
+import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { formatarValor, indicadorPorId } from "./indicadores.js";
-import { META_TARGET, METAS_ACTIONS, METAS_PLUGIN } from "./metas-audit.js";
+import { METAS_ACTIONS } from "./metas-audit.js";
 import { ator, ERP_INDISPONIVEL, META_DESATUALIZADA, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, type AuthContext } from "./metas-comum.js";
 import type { DadosMeta, Meta, MetaStore } from "./metas-store.js";
-import { alvoInicial, copiarMeta, novaMeta, pendentes, periodoAtualizadoPorUltimo, usaAlvo, type ColaboradorAtivo } from "./montar-metas.js";
+import { alvoInicial, novaMeta, pendentes, usaAlvo, type ColaboradorAtivo } from "./montar-metas.js";
+import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
-import { BUSCA_SQL, MIN_BUSCA, type LinhaBusca, type PeriodoResumo, type PeriodsService } from "./pre-vencidos-routes.js";
+import { BUSCA_SQL, MIN_BUSCA, type LinhaBusca, type PeriodsService } from "./pre-vencidos-routes.js";
 import { descreverPremio, type TipoMeta } from "./tipos-meta.js";
 import type { ErpQueryClient } from "./server.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
@@ -57,25 +58,11 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
   const manage = INOVAFARMA_PERMISSIONS.ref("metas:manage");
   const tiposManage = INOVAFARMA_PERMISSIONS.ref("tipos-meta:manage");
   const pode = (c: AuthContext, ref: { key: string } = manage) => permissions.has(c.get("user")?.permissions, ref.key);
-  const registrar = (c: AuthContext, action: string, meta: Meta, attributes: Record<string, unknown>) =>
-    audit.record({ plugin: METAS_PLUGIN, action, actor: ator(c), target: { type: META_TARGET, id: meta.id }, attributes });
+  const montagem = metasDoPeriodo({ erpClient, tipos, metas, audit });
+  const { ativosDoErp } = montagem;
+  const registrar = (c: AuthContext, action: string, meta: Meta, attributes: Record<string, unknown>) => montagem.registrar(ator(c), action, meta, attributes);
 
   const periodosOrdenados = async () => (await periods.list()).sort((a, b) => b.startDate.localeCompare(a.startDate));
-
-  /** Colaboradores ativos no ERP, em ordem de nome; `null` quando o ERP não está configurado ou não responde. */
-  const ativosDoErp = async (): Promise<ColaboradorAtivo[] | null> => {
-    const client = erpClient();
-    if (!client) return null;
-    try {
-      const rows = await client.query<{ codigoColaborador: number; nome: string | null; ativo: boolean | number }>(COLABORADORES_SQL);
-      return rows
-        .filter((r) => r.ativo)
-        .map((r) => ({ codigoColaborador: Number(r.codigoColaborador), nome: (r.nome || "").trim() || `Colaborador cód. ${r.codigoColaborador}` }))
-        .sort((a, b) => a.nome.localeCompare(b.nome));
-    } catch {
-      return null;
-    }
-  };
 
   const lojasDoErp = async () => {
     const client = erpClient();
@@ -92,31 +79,6 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
   const lojasConfirmadas = async () => new Map((await vinculos.list()).filter((v) => !vinculoDesfeito(v)).map((v) => [v.codigoColaborador, v.lojas]));
 
   const comTipo = (meta: Meta, tipo: TipoMeta) => ({ ...meta, tipo: { ...tipo, premio: descreverPremio(tipo) }, pendentes: pendentes(meta, tipo).length });
-
-  /** Cópia automática: um Período aberto sem Metas recebe as do Período atualizado por último, aberto ou fechado. */
-  const copiarPara = async (c: AuthContext, periodo: PeriodoResumo, todos: PeriodoResumo[], ativos: ColaboradorAtivo[]): Promise<PeriodoResumo | null> => {
-    const origemId = periodoAtualizadoPorUltimo(await metas.listar(todos.map((p) => p.id)), periodo.id);
-    const origem = todos.find((p) => p.id === origemId);
-    if (!origem) return null;
-    for (const meta of await metas.listar([origem.id])) {
-      const tipo = await tipos.tipo(meta.tipoId);
-      if (!tipo?.ativo) continue;
-      const { nova, novos, sairam } = copiarMeta(meta, periodo.id, tipo, ativos);
-      const criada = await metas.criar(nova);
-      // Outro acesso simultâneo já copiou esta Meta.
-      if (!criada) continue;
-      await registrar(c, METAS_ACTIONS.copiar, criada, {
-        tipo: tipo.nome,
-        periodo: periodo.name,
-        origem: origem.name,
-        participantes: criada.participantes.length,
-        novos: novos.map((p) => p.nome),
-        sairam: sairam.map((p) => p.nome),
-        pendentes: pendentes(criada, tipo).length,
-      });
-    }
-    return origem;
-  };
 
   // O que a página Metas precisa para abrir: as abas que a Permission libera e os Períodos.
   routes.get("/metas/contexto", auth, async (c: AuthContext) => {
@@ -157,34 +119,22 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     const todos = await periods.list();
     const periodo = todos.find((p) => p.id === c.req.query("periodoId"));
     if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
-    const ativos = await ativosDoErp();
-    if (!ativos) return c.json({ error: ERP_INDISPONIVEL }, 503);
+    const preparo = await montagem.preparar(ator(c), periodo, todos);
+    if (!preparo) return c.json({ error: ERP_INDISPONIVEL }, 503);
+    const { ativos, copiadoDe } = preparo;
 
-    let doPeriodo = await metas.listar([periodo.id]);
-    let copiadoDe: string | null = null;
-    if (doPeriodo.length === 0 && periodo.status === "open") {
-      copiadoDe = (await copiarPara(c, periodo, todos, ativos))?.name ?? null;
-      if (copiadoDe) doPeriodo = await metas.listar([periodo.id]);
-    }
-
-    const todosTipos = await tipos.listar();
+    const doPeriodo = metasVisiveis(await metas.listar([periodo.id]), await tipos.listar(), periodo);
     const lojas = await lojasConfirmadas();
     // Os Participantes que saíram do ERP depois de entrar na Meta continuam na lista.
     const pessoas = new Map<number, ColaboradorAtivo & { ativo: boolean }>(ativos.map((a) => [a.codigoColaborador, { ...a, ativo: true }]));
-    for (const m of doPeriodo) for (const p of m.participantes) if (!pessoas.has(p.codigoColaborador)) pessoas.set(p.codigoColaborador, { codigoColaborador: p.codigoColaborador, nome: p.nome, ativo: false });
+    for (const { meta: m } of doPeriodo) for (const p of m.participantes) if (!pessoas.has(p.codigoColaborador)) pessoas.set(p.codigoColaborador, { codigoColaborador: p.codigoColaborador, nome: p.nome, ativo: false });
 
     return c.json({
       periodo,
       somenteLeitura: periodo.status !== "open",
       copiadoDe,
       colaboradores: [...pessoas.values()].sort((a, b) => a.nome.localeCompare(b.nome)).map((p) => ({ ...p, lojas: lojas.get(p.codigoColaborador) ?? [] })),
-      metas: doPeriodo
-        .flatMap((m) => {
-          const tipo = todosTipos.find((t) => t.id === m.tipoId);
-          return tipo ? [comTipo(m, tipo)] : [];
-        })
-        .sort((a, b) => a.tipo.nome.localeCompare(b.tipo.nome)),
-      tiposDisponiveis: todosTipos.filter((t) => t.ativo && !doPeriodo.some((m) => m.tipoId === t.id)).map((t) => ({ id: t.id, nome: t.nome, indicador: t.indicador })),
+      metas: doPeriodo.map(({ meta, tipo }) => comTipo(meta, tipo)).sort((a, b) => a.tipo.nome.localeCompare(b.tipo.nome)),
     });
   });
 

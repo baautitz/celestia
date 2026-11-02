@@ -8,6 +8,7 @@ import { desempenhoSql } from "./desempenho-vendas.js";
 import type { IndicadorId } from "./indicadores.js";
 import { ator, ERP_INDISPONIVEL, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, vinculoDoUsuario, type AuthContext } from "./metas-comum.js";
 import type { MetaStore } from "./metas-store.js";
+import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
 import type { UsersService } from "./colaboradores-routes.js";
 import { minhaMeta } from "./minhas-metas.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
@@ -115,6 +116,7 @@ const listaSql = (produtos: number) => `
 
 export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): void {
   const { routes, permissions, auth, events, erpClient, tipos, metas, vinculos, avaliacoes, preVencidos, apuracoes, periods, audit, users } = deps;
+  const montagem = metasDoPeriodo({ erpClient, tipos, metas, audit });
   const geralRef = INOVAFARMA_PERMISSIONS.ref("metas-geral:view");
   const lojaRef = INOVAFARMA_PERMISSIONS.ref("metas-loja:view");
   const individualRef = INOVAFARMA_PERMISSIONS.ref("metas-individual:view");
@@ -177,11 +179,8 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
 
   /** Apuração ao vivo das Metas do Período, com os Tipos de Meta de agora. Lança se o ERP falhar. */
   async function apurar(periodo: PeriodoResumo): Promise<ApuracaoPeriodo> {
-    const todosTipos = await tipos.listar();
-    const doPeriodo = (await metas.listar([periodo.id])).flatMap((meta) => {
-      const tipo = todosTipos.find((t) => t.id === meta.tipoId);
-      return tipo ? [{ meta, tipo }] : [];
-    });
+    // Na Apuração do fechamento o Período ainda está aberto: só os Tipos ativos contam.
+    const doPeriodo = metasVisiveis(await metas.listar([periodo.id]), await tipos.listar(), { status: "open" });
     const indicadores = new Set<IndicadorId>(doPeriodo.flatMap(({ tipo }) => (tipo.regra.tipo === "percentual" ? [tipo.indicador, tipo.regra.indicadorBase] : [tipo.indicador])));
     const produtosLista = [...new Set(doPeriodo.flatMap(({ meta }) => meta.lista?.produtos.map((p) => p.produtoId) ?? []))];
     const dados = await dadosDoPeriodo(periodo, indicadores, produtosLista);
@@ -274,7 +273,11 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
    * consulta, com entrada no Audit Log em nome de quem consultou: assim a diferença para o fechamento fica visível.
    */
   async function apuracaoDe(periodo: PeriodoResumo, ator: { id: string; name: string }): Promise<{ apuracao: ApuracaoPeriodo; congelada: boolean }> {
-    if (periodo.status === "open") return { apuracao: await apurar(periodo), congelada: false };
+    if (periodo.status === "open") {
+      // Igual ao Montar Metas: cópia automática e uma Meta por Tipo de Meta ativo.
+      if (!(await montagem.preparar(ator, periodo, await periods.list()))) throw new Error(erpClient() ? ERP_INDISPONIVEL : SEM_CONEXAO);
+      return { apuracao: await apurar(periodo), congelada: false };
+    }
     const gravada = await apuracoes.apuracao(periodo.id);
     if (gravada) return { apuracao: gravada, congelada: true };
     const apuracao = await apurar(periodo);

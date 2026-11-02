@@ -87,32 +87,33 @@ interface Montagem {
   copiadoDe: string | null;
   colaboradores: { codigoColaborador: number; nome: string; lojas: number[] }[];
   metas: MetaVista[];
-  tiposDisponiveis: { id: string; nome: string }[];
 }
 
 const alvos = (m: Meta) => m.participantes.map((p) => [p.nome, p.alvo]);
 
 describe("Montar Metas", () => {
-  it("adiciona uma Meta por Tipo ativo, com todos os Colaboradores ativos e o Alvo padrão", async () => {
-    const { req, json, tipos, log } = await boot();
+  it("cada Tipo ativo vira uma Meta do Período aberto, com todos os Colaboradores ativos e o Alvo padrão", async () => {
+    const { json, tipos, log } = await boot();
     const tipo = await tipos.criar(cmv);
-    await tipos.criar({ ...ticket, ativo: false });
+    const inativo = await tipos.criar({ ...ticket, ativo: false });
     const montagem = await json<Montagem>("gil", "GET", "/metas?periodoId=abril");
-    expect(montagem.metas).toEqual([]);
-    expect(montagem.tiposDisponiveis.map((t) => t.nome)).toEqual(["CMV"]);
+    expect(montagem.metas.map((m) => m.tipo.nome)).toEqual(["CMV"]);
+    expect(alvos(montagem.metas[0] as Meta)).toEqual([
+      ["ANA", 30],
+      ["BIA", 30],
+    ]);
     expect(montagem.colaboradores).toEqual([
       { codigoColaborador: 1, nome: "ANA", ativo: true, lojas: [10] },
       { codigoColaborador: 2, nome: "BIA", ativo: true, lojas: [] },
     ]);
-
-    const res = await req("gil", "POST", "/metas", { periodoId: "abril", tipoId: tipo.id });
-    expect(res.status).toBe(201);
-    expect(alvos((await res.json()) as Meta)).toEqual([
-      ["ANA", 30],
-      ["BIA", 30],
-    ]);
-    expect((await req("gil", "POST", "/metas", { periodoId: "abril", tipoId: tipo.id })).status).toBe(409);
     expect(log).toEqual(['Adicionou a Meta "CMV" ao período "Abril" com 2 Participantes.']);
+
+    // Um novo acesso não duplica; um Tipo ativado depois entra; um Tipo desativado sai do Período aberto.
+    await tipos.atualizar(inativo.id, ticket, inativo.version);
+    await tipos.atualizar(tipo.id, { ...cmv, ativo: false }, tipo.version);
+    const depois = await json<Montagem>("gil", "GET", "/metas?periodoId=abril");
+    expect(depois.metas.map((m) => m.tipo.nome)).toEqual(["Ticket"]);
+    expect(log).toHaveLength(2);
   });
 
   it("exige a Permission e só altera Metas de Período aberto", async () => {
