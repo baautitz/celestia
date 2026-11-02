@@ -1,5 +1,4 @@
 import React, {
-  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -134,15 +133,18 @@ export type DataTablePagination =
 
 export type DataTablePrintOrientation = "portrait" | "landscape";
 
-export interface DataTablePrintOptions {
+export interface DataTablePrintOptions<TRow = unknown> {
   /** Orientação da folha A4. Padrão: "portrait". */
   orientation?: DataTablePrintOrientation;
   /** Substitui `description` no papel (ex.: filtros ativos que a tela mostra fora da tabela). */
   description?: string;
   /** Nome sugerido ao salvar como PDF (vira o título da página durante a impressão). Padrão: `title`. */
   fileName?: string;
-  /** Com `renderExpanded`, imprime também os detalhes das linhas expandidas, logo abaixo de cada uma. */
-  expanded?: boolean;
+  /**
+   * Detalhe impresso logo abaixo de cada linha, na mesma página que ela (ex.: as Metas de cada Colaborador).
+   * Use `<PrintDetailTable>` para uma subtabela compacta.
+   */
+  details?: (row: TRow) => React.ReactNode;
 }
 
 export interface DataTableProps<TRow> {
@@ -174,7 +176,7 @@ export interface DataTableProps<TRow> {
   bordered?: boolean;
   className?: string;
   /** Liga o botão "Imprimir": todas as linhas da busca/ordenação atuais, sem a paginação. */
-  print?: DataTablePrintOptions;
+  print?: DataTablePrintOptions<TRow>;
   /** Alterna o fundo das linhas, na tela e na impressão, para guiar a leitura de tabelas largas. */
   striped?: boolean;
   /** `key` da última coluna presa à esquerda na rolagem horizontal; ela e as anteriores ficam fixas. Não afeta a impressão. */
@@ -1018,16 +1020,60 @@ export function DataTable<TRow>({
           fileName={print.fileName ?? heading}
           description={print.description ?? description}
           orientation={print.orientation ?? "portrait"}
-          details={
-            print.expanded && renderExpanded
-              ? (row) =>
-                  isExpanded(getRowId(row)) ? renderExpanded(row) : null
-              : undefined
-          }
+          details={print.details}
           onDone={endPrinting}
         />
       )}
     </Card>
+  );
+}
+
+/** Subtabela compacta para `print.details`: texto pequeno, sem card, com os valores formatados como na tabela. */
+export function PrintDetailTable<TRow>({
+  columns,
+  rows,
+  getRowId,
+}: {
+  columns: DataTableColumn<TRow>[];
+  rows: TRow[];
+  getRowId: (row: TRow) => string;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <table className={cn("w-full text-[9px] border-l", PRINT_LINE_COLOR)}>
+      <thead>
+        <tr className="text-muted-foreground">
+          {columns.map((col) => (
+            <th
+              key={col.key}
+              className={cn(
+                "px-1.5 py-0.5 font-medium text-left",
+                isNumericColumn(col) && "text-right",
+              )}
+            >
+              {col.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={getRowId(row)}>
+            {columns.map((col) => (
+              <td
+                key={col.key}
+                className={cn(
+                  "px-1.5 py-0.5 whitespace-normal",
+                  isNumericColumn(col) && "text-right",
+                )}
+              >
+                {formatValue(col.value?.(row), col.format)}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -1185,11 +1231,11 @@ function PrintTable<TRow>({
             ))}
           </TableRow>
         </TableHeader>
-        <TableBody>
-          {rows.map((row) => {
+        {/* Um `<tbody>` por linha: com o detalhe, a linha e o detalhe não se separam entre páginas. */}
+        {rows.map((row) => {
             const detalhe = details?.(row);
             return (
-              <Fragment key={getRowId(row)}>
+              <TableBody key={getRowId(row)} className="break-inside-avoid">
                 <TableRow
                   className={cn(
                     "break-inside-avoid",
@@ -1215,16 +1261,15 @@ function PrintTable<TRow>({
                   <TableRow className="break-inside-avoid">
                     <TableCell
                       colSpan={columns.length}
-                      className="p-1.5 pl-6 whitespace-normal"
+                      className="p-0 pb-1.5 pl-6 whitespace-normal"
                     >
                       {detalhe}
                     </TableCell>
                   </TableRow>
                 )}
-              </Fragment>
+              </TableBody>
             );
           })}
-        </TableBody>
         {totals && rows.length > 0 && (
           // `table-row-group`: um `<tfoot>` comum se repete em toda folha; assim o total sai só depois da última linha.
           <TableFooter className={cn(TOTALS_CLASS, "table-row-group")}>
