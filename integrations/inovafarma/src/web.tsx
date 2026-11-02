@@ -820,7 +820,11 @@ export const inovafarmaWebModule = defineWebModule({
       // Cada aba tem a sua Permission; a tela mostra as que o servidor liberar.
       permission: "inovafarma:tipos-meta:manage",
       component: MetasPage,
-      variants: [{ permission: "inovafarma:metas:manage", component: MetasPage }],
+      variants: [
+        { permission: "inovafarma:metas:manage", component: MetasPage },
+        { permission: "inovafarma:metas-geral:view", component: MetasPage },
+        { permission: "inovafarma:metas-loja:view", component: MetasPage },
+      ],
     },
     {
       id: "inovafarma-vendas",

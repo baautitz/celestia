@@ -27,9 +27,29 @@ const participantes = [
 ];
 
 const contexto = {
-  abas: { tipos: true, montar: true },
+  abas: { tipos: true, montar: true, acompanhamento: true },
   periodos: [{ id: "abril", name: "Abril", startDate: "2027-04-01", endDate: "2027-04-30", status: "open" }],
   lojas: [{ codigo: 10, nome: "Centro" }],
+  visualizacoes: [{ id: "geral", lojas: [{ codigo: 10, nome: "Centro" }] }],
+};
+const acompanhamento = {
+  congelada: false,
+  apuradoEm: "2027-04-15T00:00:00.000Z",
+  linhas: [
+    {
+      metaId: "met_1",
+      tipo: { ...cmv, premio: cmv.premio },
+      codigoColaborador: 1,
+      nome: "ANA",
+      alvo: 30,
+      realizado: 25,
+      atingimento: 120,
+      atingida: true,
+      premioCentavos: 10000,
+      resultado: "CMV 25% · Meta: até 30% · ✓ 5 p.p. abaixo",
+    },
+  ],
+  totais: [{ codigoColaborador: 1, nome: "ANA", premioCentavos: 10000 }],
 };
 const metaCmv = { id: "met_1", periodoId: "abril", tipoId: "tme_1", participantes, excluidos: [], lista: null, version: 1, tipo: cmv, pendentes: 1 };
 const montagem = {
@@ -56,6 +76,7 @@ beforeEach(() => {
     if (init?.method === "PUT") return { ...cmv, ...JSON.parse(String(init.body)), version: 2, premio: "CMV % até 28% paga R$ 100,00" };
     if (init?.method === "POST") return { metas: [] };
     if (url.endsWith("/metas/contexto")) return contexto;
+    if (url.includes("/metas/acompanhamento?")) return acompanhamento;
     if (url.includes("/metas?periodoId=")) return montagem;
     if (url.endsWith("/participantes/2")) return { ...metaCmv, participantes: [participantes[0]], excluidos: [2], version: 2 };
     if (url.endsWith("/definir-alvo")) return metaCmv;
@@ -117,5 +138,16 @@ describe("Metas: Montar Metas", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/met_1/definir-alvo", expect.anything()));
     const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/definir-alvo"))!;
     expect(JSON.parse(String(init.body))).toEqual({ version: 1, codigos: [2], alvo: 27.5 });
+  });
+});
+
+describe("Metas: Acompanhamento", () => {
+  it("mostra o resultado em palavras, o Atingimento e o Prêmio, filtrando pela Loja", async () => {
+    renderizar();
+    fireEvent.click(await screen.findByRole("tab", { name: "Acompanhamento" }));
+    expect((await screen.findAllByText("CMV 25% · Meta: até 30% · ✓ 5 p.p. abaixo")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("120,0%").length).toBeGreaterThan(0);
+    expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/acompanhamento?periodoId=abril&visualizacao=geral");
+    expect(screen.getAllByRole("button", { name: /Imprimir/ }).length).toBeGreaterThan(0);
   });
 });

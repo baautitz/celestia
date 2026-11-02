@@ -8,6 +8,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
+import { AcompanhamentoMetas, type VisualizacaoMetas } from "./acompanhamento-tab";
 import { AlvoPadraoWindow } from "./alvo-padrao-window";
 import { formatarValor, indicadorPorId } from "./indicadores";
 import { MontarMetas, type LojaMetas, type PeriodoMetas } from "./montar-metas-tab";
@@ -101,9 +102,10 @@ function TiposDeMeta() {
 }
 
 interface Contexto {
-  abas: { tipos: boolean; montar: boolean };
+  abas: { tipos: boolean; montar: boolean; acompanhamento: boolean };
   periodos: PeriodoMetas[];
   lojas: LojaMetas[];
+  visualizacoes: VisualizacaoMetas[];
 }
 type Aba = keyof Contexto["abas"];
 
@@ -117,7 +119,7 @@ export function MetasPage() {
     apiFetch<Contexto>("/api/m/inovafarma/metas/contexto")
       .then((c) => {
         setContexto(c);
-        setAba(c.abas.tipos ? "tipos" : "montar");
+        setAba(c.abas.tipos ? "tipos" : c.abas.montar ? "montar" : "acompanhamento");
       })
       .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao abrir as Metas.")));
   }, [feedback]);
@@ -125,13 +127,16 @@ export function MetasPage() {
   if (!contexto || !aba) return null;
   return (
     <Stack gap="section">
-      <Tabs value={aba} onValueChange={(v) => setAba(v === "montar" ? "montar" : "tipos")}>
+      <Tabs value={aba} onValueChange={(v) => setAba(v === "montar" || v === "acompanhamento" ? v : "tipos")}>
         <TabsList>
           {contexto.abas.tipos && <TabsTrigger value="tipos">Tipos de Meta</TabsTrigger>}
           {contexto.abas.montar && <TabsTrigger value="montar">Montar Metas</TabsTrigger>}
+          {contexto.abas.acompanhamento && <TabsTrigger value="acompanhamento">Acompanhamento</TabsTrigger>}
         </TabsList>
       </Tabs>
-      {aba === "tipos" ? <TiposDeMeta /> : <MontarMetas periodos={contexto.periodos} lojas={contexto.lojas} />}
+      {aba === "tipos" && <TiposDeMeta />}
+      {aba === "montar" && <MontarMetas periodos={contexto.periodos} lojas={contexto.lojas} />}
+      {aba === "acompanhamento" && <AcompanhamentoMetas periodos={contexto.periodos} visualizacoes={contexto.visualizacoes} />}
     </Stack>
   );
 }
