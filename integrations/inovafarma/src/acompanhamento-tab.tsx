@@ -193,7 +193,7 @@ export function AcompanhamentoMetas({ periodos, visualizacoes }: { periodos: Per
         search={{ placeholder: "Buscar Colaborador" }}
         striped
         totals={(rows) => ({ colaborador: "Total", premio: rows.reduce((acc, c) => acc + c.premioCentavos / 100, 0) })}
-        print={{ description: impressao, fileName: periodo ? `Acompanhamento de Metas - ${periodo.name} - ${lojaLabel}` : undefined }}
+        print={{ orientation: "landscape", expanded: true, description: impressao, fileName: periodo ? `Acompanhamento de Metas - ${periodo.name} - ${lojaLabel}` : undefined }}
         defaultExpanded
         renderExpanded={(c) => <DataTable columns={colunas} rows={c.metas} getRowId={(l) => l.metaId} />}
       />
