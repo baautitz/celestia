@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
-import { TrendingUp, RefreshCw, Calendar, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch } from "lucide-react";
+import { TrendingUp, RefreshCw, Calendar, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch, Target } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
@@ -17,6 +17,7 @@ import { ColaboradoresPage } from "./colaboradores-page";
 import { AvaliacoesPage } from "./avaliacoes-page";
 import { PreVencidosPage } from "./pre-vencidos-page";
 import { FuroEstoquePage } from "./furo-estoque-page";
+import { MetasPage } from "./metas-page";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
 
@@ -807,6 +808,18 @@ export const inovafarmaWebModule = defineWebModule({
       permission: "inovafarma:furo-estoque-loja:manage",
       component: FuroEstoquePage,
       variants: [{ permission: "inovafarma:furo-estoque-geral:manage", component: FuroEstoquePage }],
+    },
+    {
+      id: "inovafarma-metas",
+      label: "Metas",
+      title: "Metas",
+      icon: Target,
+      path: "/inovafarma/metas",
+      section: "inovafarma",
+      order: 20,
+      // As próximas abas (Montar Metas, Acompanhamento, Minhas Metas) entram como variants com as suas Permissions.
+      permission: "inovafarma:tipos-meta:manage",
+      component: MetasPage,
     },
     {
       id: "inovafarma-vendas",
