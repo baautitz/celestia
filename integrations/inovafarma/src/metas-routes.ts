@@ -36,6 +36,7 @@ const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
 const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
 const PERIODO_NAO_ENCONTRADO = "Período de Fechamento não encontrado.";
 const PERIODO_FECHADO = "O Período de Fechamento está fechado: as Metas ficam só para leitura.";
+const SEM_METAS = "Acesso negado: o usuário não possui nenhuma permissão das Metas (Tipos de Meta, Montar Metas, Acompanhamento ou Minhas Metas).";
 const META_NAO_ENCONTRADA = "Meta não encontrada.";
 const TIPO_NAO_ENCONTRADO = "Tipo de Meta não encontrado ou inativo.";
 const META_REPETIDA = "O Período já tem uma Meta deste Tipo de Meta.";
@@ -135,7 +136,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       acompanhamento: acompanhamento.geral || acompanhamento.lojas !== null,
       minhas: (await colaboradorDasMinhasMetas(c.get("user"), permissions.has, vinculos)) !== null,
     };
-    if (!abas.tipos && !abas.montar && !abas.acompanhamento && !abas.minhas) return c.json({ error: manage.deniedMessage }, 403);
+    if (!abas.tipos && !abas.montar && !abas.acompanhamento && !abas.minhas) return c.json({ error: SEM_METAS }, 403);
     const lojas = abas.montar || abas.acompanhamento ? await lojasDoErp() : [];
     // Visualizações do Acompanhamento: Geral filtra todas as Lojas; Loja, só as do Vínculo do Usuário.
     const visualizacoes = [
