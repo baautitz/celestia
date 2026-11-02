@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ListChecks, Pencil, Plus, Target } from "lucide-react";
+import { ListChecks, Pencil, Plus, Target } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@platform/ui/components/collapsible";
 import { Label } from "@platform/ui/components/label";
 import { Stack, Text } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
@@ -57,6 +56,20 @@ interface Montagem {
   metas: MetaVista[];
   tiposDisponiveis: { id: string; nome: string; indicador: IndicadorId }[];
 }
+
+/** Uma linha por Meta do Período; expande para os Participantes. */
+const colunasMetas: DataTableColumn<MetaVista>[] = [
+  { key: "meta", label: "Meta", value: (m) => m.tipo.nome, searchable: true, sortable: true, mobileRole: "primary" },
+  { key: "indicador", label: "Indicador", value: (m) => indicadorPorId(m.tipo.indicador).nome, searchable: true },
+  { key: "premio", label: "Prêmio", value: (m) => m.tipo.premio },
+  { key: "participantes", label: "Participantes", value: (m) => m.participantes.length, format: "number", sortable: true },
+  {
+    key: "pendentes",
+    label: "Pendentes",
+    value: (m) => m.pendentes,
+    render: (m) => (m.pendentes ? <Badge variant="warning">{m.pendentes}</Badge> : null),
+  },
+];
 
 const usaAlvo = (t: TipoMetaComPremio) => !t.semAlvo && t.indicador !== "lista-produtos";
 const periodoInicial = (periodos: PeriodoMetas[]) => (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
@@ -255,20 +268,7 @@ function MetaDoPeriodo({
       },
     });
 
-  const descricao = [meta.tipo.premio, meta.pendentes ? `${meta.pendentes} pendente${meta.pendentes === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
-  const resumo = [indicador.nome, descricao, `${meta.participantes.length} Participante${meta.participantes.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
   return (
-    <Collapsible>
-      <Stack direction="row" gap="field" align="center" wrap>
-        <CollapsibleTrigger render={<Button variant="ghost" />}>
-          <ChevronDown />
-          {meta.tipo.nome}
-        </CollapsibleTrigger>
-        <Text variant="small" tone="muted">
-          {resumo}
-        </Text>
-      </Stack>
-      <CollapsibleContent>
     <Stack gap="field">
       {!somenteLeitura && (
         <Stack direction="row" gap="field" justify="end" wrap>
@@ -310,8 +310,6 @@ function MetaDoPeriodo({
         }
       />
     </Stack>
-      </CollapsibleContent>
-    </Collapsible>
   );
 }
 
@@ -412,25 +410,27 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
           <AlertDescription>As Metas de um Período fechado ficam só para leitura.</AlertDescription>
         </Alert>
       )}
-      {montagem && montagem.metas.length === 0 && (
-        <Alert>
-          <AlertTitle>Nenhuma Meta neste Período</AlertTitle>
-          <AlertDescription>
-            {montagem.somenteLeitura ? "Este Período fechou sem Metas." : "Use Adicionar Meta para escolher os Tipos de Meta deste Período."}
-          </AlertDescription>
-        </Alert>
-      )}
-      {montagem?.metas.map((m) => (
-        <MetaDoPeriodo
-          key={m.id}
-          meta={m}
-          colaboradores={colaboradores}
-          somenteLeitura={montagem.somenteLeitura}
-          periodoNome={periodo?.name ?? ""}
-          atualizar={atualizar}
-          recarregar={() => void carregar()}
-        />
-      ))}
+      <DataTable
+        columns={colunasMetas}
+        rows={montagem?.metas ?? []}
+        getRowId={(m) => m.id}
+        loading={!montagem}
+        title="Metas do Período"
+        emptyMessage={montagem?.somenteLeitura ? "Este Período fechou sem Metas." : "Nenhuma Meta. Use Adicionar Meta para escolher os Tipos de Meta deste Período."}
+        search={{ placeholder: "Buscar Meta" }}
+        renderExpanded={(m) =>
+          montagem && (
+            <MetaDoPeriodo
+              meta={m}
+              colaboradores={colaboradores}
+              somenteLeitura={montagem.somenteLeitura}
+              periodoNome={periodo?.name ?? ""}
+              atualizar={atualizar}
+              recarregar={() => void carregar()}
+            />
+          )
+        }
+      />
     </Stack>
   );
 }

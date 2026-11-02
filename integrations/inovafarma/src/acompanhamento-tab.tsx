@@ -34,9 +34,9 @@ interface Acompanhamento {
 const VISUALIZACAO_LABEL = { geral: "Geral", loja: "Loja" } as const;
 const periodoInicial = (periodos: PeriodoMetas[]) => (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
 
+/** As Metas de um Colaborador, na linha expandida. */
 const colunas: DataTableColumn<LinhaAcompanhamento>[] = [
-  { key: "meta", label: "Meta", value: (l) => l.tipo.nome, searchable: true, sortable: true, nowrap: true },
-  { key: "colaborador", label: "Colaborador", value: (l) => l.nome, searchable: true, sortable: true, nowrap: true, mobileRole: "primary" },
+  { key: "meta", label: "Meta", value: (l) => l.tipo.nome, sortable: true, nowrap: true, mobileRole: "primary" },
   { key: "resultado", label: "Resultado", value: (l) => l.resultado },
   {
     key: "situacao",
@@ -48,10 +48,30 @@ const colunas: DataTableColumn<LinhaAcompanhamento>[] = [
   { key: "premio", label: "Prêmio", value: (l) => l.premioCentavos / 100, format: "currency", sortable: true },
 ];
 
-const colunasTotais: DataTableColumn<Acompanhamento["totais"][number]>[] = [
-  { key: "colaborador", label: "Colaborador", value: (t) => t.nome, searchable: true, sortable: true, mobileRole: "primary" },
-  { key: "premio", label: "Total de Prêmios", value: (t) => t.premioCentavos / 100, format: "currency", sortable: true },
+/** Uma linha por Colaborador; expande para as Metas dele. */
+interface LinhaColaborador {
+  codigoColaborador: number;
+  nome: string;
+  premioCentavos: number;
+  metas: LinhaAcompanhamento[];
+}
+
+const colunasColaborador: DataTableColumn<LinhaColaborador>[] = [
+  { key: "colaborador", label: "Colaborador", value: (c) => c.nome, searchable: true, sortable: true, mobileRole: "primary" },
+  { key: "metas", label: "Metas", value: (c) => c.metas.length, format: "number", sortable: true },
+  {
+    key: "atingidas",
+    label: "Atingidas",
+    value: (c) => {
+      const comAlvo = c.metas.filter((m) => m.atingida !== null);
+      return comAlvo.length === 0 ? "" : `${comAlvo.filter((m) => m.atingida).length} de ${comAlvo.length}`;
+    },
+  },
+  { key: "premio", label: "Total de Prêmios", value: (c) => c.premioCentavos / 100, format: "currency", sortable: true },
 ];
+
+const porColaborador = (dados: Acompanhamento | null): LinhaColaborador[] =>
+  !dados ? [] : dados.totais.map((t) => ({ ...t, metas: dados.linhas.filter((l) => l.codigoColaborador === t.codigoColaborador) })).sort((a, b) => a.nome.localeCompare(b.nome));
 
 /** Aba Acompanhamento: Realizado, Atingimento e Prêmio de cada Participante, com o total por Colaborador. */
 export function AcompanhamentoMetas({ periodos, visualizacoes }: { periodos: PeriodoMetas[]; visualizacoes: VisualizacaoMetas[] }) {
@@ -163,26 +183,18 @@ export function AcompanhamentoMetas({ periodos, visualizacoes }: { periodos: Per
         </Alert>
       )}
       <DataTable
-        columns={colunas}
-        rows={dados?.linhas ?? []}
-        getRowId={(l) => `${l.metaId}-${l.codigoColaborador}`}
+        columns={colunasColaborador}
+        rows={porColaborador(dados)}
+        getRowId={(c) => String(c.codigoColaborador)}
         loading={carregando}
         title="Acompanhamento"
         description={periodo?.status === "open" ? "Apuração ao vivo: o resultado acompanha as vendas do ERP até o fechamento do Período." : undefined}
         emptyMessage="Nenhum Participante nas Metas deste Período e filtro."
-        search={{ placeholder: "Buscar Meta ou Colaborador" }}
+        search={{ placeholder: "Buscar Colaborador" }}
         striped
-        print={{ orientation: "landscape", description: impressao, fileName: periodo ? `Acompanhamento de Metas - ${periodo.name} - ${lojaLabel}` : undefined }}
-      />
-      <DataTable
-        columns={colunasTotais}
-        rows={dados?.totais ?? []}
-        getRowId={(t) => String(t.codigoColaborador)}
-        loading={carregando}
-        title="Total de Prêmios por Colaborador"
-        emptyMessage="Nenhum Prêmio neste Período e filtro."
-        totals={(rows) => ({ colaborador: "Total", premio: rows.reduce((acc, t) => acc + t.premioCentavos / 100, 0) })}
-        print={{ description: impressao, fileName: periodo ? `Prêmios de Metas - ${periodo.name} - ${lojaLabel}` : undefined }}
+        totals={(rows) => ({ colaborador: "Total", premio: rows.reduce((acc, c) => acc + c.premioCentavos / 100, 0) })}
+        print={{ description: impressao, fileName: periodo ? `Acompanhamento de Metas - ${periodo.name} - ${lojaLabel}` : undefined }}
+        renderExpanded={(c) => <DataTable columns={colunas} rows={c.metas} getRowId={(l) => l.metaId} />}
       />
     </Stack>
   );
