@@ -211,7 +211,7 @@ const EXPAND_KEY = "__expand";
 const FROZEN_HEAD_CLASS =
   "bg-[color-mix(in_oklab,var(--muted)_40%,var(--background))]";
 const FROZEN_CELL_CLASS =
-  "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--muted)_30%,var(--background))] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--primary)_15%,var(--background))]!";
+  "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--primary)_5%,var(--background))] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--primary)_15%,var(--background))]!";
 const FROZEN_STRIPED_CELL_CLASS =
   "group-even/row:bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))]";
 /** Linha clicada: destaque que vence o zebrado e o hover. */
@@ -1060,7 +1060,8 @@ export function DataTable<TRow>({
                             }}
                             className={cn(
                               // Sem transição: o fundo da linha e o das células fixas trocam juntos, na hora.
-                              "group/row transition-none hover:bg-muted/30",
+                              // Hover: o azul do destaque da linha selecionada, mais claro.
+                              "group/row transition-none hover:bg-primary/5",
                               renderExpanded && "cursor-pointer",
                               striped && "even:bg-muted/20",
                               SELECTED_ROW_CLASS,
