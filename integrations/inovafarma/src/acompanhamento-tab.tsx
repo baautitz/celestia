@@ -115,15 +115,7 @@ const colunasColaborador: DataTableColumn<LinhaColaborador>[] = [
     format: "number",
     sortable: true,
   },
-  {
-    key: "atingidas",
-    label: "Atingidas",
-    value: (c) => {
-      const comAlvo = c.metas.filter((m) => m.atingida !== null);
-      return comAlvo.length === 0
-        ? ""
-        : `${comAlvo.filter((m) => m.atingida).length} de ${comAlvo.length}`;
-    },
+  { key: "atingidas", label: "Atingidas", value: (c) => c.metas.filter((m) => m.atingida === true).length, format: "number", sortable: true },
   },
   {
     key: "premio",
