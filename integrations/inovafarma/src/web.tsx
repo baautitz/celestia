@@ -817,9 +817,10 @@ export const inovafarmaWebModule = defineWebModule({
       path: "/inovafarma/metas",
       section: "inovafarma",
       order: 20,
-      // As próximas abas (Montar Metas, Acompanhamento, Minhas Metas) entram como variants com as suas Permissions.
+      // Cada aba tem a sua Permission; a tela mostra as que o servidor liberar.
       permission: "inovafarma:tipos-meta:manage",
       component: MetasPage,
+      variants: [{ permission: "inovafarma:metas:manage", component: MetasPage }],
     },
     {
       id: "inovafarma-vendas",
