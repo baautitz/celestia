@@ -622,6 +622,21 @@ describe("linha selecionada", () => {
     expect(beta.getAttribute("aria-selected")).toBe("false");
   });
 
+  it("tira o destaque ao clicar fora da tabela", async () => {
+    setViewport(1280);
+    render(
+      <>
+        <p>Fora</p>
+        <DataTable columns={columns} rows={data} getRowId={(r) => r.id} />
+      </>,
+    );
+    const alfa = screen.getByText("Alfa").closest("tr")!;
+    await userEvent.click(alfa);
+    expect(alfa.getAttribute("aria-selected")).toBe("true");
+    await userEvent.click(screen.getByText("Fora"));
+    expect(alfa.getAttribute("aria-selected")).toBe("false");
+  });
+
   it("não seleciona a linha ao clicar numa ação dela", async () => {
     setViewport(1280);
     render(
@@ -634,5 +649,17 @@ describe("linha selecionada", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Editar Alfa" }));
     expect(screen.getByText("Alfa").closest("tr")!.getAttribute("aria-selected")).toBe("false");
+  });
+});
+
+describe("linha expansível no desktop", () => {
+  it("expande e recolhe ao clicar em qualquer ponto da linha", async () => {
+    setViewport(1280);
+    renderTable();
+    const cell = await screen.findByText("Alfa");
+    await userEvent.click(cell);
+    expect(screen.getByText("Detalhe de Alfa")).toBeTruthy();
+    await userEvent.click(cell);
+    expect(screen.queryByText("Detalhe de Alfa")).toBeNull();
   });
 });

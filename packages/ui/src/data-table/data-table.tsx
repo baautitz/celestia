@@ -439,6 +439,15 @@ export function DataTable<TRow>({
   const [printing, setPrinting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const nested = useContext(NestedTableContext);
+  // Clicar fora da tabela tira o destaque da linha.
+  useEffect(() => {
+    if (selectedId === null) return;
+    const clear = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setSelectedId(null);
+    };
+    document.addEventListener("pointerdown", clear);
+    return () => document.removeEventListener("pointerdown", clear);
+  }, [selectedId]);
   const containerRef = useRef<HTMLDivElement>(null);
   // O cabeçalho só gruda na página enquanto a tabela cabe na largura: larga demais, o contêiner rola na horizontal.
   const [fitsWidth, setFitsWidth] = useState(true);
@@ -1021,11 +1030,16 @@ export function DataTable<TRow>({
                             aria-selected={selected}
                             onClick={(e) => {
                               if ((e.target as Element).closest(INTERACTIVE_SELECTOR)) return;
+                              // Arrastou para selecionar texto (copiar): não é um clique na linha.
+                              if (window.getSelection()?.toString()) return;
                               setSelectedId(selected ? null : id);
+                              // Linha expansível: o clique em qualquer ponto dela também expande/recolhe.
+                              if (renderExpanded) toggleExpanded(id);
                             }}
                             className={cn(
                               // Sem transição: o fundo da linha e o das células fixas trocam juntos, na hora.
                               "group/row transition-none hover:bg-muted/30",
+                              renderExpanded && "cursor-pointer",
                               striped && "even:bg-muted/20",
                               SELECTED_ROW_CLASS,
                             )}
