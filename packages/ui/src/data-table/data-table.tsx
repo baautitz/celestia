@@ -1,5 +1,7 @@
 import React, {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -63,6 +65,8 @@ const isNumericFormat = (format?: DataTableFormat): format is TrendFormat =>
   NUMERIC_FORMATS.has(format);
 const isNumericColumn = (col: { format?: DataTableFormat }) =>
   isNumericFormat(col.format);
+const isCenteredColumn = (col: { format?: DataTableFormat; centered?: boolean }) =>
+  col.centered === true || col.format === "date";
 /** Colunas que não quebram linha na impressão; as demais quebram para a tabela encolher menos. */
 const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([
   ...NUMERIC_FORMATS,
@@ -98,6 +102,8 @@ export interface DataTableColumn<TRow> {
   value?: (row: TRow) => CellValue;
   /** Conteúdo customizado (badges etc.); tem precedência sobre `value`/`format` na célula. */
   render?: (row: TRow) => React.ReactNode;
+  /** Coluna de tags (badges de situação, perfil etc.) ou de datas: cabeçalho e células centralizados. `format: "date"` já centraliza. */
+  centered?: boolean;
   format?: DataTableFormat;
   sortable?: boolean;
   /** Direção do primeiro clique; o ciclo é primeira → oposta → padrão (sem ordenação). Padrão: "asc". */
@@ -164,7 +170,8 @@ export interface DataTableProps<TRow> {
   defaultExpanded?: boolean;
   /**
    * `page`: a tabela cresce com as linhas e quem rola é a página (sem rolagem vertical dentro da tabela).
-   * Bom para tabelas expansíveis, que senão viram uma rolagem dentro da outra. Padrão: `table`.
+   * Bom para tabelas expansíveis, que senão viram uma rolagem dentro da outra. O cabeçalho gruda abaixo da barra
+   * superior ao rolar a página, salvo quando a tabela não cabe na largura e rola na horizontal. Padrão: `table`.
    */
   scroll?: "table" | "page";
   actionsLabel?: string;
@@ -204,9 +211,23 @@ const EXPAND_KEY = "__expand";
 const FROZEN_HEAD_CLASS =
   "bg-[color-mix(in_oklab,var(--muted)_40%,var(--background))]";
 const FROZEN_CELL_CLASS =
-  "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--muted)_30%,var(--background))]";
+  "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--muted)_30%,var(--background))] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--primary)_15%,var(--background))]!";
 const FROZEN_STRIPED_CELL_CLASS =
   "group-even/row:bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))]";
+/** Linha clicada: destaque que vence o zebrado e o hover. */
+const SELECTED_ROW_CLASS = "data-[state=selected]:bg-primary/15!";
+/** Cliques nestes elementos são deles, não selecionam a linha. */
+const INTERACTIVE_SELECTOR =
+  "button, a, input, select, textarea, label, [role=button], [role=checkbox], [role=combobox], [role=menuitem]";
+/** Uma tabela dentro da linha expandida de outra: o cabeçalho dela não gruda, quem gruda é o da de fora. */
+const NestedTableContext = createContext(false);
+
+/**
+ * Cabeçalho grudado só com CSS. Com `scroll="page"` e a tabela cabendo na largura, o contêiner não rola
+ * e o cabeçalho gruda na rolagem da página, abaixo da barra superior (`--table-sticky-top`, definida em `AppMain`).
+ * Larga demais, o contêiner rola na horizontal e o cabeçalho deixa de grudar; com `scroll="table"` gruda dentro dele.
+ */
+const PAGE_STICKY_HEAD_CLASS = "top-(--table-sticky-top,0px)";
 
 /**
  * Linhas de 2px no fim do cabeçalho fixo e da última coluna fixa. Sombra interna em vez de borda:
@@ -326,6 +347,7 @@ function columnCellClassName<TRow>(
 ): string | undefined {
   return cn(
     isNumericColumn(col) && "text-right tabular-nums",
+    isCenteredColumn(col) && "text-center",
     col.nowrap && "whitespace-nowrap",
     typeof col.cellClassName === "function"
       ? col.cellClassName(row)
@@ -339,6 +361,7 @@ function totalsCellClassName<TRow>(
 ): string | undefined {
   return cn(
     isNumericColumn(col) && "text-right tabular-nums",
+    isCenteredColumn(col) && "text-center",
     col.nowrap && "whitespace-nowrap",
     typeof col.cellClassName === "string" && col.cellClassName,
   );
@@ -420,6 +443,76 @@ export function DataTable<TRow>({
   );
   const isExpanded = (id: string) => expandedIds.has(id) !== defaultExpanded;
   const [printing, setPrinting] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const nested = useContext(NestedTableContext);
+  // Clicar fora da tabela tira o destaque da linha.
+  useEffect(() => {
+    if (selectedId === null) return;
+    const clear = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setSelectedId(null);
+    };
+    document.addEventListener("pointerdown", clear);
+    return () => document.removeEventListener("pointerdown", clear);
+  }, [selectedId]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // O cabeçalho só gruda na página enquanto a tabela cabe na largura: larga demais, o contêiner rola na horizontal.
+  const [fitsWidth, setFitsWidth] = useState(true);
+  const pageScroll = scroll === "page" && fitsWidth;
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const table = container?.firstElementChild as HTMLElement | null;
+    if (scroll !== "page" || !container || !table || typeof ResizeObserver === "undefined") return;
+    const measure = () => setFitsWidth(table.offsetWidth <= container.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    observer.observe(table);
+    return () => observer.disconnect();
+  }, [scroll, isMobile]);
+
+  // Tabela larga com rolagem da página: o contêiner rola na horizontal e o `sticky` do cabeçalho real só enxergaria ele.
+  // Uma cópia do cabeçalho, fora do contêiner, gruda na página; cobre o real (margem negativa) e acompanha a rolagem
+  // lateral. Uma barra de rolagem grudada no rodapé da tela substitui a do contêiner, que fica no fim da tabela.
+  const headRef = useRef<HTMLTableSectionElement>(null);
+  const stickyHeadRef = useRef<HTMLDivElement>(null);
+  const scrollbarRef = useRef<HTMLDivElement>(null);
+  const [wideLayout, setWideLayout] = useState<{
+    tableWidth: number;
+    columnWidths: number[];
+    headHeight: number;
+  } | null>(null);
+  const isWide = scroll === "page" && !fitsWidth && !isMobile && !nested;
+  const wide = isWide ? wideLayout : null;
+  useLayoutEffect(() => {
+    const head = headRef.current;
+    const table = head?.parentElement;
+    if (!isWide || !head || !table || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const cells = Array.from(head.querySelectorAll<HTMLElement>("tr:last-child > th"));
+      setWideLayout({
+        tableWidth: table.offsetWidth,
+        columnWidths: cells.map((c) => c.getBoundingClientRect().width),
+        headHeight: head.offsetHeight,
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(table);
+    observer.observe(head);
+    return () => observer.disconnect();
+  }, [isWide, columns]);
+  const syncScroll = (e: React.UIEvent<HTMLElement>) => {
+    const left = e.currentTarget.scrollLeft;
+    for (const el of [containerRef.current, stickyHeadRef.current, scrollbarRef.current]) {
+      if (el && el !== e.currentTarget && el.scrollLeft !== left) el.scrollLeft = left;
+    }
+  };
+  useLayoutEffect(() => {
+    // Ao montar a cópia (ou trocar as larguras), ela parte da posição lateral atual da tabela.
+    const left = containerRef.current?.scrollLeft ?? 0;
+    if (stickyHeadRef.current) stickyHeadRef.current.scrollLeft = left;
+    if (scrollbarRef.current) scrollbarRef.current.scrollLeft = left;
+  }, [wide]);
   const trendTooltip = useTrendTooltipHandle();
   const endPrinting = useCallback(() => setPrinting(false), []);
   const headRefs = useRef(new Map<string, HTMLTableCellElement>());
@@ -494,6 +587,24 @@ export function DataTable<TRow>({
         onClick={() => toggleExpanded(id)}
       >
         <ChevronDown className={expanded ? "size-4" : "size-4 -rotate-90"} />
+      </Button>
+    );
+  };
+
+  // No celular: botão largo, entre os campos e o conteúdo que ele abre.
+  const mobileExpandButton = (row: TRow) => {
+    const id = getRowId(row);
+    const expanded = isExpanded(id);
+    return (
+      <Button
+        variant="outline"
+        className="w-full justify-between"
+        aria-expanded={expanded}
+        aria-label={expanded ? "Recolher linha" : "Expandir linha"}
+        onClick={() => toggleExpanded(id)}
+      >
+        {expanded ? "Ocultar detalhes" : "Ver detalhes"}
+        <ChevronDown className={expanded ? "size-4 rotate-180" : "size-4"} />
       </Button>
     );
   };
@@ -653,8 +764,95 @@ export function DataTable<TRow>({
     </Button>
   );
 
+  // `measure`: só as células do cabeçalho real medem as colunas fixas; a cópia grudada não.
+  const headerRows = (measure: boolean) => (
+    <>
+                  <GroupHeaderRow
+                    columns={columns}
+                    leading={renderExpanded ? 1 : 0}
+                    trailing={hasActions ? 1 : 0}
+                    frozenKeys={frozenKeys}
+                    frozenHead={(firstKey, lastKey) => ({
+                      style: frozenStyle(firstKey, true),
+                      className: cn(
+                        frozenClass(firstKey, true),
+                        lastKey === lastFrozenKey && FROZEN_EDGE_CLASS,
+                      ),
+                    })}
+                  />
+                  <TableRow className="bg-muted/40 border-b-0!">
+                    {renderExpanded && (
+                      <TableHead
+                        ref={measure ? setHeadRef(EXPAND_KEY) : undefined}
+                        style={frozenStyle(EXPAND_KEY, true)}
+                        className={cn(
+                          "w-12",
+                          frozenClass(EXPAND_KEY, true),
+                          HEADER_EDGE_CLASS,
+                        )}
+                      />
+                    )}
+                    {columns.map((col) => (
+                      <TableHead
+                        key={col.key}
+                        ref={measure ? setHeadRef(col.key) : undefined}
+                        style={frozenStyle(col.key, true)}
+                        className={cn(
+                          col.sortable && "cursor-pointer select-none",
+                          isNumericColumn(col) && "text-right",
+                          isCenteredColumn(col) && "text-center",
+                          boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                          frozenClass(col.key, true),
+                          headerEdgeClass(col.key),
+                        )}
+                        onClick={() => col.sortable && handleSort(col.key)}
+                        aria-sort={
+                          col.sortable && sortKey === col.key
+                            ? order === "asc"
+                              ? "ascending"
+                              : "descending"
+                            : undefined
+                        }
+                      >
+                        {col.sortable ? (
+                          <div
+                            className={cn(
+                              "flex items-center gap-1",
+                              isNumericColumn(col) && "justify-end",
+                              isCenteredColumn(col) && "justify-center",
+                            )}
+                          >
+                            <HeaderLabel col={col} />
+                            {sortKey === col.key ? (
+                              order === "asc" ? (
+                                <ArrowUp className="size-3" />
+                              ) : (
+                                <ArrowDown className="size-3" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="size-3 text-muted-foreground" />
+                            )}
+                          </div>
+                        ) : (
+                          <HeaderLabel col={col} />
+                        )}
+                      </TableHead>
+                    ))}
+                    {hasActions && (
+                      <TableHead
+                        className={cn(actionsHeadClassName, HEADER_EDGE_CLASS)}
+                      >
+                        {actionsLabel}
+                      </TableHead>
+                    )}
+                  </TableRow>
+    </>
+  );
+
+  // Dentro da linha expandida de outra tabela: sem a moldura do Card (borda, fundo e respiro), para não empilhar cards.
+  // `overflow-visible`: sem o respiro, o corte do Card esconderia a borda (`ring`, desenhada por fora) dos cards dos itens.
   return (
-    <Card className={className}>
+    <Card className={cn(scroll === "page" && "overflow-clip", nested && "overflow-visible py-0 ring-0 bg-transparent", className)}>
       {(heading || description || search || print) && (
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -697,7 +895,7 @@ export function DataTable<TRow>({
           )}
         </CardHeader>
       )}
-      <CardContent>
+      <CardContent className={nested ? "px-0" : undefined}>
         {isMobile ? (
           <div className="flex flex-col gap-3">
             {loading ? (
@@ -729,20 +927,14 @@ export function DataTable<TRow>({
                     value: mobileCell(c, row),
                     wide: c.mobileWide,
                   }))}
-                  actions={
-                    renderExpanded ? (
-                      <>
-                        {expandButton(row)}
-                        {rowActions?.(row)}
-                      </>
-                    ) : (
-                      rowActions?.(row)
-                    )
-                  }
+                  actions={rowActions?.(row)}
+                  expand={renderExpanded ? mobileExpandButton(row) : undefined}
                   details={
-                    renderExpanded && isExpanded(getRowId(row))
-                      ? renderExpanded(row)
-                      : undefined
+                    renderExpanded && isExpanded(getRowId(row)) ? (
+                      <NestedTableContext.Provider value={true}>
+                        {renderExpanded(row)}
+                      </NestedTableContext.Provider>
+                    ) : undefined
                   }
                 />
               ))
@@ -774,85 +966,46 @@ export function DataTable<TRow>({
         ) : (
           <>
             <div className={bordered ? "border border-border" : undefined}>
-              <Table containerClassName={scroll === "page" ? "max-h-none!" : undefined}>
-                <TableHeader>
-                  <GroupHeaderRow
-                    columns={columns}
-                    leading={renderExpanded ? 1 : 0}
-                    trailing={hasActions ? 1 : 0}
-                    frozenKeys={frozenKeys}
-                    frozenHead={(firstKey, lastKey) => ({
-                      style: frozenStyle(firstKey, true),
-                      className: cn(
-                        frozenClass(firstKey, true),
-                        lastKey === lastFrozenKey && FROZEN_EDGE_CLASS,
-                      ),
-                    })}
-                  />
-                  <TableRow className="bg-muted/40 border-b-0!">
-                    {renderExpanded && (
-                      <TableHead
-                        ref={setHeadRef(EXPAND_KEY)}
-                        style={frozenStyle(EXPAND_KEY, true)}
-                        className={cn(
-                          "w-12",
-                          frozenClass(EXPAND_KEY, true),
-                          HEADER_EDGE_CLASS,
-                        )}
-                      />
-                    )}
-                    {columns.map((col) => (
-                      <TableHead
-                        key={col.key}
-                        ref={setHeadRef(col.key)}
-                        style={frozenStyle(col.key, true)}
-                        className={cn(
-                          col.sortable && "cursor-pointer select-none",
-                          isNumericColumn(col) && "text-right",
-                          boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
-                          frozenClass(col.key, true),
-                          headerEdgeClass(col.key),
-                        )}
-                        onClick={() => col.sortable && handleSort(col.key)}
-                        aria-sort={
-                          col.sortable && sortKey === col.key
-                            ? order === "asc"
-                              ? "ascending"
-                              : "descending"
-                            : undefined
-                        }
-                      >
-                        {col.sortable ? (
-                          <div
-                            className={cn(
-                              "flex items-center gap-1",
-                              isNumericColumn(col) && "justify-end",
-                            )}
-                          >
-                            <HeaderLabel col={col} />
-                            {sortKey === col.key ? (
-                              order === "asc" ? (
-                                <ArrowUp className="size-3" />
-                              ) : (
-                                <ArrowDown className="size-3" />
-                              )
-                            ) : (
-                              <ArrowUpDown className="size-3 text-muted-foreground" />
-                            )}
-                          </div>
-                        ) : (
-                          <HeaderLabel col={col} />
-                        )}
-                      </TableHead>
-                    ))}
-                    {hasActions && (
-                      <TableHead
-                        className={cn(actionsHeadClassName, HEADER_EDGE_CLASS)}
-                      >
-                        {actionsLabel}
-                      </TableHead>
-                    )}
-                  </TableRow>
+              {wide && (
+                <div
+                  ref={stickyHeadRef}
+                  aria-hidden
+                  className="sticky top-(--table-sticky-top,0px) z-10 overflow-hidden bg-background"
+                >
+                  <table
+                    className="caption-bottom text-xs table-fixed"
+                    style={{ width: wide.tableWidth }}
+                  >
+                    <colgroup>
+                      {wide.columnWidths.map((w, idx) => (
+                        <col key={idx} style={{ width: w }} />
+                      ))}
+                    </colgroup>
+                    <TableHeader className="static">{headerRows(false)}</TableHeader>
+                  </table>
+                </div>
+              )}
+              <Table
+                containerRef={containerRef}
+                onContainerScroll={wide ? syncScroll : undefined}
+                containerStyle={wide ? { marginTop: -wide.headHeight } : undefined}
+                containerClassName={
+                  scroll === "page"
+                    ? cn(
+                        "max-h-none!",
+                        pageScroll && "overflow-visible!",
+                        wide && "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                      )
+                    : undefined
+                }
+              >
+                <TableHeader
+                  ref={headRef}
+                  className={
+                    nested && pageScroll ? "static" : pageScroll ? PAGE_STICKY_HEAD_CLASS : undefined
+                  }
+                >
+                  {headerRows(true)}
                 </TableHeader>
                 <TableBody>
                   {loading ? (
@@ -888,15 +1041,29 @@ export function DataTable<TRow>({
                     </TableRow>
                   ) : (
                     visible.map((row) => {
+                      const id = getRowId(row);
                       const expanded =
-                        renderExpanded !== undefined &&
-                        isExpanded(getRowId(row));
+                        renderExpanded !== undefined && isExpanded(id);
+                      const selected = selectedId === id;
                       return (
-                        <React.Fragment key={getRowId(row)}>
+                        <React.Fragment key={id}>
                           <TableRow
+                            data-state={selected ? "selected" : undefined}
+                            aria-selected={selected}
+                            onClick={(e) => {
+                              if ((e.target as Element).closest(INTERACTIVE_SELECTOR)) return;
+                              // Arrastou para selecionar texto (copiar): não é um clique na linha.
+                              if (window.getSelection()?.toString()) return;
+                              setSelectedId(selected ? null : id);
+                              // Linha expansível: o clique em qualquer ponto dela também expande/recolhe.
+                              if (renderExpanded) toggleExpanded(id);
+                            }}
                             className={cn(
-                              "group/row hover:bg-muted/30",
+                              // Sem transição: o fundo da linha e o das células fixas trocam juntos, na hora.
+                              "group/row transition-none hover:bg-muted/30",
+                              renderExpanded && "cursor-pointer",
                               striped && "even:bg-muted/20",
+                              SELECTED_ROW_CLASS,
                             )}
                           >
                             {renderExpanded && (
@@ -953,7 +1120,9 @@ export function DataTable<TRow>({
                                   columns.length + (hasActions ? 1 : 0) + 1
                                 }
                               >
-                                {renderExpanded(row)}
+                                <NestedTableContext.Provider value={true}>
+                                  {renderExpanded(row)}
+                                </NestedTableContext.Provider>
                               </TableCell>
                             </TableRow>
                           )}
@@ -1006,6 +1175,16 @@ export function DataTable<TRow>({
                   </TableFooter>
                 )}
               </Table>
+              {wide && (
+                <div
+                  ref={scrollbarRef}
+                  onScroll={syncScroll}
+                  aria-hidden
+                  className="sticky bottom-0 z-10 overflow-x-auto overflow-y-hidden bg-background"
+                >
+                  <div className="h-px" style={{ width: wide.tableWidth }} />
+                </div>
+              )}
             </div>
             <SharedTrendTooltip handle={trendTooltip} />
             {footer}
@@ -1055,6 +1234,7 @@ export function PrintDetailTable<TRow>({
               className={cn(
                 "px-1.5 py-0.5 font-medium text-left",
                 isNumericColumn(col) && "text-right",
+                isCenteredColumn(col) && "text-center",
               )}
             >
               {col.label}
@@ -1071,6 +1251,7 @@ export function PrintDetailTable<TRow>({
                 className={cn(
                   "px-1.5 py-0.5 whitespace-normal",
                   isNumericColumn(col) && "text-right",
+                  isCenteredColumn(col) && "text-center",
                 )}
               >
                 {formatValue(col.value?.(row), col.format)}
@@ -1228,6 +1409,7 @@ function PrintTable<TRow>({
                   "h-8",
                   wrapsInPrint(col) && "whitespace-normal",
                   isNumericColumn(col) && "text-right",
+                  isCenteredColumn(col) && "text-center",
                   boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
                   frozenEdge(col.key),
                 )}

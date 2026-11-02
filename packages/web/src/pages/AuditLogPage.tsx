@@ -27,6 +27,7 @@ const FILTER_FIELDS: { key: keyof AuditLogFilter; label: string; type?: "date" }
 const columns: DataTableColumn<AuditLogEntry>[] = [
   {
     key: "occurredAt",
+    centered: true,
     label: "Quando",
     value: (e) => formatDateTime(e.occurredAt),
     cellClassName: "text-xs text-muted-foreground",
@@ -49,6 +50,7 @@ const columns: DataTableColumn<AuditLogEntry>[] = [
   },
   {
     key: "plugin",
+    centered: true,
     label: "Plugin",
     value: (e) => e.plugin,
     render: (e) => <Badge variant="secondary">{e.plugin}</Badge>,

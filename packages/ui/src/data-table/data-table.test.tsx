@@ -598,3 +598,91 @@ describe("totalizador", () => {
     expect(screen.getByText("▲ 50,0% · 100")).toBeTruthy();
   });
 });
+
+describe("linha selecionada", () => {
+  const data: Row[] = [
+    { id: "1", name: "Alfa" },
+    { id: "2", name: "Beta" },
+  ];
+
+  it("destaca a linha clicada, troca ao clicar em outra e desmarca ao clicar de novo", async () => {
+    setViewport(1280);
+    render(<DataTable columns={columns} rows={data} getRowId={(r) => r.id} />);
+    const alfa = screen.getByText("Alfa").closest("tr")!;
+    const beta = screen.getByText("Beta").closest("tr")!;
+
+    await userEvent.click(alfa);
+    expect(alfa.getAttribute("aria-selected")).toBe("true");
+
+    await userEvent.click(beta);
+    expect(alfa.getAttribute("aria-selected")).toBe("false");
+    expect(beta.getAttribute("aria-selected")).toBe("true");
+
+    await userEvent.click(beta);
+    expect(beta.getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("tira o destaque ao clicar fora da tabela", async () => {
+    setViewport(1280);
+    render(
+      <>
+        <p>Fora</p>
+        <DataTable columns={columns} rows={data} getRowId={(r) => r.id} />
+      </>,
+    );
+    const alfa = screen.getByText("Alfa").closest("tr")!;
+    await userEvent.click(alfa);
+    expect(alfa.getAttribute("aria-selected")).toBe("true");
+    await userEvent.click(screen.getByText("Fora"));
+    expect(alfa.getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("não seleciona a linha ao clicar numa ação dela", async () => {
+    setViewport(1280);
+    render(
+      <DataTable
+        columns={columns}
+        rows={data}
+        getRowId={(r) => r.id}
+        rowActions={(r) => <button type="button">Editar {r.name}</button>}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Editar Alfa" }));
+    expect(screen.getByText("Alfa").closest("tr")!.getAttribute("aria-selected")).toBe("false");
+  });
+});
+
+describe("linha expansível no desktop", () => {
+  it("expande e recolhe ao clicar em qualquer ponto da linha", async () => {
+    setViewport(1280);
+    renderTable();
+    const cell = await screen.findByText("Alfa");
+    await userEvent.click(cell);
+    expect(screen.getByText("Detalhe de Alfa")).toBeTruthy();
+    await userEvent.click(cell);
+    expect(screen.queryByText("Detalhe de Alfa")).toBeNull();
+  });
+});
+
+describe("tabela aninhada no celular", () => {
+  it("a tabela da linha expandida perde a moldura própria, mas cada item continua um card", async () => {
+    setViewport(500);
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        getRowId={(r) => r.id}
+        defaultExpanded
+        renderExpanded={() => (
+          <DataTable columns={columns} rows={[{ id: "x", name: "Interno" }]} getRowId={(r) => r.id} />
+        )}
+      />,
+    );
+    const interno = await screen.findByText("Interno");
+    const item = interno.closest("[data-slot=card]")!;
+    expect(item.className).not.toContain("ring-0");
+    const tabela = item.parentElement!.closest("[data-slot=card]")!;
+    expect(tabela.className).toContain("ring-0");
+    expect(tabela.className).toContain("overflow-visible");
+  });
+});

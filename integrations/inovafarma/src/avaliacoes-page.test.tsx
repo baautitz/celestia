@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
+import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { AvaliacoesPage } from "./avaliacoes-page";
 
 const apiFetch = vi.hoisted(() => vi.fn());
@@ -39,10 +40,16 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** Destino das ações do cabeçalho, que no app é o shell. */
+const HeaderSlot = () => <>{useHeaderActions().actions}</>;
+
 const renderizar = () =>
   render(
     <UiProvider>
-      <AvaliacoesPage />
+      <HeaderActionsProvider>
+        <HeaderSlot />
+        <AvaliacoesPage />
+      </HeaderActionsProvider>
     </UiProvider>,
   );
 

@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, MoreHorizontal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
-import { Stack, Text } from "@platform/ui/components/layout";
+import { Show, Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
+import { HeaderActions } from "@platform/ui/context/header-actions";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import { formatDate, formatNumber } from "@platform/ui/lib/format";
+import { formatDate } from "@platform/ui/lib/format";
 import { LancamentoWindow, type Lancamento, type LojaOpcao } from "./pre-vencido-window";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
@@ -163,18 +165,33 @@ function MeusLancamentos({ contexto }: { contexto: Contexto }) {
     { key: "codigoBarra", label: "Código de barras", value: (l) => l.codigoBarra ?? "", searchable: true },
     { key: "loja", label: "Loja", value: (l) => nomeLoja(l.codigoLoja), sortable: true },
     { key: "quantidade", label: "Quantidade", value: (l) => l.quantidade, format: "number", sortable: true },
-    { key: "validade", label: "Validade", value: (l) => l.validade, render: (l) => validadeLabel(l.validade), sortable: true },
+    { key: "validade", centered: true, label: "Validade", value: (l) => l.validade, render: (l) => validadeLabel(l.validade), sortable: true },
   ];
 
   return (
     <Stack gap="section">
-      <Stack direction="row" align="end" justify="between" gap="section" wrap>
-        <SeletorPeriodo periodos={contexto.periodos} valor={periodoId} onChange={setPeriodoId} />
-        <Button disabled={!aberto} onClick={() => void abrir()}>
-          <Plus />
-          Novo lançamento
-        </Button>
-      </Stack>
+      <HeaderActions>
+        <Show on="lgUp">
+          <Button disabled={!aberto} onClick={() => void abrir()}>
+            <Plus />
+            Novo lançamento
+          </Button>
+        </Show>
+        <Show on="belowLg">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="Mais ações" />}>
+              <MoreHorizontal />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={!aberto} onClick={() => void abrir()}>
+                <Plus />
+                Novo lançamento
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Show>
+      </HeaderActions>
+      <SeletorPeriodo periodos={contexto.periodos} valor={periodoId} onChange={setPeriodoId} />
       {!aberto && (
         <Alert>
           <AlertTitle>Período fechado</AlertTitle>
@@ -182,6 +199,7 @@ function MeusLancamentos({ contexto }: { contexto: Contexto }) {
         </Alert>
       )}
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={lancamentos}
         getRowId={(l) => l.id}
@@ -235,14 +253,10 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
       { key: "vendida", label: "Qtde vendida (todas as Lojas)", value: (l) => l.quantidadeVendida, format: "number", sortable: true },
       {
         key: "situacao",
+        centered: true,
         label: "Situação",
         value: (l) => l.produtosConformes / l.produtos,
-        render: (l) => (
-          <Stack direction="row" align="center" gap="field">
-            <SituacaoBadge situacao={l.situacao} />
-            <Text>{`${l.produtosConformes} de ${l.produtos} conformes`}</Text>
-          </Stack>
-        ),
+        render: (l) => <SituacaoBadge situacao={l.situacao} />,
         sortable: true,
       },
     ],
@@ -271,6 +285,7 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
         </Stack>
       </Stack>
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={linhas}
         getRowId={(l) => String(l.codigoColaborador)}
@@ -281,12 +296,13 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
         search={{ placeholder: "Buscar Colaborador" }}
         renderExpanded={(l) => (
           <DataTable
+            scroll="page"
             columns={[
               { key: "produto", label: "Produto", value: (d: DetalheConferencia) => d.nomeProduto },
-              { key: "validades", label: "Validade", value: (d: DetalheConferencia) => d.validades.map(validadeLabel).join(", ") },
-              { key: "lancada", label: "Lançado", value: (d: DetalheConferencia) => d.quantidadeLancada, render: (d: DetalheConferencia) => formatNumber(d.quantidadeLancada) },
-              { key: "vendida", label: "Vendido", value: (d: DetalheConferencia) => d.quantidadeVendida, render: (d: DetalheConferencia) => formatNumber(d.quantidadeVendida) },
-              { key: "situacao", label: "Situação", render: (d: DetalheConferencia) => <SituacaoBadge situacao={d.situacao} /> },
+              { key: "validades", centered: true, label: "Validade", value: (d: DetalheConferencia) => d.validades.map(validadeLabel).join(", ") },
+              { key: "lancada", label: "Lançado", value: (d: DetalheConferencia) => d.quantidadeLancada, format: "number" },
+              { key: "vendida", label: "Vendido", value: (d: DetalheConferencia) => d.quantidadeVendida, format: "number" },
+              { key: "situacao", centered: true, label: "Situação", render: (d: DetalheConferencia) => <SituacaoBadge situacao={d.situacao} /> },
             ]}
             rows={l.detalhe}
             getRowId={(d) => d.produtoId}

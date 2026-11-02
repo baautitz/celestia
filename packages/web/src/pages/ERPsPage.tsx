@@ -292,6 +292,7 @@ export const ERPsPage: React.FC = () => {
     },
     {
       key: "driver",
+      centered: true,
       label: "ERP Driver",
       value: (e) => driverLabel(e.driver),
       render: (e) => <Badge variant="secondary">{driverLabel(e.driver)}</Badge>,
@@ -299,6 +300,7 @@ export const ERPsPage: React.FC = () => {
     },
     {
       key: "updatedAt",
+      centered: true,
       label: "Atualizado em",
       value: (e) => formatDate(e.updatedAt),
       cellClassName: "text-xs text-muted-foreground",
@@ -360,6 +362,7 @@ export const ERPsPage: React.FC = () => {
       <PageHeader title="ERPs" description="Cadastre os ERPs de onde os módulos leem dados. As consultas aos ERPs são somente leitura." />
 
       <DataTable
+        scroll="page"
         columns={columns}
         rows={erps}
         getRowId={(e) => e.id}

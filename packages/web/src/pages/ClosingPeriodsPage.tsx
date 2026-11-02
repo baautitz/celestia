@@ -38,6 +38,7 @@ const columns: DataTableColumn<ClosingPeriodRecord>[] = [
   },
   {
     key: "startDate",
+    centered: true,
     label: "Data Inicial",
     value: (p) => formatDay(p.startDate),
     mobileRole: "secondary",
@@ -45,12 +46,14 @@ const columns: DataTableColumn<ClosingPeriodRecord>[] = [
   },
   {
     key: "endDate",
+    centered: true,
     label: "Data Final",
     value: (p) => formatDay(p.endDate),
     skeletonClassName: "h-4 w-24",
   },
   {
     key: "status",
+    centered: true,
     label: "Situação",
     value: (p) => (p.status === "open" ? "Aberto" : "Fechado"),
     render: (p) => (
@@ -380,6 +383,7 @@ export const ClosingPeriodsPage: React.FC = () => {
       </HeaderActions>
 
       <DataTable
+        scroll="page"
         columns={columns}
         rows={periods}
         getRowId={(p) => p.id}

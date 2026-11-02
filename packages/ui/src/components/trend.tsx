@@ -62,15 +62,17 @@ interface TrendDetailProps {
   title: string
 }
 
+type TrendDetailSide = React.ComponentProps<typeof TooltipContent>["side"]
+
 /**
  * Detalhe no estilo do `ChartTooltipContent`, sem a seta escura do primitivo. Não captura o mouse,
  * para ir de uma célula a outra sem o tooltip ficar no caminho.
  */
-function TrendDetail({ trend, title }: TrendDetailProps) {
+function TrendDetail({ trend, title, side }: TrendDetailProps & { side?: TrendDetailSide }) {
   const described = describeTrend(trend)
   if (!described) return null
   return (
-    <TooltipContent className="pointer-events-none grid min-w-40 items-start gap-1.5 border border-border/50 bg-background text-foreground shadow-xl **:data-[side]:hidden">
+    <TooltipContent side={side} className="pointer-events-none grid min-w-40 items-start gap-1.5 border border-border/50 bg-background text-foreground shadow-xl **:data-[side]:hidden">
       <span className="font-medium">{title}</span>
       <span className="flex justify-between gap-4">
         <span className="text-muted-foreground">Atual</span>
@@ -104,11 +106,14 @@ function useTrendTooltipHandle(): TrendTooltipHandle {
   return handle
 }
 
-/** Tooltip compartilhado pelos `TrendTooltipTrigger` do mesmo `handle`. */
+/**
+ * Tooltip compartilhado pelos `TrendTooltipTrigger` do mesmo `handle` (células de tabela). Abre para baixo:
+ * para cima, cobriria o cabeçalho grudado da tabela.
+ */
 function SharedTrendTooltip({ handle }: { handle: TrendTooltipHandle }) {
   return (
     <TooltipPrimitive.Root handle={handle} disableHoverablePopup>
-      {({ payload }) => payload && <TrendDetail {...payload} />}
+      {({ payload }) => payload && <TrendDetail {...payload} side="bottom" />}
     </TooltipPrimitive.Root>
   )
 }

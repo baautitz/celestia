@@ -261,6 +261,7 @@ export const IAMUsersPage: React.FC = () => {
           },
           {
             key: "role",
+            centered: true,
             label: "Perfil",
             value: (u) => getRoleName(u.roleId),
             render: (u) => <Badge variant="secondary">{getRoleName(u.roleId)}</Badge>,
@@ -268,6 +269,7 @@ export const IAMUsersPage: React.FC = () => {
           },
           {
             key: "access",
+            centered: true,
             label: "Acesso",
             value: (u) => (u.allowWithoutCertificate ? "Sem certificado" : "Com certificado"),
             render: (u) => (
@@ -279,6 +281,7 @@ export const IAMUsersPage: React.FC = () => {
           },
           {
             key: "status",
+            centered: true,
             label: "Status",
             value: (u) => u.status,
             render: (u) =>

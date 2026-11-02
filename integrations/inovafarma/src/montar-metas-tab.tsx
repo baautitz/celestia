@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListChecks, Pencil, Plus, Save, Target, Trash2 } from "lucide-react";
+import { ListChecks, Pencil, Plus, Save, Target, Trash2, MoreHorizontal } from "lucide-react";
 import {
   Alert,
   AlertDescription,
@@ -7,8 +7,9 @@ import {
 } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
-import { Stack, Text } from "@platform/ui/components/layout";
+import { Show, Stack, Text } from "@platform/ui/components/layout";
 import {
   Select,
   SelectContent,
@@ -105,6 +106,7 @@ const colunasMetas: DataTableColumn<MetaVista>[] = [
   },
   {
     key: "pendentes",
+    centered: true,
     label: "Pendentes",
     value: (m) => m.pendentes,
     render: (m) =>
@@ -282,6 +284,7 @@ function SalvarAlteracoesWindow({ alteracoes }: { alteracoes: Alteracao[] }) {
   return (
     <>
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={alteracoes}
         getRowId={(a) => `${a.meta.id}-${a.codigoColaborador}`}
@@ -696,32 +699,54 @@ export function MontarMetas({
   return (
     <Stack gap="section">
       <HeaderActions>
-        <Button
-          variant="outline"
-          disabled={alteracoes.length === 0}
-          onClick={() => setEdicoes({})}
-        >
-          Descartar
-        </Button>
-        <Button
-          variant="outline"
-          disabled={alteracoes.length === 0}
-          onClick={() => void salvarAlteracoes()}
-        >
-          <Save />
-          Salvar alterações{alteracoes.length ? ` (${alteracoes.length})` : ""}
-        </Button>
-        <Button
-          disabled={
-            !montagem ||
-            montagem.somenteLeitura ||
-            !montagem.tiposDisponiveis?.length
-          }
-          onClick={() => void adicionar()}
-        >
-          <Plus />
-          Adicionar Meta
-        </Button>
+        <Show on="lgUp">
+          <Button
+            variant="outline"
+            disabled={alteracoes.length === 0}
+            onClick={() => setEdicoes({})}
+          >
+            Descartar
+          </Button>
+          <Button
+            variant="outline"
+            disabled={alteracoes.length === 0}
+            onClick={() => void salvarAlteracoes()}
+          >
+            <Save />
+            Salvar alterações{alteracoes.length ? ` (${alteracoes.length})` : ""}
+          </Button>
+          <Button
+            disabled={
+              !montagem ||
+              montagem.somenteLeitura ||
+              !montagem.tiposDisponiveis?.length
+            }
+            onClick={() => void adicionar()}
+          >
+            <Plus />
+            Adicionar Meta
+          </Button>
+        </Show>
+        <Show on="belowLg">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="Mais ações" />}>
+              <MoreHorizontal />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={alteracoes.length === 0} onClick={() => setEdicoes({})}>
+                Descartar
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={alteracoes.length === 0} onClick={() => void salvarAlteracoes()}>
+                <Save />
+                Salvar alterações{alteracoes.length ? ` (${alteracoes.length})` : ""}
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!montagem || montagem.somenteLeitura || !montagem.tiposDisponiveis?.length} onClick={() => void adicionar()}>
+                <Plus />
+                Adicionar Meta
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Show>
       </HeaderActions>
       <Stack direction="row" align="end" gap="section" wrap>
         <Stack gap="field">

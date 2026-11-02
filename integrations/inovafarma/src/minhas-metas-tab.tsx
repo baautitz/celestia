@@ -29,6 +29,7 @@ const colunas: DataTableColumn<MinhaMeta>[] = [
   { key: "resultado", label: "Resultado", value: resultado },
   {
     key: "situacao",
+    centered: true,
     label: "Situação",
     value: (m) => (m.atingida === null ? "" : m.atingida ? "Atingida" : "Não atingida"),
     render: (m) => (m.atingida === null ? null : <Badge variant={m.atingida ? "default" : "outline"}>{m.atingida ? "Atingida" : "Não atingida"}</Badge>),
@@ -93,6 +94,7 @@ export function MinhasMetas({ periodos }: { periodos: PeriodoMetas[] }) {
         </Select>
       </Stack>
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={dados?.metas ?? []}
         getRowId={(m) => m.metaId}

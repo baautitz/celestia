@@ -7,6 +7,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Um só tamanho de texto no sistema todo: o `text-xs` (padrão das telas) fica do tamanho do texto do celular (`text-sm`, 14px). */
+@theme {
+    --text-xs: 0.875rem;
+    --text-xs--line-height: calc(1.25 / 0.875);
+}
+
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: 'Inter Variable', sans-serif;

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
+import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { PreVencidosPage } from "./pre-vencidos-page";
 
 const apiFetch = vi.hoisted(() => vi.fn());
@@ -34,11 +35,17 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** Destino das ações do cabeçalho, que no app é o shell. */
+const HeaderSlot = () => <>{useHeaderActions().actions}</>;
+
 describe("lançar na tela", () => {
   it("depois de lançar, a tabela mostra o lançamento sem recarregar a página", async () => {
     render(
       <UiProvider>
-        <PreVencidosPage />
+        <HeaderActionsProvider>
+          <HeaderSlot />
+          <PreVencidosPage />
+        </HeaderActionsProvider>
       </UiProvider>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Novo lançamento" }));
