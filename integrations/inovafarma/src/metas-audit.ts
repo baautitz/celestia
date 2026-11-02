@@ -10,6 +10,7 @@ export const METAS_ACTIONS = {
   definirAlvo: "meta_alvo_define",
   lista: "meta_lista_update",
   excluir: "meta_delete",
+  premio: "meta_premio_update",
 } as const;
 
 /** Tudo em texto (Tipo, Período, Alvos): a entrada continua legível se o Tipo de Meta ou o Colaborador mudar. */
@@ -27,6 +28,8 @@ const AtributosParticipante = Base.extend({
 const AtributosDefinicao = Base.extend({ rotulo: z.string(), alvo: z.string(), participantes: z.array(z.string()) });
 const AtributosLista = Base.extend({ produtos: z.array(z.string()), minimo: z.string(), ajustes: z.number().int() });
 
+const AtributosPremio = Base.extend({ colaborador: z.string(), premio: z.string(), anterior: z.string() });
+export type AtributosPremio = z.infer<typeof AtributosPremio>;
 export type AtributosCriacao = z.infer<typeof AtributosCriacao>;
 export type AtributosCopia = z.infer<typeof AtributosCopia>;
 export type AtributosParticipante = z.infer<typeof AtributosParticipante>;
@@ -49,6 +52,12 @@ export function declareMetasAudit(audit: AuditService): void {
     schema: AtributosCriacao,
     action: METAS_ACTIONS.criar,
     summary: (a) => `Adicionou a Meta "${a.tipo}" ao período "${a.periodo}" com ${plural(a.participantes, "Participante")}.`,
+  });
+  audit.declareAction({
+    ...base,
+    schema: AtributosPremio,
+    action: METAS_ACTIONS.premio,
+    summary: (a) => `Alterou o Prêmio de ${a.colaborador} ${daMeta(a)} de "${a.anterior}" para "${a.premio}".`,
   });
   audit.declareAction({
     ...base,

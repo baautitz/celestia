@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListChecks, Plus, Save, Target, Trash2 } from "lucide-react";
+import { ListChecks, Pencil, Plus, Save, Target, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
@@ -16,6 +16,8 @@ import { AlvoInput, rotuloAlvo } from "./alvo-input";
 import { DefinirAlvoWindow } from "./alvo-padrao-window";
 import { formatarValor, indicadorPorId, type IndicadorId } from "./indicadores";
 import { ListaProdutosWindow } from "./lista-produtos-window";
+import { regraDoParticipante } from "./apuracao";
+import { PremioParticipanteWindow, resumoPremio } from "./premio-participante-window";
 import type { Meta } from "./metas-store";
 import type { TipoMetaComPremio } from "./tipo-meta-window";
 
@@ -269,13 +271,28 @@ function MetaDoPeriodo({
   somenteLeitura,
   edicoes,
   editar,
+  atualizar,
 }: {
   meta: MetaVista;
   colaboradores: Colaborador[];
   somenteLeitura: boolean;
   edicoes: Record<number, Edicao> | undefined;
   editar: (codigo: number, edicao: Edicao) => void;
+  atualizar: (meta: MetaVista) => void;
 }) {
+  const { windows } = useUi();
+  const temPremio = meta.tipo.regra.tipo !== "saldo";
+  const alterarPremio = async (c: Colaborador) => {
+    const participante = meta.participantes.find((p) => p.codigoColaborador === c.codigoColaborador);
+    if (!participante) return;
+    const r = await windows.open<MetaVista>({
+      surface: "dialog",
+      title: "Prêmio do Participante",
+      description: `${c.nome} · Meta "${meta.tipo.nome}". Começa com o Prêmio do Tipo de Meta.`,
+      content: () => <PremioParticipanteWindow meta={meta} participante={participante} />,
+    });
+    if (r.status === "confirmed") atualizar(r.value);
+  };
   const indicador = indicadorPorId(meta.tipo.indicador);
   const avaliacoes = meta.tipo.indicador === "avaliacoes";
   const estado = (c: Colaborador) => participacao(meta, edicoes, c.codigoColaborador);
@@ -320,7 +337,44 @@ function MetaDoPeriodo({
       },
     });
 
-  return <DataTable columns={colunas} rows={linhas} getRowId={(c) => String(c.codigoColaborador)} title="Participantes" emptyMessage="Nenhum Colaborador nesta Loja." search={{ placeholder: "Buscar Colaborador" }} />;
+  if (temPremio)
+    colunas.push({
+      key: "premio",
+      label: "Prêmio",
+      value: (c) => {
+        const p = meta.participantes.find((x) => x.codigoColaborador === c.codigoColaborador);
+        return p ? resumoPremio(regraDoParticipante(meta.tipo.regra, p)) : "";
+      },
+      render: (c) => {
+        const p = meta.participantes.find((x) => x.codigoColaborador === c.codigoColaborador);
+        if (!p) return null;
+        const proprio = Boolean(p.premio && p.premio.tipo === meta.tipo.regra.tipo);
+        return (
+          <Stack direction="row" gap="tight" align="center">
+            {resumoPremio(regraDoParticipante(meta.tipo.regra, p))}
+            {proprio && <Badge variant="secondary">Próprio</Badge>}
+          </Stack>
+        );
+      },
+    });
+
+  return (
+    <DataTable
+      columns={colunas}
+      rows={linhas}
+      getRowId={(c) => String(c.codigoColaborador)}
+      title="Participantes"
+      emptyMessage="Nenhum Colaborador nesta Loja."
+      search={{ placeholder: "Buscar Colaborador" }}
+      rowActions={(c) =>
+        !somenteLeitura && temPremio && salvo(c.codigoColaborador) ? (
+          <Button size="icon" variant="ghost" aria-label={`Alterar o Prêmio de ${c.nome}`} onClick={() => void alterarPremio(c)}>
+            <Pencil />
+          </Button>
+        ) : null
+      }
+    />
+  );
 }
 
 /** Aba Montar Metas: as Metas de cada Período, com Participantes, Alvos e Lista de Produtos. */
@@ -360,6 +414,8 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
     });
     if (r.status === "confirmed") void carregar();
   };
+
+  const atualizar = (meta: MetaVista) => setMontagem((m) => m && { ...m, metas: m.metas.map((x) => (x.id === meta.id ? meta : x)) });
 
   /** Guarda a edição; voltar ao que está salvo desfaz a pendência. */
   const editar = (meta: MetaVista, codigo: number, edicao: Edicao) =>
@@ -480,6 +536,7 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
               somenteLeitura={montagem.somenteLeitura}
               edicoes={edicoes[m.id]}
               editar={(codigo, edicao) => editar(m, codigo, edicao)}
+              atualizar={atualizar}
             />
           )
         }

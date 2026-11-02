@@ -11,7 +11,8 @@ import { alvoInicial, novaMeta, pendentes, usaAlvo, type ColaboradorAtivo } from
 import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { BUSCA_SQL, MIN_BUSCA, type LinhaBusca, type PeriodsService } from "./pre-vencidos-routes.js";
-import { descreverPremio, type TipoMeta } from "./tipos-meta.js";
+import { descreverPremio, RegraPremio, type TipoMeta } from "./tipos-meta.js";
+import { regraDoParticipante } from "./apuracao.js";
 import type { ErpQueryClient } from "./server.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
 import type { AuditService } from "./vinculo-audit.js";
@@ -40,6 +41,7 @@ const SEM_ALVO = "Esta Meta não tem Alvo por Participante.";
 const SO_LISTA = "Só a Meta de Lista de Produtos tem produtos.";
 
 const Version = z.number().int().min(1);
+const PremioParticipante = z.object({ version: Version, premio: RegraPremio.nullable() });
 const Alvo = z.number({ invalid_type_error: "Informe o Alvo." }).positive("O Alvo deve ser maior que zero.").max(1e12);
 const Nova = z.object({ periodoId: z.string().min(1), tipoId: z.string().min(1) });
 const Participacao = z.object({ version: Version, participa: z.boolean(), alvo: Alvo.nullable().optional() });
@@ -241,6 +243,34 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       rotulo: rotuloAlvo(tipo),
       alvo: formatarValor(indicadorPorId(tipo.indicador), parsed.data.alvo),
       participantes: marcados.map((p) => p.nome),
+    });
+    return c.json(comTipo(atualizada, tipo));
+  });
+
+  // Prêmio próprio do Participante, no tipo de regra do Tipo de Meta; null volta ao Prêmio do Tipo de Meta.
+  routes.put("/metas/:id/participantes/:codigo/premio", auth, async (c: AuthContext) => {
+    const alteracao = await alteravel(c);
+    if ("recusa" in alteracao) return alteracao.recusa;
+    const { meta, tipo, periodo } = alteracao;
+    const parsed = PremioParticipante.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    const { version, premio } = parsed.data;
+    if (tipo.regra.tipo === "saldo") return c.json({ error: "Na Meta de Avaliações o Prêmio é o Saldo." }, 400);
+    if (premio && premio.tipo !== tipo.regra.tipo) return c.json({ error: "O Prêmio do Participante segue o tipo de regra do Tipo de Meta." }, 400);
+    if (meta.version !== version) return c.json(META_DESATUALIZADA, 409);
+    const codigo = Number(c.req.param("codigo"));
+    const atual = meta.participantes.find((p) => p.codigoColaborador === codigo);
+    if (!atual) return c.json({ error: NAO_PARTICIPANTE }, 400);
+    const descrever = (regra: RegraPremio) => descreverPremio({ ...tipo, regra });
+    if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
+    const atualizada = await gravar(meta, { participantes: meta.participantes.map((p) => (p === atual ? { ...p, premio } : p)) }, version);
+    if (!atualizada) return c.json(META_DESATUALIZADA, 409);
+    await registrar(c, METAS_ACTIONS.premio, atualizada, {
+      tipo: tipo.nome,
+      periodo: periodo.name,
+      colaborador: atual.nome,
+      anterior: descrever(regraDoParticipante(tipo.regra, atual)),
+      premio: descrever(premio ?? tipo.regra),
     });
     return c.json(comTipo(atualizada, tipo));
   });

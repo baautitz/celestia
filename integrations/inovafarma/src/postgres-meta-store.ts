@@ -8,7 +8,7 @@ type ParticipanteRow = typeof metasParticipantes.$inferSelect;
 
 const meta = (row: MetaRow, participantes: ParticipanteRow[]): Meta => ({
   ...row,
-  participantes: ordenarParticipantes(participantes.filter((p) => p.metaId === row.id).map(({ codigoColaborador, nome, alvo }) => ({ codigoColaborador, nome, alvo }))),
+  participantes: ordenarParticipantes(participantes.filter((p) => p.metaId === row.id).map(({ codigoColaborador, nome, alvo, premio }) => ({ codigoColaborador, nome, alvo, ...(premio ? { premio } : {}) }))),
   criadoEm: row.criadoEm.toISOString(),
   atualizadoEm: row.atualizadoEm.toISOString(),
 });
@@ -36,8 +36,8 @@ export class PostgresMetaStore implements MetaStore {
     return this.db.transaction(async (tx) => {
       const [row] = await tx.insert(metas).values({ id: novoIdMeta(), periodoId: nova.periodoId, tipoId: nova.tipoId, excluidos: nova.excluidos, lista: nova.lista }).onConflictDoNothing().returning();
       if (!row) return null;
-      if (nova.participantes.length) await tx.insert(metasParticipantes).values(nova.participantes.map((p) => ({ ...p, metaId: row.id })));
-      return meta(row, nova.participantes.map((p) => ({ ...p, metaId: row.id })));
+      if (nova.participantes.length) await tx.insert(metasParticipantes).values(nova.participantes.map((p) => ({ ...p, premio: p.premio ?? null, metaId: row.id })));
+      return meta(row, nova.participantes.map((p) => ({ ...p, premio: p.premio ?? null, metaId: row.id })));
     });
   }
 
@@ -84,7 +84,7 @@ export class PostgresMetaStore implements MetaStore {
         .returning();
       if (!row) return null;
       await tx.delete(metasParticipantes).where(eq(metasParticipantes.metaId, id));
-      if (dados.participantes.length) await tx.insert(metasParticipantes).values(dados.participantes.map((p) => ({ ...p, metaId: id })));
+      if (dados.participantes.length) await tx.insert(metasParticipantes).values(dados.participantes.map((p) => ({ ...p, premio: p.premio ?? null, metaId: id })));
       return row;
     });
     return atualizada ? this.meta(id) : null;

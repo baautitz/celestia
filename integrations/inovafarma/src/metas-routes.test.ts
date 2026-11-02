@@ -127,6 +127,22 @@ describe("Montar Metas", () => {
     expect(log.at(-1)).toBe('Removeu a Meta "CMV" do período "Abril", que tinha 2 Participantes.');
   });
 
+  it("grava o Prêmio próprio do Participante no tipo de regra do Tipo de Meta e volta ao do Tipo", async () => {
+    const { req, tipos, log } = await boot();
+    const tipo = await tipos.criar(cmv);
+    const criada = (await (await req("gil", "POST", "/metas", { periodoId: "abril", tipoId: tipo.id })).json()) as Meta;
+    const url = `/metas/${criada.id}/participantes/1/premio`;
+    expect((await req("gil", "PUT", url, { version: criada.version, premio: { tipo: "fixo", valorCentavos: 15000 } })).status).toBe(400);
+    const proprio = { tipo: "faixas", faixas: [{ atingimento: 100, valorCentavos: 15000 }] };
+    const res = await req("gil", "PUT", url, { version: criada.version, premio: proprio });
+    expect(res.status).toBe(200);
+    const salva = (await res.json()) as Meta;
+    expect(salva.participantes.find((p) => p.codigoColaborador === 1)?.premio).toEqual(proprio);
+    expect(log.at(-1)).toMatch(/^Alterou o Prêmio de ANA da Meta "CMV"/);
+    const volta = (await (await req("gil", "PUT", url, { version: salva.version, premio: null })).json()) as Meta;
+    expect(volta.participantes.find((p) => p.codigoColaborador === 1)?.premio).toBeNull();
+  });
+
   it("exige a Permission e só altera Metas de Período aberto", async () => {
     const { req, tipos } = await boot();
     const tipo = await tipos.criar(cmv);

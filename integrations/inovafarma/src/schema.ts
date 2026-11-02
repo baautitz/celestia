@@ -154,6 +154,8 @@ export const metasParticipantes = inovafarmaSchema.table(
     nome: text("nome").notNull(),
     /** Na unidade do Indicador do Tipo de Meta (R$ em centavos); null: pendente. */
     alvo: doublePrecision("alvo"),
+    /** Prêmio próprio do Participante, no tipo de regra do Tipo de Meta; null: o do Tipo de Meta. */
+    premio: jsonb("premio").$type<RegraPremio>(),
   },
   (t) => [primaryKey({ columns: [t.metaId, t.codigoColaborador] })],
 );

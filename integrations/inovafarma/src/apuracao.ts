@@ -59,6 +59,10 @@ function premio(regra: RegraPremio, atingimento: number | null, atingida: boolea
 }
 
 /** Realizado, Atingimento e Prêmio de um Participante numa Meta, com o resultado em palavras. */
+/** O Prêmio próprio do Participante vale enquanto for do mesmo tipo de regra do Tipo de Meta; senão, vale o do Tipo. */
+export const regraDoParticipante = (regra: RegraPremio, participante: Pick<ParticipanteMeta, "premio">): RegraPremio =>
+  participante.premio && participante.premio.tipo === regra.tipo ? participante.premio : regra;
+
 export function apurarParticipante(tipo: TipoApurado, lista: ListaProdutos | null, participante: ParticipanteMeta, dados: DadosColaborador): ResultadoParticipante {
   const indicador = indicadorPorId(tipo.indicador);
   const { codigoColaborador, nome } = participante;
@@ -113,7 +117,7 @@ export function apurarParticipante(tipo: TipoApurado, lista: ListaProdutos | nul
     realizado,
     atingimento,
     atingida,
-    premioCentavos: premio(tipo.regra, atingimento, atingida, realizado, dados),
+    premioCentavos: premio(regraDoParticipante(tipo.regra, participante), atingimento, atingida, realizado, dados),
     resultado,
     ...(aviso ? { aviso } : {}),
     ...(totalProdutos === undefined ? {} : { totalProdutos }),

@@ -59,6 +59,14 @@ describe("Apuração de um Participante", () => {
     expect(apurarParticipante(tipo({ indicador: "pre-vencidos" }), null, ana(50), dados({ indicadores: { "pre-vencidos": 0 } })).aviso).toBeUndefined();
   });
 
+  it("usa o Prêmio próprio do Participante quando é do mesmo tipo de regra do Tipo de Meta", () => {
+    const fixo = tipo({});
+    const comProprio = { ...ana(100), premio: { tipo: "fixo" as const, valorCentavos: 15000 } };
+    expect(apurarParticipante(fixo, null, comProprio, dados({ indicadores: { "foco-qtd": 120 } })).premioCentavos).toBe(15000);
+    const outroTipo = { ...ana(100), premio: { tipo: "percentual" as const, percentual: 1, indicadorBase: "venda-liquida" as const, soSeAtingir: true } };
+    expect(apurarParticipante(fixo, null, outroTipo, dados({ indicadores: { "foco-qtd": 120 } })).premioCentavos).toBe(10000);
+  });
+
   it("paga a maior Faixa alcançada", () => {
     const faixas = tipo({ regra: { tipo: "faixas", faixas: [{ atingimento: 100, valorCentavos: 10000 }, { atingimento: 80, valorCentavos: 5000 }, { atingimento: 120, valorCentavos: 15000 }] } });
     expect(apurarParticipante(faixas, null, ana(100), dados({ indicadores: { "foco-qtd": 110 } })).premioCentavos).toBe(10000);

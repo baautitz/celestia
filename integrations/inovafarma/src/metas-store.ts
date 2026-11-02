@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { RegraPremio } from "./tipos-meta.js";
 
 /** Colaborador que participa de uma Meta, com o próprio Alvo (null: pendente, em branco). */
 export interface ParticipanteMeta {
@@ -7,6 +8,8 @@ export interface ParticipanteMeta {
   nome: string;
   /** Na unidade do Indicador do Tipo de Meta (R$ em centavos). */
   alvo: number | null;
+  /** Prêmio próprio do Participante, no tipo de regra do Tipo de Meta; sem ele, vale o do Tipo de Meta. */
+  premio?: RegraPremio | null;
 }
 
 /** Produto da Lista de Produtos, com a quantidade igual para todos os Participantes. */

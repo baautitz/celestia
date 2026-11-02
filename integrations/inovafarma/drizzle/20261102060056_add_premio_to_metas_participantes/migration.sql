@@ -1,0 +1,1 @@
+ALTER TABLE "inovafarma"."metas_participantes" ADD COLUMN "premio" jsonb;
