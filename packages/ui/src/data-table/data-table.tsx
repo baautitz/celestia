@@ -162,6 +162,11 @@ export interface DataTableProps<TRow> {
   renderExpanded?: (row: TRow) => React.ReactNode;
   /** Com `renderExpanded`, as linhas já começam expandidas. */
   defaultExpanded?: boolean;
+  /**
+   * `page`: a tabela cresce com as linhas e quem rola é a página (sem rolagem vertical dentro da tabela).
+   * Bom para tabelas expansíveis, que senão viram uma rolagem dentro da outra. Padrão: `table`.
+   */
+  scroll?: "table" | "page";
   actionsLabel?: string;
   actionsHeadClassName?: string;
   actionsSkeletonClassName?: string;
@@ -387,6 +392,7 @@ export function DataTable<TRow>({
   rowActions,
   renderExpanded,
   defaultExpanded = false,
+  scroll = "table",
   actionsLabel = "Ações",
   actionsHeadClassName = "text-right w-20",
   actionsSkeletonClassName = "h-8 w-8 ml-auto",
@@ -768,7 +774,7 @@ export function DataTable<TRow>({
         ) : (
           <>
             <div className={bordered ? "border border-border" : undefined}>
-              <Table>
+              <Table containerClassName={scroll === "page" ? "max-h-none" : undefined}>
                 <TableHeader>
                   <GroupHeaderRow
                     columns={columns}
