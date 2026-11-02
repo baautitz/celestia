@@ -11,6 +11,7 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { AcompanhamentoMetas, type VisualizacaoMetas } from "./acompanhamento-tab";
 import { AlvoPadraoWindow } from "./alvo-padrao-window";
 import { formatarValor, indicadorPorId } from "./indicadores";
+import { MinhasMetas } from "./minhas-metas-tab";
 import { MontarMetas, type LojaMetas, type PeriodoMetas } from "./montar-metas-tab";
 import { EXIBICAO_LABEL } from "./tipos-meta";
 import { BASE, TipoMetaWindow, type TipoMetaComPremio, type TipoMetaSalvo } from "./tipo-meta-window";
@@ -102,7 +103,7 @@ function TiposDeMeta() {
 }
 
 interface Contexto {
-  abas: { tipos: boolean; montar: boolean; acompanhamento: boolean };
+  abas: { tipos: boolean; montar: boolean; acompanhamento: boolean; minhas: boolean };
   periodos: PeriodoMetas[];
   lojas: LojaMetas[];
   visualizacoes: VisualizacaoMetas[];
@@ -119,7 +120,7 @@ export function MetasPage() {
     apiFetch<Contexto>("/api/m/inovafarma/metas/contexto")
       .then((c) => {
         setContexto(c);
-        setAba(c.abas.tipos ? "tipos" : c.abas.montar ? "montar" : "acompanhamento");
+        setAba(c.abas.tipos ? "tipos" : c.abas.montar ? "montar" : c.abas.acompanhamento ? "acompanhamento" : "minhas");
       })
       .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao abrir as Metas.")));
   }, [feedback]);
@@ -127,16 +128,18 @@ export function MetasPage() {
   if (!contexto || !aba) return null;
   return (
     <Stack gap="section">
-      <Tabs value={aba} onValueChange={(v) => setAba(v === "montar" || v === "acompanhamento" ? v : "tipos")}>
+      <Tabs value={aba} onValueChange={(v) => setAba(v === "montar" || v === "acompanhamento" || v === "minhas" ? v : "tipos")}>
         <TabsList>
           {contexto.abas.tipos && <TabsTrigger value="tipos">Tipos de Meta</TabsTrigger>}
           {contexto.abas.montar && <TabsTrigger value="montar">Montar Metas</TabsTrigger>}
           {contexto.abas.acompanhamento && <TabsTrigger value="acompanhamento">Acompanhamento</TabsTrigger>}
+          {contexto.abas.minhas && <TabsTrigger value="minhas">Minhas Metas</TabsTrigger>}
         </TabsList>
       </Tabs>
       {aba === "tipos" && <TiposDeMeta />}
       {aba === "montar" && <MontarMetas periodos={contexto.periodos} lojas={contexto.lojas} />}
       {aba === "acompanhamento" && <AcompanhamentoMetas periodos={contexto.periodos} visualizacoes={contexto.visualizacoes} />}
+      {aba === "minhas" && <MinhasMetas periodos={contexto.periodos} />}
     </Stack>
   );
 }

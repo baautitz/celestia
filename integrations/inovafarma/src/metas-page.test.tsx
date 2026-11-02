@@ -27,7 +27,7 @@ const participantes = [
 ];
 
 const contexto = {
-  abas: { tipos: true, montar: true, acompanhamento: true },
+  abas: { tipos: true, montar: true, acompanhamento: true, minhas: true },
   periodos: [{ id: "abril", name: "Abril", startDate: "2027-04-01", endDate: "2027-04-30", status: "open" }],
   lojas: [{ codigo: 10, nome: "Centro" }],
   visualizacoes: [{ id: "geral", lojas: [{ codigo: 10, nome: "Centro" }] }],
@@ -50,6 +50,14 @@ const acompanhamento = {
     },
   ],
   totais: [{ codigoColaborador: 1, nome: "ANA", premioCentavos: 10000 }],
+};
+const minhas = {
+  congelada: false,
+  metas: [
+    { metaId: "met_1", nome: "CMV", exibicao: "atingida", atingida: true, premioCentavos: 10000 },
+    { metaId: "met_2", nome: "Ticket", exibicao: "progresso", atingida: false, realizado: "R$ 100,00", alvo: "R$ 120,00", falta: "R$ 20,00" },
+    { metaId: "met_3", nome: "Lista", exibicao: "contagem", atingida: false, contagem: "19/20 produtos" },
+  ],
 };
 const metaCmv = { id: "met_1", periodoId: "abril", tipoId: "tme_1", participantes, excluidos: [], lista: null, version: 1, tipo: cmv, pendentes: 1 };
 const montagem = {
@@ -77,6 +85,7 @@ beforeEach(() => {
     if (init?.method === "POST") return { metas: [] };
     if (url.endsWith("/metas/contexto")) return contexto;
     if (url.includes("/metas/acompanhamento?")) return acompanhamento;
+    if (url.includes("/metas/minhas?")) return minhas;
     if (url.includes("/metas?periodoId=")) return montagem;
     if (url.endsWith("/participantes/2")) return { ...metaCmv, participantes: [participantes[0]], excluidos: [2], version: 2 };
     if (url.endsWith("/definir-alvo")) return metaCmv;
@@ -149,5 +158,17 @@ describe("Metas: Acompanhamento", () => {
     expect(screen.getAllByText("120,0%").length).toBeGreaterThan(0);
     expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/acompanhamento?periodoId=abril&visualizacao=geral");
     expect(screen.getAllByRole("button", { name: /Imprimir/ }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Metas: Minhas Metas", () => {
+  it("mostra cada Meta na Exibição que o servidor liberou", async () => {
+    renderizar();
+    fireEvent.click(await screen.findByRole("tab", { name: "Minhas Metas" }));
+    expect((await screen.findAllByText("Realizado R$ 100,00 de R$ 120,00 · faltam R$ 20,00")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("19/20 produtos").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Atingida").length).toBeGreaterThan(0);
+    expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/minhas?periodoId=abril");
+    expect(screen.queryByRole("button", { name: /Imprimir/ })).toBeNull();
   });
 });
