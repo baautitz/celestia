@@ -50,7 +50,7 @@ function TiposDeMeta() {
     if (resultado.status !== "confirmed" || !resultado.value.alvoPadraoMudou) return;
     const salvo = resultado.value.tipo;
     await windows.open<true>({
-      surface: "dialog",
+      surface: "sheet",
       title: salvo.indicador === "avaliacoes" ? "Aplicar o novo valor inicial" : "Aplicar o novo Alvo padrão",
       description: `Tipo de Meta "${salvo.nome}"`,
       content: () => <AlvoPadraoWindow tipo={salvo} />,
