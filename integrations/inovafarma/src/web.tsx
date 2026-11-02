@@ -815,8 +815,8 @@ export const inovafarmaWebModule = defineWebModule({
       title: "Metas",
       icon: Target,
       path: "/inovafarma/metas",
-      section: "inovafarma",
-      order: 20,
+      section: "inovafarma-lancamentos",
+      order: 50,
       // Cada aba tem a sua Permission; a tela mostra as que o servidor liberar.
       permission: "inovafarma:tipos-meta:manage",
       component: MetasPage,

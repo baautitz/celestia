@@ -8,10 +8,10 @@ describe("menu dos módulos registrados", () => {
     expect(menu[4].entries.map((e) => e.label)).toEqual(["Usuários", "Grupos", "Dispositivos", "ERPs", "Auditoria"]);
   });
 
-  it("mostra Pré-vencidos, Avaliações e Furo de Estoque em Lançamentos, Colaboradores e Metas em InovaFarma e mantém Desempenho de Vendas em Relatórios", () => {
+  it("mostra Pré-vencidos, Avaliações, Furo de Estoque e Metas em Lançamentos, Colaboradores em InovaFarma e mantém Desempenho de Vendas em Relatórios", () => {
     const menu = menuSections(() => true);
-    expect(menu.find((s) => s.label === "Lançamentos")?.entries.map((e) => e.label)).toEqual(["Pré-vencidos", "Avaliações", "Furo de Estoque"]);
-    expect(menu.find((s) => s.label === "InovaFarma")?.entries.map((e) => e.label)).toEqual(["Colaboradores", "Metas"]);
+    expect(menu.find((s) => s.label === "Lançamentos")?.entries.map((e) => e.label)).toEqual(["Pré-vencidos", "Avaliações", "Furo de Estoque", "Metas"]);
+    expect(menu.find((s) => s.label === "InovaFarma")?.entries.map((e) => e.label)).toEqual(["Colaboradores"]);
     expect(menu.find((s) => s.label === "Relatórios")?.entries.map((e) => e.label)).toContain("Desempenho de Vendas");
   });
 
