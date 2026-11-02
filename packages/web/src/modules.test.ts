@@ -16,7 +16,7 @@ describe("menu dos módulos registrados", () => {
   });
 
   it("esconde as Seções do InovaFarma de quem não tem nenhuma Permission delas", () => {
-    const menu = menuSections((permission) => !permission.startsWith("inovafarma:colaboradores:") && !permission.startsWith("inovafarma:pre-vencidos-") && !permission.startsWith("inovafarma:avaliacoes-") && !permission.startsWith("inovafarma:furo-estoque-") && !permission.startsWith("inovafarma:tipos-meta:"));
+    const menu = menuSections((permission) => !permission.startsWith("inovafarma:colaboradores:") && !permission.startsWith("inovafarma:pre-vencidos-") && !permission.startsWith("inovafarma:avaliacoes-") && !permission.startsWith("inovafarma:furo-estoque-") && !permission.startsWith("inovafarma:tipos-meta:") && !permission.startsWith("inovafarma:metas"));
     expect(menu.map((s) => s.label)).not.toContain("InovaFarma");
     expect(menu.map((s) => s.label)).not.toContain("Lançamentos");
   });
