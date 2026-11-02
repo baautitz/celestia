@@ -131,7 +131,8 @@
           "inovafarma:tipos-meta:manage",
           "inovafarma:metas:manage",
           "inovafarma:metas-geral:view",
-          "inovafarma:metas-loja:view"
+          "inovafarma:metas-loja:view",
+          "inovafarma:metas-individual:view"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -327,7 +328,8 @@
         "inovafarma:tipos-meta:manage",
         "inovafarma:metas:manage",
         "inovafarma:metas-geral:view",
-        "inovafarma:metas-loja:view"
+        "inovafarma:metas-loja:view",
+        "inovafarma:metas-individual:view"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -600,6 +602,13 @@
             "label": "Metas: Acompanhamento por Loja",
             "description": "Permite ver o Acompanhamento das Metas dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas da Loja.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-individual:view",
+            "label": "Metas: Minhas Metas",
+            "description": "Permite ver as Metas do Colaborador vinculado ao Usuário, na Exibição escolhida no Tipo de Meta.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver as próprias Metas.",
             "module": "inovafarma"
           }
         ]
@@ -875,6 +884,13 @@
             "label": "Metas: Acompanhamento por Loja",
             "description": "Permite ver o Acompanhamento das Metas dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas da Loja.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-individual:view",
+            "label": "Metas: Minhas Metas",
+            "description": "Permite ver as Metas do Colaborador vinculado ao Usuário, na Exibição escolhida no Tipo de Meta.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver as próprias Metas.",
             "module": "inovafarma"
           }
         ]
