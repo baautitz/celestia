@@ -6,7 +6,7 @@ import type { ApuracaoPeriodo, ApuracaoStore, MetaApurada } from "./apuracao-sto
 import type { AvaliacaoStore } from "./avaliacoes-store.js";
 import { desempenhoSql } from "./desempenho-vendas.js";
 import type { IndicadorId } from "./indicadores.js";
-import { ator, type AuthContext } from "./metas-comum.js";
+import { ator, ERP_INDISPONIVEL, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, vinculoDoUsuario, type AuthContext } from "./metas-comum.js";
 import type { MetaStore } from "./metas-store.js";
 import type { UsersService } from "./colaboradores-routes.js";
 import { minhaMeta } from "./minhas-metas.js";
@@ -16,19 +16,16 @@ import { LOTE_PRODUTOS, vendasSql, type LinhaVenda, type PeriodoResumo, type Per
 import type { PreVencidoStore } from "./pre-vencidos-store.js";
 import { descreverPremio } from "./tipos-meta.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
+import type { ErpQueryClient } from "./server.js";
 import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
 import type { AuditService } from "./vinculo-audit.js";
-
-interface ErpQuery {
-  query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
-}
 
 export interface AcompanhamentoRoutesDeps {
   routes: ModuleContext["routes"];
   permissions: Pick<ModuleContext["permissions"], "has">;
   auth: MiddlewareHandler;
   events: Pick<ModuleContext["events"], "before" | "after">;
-  erpClient: () => ErpQuery | undefined;
+  erpClient: () => ErpQueryClient | undefined;
   tipos: TipoMetaStore;
   metas: MetaStore;
   vinculos: VinculoStore;
@@ -42,9 +39,6 @@ export interface AcompanhamentoRoutesDeps {
 
 export type VisualizacaoMetas = "geral" | "loja";
 
-const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
-const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
-const PERIODO_NAO_ENCONTRADO = "Período de Fechamento não encontrado.";
 const LOJA_FORA = "A Loja informada não está entre as Lojas do seu Colaborador.";
 const FECHAMENTO_SEM_APURACAO = "Não foi possível apurar as Metas do Período no ERP InovaFarma: o Período não pode ser fechado agora. Tente novamente em instantes.";
 /** A Apuração ao fechar consulta o ERP inteiro do Período: mais que os 2 s padrão de um handler. */
@@ -61,7 +55,7 @@ export async function visualizacoesDasMetas(
 ): Promise<{ geral: boolean; lojas: number[] | null }> {
   const geral = has(user?.permissions, INOVAFARMA_PERMISSIONS.keys["metas-geral:view"]);
   if (!has(user?.permissions, INOVAFARMA_PERMISSIONS.keys["metas-loja:view"]) || !user?.sub) return { geral, lojas: null };
-  const vinculo = (await vinculos.list()).find((v) => v.usuarioId === user.sub && !vinculoDesfeito(v));
+  const vinculo = await vinculoDoUsuario(vinculos, user.sub);
   return { geral, lojas: vinculo?.lojas.length ? vinculo.lojas : null };
 }
 
@@ -75,7 +69,7 @@ export async function colaboradorDasMinhasMetas(
   vinculos: VinculoStore,
 ): Promise<number | null> {
   if (!has(user?.permissions, INOVAFARMA_PERMISSIONS.keys["metas-individual:view"]) || !user?.sub) return null;
-  return (await vinculos.list()).find((v) => v.usuarioId === user.sub && !vinculoDesfeito(v))?.codigoColaborador ?? null;
+  return (await vinculoDoUsuario(vinculos, user.sub))?.codigoColaborador ?? null;
 }
 
 type LinhaDesempenho = { codigoColaborador: number; quantidadeVendas: number | null; totalLiquido: number | null; totalCmv: number | null; vendasComCadastro: number | null } & Record<
@@ -87,20 +81,20 @@ const INDICADORES_DE_VENDAS: Partial<Record<IndicadorId, (r: LinhaDesempenho) =>
   const n = (v: number | null | undefined) => Number(v) || 0;
   const porVenda = (r: LinhaDesempenho, valor: number) => (n(r.quantidadeVendas) > 0 ? valor / n(r.quantidadeVendas) : 0);
   const categoria = (coluna: string) => ({ qtd: (r: LinhaDesempenho) => n(r[`qtd${coluna}`]), valor: (r: LinhaDesempenho) => Math.round(n(r[`valor${coluna}`]) * 100) });
-  const [foco, vitaminas, genericos, similares, incentivos] = ["TotalFoco", "Vitaminas", "Genericos", "Similares", "Incentivos"].map(categoria);
+  const [foco, vitaminas, genericos, similares, incentivos] = [categoria("TotalFoco"), categoria("Vitaminas"), categoria("Genericos"), categoria("Similares"), categoria("Incentivos")];
   return {
     cmv: (r) => (n(r.totalLiquido) > 0 ? (n(r.totalCmv) / n(r.totalLiquido)) * 100 : 0),
     "ticket-medio": (r) => Math.round(porVenda(r, n(r.totalLiquido) * 100)),
-    "foco-qtd": foco!.qtd,
-    "foco-valor": foco!.valor,
-    "vitaminas-qtd": vitaminas!.qtd,
-    "vitaminas-valor": vitaminas!.valor,
-    "genericos-qtd": genericos!.qtd,
-    "genericos-valor": genericos!.valor,
-    "similares-qtd": similares!.qtd,
-    "similares-valor": similares!.valor,
-    "incentivos-qtd": incentivos!.qtd,
-    "incentivos-valor": incentivos!.valor,
+    "foco-qtd": foco.qtd,
+    "foco-valor": foco.valor,
+    "vitaminas-qtd": vitaminas.qtd,
+    "vitaminas-valor": vitaminas.valor,
+    "genericos-qtd": genericos.qtd,
+    "genericos-valor": genericos.valor,
+    "similares-qtd": similares.qtd,
+    "similares-valor": similares.valor,
+    "incentivos-qtd": incentivos.qtd,
+    "incentivos-valor": incentivos.valor,
     "vendas-cadastro-qtd": (r) => n(r.vendasComCadastro),
     "vendas-cadastro-percent": (r) => porVenda(r, n(r.vendasComCadastro) * 100),
   };
@@ -136,19 +130,25 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     const datas = { dataInicio: `${periodo.startDate} 00:00:00`, dataFim: `${periodo.endDate} 23:59:59` };
     const deVendas = [...indicadores].filter((i) => INDICADORES_DE_VENDAS[i]);
     const precisaErp = deVendas.length > 0 || produtosLista.length > 0 || indicadores.has("pre-vencidos");
-    const client = erpClient();
-    if (precisaErp && !client) throw new Error(SEM_CONEXAO);
+    const conectado = erpClient();
+    if (precisaErp && !conectado) throw new Error(SEM_CONEXAO);
+    const client = {
+      query: <T,>(sql: string, params: Record<string, unknown>) => {
+        if (!conectado) throw new Error(SEM_CONEXAO);
+        return conectado.query<T>(sql, params);
+      },
+    };
 
     if (deVendas.length > 0) {
-      for (const r of await client!.query<LinhaDesempenho>(desempenhoSql("").sql, datas)) {
+      for (const r of await client.query<LinhaDesempenho>(desempenhoSql("").sql, datas)) {
         const d = de(Number(r.codigoColaborador));
-        for (const i of deVendas) d.indicadores[i] = INDICADORES_DE_VENDAS[i]!(r);
+        for (const i of deVendas) d.indicadores[i] = INDICADORES_DE_VENDAS[i]?.(r);
       }
     }
     if (produtosLista.length > 0) {
       const params: Record<string, unknown> = { ...datas };
       produtosLista.forEach((id, n) => (params[`g${n}`] = id));
-      for (const r of await client!.query<LinhaVenda>(listaSql(produtosLista.length), params)) {
+      for (const r of await client.query<LinhaVenda>(listaSql(produtosLista.length), params)) {
         const d = de(Number(r.codigoColaborador));
         d.produtos[r.produtoId] = (d.produtos[r.produtoId] ?? 0) + (Number(r.quantidade) || 0);
       }
@@ -162,7 +162,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
         const lote = codigos.slice(i, i + LOTE_PRODUTOS);
         const params: Record<string, unknown> = { ...datas };
         lote.forEach((codigo, n) => (params[`p${n}`] = codigo));
-        vendas.push(...(await client!.query<LinhaVenda>(vendasSql(lote.length), params)));
+        vendas.push(...(await client.query<LinhaVenda>(vendasSql(lote.length), params)));
       }
       const conferencia = conferir(lancamentos, vendas.map((v) => ({ codigoColaborador: Number(v.codigoColaborador), produtoId: v.produtoId, quantidade: Number(v.quantidade) || 0 })));
       for (const linha of conferencia) {

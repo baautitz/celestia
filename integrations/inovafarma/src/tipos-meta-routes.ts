@@ -1,7 +1,8 @@
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { formatarValor, indicadorPorId } from "./indicadores.js";
+import { ator, META_DESATUALIZADA, type AuthContext } from "./metas-comum.js";
 import type { MetaStore } from "./metas-store.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
@@ -20,8 +21,6 @@ export interface TiposMetaRoutesDeps {
   audit: AuditService;
 }
 
-type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
-
 const NAO_ENCONTRADO = "Tipo de Meta não encontrado.";
 const NOME_DUPLICADO = "Já existe um Tipo de Meta com este nome.";
 const INDICADOR_FIXO = "O Indicador de um Tipo de Meta não muda depois de cadastrado: cadastre outro Tipo de Meta.";
@@ -30,7 +29,6 @@ const META_NAO_ENCONTRADA = "Meta não encontrada para este Tipo de Meta.";
 const PERIODO_FECHADO = "O Período de Fechamento da Meta está fechado: a Meta não pode ser alterada.";
 const PARTICIPANTE_FORA = "Um dos Colaboradores escolhidos não é Participante da Meta.";
 const VERSAO_DESATUALIZADA = { error: "O Tipo de Meta foi alterado por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
-const META_DESATUALIZADA = { error: "A Meta foi alterada por outra pessoa. A janela foi recarregada.", code: "versao_desatualizada" };
 
 const Edicao = DadosTipoMeta.extend({ version: z.number().int().min(1) });
 const Aplicacao = z.object({
@@ -57,7 +55,6 @@ const valores = (t: TipoMeta): ValoresTipo => {
 export function registerTiposMetaRoutes({ routes, permissions, auth, store, metas, periods, audit }: TiposMetaRoutesDeps): void {
   const manage = INOVAFARMA_PERMISSIONS.ref("tipos-meta:manage");
   const pode = (c: AuthContext) => permissions.has(c.get("user")?.permissions, manage.key);
-  const ator = (c: AuthContext) => ({ id: c.get("user")?.sub ?? "", name: c.get("user")?.fullname ?? "" });
 
   const registrar = (c: AuthContext, action: string, tipo: TipoMeta, anterior: TipoMeta | null = null) =>
     audit.record({

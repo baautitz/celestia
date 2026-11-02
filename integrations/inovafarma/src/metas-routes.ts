@@ -1,28 +1,26 @@
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { colaboradorDasMinhasMetas, visualizacoesDasMetas } from "./acompanhamento-routes.js";
 import { COLABORADORES_SQL, LOJAS_SQL } from "./colaboradores-routes.js";
 import { formatarValor, indicadorPorId } from "./indicadores.js";
 import { META_TARGET, METAS_ACTIONS, METAS_PLUGIN } from "./metas-audit.js";
+import { ator, ERP_INDISPONIVEL, META_DESATUALIZADA, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, type AuthContext } from "./metas-comum.js";
 import type { DadosMeta, Meta, MetaStore } from "./metas-store.js";
 import { alvoInicial, copiarMeta, novaMeta, pendentes, periodoAtualizadoPorUltimo, usaAlvo, type ColaboradorAtivo } from "./montar-metas.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { BUSCA_SQL, MIN_BUSCA, type LinhaBusca, type PeriodoResumo, type PeriodsService } from "./pre-vencidos-routes.js";
 import { descreverPremio, type TipoMeta } from "./tipos-meta.js";
+import type { ErpQueryClient } from "./server.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
 import type { AuditService } from "./vinculo-audit.js";
 import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
-
-interface ErpQuery {
-  query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
-}
 
 export interface MetasRoutesDeps {
   routes: ModuleContext["routes"];
   permissions: Pick<ModuleContext["permissions"], "has">;
   auth: MiddlewareHandler;
-  erpClient: () => ErpQuery | undefined;
+  erpClient: () => ErpQueryClient | undefined;
   tipos: TipoMetaStore;
   metas: MetaStore;
   vinculos: VinculoStore;
@@ -30,11 +28,6 @@ export interface MetasRoutesDeps {
   audit: AuditService;
 }
 
-type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
-
-const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
-const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
-const PERIODO_NAO_ENCONTRADO = "Período de Fechamento não encontrado.";
 const PERIODO_FECHADO = "O Período de Fechamento está fechado: as Metas ficam só para leitura.";
 const SEM_METAS = "Acesso negado: o usuário não possui nenhuma permissão das Metas (Tipos de Meta, Montar Metas, Acompanhamento ou Minhas Metas).";
 const META_NAO_ENCONTRADA = "Meta não encontrada.";
@@ -44,7 +37,6 @@ const NAO_PARTICIPANTE = "O Colaborador não é Participante da Meta.";
 const NAO_ATIVO = "O Colaborador não está ativo no ERP.";
 const SEM_ALVO = "Esta Meta não tem Alvo por Participante.";
 const SO_LISTA = "Só a Meta de Lista de Produtos tem produtos.";
-const VERSAO_DESATUALIZADA = { error: "A Meta foi alterada por outra pessoa. A tela foi recarregada.", code: "versao_desatualizada" };
 
 const Version = z.number().int().min(1);
 const Alvo = z.number({ invalid_type_error: "Informe o Alvo." }).positive("O Alvo deve ser maior que zero.").max(1e12);
@@ -65,7 +57,6 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
   const manage = INOVAFARMA_PERMISSIONS.ref("metas:manage");
   const tiposManage = INOVAFARMA_PERMISSIONS.ref("tipos-meta:manage");
   const pode = (c: AuthContext, ref: { key: string } = manage) => permissions.has(c.get("user")?.permissions, ref.key);
-  const ator = (c: AuthContext) => ({ id: c.get("user")?.sub ?? "", name: c.get("user")?.fullname ?? "" });
   const registrar = (c: AuthContext, action: string, meta: Meta, attributes: Record<string, unknown>) =>
     audit.record({ plugin: METAS_PLUGIN, action, actor: ator(c), target: { type: META_TARGET, id: meta.id }, attributes });
 
@@ -236,14 +227,14 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
 
   // Marca ou desmarca um Colaborador como Participante, ou altera o Alvo dele.
   routes.put("/metas/:id/participantes/:codigo", auth, async (c: AuthContext) => {
-    const alvo = await alteravel(c);
-    if ("recusa" in alvo) return alvo.recusa;
-    const { meta, tipo, periodo } = alvo;
+    const alteracao = await alteravel(c);
+    if ("recusa" in alteracao) return alteracao.recusa;
+    const { meta, tipo, periodo } = alteracao;
     const parsed = Participacao.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
     const { version, participa } = parsed.data;
     if (parsed.data.alvo != null && !usaAlvo(tipo)) return c.json({ error: SEM_ALVO }, 400);
-    if (meta.version !== version) return c.json(VERSAO_DESATUALIZADA, 409);
+    if (meta.version !== version) return c.json(META_DESATUALIZADA, 409);
     const codigo = Number(c.req.param("codigo"));
     const atual = meta.participantes.find((p) => p.codigoColaborador === codigo);
     const indicador = indicadorPorId(tipo.indicador);
@@ -273,16 +264,16 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     }
     if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
     const atualizada = await gravar(meta, dados, version);
-    if (!atualizada) return c.json(VERSAO_DESATUALIZADA, 409);
+    if (!atualizada) return c.json(META_DESATUALIZADA, 409);
     await registrar(c, METAS_ACTIONS.participante, atualizada, atributos);
     return c.json(comTipo(atualizada, tipo));
   });
 
   // Definir Alvo (ou valor inicial, na Meta de Avaliações) em massa, para os Participantes marcados.
   routes.post("/metas/:id/definir-alvo", auth, async (c: AuthContext) => {
-    const alvo = await alteravel(c);
-    if ("recusa" in alvo) return alvo.recusa;
-    const { meta, tipo, periodo } = alvo;
+    const alteracao = await alteravel(c);
+    if ("recusa" in alteracao) return alteracao.recusa;
+    const { meta, tipo, periodo } = alteracao;
     if (!usaAlvo(tipo)) return c.json({ error: SEM_ALVO }, 400);
     const parsed = Definicao.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
@@ -291,7 +282,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     if (marcados.length !== new Set(codigos).size) return c.json({ error: NAO_PARTICIPANTE }, 400);
     if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
     const atualizada = await metas.definirAlvo(meta.id, codigos, parsed.data.alvo, version);
-    if (!atualizada) return c.json(VERSAO_DESATUALIZADA, 409);
+    if (!atualizada) return c.json(META_DESATUALIZADA, 409);
     await registrar(c, METAS_ACTIONS.definirAlvo, atualizada, {
       tipo: tipo.nome,
       periodo: periodo.name,
@@ -304,9 +295,9 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
 
   // Lista de Produtos: a quantidade de cada produto, os ajustes por Colaborador e o mínimo de produtos batidos.
   routes.put("/metas/:id/lista", auth, async (c: AuthContext) => {
-    const alvo = await alteravel(c);
-    if ("recusa" in alvo) return alvo.recusa;
-    const { meta, tipo, periodo } = alvo;
+    const alteracao = await alteravel(c);
+    if ("recusa" in alteracao) return alteracao.recusa;
+    const { meta, tipo, periodo } = alteracao;
     if (tipo.indicador !== "lista-produtos") return c.json({ error: SO_LISTA }, 400);
     const parsed = Lista.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
@@ -317,10 +308,10 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     const participantes = new Set(meta.participantes.map((p) => p.codigoColaborador));
     if (!ajustes.every((a) => ids.has(a.produtoId) && participantes.has(a.codigoColaborador))) return c.json({ error: "Um ajuste é de um produto ou Colaborador fora da Meta." }, 400);
     // O ajuste igual à quantidade do produto não é ajuste.
-    const lista = { produtos, minimo, ajustes: ajustes.filter((a) => produtos.find((p) => p.produtoId === a.produtoId)!.quantidade !== a.quantidade) };
+    const lista = { produtos, minimo, ajustes: ajustes.filter((a) => produtos.find((p) => p.produtoId === a.produtoId)?.quantidade !== a.quantidade) };
     if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
     const atualizada = await gravar(meta, { lista }, version);
-    if (!atualizada) return c.json(VERSAO_DESATUALIZADA, 409);
+    if (!atualizada) return c.json(META_DESATUALIZADA, 409);
     await registrar(c, METAS_ACTIONS.lista, atualizada, {
       tipo: tipo.nome,
       periodo: periodo.name,
