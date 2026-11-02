@@ -304,6 +304,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
               totalBrutoGeral,
               totalDescontoGeral,
               totalCmvGeral,
+              descontoPercentGeral: totalBrutoGeral > 0 ? (totalDescontoGeral / totalBrutoGeral) * 100 : 0,
               cmvPercentGeral: totalLiquidoGeral > 0 ? (totalCmvGeral / totalLiquidoGeral) * 100 : 0,
               cadastroPercentGeral: totalVendasGeral > 0 ? (totalVendasComCadastro / totalVendasGeral) * 100 : 0,
               totalColaboradores: rows.length,
@@ -313,12 +314,15 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
               const liq = Number(r.totalLiquido) || 0;
               const qtd = Number(r.quantidadeVendas) || 0;
               const cmv = Number(r.totalCmv) || 0;
+              const bruto = Number(r.totalBruto) || 0;
+              const desconto = Number(r.totalDesconto) || 0;
               return {
                 codigoColaborador: Number(r.codigoColaborador),
                 nomeColaborador: (r.nomeColaborador || "").trim(),
                 quantidadeVendas: qtd,
-                totalBruto: Number(r.totalBruto) || 0,
-                totalDesconto: Number(r.totalDesconto) || 0,
+                totalBruto: bruto,
+                totalDesconto: desconto,
+                descontoPercent: bruto > 0 ? (desconto / bruto) * 100 : 0,
                 totalLiquido: liq,
                 totalCmv: cmv,
                 cmvPercent: liq > 0 ? (cmv / liq) * 100 : 0,
