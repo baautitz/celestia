@@ -127,7 +127,8 @@
           "inovafarma:avaliacoes-loja:manage",
           "inovafarma:avaliacoes-geral:manage",
           "inovafarma:furo-estoque-loja:manage",
-          "inovafarma:furo-estoque-geral:manage"
+          "inovafarma:furo-estoque-geral:manage",
+          "inovafarma:tipos-meta:manage"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -319,7 +320,8 @@
         "inovafarma:avaliacoes-loja:manage",
         "inovafarma:avaliacoes-geral:manage",
         "inovafarma:furo-estoque-loja:manage",
-        "inovafarma:furo-estoque-geral:manage"
+        "inovafarma:furo-estoque-geral:manage",
+        "inovafarma:tipos-meta:manage"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -564,6 +566,13 @@
             "label": "Furo de Estoque: Justificar todas e gerenciar Motivos",
             "description": "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:tipos-meta:manage",
+            "label": "Metas: Gerenciar Tipos de Meta",
+            "description": "Permite cadastrar, alterar, ativar e desativar os Tipos de Meta e aplicar o Alvo padrão às Metas dos Períodos abertos.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar os Tipos de Meta.",
             "module": "inovafarma"
           }
         ]
@@ -811,6 +820,13 @@
             "label": "Furo de Estoque: Justificar todas e gerenciar Motivos",
             "description": "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:tipos-meta:manage",
+            "label": "Metas: Gerenciar Tipos de Meta",
+            "description": "Permite cadastrar, alterar, ativar e desativar os Tipos de Meta e aplicar o Alvo padrão às Metas dos Períodos abertos.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar os Tipos de Meta.",
             "module": "inovafarma"
           }
         ]
