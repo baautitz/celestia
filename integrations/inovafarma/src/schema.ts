@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, doublePrecision, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { IndicadorId } from "./indicadores.js";
+import type { ListaProdutos } from "./metas-store.js";
 import type { Exibicao, RegraPremio } from "./tipos-meta.js";
 
 /** Um schema Postgres por Module. */
@@ -131,6 +132,10 @@ export const metas = inovafarmaSchema.table(
     tipoId: text("tipo_id")
       .notNull()
       .references(() => tiposMeta.id),
+    /** Colaboradores desmarcados da Meta, para a cópia automática não os incluir de novo. */
+    excluidos: jsonb("excluidos").$type<number[]>().notNull().default([]),
+    /** Lista de Produtos (só no Indicador Lista de Produtos). */
+    lista: jsonb("lista").$type<ListaProdutos>(),
     version: integer("version").notNull().default(1),
     criadoEm: timestamp("criado_em").notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),

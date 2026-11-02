@@ -26,6 +26,23 @@ const participantes = [
   { codigoColaborador: 2, nome: "BIA", alvo: null },
 ];
 
+const contexto = {
+  abas: { tipos: true, montar: true },
+  periodos: [{ id: "abril", name: "Abril", startDate: "2027-04-01", endDate: "2027-04-30", status: "open" }],
+  lojas: [{ codigo: 10, nome: "Centro" }],
+};
+const metaCmv = { id: "met_1", periodoId: "abril", tipoId: "tme_1", participantes, excluidos: [], lista: null, version: 1, tipo: cmv, pendentes: 1 };
+const montagem = {
+  somenteLeitura: false,
+  copiadoDe: null,
+  colaboradores: [
+    { codigoColaborador: 1, nome: "ANA", ativo: true, lojas: [10] },
+    { codigoColaborador: 2, nome: "BIA", ativo: true, lojas: [] },
+  ],
+  metas: [metaCmv],
+  tiposDisponiveis: [],
+};
+
 beforeEach(() => {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
@@ -38,6 +55,10 @@ beforeEach(() => {
   apiFetch.mockImplementation(async (url: string, init?: RequestInit) => {
     if (init?.method === "PUT") return { ...cmv, ...JSON.parse(String(init.body)), version: 2, premio: "CMV % até 28% paga R$ 100,00" };
     if (init?.method === "POST") return { metas: [] };
+    if (url.endsWith("/metas/contexto")) return contexto;
+    if (url.includes("/metas?periodoId=")) return montagem;
+    if (url.endsWith("/participantes/2")) return { ...metaCmv, participantes: [participantes[0]], excluidos: [2], version: 2 };
+    if (url.endsWith("/definir-alvo")) return metaCmv;
     if (url.endsWith("/aplicacao")) return { periodos: [{ id: "abril", name: "Abril", metaId: "met_1", version: 3, participantes }] };
     return [cmv];
   });
@@ -68,5 +89,33 @@ describe("Metas: Tipos de Meta", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/tipos/tme_1/aplicar-alvo-padrao", expect.anything()));
     const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/aplicar-alvo-padrao"))!;
     expect(JSON.parse(String(init.body))).toEqual({ aplicacoes: [{ metaId: "met_1", version: 3, codigos: [2] }] });
+  });
+});
+
+describe("Metas: Montar Metas", () => {
+  const abrir = async () => {
+    renderizar();
+    fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
+    return screen.findByRole("switch", { name: "BIA participa da Meta CMV" });
+  };
+
+  it("mostra os Participantes com o Alvo e desmarca quem não participa", async () => {
+    const bia = await abrir();
+    expect(screen.getAllByText("Pendente").length).toBeGreaterThan(0);
+    fireEvent.click(bia);
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/met_1/participantes/2", expect.anything()));
+    const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/participantes/2"))!;
+    expect(JSON.parse(String(init.body))).toEqual({ version: 1, participa: false });
+  });
+
+  it("define o mesmo Alvo para os Participantes marcados", async () => {
+    await abrir();
+    fireEvent.click(screen.getByRole("button", { name: "Definir Alvo" }));
+    fireEvent.change(await screen.findByLabelText("Alvo (em %)"), { target: { value: "27,5" } });
+    fireEvent.click(screen.getByRole("switch", { name: "ANA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/met_1/definir-alvo", expect.anything()));
+    const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/definir-alvo"))!;
+    expect(JSON.parse(String(init.body))).toEqual({ version: 1, codigos: [2], alvo: 27.5 });
   });
 });

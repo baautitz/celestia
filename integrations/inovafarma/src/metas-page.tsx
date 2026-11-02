@@ -10,6 +10,7 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { AlvoPadraoWindow } from "./alvo-padrao-window";
 import { formatarValor, indicadorPorId } from "./indicadores";
+import { MontarMetas, type LojaMetas, type PeriodoMetas } from "./montar-metas-tab";
 import { EXIBICAO_LABEL } from "./tipos-meta";
 import { BASE, TipoMetaWindow, type TipoMetaComPremio, type TipoMetaSalvo } from "./tipo-meta-window";
 
@@ -99,16 +100,38 @@ function TiposDeMeta() {
   );
 }
 
-/** Página Metas: construtor de Metas do InovaFarma. As próximas abas (Montar Metas, Acompanhamento, Minhas Metas) entram aqui. */
+interface Contexto {
+  abas: { tipos: boolean; montar: boolean };
+  periodos: PeriodoMetas[];
+  lojas: LojaMetas[];
+}
+type Aba = keyof Contexto["abas"];
+
+/** Página Metas: construtor de Metas do InovaFarma, com as abas que a Permission libera. */
 export function MetasPage() {
+  const { feedback } = useUi();
+  const [contexto, setContexto] = useState<Contexto | null>(null);
+  const [aba, setAba] = useState<Aba | null>(null);
+
+  useEffect(() => {
+    apiFetch<Contexto>("/api/m/inovafarma/metas/contexto")
+      .then((c) => {
+        setContexto(c);
+        setAba(c.abas.tipos ? "tipos" : "montar");
+      })
+      .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao abrir as Metas.")));
+  }, [feedback]);
+
+  if (!contexto || !aba) return null;
   return (
     <Stack gap="section">
-      <Tabs value="tipos">
+      <Tabs value={aba} onValueChange={(v) => setAba(v === "montar" ? "montar" : "tipos")}>
         <TabsList>
-          <TabsTrigger value="tipos">Tipos de Meta</TabsTrigger>
+          {contexto.abas.tipos && <TabsTrigger value="tipos">Tipos de Meta</TabsTrigger>}
+          {contexto.abas.montar && <TabsTrigger value="montar">Montar Metas</TabsTrigger>}
         </TabsList>
       </Tabs>
-      <TiposDeMeta />
+      {aba === "tipos" ? <TiposDeMeta /> : <MontarMetas periodos={contexto.periodos} lojas={contexto.lojas} />}
     </Stack>
   );
 }

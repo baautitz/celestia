@@ -95,8 +95,8 @@ describe("Tipos de Meta", () => {
       { codigoColaborador: 1, nome: "ANA", alvo: 28 },
       { codigoColaborador: 2, nome: "BIA", alvo: null },
     ];
-    const abril = (await metas.criar({ periodoId: "abril", tipoId: criado.id, participantes }))!;
-    await metas.criar({ periodoId: "marco", tipoId: criado.id, participantes });
+    const abril = (await metas.criar({ periodoId: "abril", tipoId: criado.id, participantes, excluidos: [], lista: null }))!;
+    await metas.criar({ periodoId: "marco", tipoId: criado.id, participantes, excluidos: [], lista: null });
 
     const aplicacao = (await (await req("gil", "GET", `/metas/tipos/${criado.id}/aplicacao`)).json()) as { periodos: { id: string; metaId: string; participantes: unknown[] }[] };
     expect(aplicacao.periodos.map((p) => [p.id, p.metaId, p.participantes.length])).toEqual([["abril", abril.id, 2]]);

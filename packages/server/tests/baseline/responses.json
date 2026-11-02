@@ -128,7 +128,8 @@
           "inovafarma:avaliacoes-geral:manage",
           "inovafarma:furo-estoque-loja:manage",
           "inovafarma:furo-estoque-geral:manage",
-          "inovafarma:tipos-meta:manage"
+          "inovafarma:tipos-meta:manage",
+          "inovafarma:metas:manage"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -321,7 +322,8 @@
         "inovafarma:avaliacoes-geral:manage",
         "inovafarma:furo-estoque-loja:manage",
         "inovafarma:furo-estoque-geral:manage",
-        "inovafarma:tipos-meta:manage"
+        "inovafarma:tipos-meta:manage",
+        "inovafarma:metas:manage"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -573,6 +575,13 @@
             "label": "Metas: Gerenciar Tipos de Meta",
             "description": "Permite cadastrar, alterar, ativar e desativar os Tipos de Meta e aplicar o Alvo padrão às Metas dos Períodos abertos.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar os Tipos de Meta.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas:manage",
+            "label": "Metas: Montar Metas",
+            "description": "Permite montar as Metas de cada Período de Fechamento: Tipos, Participantes, Alvos e Lista de Produtos.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para montar as Metas.",
             "module": "inovafarma"
           }
         ]
@@ -827,6 +836,13 @@
             "label": "Metas: Gerenciar Tipos de Meta",
             "description": "Permite cadastrar, alterar, ativar e desativar os Tipos de Meta e aplicar o Alvo padrão às Metas dos Períodos abertos.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar os Tipos de Meta.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas:manage",
+            "label": "Metas: Montar Metas",
+            "description": "Permite montar as Metas de cada Período de Fechamento: Tipos, Participantes, Alvos e Lista de Produtos.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para montar as Metas.",
             "module": "inovafarma"
           }
         ]
