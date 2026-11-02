@@ -60,7 +60,7 @@ const numero = (n: number, max = 2) => n.toLocaleString("pt-BR", { maximumFracti
 
 /** R$ a partir de centavos, com espaço comum (sem o espaço fino do Intl) para caber em texto e Log Entry. */
 export const reais = (centavos: number) =>
-  (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }).replace(/ /g, " ");
+  (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }).replace(/\u00a0/g, " ");
 
 export const porcentagem = (pct: number) => `${numero(pct)}%`;
 
