@@ -72,4 +72,9 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite cadastrar, alterar, ativar e desativar os Tipos de Meta e aplicar o Alvo padrão às Metas dos Períodos abertos.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para gerenciar os Tipos de Meta.",
   },
+  "metas:manage": {
+    label: "Metas: Montar Metas",
+    description: "Permite montar as Metas de cada Período de Fechamento: Tipos, Participantes, Alvos e Lista de Produtos.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para montar as Metas.",
+  },
 });

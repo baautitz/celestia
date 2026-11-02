@@ -44,7 +44,7 @@ const SEM_VINCULO = "Seu Usuário não está vinculado a um Colaborador. Peça o
 const VERSAO_DESATUALIZADA = { error: "O lançamento foi alterado por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
 const PERIODO_NAO_ENCONTRADO = "Período de Fechamento não encontrado.";
 const PERIODO_FECHADO = "O Período de Fechamento está fechado: não é possível lançar, alterar nem excluir.";
-const MIN_BUSCA = 3;
+export const MIN_BUSCA = 3;
 const LIMITE_BUSCA = 30;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,7 +61,7 @@ const PRODUTO_SQL = `
   WHERE p.Eliminado = 0 AND CONVERT(varchar(36), p.rowguid) = @produtoId
 `;
 
-const BUSCA_SQL = `
+export const BUSCA_SQL = `
   SELECT TOP ${LIMITE_BUSCA} CONVERT(varchar(36), p.rowguid) AS produtoId, LTRIM(RTRIM(p.NomeProduto)) AS nome,
          CASE WHEN p.CodigoBarra = @busca OR EXISTS (SELECT 1 FROM Produto_CodigoBarra b WHERE b.CodigoProduto = p.CodigoProduto AND b.CodigoBarra = @busca)
               THEN @busca ELSE p.CodigoBarra END AS codigoBarra
@@ -74,7 +74,7 @@ const BUSCA_SQL = `
 `;
 
 type LinhaProduto = { codigoProduto: number; produtoId: string; nome: string | null; codigoBarra: string | null };
-type LinhaBusca = { produtoId: string; nome: string | null; codigoBarra: string | null };
+export type LinhaBusca = { produtoId: string; nome: string | null; codigoBarra: string | null };
 type LinhaVenda = { codigoColaborador: number; produtoId: string; quantidade: number | null };
 
 const LOTE_PRODUTOS = 1000;
