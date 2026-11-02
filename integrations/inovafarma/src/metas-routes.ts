@@ -224,6 +224,12 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     return { meta, tipo, periodo } as const;
   };
 
+  /**
+   * O Período pode fechar entre `alteravel` e a gravação (a Apuração congela no fechamento): confere de novo logo antes
+   * de gravar. O status é do Module `closing_period`, fora do store das Metas, então não entra na condição da gravação.
+   */
+  const aindaAberto = async (meta: Meta) => (await periods.list()).find((p) => p.id === meta.periodoId)?.status === "open";
+
   const gravar = async (meta: Meta, dados: Partial<DadosMeta>, version: number) =>
     metas.atualizar(meta.id, { participantes: meta.participantes, excluidos: meta.excluidos, lista: meta.lista, ...dados }, version);
 
@@ -264,6 +270,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       dados = { participantes: [...meta.participantes, { ...colaborador, alvo: novo }], excluidos: meta.excluidos.filter((e) => e !== codigo) };
       atributos = { ...base, colaborador: colaborador.nome, mudanca: "incluido", alvo: texto(novo), anterior: null };
     }
+    if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
     const atualizada = await gravar(meta, dados, version);
     if (!atualizada) return c.json(VERSAO_DESATUALIZADA, 409);
     await registrar(c, METAS_ACTIONS.participante, atualizada, atributos);
@@ -281,6 +288,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     const { version, codigos } = parsed.data;
     const marcados = meta.participantes.filter((p) => codigos.includes(p.codigoColaborador));
     if (marcados.length !== new Set(codigos).size) return c.json({ error: NAO_PARTICIPANTE }, 400);
+    if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
     const atualizada = await metas.definirAlvo(meta.id, codigos, parsed.data.alvo, version);
     if (!atualizada) return c.json(VERSAO_DESATUALIZADA, 409);
     await registrar(c, METAS_ACTIONS.definirAlvo, atualizada, {
@@ -309,6 +317,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     if (!ajustes.every((a) => ids.has(a.produtoId) && participantes.has(a.codigoColaborador))) return c.json({ error: "Um ajuste é de um produto ou Colaborador fora da Meta." }, 400);
     // O ajuste igual à quantidade do produto não é ajuste.
     const lista = { produtos, minimo, ajustes: ajustes.filter((a) => produtos.find((p) => p.produtoId === a.produtoId)!.quantidade !== a.quantidade) };
+    if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
     const atualizada = await gravar(meta, { lista }, version);
     if (!atualizada) return c.json(VERSAO_DESATUALIZADA, 409);
     await registrar(c, METAS_ACTIONS.lista, atualizada, {
