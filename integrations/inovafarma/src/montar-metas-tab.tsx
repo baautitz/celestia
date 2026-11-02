@@ -390,7 +390,8 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
 
   const salvarAlteracoes = async () => {
     const r = await windows.open<true>({
-      surface: "sheet",
+      surface: "dialog",
+      size: "large",
       title: "Salvar alterações",
       description: `${alteracoes.length} alteraç${alteracoes.length === 1 ? "ão" : "ões"} nas Metas de ${periodo?.name ?? "o Período"}.`,
       content: () => <SalvarAlteracoesWindow alteracoes={alteracoes} />,
