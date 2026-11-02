@@ -51,7 +51,7 @@ function boot() {
   });
   const req = (who: string, method: string, path: string, body?: unknown) =>
     app.request(path, { method, headers: { "x-user": who, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
-  return { req, metas, log };
+  return { req, metas, log, periodos };
 }
 
 type Tipo = typeof cmv & { id: string; version: number; premio: string };
@@ -109,5 +109,44 @@ describe("Tipos de Meta", () => {
     const marco = (await metas.listar(["marco"]))[0]!;
     expect((await aplicar(marco.id, marco.version)).status).toBe(409);
     expect(log.at(-1)).toBe('Aplicou o Alvo padrão 30% do Tipo de Meta "CMV" a 1 Participante no período "Abril": BIA.');
+  });
+});
+
+describe("Alvo padrão com o Período fechando ao mesmo tempo", () => {
+  it("não grava nem registra se o Período fecha durante a aplicação", async () => {
+    const { req, metas, log, periodos } = boot();
+    const criado = (await (await req("gil", "POST", "/metas/tipos", cmv)).json()) as Tipo;
+    const abril = await metas.criar({ periodoId: "abril", tipoId: criado.id, participantes: [{ codigoColaborador: 2, nome: "BIA", alvo: null }], excluidos: [], lista: null });
+    if (!abril) throw new Error("Meta não criada");
+    // Outro gestor fecha o Período enquanto a aplicação confere a Meta.
+    const ler = metas.meta.bind(metas);
+    metas.meta = async (id) => {
+      periodos[0] = { ...periodos[0], status: "closed" } as PeriodoResumo;
+      return ler(id);
+    };
+    const antes = log.length;
+    const res = await req("gil", "POST", `/metas/tipos/${criado.id}/aplicar-alvo-padrao`, { aplicacoes: [{ metaId: abril.id, version: abril.version, codigos: [2] }] });
+    expect(res.status).toBe(409);
+    expect((await ler(abril.id))?.participantes[0]?.alvo).toBeNull();
+    expect(log.length).toBe(antes);
+  });
+});
+
+describe("Alvo em várias Metas de uma vez", () => {
+  it("grava todas ou nenhuma: uma Meta alterada por outra pessoa não deixa as outras alteradas", async () => {
+    const metas = new MemoryMetaStore();
+    const participantes = [{ codigoColaborador: 1, nome: "ANA", alvo: null }];
+    const abril = await metas.criar({ periodoId: "abril", tipoId: "t", participantes, excluidos: [], lista: null });
+    const maio = await metas.criar({ periodoId: "maio", tipoId: "t", participantes, excluidos: [], lista: null });
+    if (!abril || !maio) throw new Error("Metas não criadas");
+    const aplicacoes = (versaoMaio: number) => [
+      { id: abril.id, codigos: [1], expectedVersion: abril.version },
+      { id: maio.id, codigos: [1], expectedVersion: versaoMaio },
+    ];
+    const alvos = async () => (await metas.listar(["abril", "maio"])).map((m) => m.participantes[0]?.alvo);
+    expect(await metas.definirAlvos(aplicacoes(maio.version + 1), 30)).toBeNull();
+    expect(await alvos()).toEqual([null, null]);
+    expect((await metas.definirAlvos(aplicacoes(maio.version), 30))?.length).toBe(2);
+    expect(await alvos()).toEqual([30, 30]);
   });
 });

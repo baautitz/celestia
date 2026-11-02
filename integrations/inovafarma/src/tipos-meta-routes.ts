@@ -148,12 +148,17 @@ export function registerTiposMetaRoutes({ routes, permissions, auth, store, meta
       alvos.push({ ...a, meta, periodo });
     }
 
+    // O Período pode ter fechado durante a conferência: confere de novo logo antes de gravar.
+    const abertosAgora = new Set((await periodosAbertos()).map((p) => p.id));
+    if (!alvos.every(({ periodo }) => abertosAgora.has(periodo.id))) return c.json({ error: PERIODO_FECHADO }, 409);
+    const atualizadas = await metas.definirAlvos(
+      alvos.map(({ meta, codigos, version }) => ({ id: meta.id, codigos, expectedVersion: version })),
+      tipo.alvoPadrao,
+    );
+    if (!atualizadas) return c.json(META_DESATUALIZADA, 409);
+
     const alvoTexto = formatarValor(indicadorPorId(tipo.indicador), tipo.alvoPadrao);
-    const atualizadas = [];
-    for (const { meta, periodo, codigos, version } of alvos) {
-      const atualizada = await metas.definirAlvo(meta.id, codigos, tipo.alvoPadrao, version);
-      if (!atualizada) return c.json(META_DESATUALIZADA, 409);
-      atualizadas.push(atualizada);
+    for (const { meta, periodo, codigos } of alvos) {
       await audit.record({
         plugin: TIPOS_META_PLUGIN,
         action: TIPOS_META_ACTIONS.aplicarAlvoPadrao,
