@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
-import { HeaderActionsProvider } from "@platform/ui/context/header-actions";
+import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { MetasPage } from "./metas-page";
 
 const apiFetch = vi.hoisted(() => vi.fn());
@@ -95,7 +95,17 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const renderizar = () => render(<UiProvider><HeaderActionsProvider><MetasPage /></HeaderActionsProvider></UiProvider>);
+/** Destino das ações do cabeçalho, que no app é o shell. */
+const HeaderSlot = () => <>{useHeaderActions().actions}</>;
+const renderizar = () =>
+  render(
+    <UiProvider>
+      <HeaderActionsProvider>
+        <HeaderSlot />
+        <MetasPage />
+      </HeaderActionsProvider>
+    </UiProvider>,
+  );
 
 describe("Metas: Tipos de Meta", () => {
   it("lista os Tipos de Meta com a prévia do Prêmio", async () => {
@@ -131,10 +141,13 @@ describe("Metas: Montar Metas", () => {
     return screen.findByRole("switch", { name: "BIA participa da Meta CMV" });
   };
 
-  it("mostra os Participantes com o Alvo e desmarca quem não participa", async () => {
+  it("edita na linha e só grava depois do resumo de Salvar alterações", async () => {
     const bia = await abrir();
-    expect(screen.getAllByText("Pendente").length).toBeGreaterThan(0);
     fireEvent.click(bia);
+    expect(apiFetch).not.toHaveBeenCalledWith("/api/m/inovafarma/metas/met_1/participantes/2", expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações (1)" }));
+    expect((await screen.findAllByText("Não participa")).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/met_1/participantes/2", expect.anything()));
     const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/participantes/2"))!;
     expect(JSON.parse(String(init.body))).toEqual({ version: 1, participa: false });

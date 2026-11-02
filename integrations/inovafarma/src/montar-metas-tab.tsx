@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListChecks, Pencil, Plus, Target, Trash2 } from "lucide-react";
+import { ListChecks, Plus, Save, Target, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
@@ -130,37 +130,57 @@ function AdicionarMetaWindow({ periodoId, tipos }: { periodoId: string; tipos: M
   );
 }
 
-function AlvoParticipanteWindow({ meta, codigoColaborador }: { meta: MetaVista; codigoColaborador: number }) {
-  const { resolve } = useWindow<MetaVista>();
+/** Participação editada na tela e ainda não salva. */
+interface Edicao {
+  participa: boolean;
+  alvo: number | null;
+}
+/** Edições por Meta e por Colaborador. */
+type Edicoes = Record<string, Record<number, Edicao>>;
+
+interface Alteracao {
+  meta: MetaVista;
+  codigoColaborador: number;
+  nome: string;
+  edicao: Edicao;
+  antes: string;
+  depois: string;
+}
+
+/** Resumo das alterações antes de salvar; grava Meta a Meta, uma Participação por vez, seguindo a `version` devolvida. */
+function SalvarAlteracoesWindow({ alteracoes }: { alteracoes: Alteracao[] }) {
+  const { resolve } = useWindow<true>();
   const { feedback } = useUi();
-  const participante = meta.participantes.find((p) => p.codigoColaborador === codigoColaborador)!;
-  const [alvo, setAlvo] = useState(participante.alvo);
   const [enviando, setEnviando] = useState(false);
-  const indicador = indicadorPorId(meta.tipo.indicador);
   const salvar = async () => {
     setEnviando(true);
+    const versoes = new Map<string, number>();
     try {
-      resolve(
-        await apiFetch<MetaVista>(`${BASE}/${meta.id}/participantes/${codigoColaborador}`, {
-          method: "PUT",
-          headers: JSON_HEADERS,
-          body: JSON.stringify({ version: meta.version, participa: true, alvo }),
-        }),
-      );
+      for (const a of alteracoes) {
+        const version = versoes.get(a.meta.id) ?? a.meta.version;
+        const corpo = { version, participa: a.edicao.participa, ...(a.edicao.participa && a.edicao.alvo !== null ? { alvo: a.edicao.alvo } : {}) };
+        const salva = await apiFetch<MetaVista>(`${BASE}/${a.meta.id}/participantes/${a.codigoColaborador}`, { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(corpo) });
+        versoes.set(a.meta.id, salva.version);
+      }
+      feedback.notify({ type: "success", title: alteracoes.length === 1 ? "Alteração salva." : `${alteracoes.length} alterações salvas.` });
     } catch (err: unknown) {
-      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao alterar o Alvo."));
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao salvar as alterações."));
     } finally {
       setEnviando(false);
     }
+    resolve(true);
   };
+  const colunas: DataTableColumn<Alteracao>[] = [
+    { key: "meta", label: "Meta", value: (a) => a.meta.tipo.nome },
+    { key: "colaborador", label: "Colaborador", value: (a) => a.nome, mobileRole: "primary" },
+    { key: "antes", label: "Antes", value: (a) => a.antes },
+    { key: "depois", label: "Depois", value: (a) => a.depois },
+  ];
   return (
     <>
-      <Stack gap="field">
-        <Label>{rotuloAlvo(indicador)}</Label>
-        <AlvoInput autoFocus indicador={indicador} valor={alvo} onChange={setAlvo} label={rotuloAlvo(indicador)} />
-      </Stack>
+      <DataTable columns={colunas} rows={alteracoes} getRowId={(a) => `${a.meta.id}-${a.codigoColaborador}`} />
       <WindowActions>
-        <WindowCancelButton />
+        <WindowCancelButton>Voltar</WindowCancelButton>
         <Button type="button" disabled={enviando} onClick={() => void salvar()}>
           Salvar
         </Button>
@@ -234,61 +254,46 @@ function AcoesDaMeta({ meta, somenteLeitura, periodoNome, recarregar }: { meta: 
   );
 }
 
+/** O que a tela mostra de um Colaborador na Meta: a edição pendente ou o que está salvo. */
+const participacao = (meta: MetaVista, edicoes: Record<number, Edicao> | undefined, codigo: number): Edicao => {
+  const editada = edicoes?.[codigo];
+  if (editada) return editada;
+  const p = meta.participantes.find((x) => x.codigoColaborador === codigo);
+  return p ? { participa: true, alvo: p.alvo } : { participa: false, alvo: null };
+};
+
+/** Uma Meta do Período: os Colaboradores com o Participa e o Alvo editáveis na própria linha. */
 function MetaDoPeriodo({
   meta,
   colaboradores,
   somenteLeitura,
-  atualizar,
-  recarregar,
+  edicoes,
+  editar,
 }: {
   meta: MetaVista;
   colaboradores: Colaborador[];
   somenteLeitura: boolean;
-  atualizar: (meta: MetaVista) => void;
-  recarregar: () => void;
+  edicoes: Record<number, Edicao> | undefined;
+  editar: (codigo: number, edicao: Edicao) => void;
 }) {
-  const { feedback, windows } = useUi();
   const indicador = indicadorPorId(meta.tipo.indicador);
   const avaliacoes = meta.tipo.indicador === "avaliacoes";
-  const participante = (codigo: number) => meta.participantes.find((p) => p.codigoColaborador === codigo);
+  const estado = (c: Colaborador) => participacao(meta, edicoes, c.codigoColaborador);
+  const salvo = (codigo: number) => meta.participantes.some((p) => p.codigoColaborador === codigo);
   // Os Colaboradores inativos só aparecem enquanto participam.
-  const linhas = colaboradores.filter((c) => c.ativo || participante(c.codigoColaborador));
-
-  const marcar = async (c: Colaborador, participa: boolean) => {
-    try {
-      atualizar(
-        await apiFetch<MetaVista>(`${BASE}/${meta.id}/participantes/${c.codigoColaborador}`, {
-          method: "PUT",
-          headers: JSON_HEADERS,
-          body: JSON.stringify({ version: meta.version, participa }),
-        }),
-      );
-    } catch (err: unknown) {
-      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao alterar o Participante."));
-      recarregar();
-    }
-  };
-
-  const alterarAlvo = async (c: Colaborador) => {
-    const r = await windows.open<MetaVista>({
-      surface: "dialog",
-      title: avaliacoes ? "Alterar valor inicial" : "Alterar Alvo",
-      description: `${c.nome} · Meta "${meta.tipo.nome}"`,
-      content: () => <AlvoParticipanteWindow meta={meta} codigoColaborador={c.codigoColaborador} />,
-    });
-    if (r.status === "confirmed") atualizar(r.value);
-  };
+  const linhas = colaboradores.filter((c) => c.ativo || salvo(c.codigoColaborador));
+  const texto = (e: Edicao) => (!e.participa ? "" : e.alvo === null ? "Pendente" : formatarValor(indicador, e.alvo));
 
   const colunas: DataTableColumn<Colaborador>[] = [
     {
       key: "participa",
       label: "Participa",
-      value: (c) => (participante(c.codigoColaborador) ? "Sim" : "Não"),
+      value: (c) => (estado(c).participa ? "Sim" : "Não"),
       render: (c) => (
         <Switch
-          checked={Boolean(participante(c.codigoColaborador))}
+          checked={estado(c).participa}
           disabled={somenteLeitura}
-          onCheckedChange={(on: boolean) => void marcar(c, on)}
+          onCheckedChange={(on: boolean) => editar(c.codigoColaborador, { participa: on, alvo: estado(c).alvo })}
           aria-label={`${c.nome} participa da Meta ${meta.tipo.nome}`}
         />
       ),
@@ -299,36 +304,23 @@ function MetaDoPeriodo({
     colunas.push({
       key: "alvo",
       label: avaliacoes ? "Valor inicial" : "Alvo",
-      value: (c) => {
-        const p = participante(c.codigoColaborador);
-        return !p ? "" : p.alvo === null ? "Pendente" : formatarValor(indicador, p.alvo);
-      },
+      value: (c) => texto(estado(c)),
       render: (c) => {
-        const p = participante(c.codigoColaborador);
-        if (!p) return null;
-        return p.alvo === null ? <Badge variant="warning">Pendente</Badge> : formatarValor(indicador, p.alvo);
+        const e = estado(c);
+        if (!e.participa) return null;
+        if (somenteLeitura) return e.alvo === null ? <Badge variant="warning">Pendente</Badge> : formatarValor(indicador, e.alvo);
+        return (
+          <AlvoInput
+            indicador={indicador}
+            valor={e.alvo}
+            onChange={(alvo) => editar(c.codigoColaborador, { participa: true, alvo })}
+            label={`${rotuloAlvo(indicador)} de ${c.nome}`}
+          />
+        );
       },
     });
 
-  return (
-    <Stack gap="field">
-      <DataTable
-        columns={colunas}
-        rows={linhas}
-        getRowId={(c) => String(c.codigoColaborador)}
-        title="Participantes"
-        emptyMessage="Nenhum Colaborador nesta Loja."
-        search={{ placeholder: "Buscar Colaborador" }}
-        rowActions={(c) =>
-          !somenteLeitura && usaAlvo(meta.tipo) && participante(c.codigoColaborador) ? (
-            <Button size="icon" variant="ghost" aria-label={`${avaliacoes ? "Alterar valor inicial" : "Alterar Alvo"} de ${c.nome}`} onClick={() => void alterarAlvo(c)}>
-              <Pencil />
-            </Button>
-          ) : null
-        }
-      />
-    </Stack>
-  );
+  return <DataTable columns={colunas} rows={linhas} getRowId={(c) => String(c.codigoColaborador)} title="Participantes" emptyMessage="Nenhum Colaborador nesta Loja." search={{ placeholder: "Buscar Colaborador" }} />;
 }
 
 /** Aba Montar Metas: as Metas de cada Período, com Participantes, Alvos e Lista de Produtos. */
@@ -337,6 +329,7 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
   const [periodoId, setPeriodoId] = useState(() => periodoInicial(periodos));
   const [loja, setLoja] = useState(TODAS);
   const [montagem, setMontagem] = useState<Montagem | null>(null);
+  const [edicoes, setEdicoes] = useState<Edicoes>({});
   const consulta = useRef(0);
   const periodo = periodos.find((p) => p.id === periodoId);
 
@@ -347,6 +340,7 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
       const m = await apiFetch<Montagem>(`${BASE}?periodoId=${encodeURIComponent(periodoId)}`);
       if (minha !== consulta.current) return;
       setMontagem(m);
+      setEdicoes({});
       if (m.copiadoDe) feedback.notify({ type: "success", title: `Metas copiadas de ${m.copiadoDe}.`, description: "Confira os Participantes novos e os pendentes." });
     } catch (err: unknown) {
       if (minha === consulta.current) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar as Metas."));
@@ -367,9 +361,42 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
     if (r.status === "confirmed") void carregar();
   };
 
-  const atualizar = (meta: MetaVista) => setMontagem((m) => m && { ...m, metas: m.metas.map((x) => (x.id === meta.id ? meta : x)) });
+  /** Guarda a edição; voltar ao que está salvo desfaz a pendência. */
+  const editar = (meta: MetaVista, codigo: number, edicao: Edicao) =>
+    setEdicoes((atual) => {
+      const daMeta = { ...(atual[meta.id] ?? {}) };
+      const original = participacao(meta, undefined, codigo);
+      if (original.participa === edicao.participa && (!edicao.participa || original.alvo === edicao.alvo)) delete daMeta[codigo];
+      else daMeta[codigo] = edicao;
+      return { ...atual, [meta.id]: daMeta };
+    });
 
+  const alteracoes: Alteracao[] = (montagem?.metas ?? []).flatMap((meta) =>
+    Object.entries(edicoes[meta.id] ?? {}).map(([codigo, edicao]) => {
+      const indicador = indicadorPorId(meta.tipo.indicador);
+      const valor = (e: Edicao, novo: boolean) =>
+        !e.participa ? "Não participa" : !usaAlvo(meta.tipo) ? "Participa" : e.alvo === null ? (novo ? "Participa com o Alvo padrão" : "Participa · Alvo pendente") : `Participa · ${formatarValor(indicador, e.alvo)}`;
+      const original = participacao(meta, undefined, Number(codigo));
+      return {
+        meta,
+        codigoColaborador: Number(codigo),
+        nome: montagem?.colaboradores.find((c) => c.codigoColaborador === Number(codigo))?.nome ?? `Colaborador ${codigo}`,
+        edicao,
+        antes: valor(original, false),
+        depois: valor(edicao, !original.participa),
+      };
+    }),
+  );
 
+  const salvarAlteracoes = async () => {
+    const r = await windows.open<true>({
+      surface: "dialog",
+      title: "Salvar alterações",
+      description: `${alteracoes.length} alteraç${alteracoes.length === 1 ? "ão" : "ões"} nas Metas de ${periodo?.name ?? "o Período"}.`,
+      content: () => <SalvarAlteracoesWindow alteracoes={alteracoes} />,
+    });
+    if (r.status === "confirmed") void carregar();
+  };
 
   if (periodos.length === 0)
     return (
@@ -383,6 +410,13 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
   return (
     <Stack gap="section">
       <HeaderActions>
+        <Button variant="outline" disabled={alteracoes.length === 0} onClick={() => setEdicoes({})}>
+          Descartar
+        </Button>
+        <Button variant="outline" disabled={alteracoes.length === 0} onClick={() => void salvarAlteracoes()}>
+          <Save />
+          Salvar alterações{alteracoes.length ? ` (${alteracoes.length})` : ""}
+        </Button>
         <Button disabled={!montagem || montagem.somenteLeitura || !montagem.tiposDisponiveis?.length} onClick={() => void adicionar()}>
           <Plus />
           Adicionar Meta
@@ -443,8 +477,8 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
               meta={m}
               colaboradores={colaboradores}
               somenteLeitura={montagem.somenteLeitura}
-              atualizar={atualizar}
-              recarregar={() => void carregar()}
+              edicoes={edicoes[m.id]}
+              editar={(codigo, edicao) => editar(m, codigo, edicao)}
             />
           )
         }
