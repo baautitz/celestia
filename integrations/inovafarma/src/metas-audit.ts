@@ -9,6 +9,7 @@ export const METAS_ACTIONS = {
   participante: "meta_participante_update",
   definirAlvo: "meta_alvo_define",
   lista: "meta_lista_update",
+  excluir: "meta_delete",
 } as const;
 
 /** Tudo em texto (Tipo, Período, Alvos): a entrada continua legível se o Tipo de Meta ou o Colaborador mudar. */
@@ -48,6 +49,12 @@ export function declareMetasAudit(audit: AuditService): void {
     schema: AtributosCriacao,
     action: METAS_ACTIONS.criar,
     summary: (a) => `Adicionou a Meta "${a.tipo}" ao período "${a.periodo}" com ${plural(a.participantes, "Participante")}.`,
+  });
+  audit.declareAction({
+    ...base,
+    schema: AtributosCriacao,
+    action: METAS_ACTIONS.excluir,
+    summary: (a) => `Removeu a Meta "${a.tipo}" do período "${a.periodo}", que tinha ${plural(a.participantes, "Participante")}.`,
   });
   audit.declareAction({
     ...base,

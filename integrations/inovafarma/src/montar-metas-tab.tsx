@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListChecks, Pencil, Plus, Target } from "lucide-react";
+import { ListChecks, Pencil, Plus, Target, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
@@ -172,7 +172,7 @@ function AlvoParticipanteWindow({ meta, codigoColaborador }: { meta: MetaVista; 
 /** Uma Meta do Período: os Colaboradores com o checkbox de Participante e o Alvo de cada um. */
 /** Ações de uma Meta na coluna Ações: Definir Alvo (ou valor inicial) e Lista de Produtos. */
 function AcoesDaMeta({ meta, somenteLeitura, periodoNome, recarregar }: { meta: MetaVista; somenteLeitura: boolean; periodoNome: string; recarregar: () => void }) {
-  const { windows } = useUi();
+  const { feedback, windows } = useUi();
   const avaliacoes = meta.tipo.indicador === "avaliacoes";
   const definirAlvo = async () => {
     const r = await windows.open<true>({
@@ -194,6 +194,23 @@ function AcoesDaMeta({ meta, somenteLeitura, periodoNome, recarregar }: { meta: 
     if (r.status === "confirmed") recarregar();
   };
 
+  const remover = async () => {
+    const ok = await windows.confirm({
+      title: "Remover Meta",
+      description: `Remover a Meta "${meta.tipo.nome}" de ${periodoNome}, com os ${meta.participantes.length} Participantes e os Alvos deles?`,
+      confirmLabel: "Remover",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await apiFetch(`${BASE}/${meta.id}?version=${meta.version}`, { method: "DELETE" });
+      feedback.notify({ type: "success", title: "Meta removida." });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao remover a Meta."));
+    }
+    recarregar();
+  };
+
   return (
     <Stack direction="row" gap="tight" justify="end">
       {!somenteLeitura && usaAlvo(meta.tipo) && (
@@ -206,6 +223,11 @@ function AcoesDaMeta({ meta, somenteLeitura, periodoNome, recarregar }: { meta: 
         <Button variant="outline" onClick={() => void abrirLista()}>
           <ListChecks />
           Lista de Produtos
+        </Button>
+      )}
+      {!somenteLeitura && (
+        <Button size="icon" variant="ghost" tone="destructive" aria-label={`Remover a Meta ${meta.tipo.nome}`} onClick={() => void remover()}>
+          <Trash2 />
         </Button>
       )}
     </Stack>

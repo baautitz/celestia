@@ -62,6 +62,8 @@ export interface MetaStore {
   definirAlvos(aplicacoes: AplicacaoAlvo[], alvo: number | null): Promise<Meta[] | null>;
   /** Grava Participantes, excluídos e Lista de Produtos de uma vez. Compare-and-set pela `version`; null se a Meta mudou ou sumiu. */
   atualizar(id: string, dados: DadosMeta, expectedVersion: number): Promise<Meta | null>;
+  /** Remove a Meta com os Participantes. Compare-and-set pela `version`; false se a Meta mudou ou sumiu. */
+  excluir(id: string, expectedVersion: number): Promise<boolean>;
 }
 
 export const novoIdMeta = (): string => `met_${randomUUID()}`;
@@ -72,6 +74,11 @@ export class MemoryMetaStore implements MetaStore {
 
   async listar(periodoIds: string[]): Promise<Meta[]> {
     return [...this.metas.values()].filter((m) => periodoIds.includes(m.periodoId));
+  }
+
+  async excluir(id: string, expectedVersion: number): Promise<boolean> {
+    if (this.metas.get(id)?.version !== expectedVersion) return false;
+    return this.metas.delete(id);
   }
 
   async meta(id: string): Promise<Meta | null> {

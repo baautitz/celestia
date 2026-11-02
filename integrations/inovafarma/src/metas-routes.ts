@@ -245,6 +245,19 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     return c.json(comTipo(atualizada, tipo));
   });
 
+  // Remove a Meta do Período aberto, com os Participantes.
+  routes.delete("/metas/:id", auth, async (c: AuthContext) => {
+    const alteracao = await alteravel(c);
+    if ("recusa" in alteracao) return alteracao.recusa;
+    const { meta, tipo, periodo } = alteracao;
+    const version = Number(c.req.query("version"));
+    if (!Number.isInteger(version)) return c.json({ error: "Informe a versão da Meta." }, 400);
+    if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
+    if (!(await metas.excluir(meta.id, version))) return c.json(META_DESATUALIZADA, 409);
+    await registrar(c, METAS_ACTIONS.excluir, meta, { tipo: tipo.nome, periodo: periodo.name, participantes: meta.participantes.length });
+    return c.body(null, 204);
+  });
+
   // Lista de Produtos: a quantidade de cada produto, os ajustes por Colaborador e o mínimo de produtos batidos.
   routes.put("/metas/:id/lista", auth, async (c: AuthContext) => {
     const alteracao = await alteravel(c);

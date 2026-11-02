@@ -41,6 +41,12 @@ export class PostgresMetaStore implements MetaStore {
     });
   }
 
+  async excluir(id: string, expectedVersion: number): Promise<boolean> {
+    // Os Participantes saem junto (`onDelete: "cascade"`).
+    const rows = await this.db.delete(metas).where(and(eq(metas.id, id), eq(metas.version, expectedVersion))).returning({ id: metas.id });
+    return rows.length > 0;
+  }
+
   async definirAlvo(id: string, codigos: number[], alvo: number | null, expectedVersion: number): Promise<Meta | null> {
     return (await this.definirAlvos([{ id, codigos, expectedVersion }], alvo))?.[0] ?? null;
   }

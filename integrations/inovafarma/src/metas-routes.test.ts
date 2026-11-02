@@ -115,6 +115,18 @@ describe("Montar Metas", () => {
     expect(log).toEqual(['Adicionou a Meta "CMV" ao período "Abril" com 2 Participantes.']);
   });
 
+  it("remove a Meta do Período aberto pela version e devolve o Tipo ao Adicionar Meta", async () => {
+    const { req, json, tipos, log } = await boot();
+    const tipo = await tipos.criar(cmv);
+    const criada = (await (await req("gil", "POST", "/metas", { periodoId: "abril", tipoId: tipo.id })).json()) as Meta;
+    expect((await req("gil", "DELETE", `/metas/${criada.id}?version=${criada.version + 1}`)).status).toBe(409);
+    expect((await req("gil", "DELETE", `/metas/${criada.id}?version=${criada.version}`)).status).toBe(204);
+    const montagem = await json<Montagem>("gil", "GET", "/metas?periodoId=abril");
+    expect(montagem.metas).toEqual([]);
+    expect(montagem.tiposDisponiveis.map((t) => t.nome)).toEqual(["CMV"]);
+    expect(log.at(-1)).toBe('Removeu a Meta "CMV" do período "Abril", que tinha 2 Participantes.');
+  });
+
   it("exige a Permission e só altera Metas de Período aberto", async () => {
     const { req, tipos } = await boot();
     const tipo = await tipos.criar(cmv);
