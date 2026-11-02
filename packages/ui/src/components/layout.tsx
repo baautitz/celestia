@@ -33,7 +33,7 @@ const paddings = {
   card: "p-4",
 } as const
 const aligns = { start: "items-start", center: "items-center", end: "items-end" } as const
-const justifies = { end: "justify-end", between: "justify-between" } as const
+const justifies = { center: "justify-center", end: "justify-end", between: "justify-between" } as const
 /** `lgUp`: a partir do breakpoint `lg` (1024px); `belowLg`: abaixo dele. */
 const visibility = {
   lgUp: "hidden lg:contents",

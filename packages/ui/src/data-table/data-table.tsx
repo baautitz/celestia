@@ -65,6 +65,8 @@ const isNumericFormat = (format?: DataTableFormat): format is TrendFormat =>
   NUMERIC_FORMATS.has(format);
 const isNumericColumn = (col: { format?: DataTableFormat }) =>
   isNumericFormat(col.format);
+const isCenteredColumn = (col: { format?: DataTableFormat; centered?: boolean }) =>
+  col.centered === true || col.format === "date";
 /** Colunas que não quebram linha na impressão; as demais quebram para a tabela encolher menos. */
 const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([
   ...NUMERIC_FORMATS,
@@ -100,6 +102,8 @@ export interface DataTableColumn<TRow> {
   value?: (row: TRow) => CellValue;
   /** Conteúdo customizado (badges etc.); tem precedência sobre `value`/`format` na célula. */
   render?: (row: TRow) => React.ReactNode;
+  /** Coluna de tags (badges de situação, perfil etc.) ou de datas: cabeçalho e células centralizados. `format: "date"` já centraliza. */
+  centered?: boolean;
   format?: DataTableFormat;
   sortable?: boolean;
   /** Direção do primeiro clique; o ciclo é primeira → oposta → padrão (sem ordenação). Padrão: "asc". */
@@ -343,6 +347,7 @@ function columnCellClassName<TRow>(
 ): string | undefined {
   return cn(
     isNumericColumn(col) && "text-right tabular-nums",
+    isCenteredColumn(col) && "text-center",
     col.nowrap && "whitespace-nowrap",
     typeof col.cellClassName === "function"
       ? col.cellClassName(row)
@@ -356,6 +361,7 @@ function totalsCellClassName<TRow>(
 ): string | undefined {
   return cn(
     isNumericColumn(col) && "text-right tabular-nums",
+    isCenteredColumn(col) && "text-center",
     col.nowrap && "whitespace-nowrap",
     typeof col.cellClassName === "string" && col.cellClassName,
   );
@@ -585,6 +591,24 @@ export function DataTable<TRow>({
     );
   };
 
+  // No celular: botão largo, entre os campos e o conteúdo que ele abre.
+  const mobileExpandButton = (row: TRow) => {
+    const id = getRowId(row);
+    const expanded = isExpanded(id);
+    return (
+      <Button
+        variant="outline"
+        className="w-full justify-between"
+        aria-expanded={expanded}
+        aria-label={expanded ? "Recolher linha" : "Expandir linha"}
+        onClick={() => toggleExpanded(id)}
+      >
+        {expanded ? "Ocultar detalhes" : "Ver detalhes"}
+        <ChevronDown className={expanded ? "size-4 rotate-180" : "size-4"} />
+      </Button>
+    );
+  };
+
   const text = (col: DataTableColumn<TRow>, row: TRow): string =>
     formatValue(col.value?.(row), col.format);
 
@@ -776,6 +800,7 @@ export function DataTable<TRow>({
                         className={cn(
                           col.sortable && "cursor-pointer select-none",
                           isNumericColumn(col) && "text-right",
+                          isCenteredColumn(col) && "text-center",
                           boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
                           frozenClass(col.key, true),
                           headerEdgeClass(col.key),
@@ -794,6 +819,7 @@ export function DataTable<TRow>({
                             className={cn(
                               "flex items-center gap-1",
                               isNumericColumn(col) && "justify-end",
+                              isCenteredColumn(col) && "justify-center",
                             )}
                           >
                             <HeaderLabel col={col} />
@@ -823,8 +849,10 @@ export function DataTable<TRow>({
     </>
   );
 
+  // Dentro da linha expandida de outra tabela: sem a moldura do Card (borda, fundo e respiro), para não empilhar cards.
+  // `overflow-visible`: sem o respiro, o corte do Card esconderia a borda (`ring`, desenhada por fora) dos cards dos itens.
   return (
-    <Card className={cn(scroll === "page" && "overflow-clip", className)}>
+    <Card className={cn(scroll === "page" && "overflow-clip", nested && "overflow-visible py-0 ring-0 bg-transparent", className)}>
       {(heading || description || search || print) && (
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -867,7 +895,7 @@ export function DataTable<TRow>({
           )}
         </CardHeader>
       )}
-      <CardContent>
+      <CardContent className={nested ? "px-0" : undefined}>
         {isMobile ? (
           <div className="flex flex-col gap-3">
             {loading ? (
@@ -899,20 +927,14 @@ export function DataTable<TRow>({
                     value: mobileCell(c, row),
                     wide: c.mobileWide,
                   }))}
-                  actions={
-                    renderExpanded ? (
-                      <>
-                        {expandButton(row)}
-                        {rowActions?.(row)}
-                      </>
-                    ) : (
-                      rowActions?.(row)
-                    )
-                  }
+                  actions={rowActions?.(row)}
+                  expand={renderExpanded ? mobileExpandButton(row) : undefined}
                   details={
-                    renderExpanded && isExpanded(getRowId(row))
-                      ? renderExpanded(row)
-                      : undefined
+                    renderExpanded && isExpanded(getRowId(row)) ? (
+                      <NestedTableContext.Provider value={true}>
+                        {renderExpanded(row)}
+                      </NestedTableContext.Provider>
+                    ) : undefined
                   }
                 />
               ))
@@ -1212,6 +1234,7 @@ export function PrintDetailTable<TRow>({
               className={cn(
                 "px-1.5 py-0.5 font-medium text-left",
                 isNumericColumn(col) && "text-right",
+                isCenteredColumn(col) && "text-center",
               )}
             >
               {col.label}
@@ -1228,6 +1251,7 @@ export function PrintDetailTable<TRow>({
                 className={cn(
                   "px-1.5 py-0.5 whitespace-normal",
                   isNumericColumn(col) && "text-right",
+                  isCenteredColumn(col) && "text-center",
                 )}
               >
                 {formatValue(col.value?.(row), col.format)}
@@ -1385,6 +1409,7 @@ function PrintTable<TRow>({
                   "h-8",
                   wrapsInPrint(col) && "whitespace-normal",
                   isNumericColumn(col) && "text-right",
+                  isCenteredColumn(col) && "text-center",
                   boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
                   frozenEdge(col.key),
                 )}

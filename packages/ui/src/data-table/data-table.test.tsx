@@ -663,3 +663,26 @@ describe("linha expansível no desktop", () => {
     expect(screen.queryByText("Detalhe de Alfa")).toBeNull();
   });
 });
+
+describe("tabela aninhada no celular", () => {
+  it("a tabela da linha expandida perde a moldura própria, mas cada item continua um card", async () => {
+    setViewport(500);
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        getRowId={(r) => r.id}
+        defaultExpanded
+        renderExpanded={() => (
+          <DataTable columns={columns} rows={[{ id: "x", name: "Interno" }]} getRowId={(r) => r.id} />
+        )}
+      />,
+    );
+    const interno = await screen.findByText("Interno");
+    const item = interno.closest("[data-slot=card]")!;
+    expect(item.className).not.toContain("ring-0");
+    const tabela = item.parentElement!.closest("[data-slot=card]")!;
+    expect(tabela.className).toContain("ring-0");
+    expect(tabela.className).toContain("overflow-visible");
+  });
+});

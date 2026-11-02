@@ -15,6 +15,8 @@ interface MobileCardProps {
   secondary?: string;
   fields: MobileCardField[];
   actions?: React.ReactNode;
+  /** Botão de expandir/recolher: fica acima dos `details` que ele abre. */
+  expand?: React.ReactNode;
   details?: React.ReactNode;
 }
 
@@ -23,6 +25,7 @@ export const MobileCard: React.FC<MobileCardProps> = ({
   secondary,
   fields,
   actions,
+  expand,
   details,
 }) => {
   return (
@@ -48,10 +51,17 @@ export const MobileCard: React.FC<MobileCardProps> = ({
           ))}
         </div>
 
-        {details && (
+        {expand && (
           <>
             <Separator className="my-3" />
-            <div className="text-sm">{details}</div>
+            {expand}
+          </>
+        )}
+
+        {details && (
+          <>
+            {!expand && <Separator className="my-3" />}
+            <div className={cn("text-sm", expand && "mt-3")}>{details}</div>
           </>
         )}
       </CardContent>
