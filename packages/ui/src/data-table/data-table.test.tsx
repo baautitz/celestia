@@ -598,3 +598,41 @@ describe("totalizador", () => {
     expect(screen.getByText("▲ 50,0% · 100")).toBeTruthy();
   });
 });
+
+describe("linha selecionada", () => {
+  const data: Row[] = [
+    { id: "1", name: "Alfa" },
+    { id: "2", name: "Beta" },
+  ];
+
+  it("destaca a linha clicada, troca ao clicar em outra e desmarca ao clicar de novo", async () => {
+    setViewport(1280);
+    render(<DataTable columns={columns} rows={data} getRowId={(r) => r.id} />);
+    const alfa = screen.getByText("Alfa").closest("tr")!;
+    const beta = screen.getByText("Beta").closest("tr")!;
+
+    await userEvent.click(alfa);
+    expect(alfa.getAttribute("aria-selected")).toBe("true");
+
+    await userEvent.click(beta);
+    expect(alfa.getAttribute("aria-selected")).toBe("false");
+    expect(beta.getAttribute("aria-selected")).toBe("true");
+
+    await userEvent.click(beta);
+    expect(beta.getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("não seleciona a linha ao clicar numa ação dela", async () => {
+    setViewport(1280);
+    render(
+      <DataTable
+        columns={columns}
+        rows={data}
+        getRowId={(r) => r.id}
+        rowActions={(r) => <button type="button">Editar {r.name}</button>}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Editar Alfa" }));
+    expect(screen.getByText("Alfa").closest("tr")!.getAttribute("aria-selected")).toBe("false");
+  });
+});

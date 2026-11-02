@@ -284,9 +284,9 @@ function AppHeader(props: Omit<React.ComponentProps<"header">, "className" | "st
   )
 }
 
-/** Área de conteúdo das páginas autenticadas. */
+/** Área de conteúdo das páginas autenticadas. `--table-sticky-top`: altura do `AppHeader`, onde o cabeçalho das tabelas gruda ao rolar a página. */
 function AppMain(props: Omit<React.ComponentProps<"main">, "className" | "style">) {
-  return <main className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8" {...props} />
+  return <main className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8 [--table-sticky-top:--spacing(14)]" {...props} />
 }
 
 /** Tela central cheia (login). */
