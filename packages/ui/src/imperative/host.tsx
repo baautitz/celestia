@@ -4,10 +4,18 @@ import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFoo
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/dialog.tsx"
 import { ScrollArea } from "../components/scroll-area.tsx"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../components/sheet.tsx"
-import type { DismissRequestReason, WindowSnapshotEntry } from "../contracts/windows.ts"
+import type { DismissRequestReason, WindowSize, WindowSnapshotEntry } from "../contracts/windows.ts"
 import type { WindowController } from "./controller.ts"
 import { WindowContext, WindowFooterContext } from "./use-window.tsx"
 import type { WindowHandle } from "./use-window.tsx"
+
+/** Largura do diálogo por `size`; `medium` é o padrão. */
+const DIALOG_WIDTH: Record<WindowSize, string> = {
+  small: "sm:max-w-md",
+  medium: "sm:max-w-lg",
+  large: "sm:max-w-3xl",
+  full: "sm:max-w-6xl",
+}
 
 /** Conteúdo de uma janela: componente sem props (quem abre fecha sobre os dados). */
 export type WindowContent = ComponentType
@@ -77,7 +85,7 @@ function ManagedWindow({ entry, controller }: {
           </Sheet>
         ) : (
           <Dialog open onOpenChange={onOpenChange}>
-            <DialogContent className={options.size === "small" ? "sm:max-w-md" : "sm:max-w-lg"}>
+            <DialogContent className={DIALOG_WIDTH[options.size ?? "medium"]}>
               <DialogHeader>
                 <DialogTitle>{title}</DialogTitle>
                 {options.description && <DialogDescription>{options.description}</DialogDescription>}
