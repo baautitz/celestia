@@ -84,6 +84,7 @@ function TiposDeMeta() {
         </Button>
       </HeaderActions>
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={tipos}
         getRowId={(t) => t.id}

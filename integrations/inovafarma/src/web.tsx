@@ -712,6 +712,7 @@ function VendasComissoesPage() {
 
       {/* Tabela de Colaboradores */}
       <DataTable
+        scroll="page"
         columns={tableColumns}
         rows={colaboradores}
         getRowId={(r) => String(r.codigoColaborador)}
@@ -727,7 +728,6 @@ function VendasComissoesPage() {
             ? "Selecione um Período de Fechamento para carregar as vendas."
             : "Nenhuma venda encontrada para o período e filtros selecionados."
         }
-        pagination={{ pageSize: 20 }}
         striped
         bordered
         frozenUntil="nomeColaborador"

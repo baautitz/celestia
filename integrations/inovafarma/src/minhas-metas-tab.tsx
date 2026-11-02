@@ -93,6 +93,7 @@ export function MinhasMetas({ periodos }: { periodos: PeriodoMetas[] }) {
         </Select>
       </Stack>
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={dados?.metas ?? []}
         getRowId={(m) => m.metaId}

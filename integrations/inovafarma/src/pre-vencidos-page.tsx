@@ -182,6 +182,7 @@ function MeusLancamentos({ contexto }: { contexto: Contexto }) {
         </Alert>
       )}
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={lancamentos}
         getRowId={(l) => l.id}
@@ -271,6 +272,7 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
         </Stack>
       </Stack>
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={linhas}
         getRowId={(l) => String(l.codigoColaborador)}
@@ -281,6 +283,7 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
         search={{ placeholder: "Buscar Colaborador" }}
         renderExpanded={(l) => (
           <DataTable
+            scroll="page"
             columns={[
               { key: "produto", label: "Produto", value: (d: DetalheConferencia) => d.nomeProduto },
               { key: "validades", label: "Validade", value: (d: DetalheConferencia) => d.validades.map(validadeLabel).join(", ") },

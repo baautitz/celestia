@@ -126,6 +126,7 @@ function MinhasAvaliacoes({ contexto }: { contexto: Contexto }) {
     <Stack gap="section">
       <SeletorPeriodo periodos={contexto.periodos} valor={periodoId} onChange={setPeriodoId} />
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={avaliacoes}
         getRowId={(a) => a.id}
@@ -245,6 +246,7 @@ function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
         </Alert>
       )}
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={linhas}
         getRowId={(l) => String(l.codigoColaborador)}
@@ -255,6 +257,7 @@ function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
         totals={(filtradas) => ({ quantidade: filtradas.reduce((n, l) => n + l.quantidade, 0), total: filtradas.reduce((n, l) => n + l.total, 0) })}
         renderExpanded={(l) => (
           <DataTable
+            scroll="page"
             columns={colunasDetalhe}
             rows={l.avaliacoes}
             getRowId={(a) => a.id}

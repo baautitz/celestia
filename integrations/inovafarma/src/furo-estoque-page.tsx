@@ -268,6 +268,7 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
       </Grid>
 
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={visiveis}
         getRowId={(a) => String(a.codigoMovimento)}
@@ -281,7 +282,7 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
             <Text variant="small" tone="muted">
               Observação no ERP: {a.observacaoErp || "sem observação"}
             </Text>
-            <DataTable columns={colunasItens} rows={a.itens} getRowId={(i) => i.produtoId} />
+            <DataTable scroll="page" columns={colunasItens} rows={a.itens} getRowId={(i) => i.produtoId} />
           </Stack>
         )}
         rowActions={
@@ -329,6 +330,7 @@ function Motivos({ motivos, recarregar }: { motivos: Motivo[]; recarregar: () =>
         </Button>
       </HeaderActions>
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={motivos}
         getRowId={(m) => m.id}

@@ -282,6 +282,7 @@ function SalvarAlteracoesWindow({ alteracoes }: { alteracoes: Alteracao[] }) {
   return (
     <>
       <DataTable
+        scroll="page"
         columns={colunas}
         rows={alteracoes}
         getRowId={(a) => `${a.meta.id}-${a.codigoColaborador}`}

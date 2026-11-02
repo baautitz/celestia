@@ -485,6 +485,7 @@ export function ColaboradoresPage() {
       </Stack>
 
       <DataTable
+        scroll="page"
         columns={columns}
         rows={rows}
         getRowId={(r) => String(r.codigoColaborador)}
