@@ -14,6 +14,12 @@ import { declareFuroEstoqueAudit } from "./furo-estoque-audit.js";
 import { registerFuroEstoqueRoutes } from "./furo-estoque-routes.js";
 import { MemoryFuroEstoqueStore } from "./furo-estoque-store.js";
 import { PostgresFuroEstoqueStore } from "./postgres-furo-estoque-store.js";
+import { declareTiposMetaAudit } from "./tipos-meta-audit.js";
+import { registerTiposMetaRoutes } from "./tipos-meta-routes.js";
+import { MemoryTipoMetaStore } from "./tipos-meta-store.js";
+import { MemoryMetaStore } from "./metas-store.js";
+import { PostgresTipoMetaStore } from "./postgres-tipos-meta-store.js";
+import { PostgresMetaStore } from "./postgres-meta-store.js";
 import { declarePreVencidoAudit } from "./pre-vencidos-audit.js";
 import { registerPreVencidosRoutes, type PeriodsService } from "./pre-vencidos-routes.js";
 import { MemoryPreVencidoStore } from "./pre-vencidos-store.js";
@@ -100,6 +106,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declarePreVencidoAudit(audit);
       declareAvaliacaoAudit(audit);
       declareFuroEstoqueAudit(audit);
+      declareTiposMetaAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
       const users = services.use<UsersService>("iam", "users");
       const periods = services.use<PeriodsService>("closing_period", "periods");
@@ -141,6 +148,15 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         store: db ? new PostgresFuroEstoqueStore(db) : new MemoryFuroEstoqueStore(),
         vinculos: store,
         users,
+        periods,
+        audit,
+      });
+      registerTiposMetaRoutes({
+        routes,
+        permissions,
+        auth,
+        store: db ? new PostgresTipoMetaStore(db) : new MemoryTipoMetaStore(),
+        metas: db ? new PostgresMetaStore(db) : new MemoryMetaStore(),
         periods,
         audit,
       });
