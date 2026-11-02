@@ -129,7 +129,9 @@
           "inovafarma:furo-estoque-loja:manage",
           "inovafarma:furo-estoque-geral:manage",
           "inovafarma:tipos-meta:manage",
-          "inovafarma:metas:manage"
+          "inovafarma:metas:manage",
+          "inovafarma:metas-geral:view",
+          "inovafarma:metas-loja:view"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -323,7 +325,9 @@
         "inovafarma:furo-estoque-loja:manage",
         "inovafarma:furo-estoque-geral:manage",
         "inovafarma:tipos-meta:manage",
-        "inovafarma:metas:manage"
+        "inovafarma:metas:manage",
+        "inovafarma:metas-geral:view",
+        "inovafarma:metas-loja:view"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -582,6 +586,20 @@
             "label": "Metas: Montar Metas",
             "description": "Permite montar as Metas de cada Período de Fechamento: Tipos, Participantes, Alvos e Lista de Produtos.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para montar as Metas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-geral:view",
+            "label": "Metas: Acompanhamento de todas as Lojas",
+            "description": "Permite ver o Acompanhamento das Metas de todos os Colaboradores: Realizado, Atingimento e Prêmio.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-loja:view",
+            "label": "Metas: Acompanhamento por Loja",
+            "description": "Permite ver o Acompanhamento das Metas dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas da Loja.",
             "module": "inovafarma"
           }
         ]
@@ -843,6 +861,20 @@
             "label": "Metas: Montar Metas",
             "description": "Permite montar as Metas de cada Período de Fechamento: Tipos, Participantes, Alvos e Lista de Produtos.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para montar as Metas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-geral:view",
+            "label": "Metas: Acompanhamento de todas as Lojas",
+            "description": "Permite ver o Acompanhamento das Metas de todos os Colaboradores: Realizado, Atingimento e Prêmio.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:metas-loja:view",
+            "label": "Metas: Acompanhamento por Loja",
+            "description": "Permite ver o Acompanhamento das Metas dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas da Loja.",
             "module": "inovafarma"
           }
         ]
