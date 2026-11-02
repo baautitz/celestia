@@ -156,8 +156,7 @@ describe("Metas: Acompanhamento", () => {
   it("mostra o resultado em palavras, o Atingimento e o Prêmio, filtrando pela Loja", async () => {
     renderizar();
     fireEvent.click(await screen.findByRole("tab", { name: "Acompanhamento" }));
-    // Uma linha por Colaborador, que expande para as Metas dele.
-    fireEvent.click((await screen.findAllByRole("button", { name: "Expandir linha" }))[0]!);
+    // Uma linha por Colaborador, já expandida com as Metas dele.
     expect((await screen.findAllByText("CMV 25% · Meta: até 30% · ✓ 5 p.p. abaixo")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("120,0%").length).toBeGreaterThan(0);
     expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/acompanhamento?periodoId=abril&visualizacao=geral");

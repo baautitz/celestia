@@ -170,18 +170,58 @@ function AlvoParticipanteWindow({ meta, codigoColaborador }: { meta: MetaVista; 
 }
 
 /** Uma Meta do Período: os Colaboradores com o checkbox de Participante e o Alvo de cada um. */
+/** Ações de uma Meta na coluna Ações: Definir Alvo (ou valor inicial) e Lista de Produtos. */
+function AcoesDaMeta({ meta, somenteLeitura, periodoNome, recarregar }: { meta: MetaVista; somenteLeitura: boolean; periodoNome: string; recarregar: () => void }) {
+  const { windows } = useUi();
+  const avaliacoes = meta.tipo.indicador === "avaliacoes";
+  const definirAlvo = async () => {
+    const r = await windows.open<true>({
+      surface: "sheet",
+      title: avaliacoes ? "Definir valor inicial" : "Definir Alvo",
+      description: `Meta "${meta.tipo.nome}" · ${periodoNome}`,
+      content: () => <DefinirAlvoWindow indicadorId={meta.tipo.indicador} meta={{ id: meta.periodoId, name: periodoNome, metaId: meta.id, version: meta.version, participantes: meta.participantes }} />,
+    });
+    if (r.status === "confirmed") recarregar();
+  };
+
+  const abrirLista = async () => {
+    const r = await windows.open<Meta>({
+      surface: "sheet",
+      title: "Lista de Produtos",
+      description: `Meta "${meta.tipo.nome}" · ${periodoNome}`,
+      content: () => <ListaProdutosWindow meta={meta} somenteLeitura={somenteLeitura} />,
+    });
+    if (r.status === "confirmed") recarregar();
+  };
+
+  return (
+    <Stack direction="row" gap="tight" justify="end">
+      {!somenteLeitura && usaAlvo(meta.tipo) && (
+        <Button variant="outline" onClick={() => void definirAlvo()}>
+          <Target />
+          {avaliacoes ? "Definir valor inicial" : "Definir Alvo"}
+        </Button>
+      )}
+      {meta.tipo.indicador === "lista-produtos" && (
+        <Button variant="outline" onClick={() => void abrirLista()}>
+          <ListChecks />
+          Lista de Produtos
+        </Button>
+      )}
+    </Stack>
+  );
+}
+
 function MetaDoPeriodo({
   meta,
   colaboradores,
   somenteLeitura,
-  periodoNome,
   atualizar,
   recarregar,
 }: {
   meta: MetaVista;
   colaboradores: Colaborador[];
   somenteLeitura: boolean;
-  periodoNome: string;
   atualizar: (meta: MetaVista) => void;
   recarregar: () => void;
 }) {
@@ -217,26 +257,6 @@ function MetaDoPeriodo({
     if (r.status === "confirmed") atualizar(r.value);
   };
 
-  const definirAlvo = async () => {
-    const r = await windows.open<true>({
-      surface: "sheet",
-      title: avaliacoes ? "Definir valor inicial" : "Definir Alvo",
-      description: `Meta "${meta.tipo.nome}" · ${periodoNome}`,
-      content: () => <DefinirAlvoWindow indicadorId={meta.tipo.indicador} meta={{ id: meta.periodoId, name: periodoNome, metaId: meta.id, version: meta.version, participantes: meta.participantes }} />,
-    });
-    if (r.status === "confirmed") recarregar();
-  };
-
-  const abrirLista = async () => {
-    const r = await windows.open<Meta>({
-      surface: "sheet",
-      title: "Lista de Produtos",
-      description: `Meta "${meta.tipo.nome}" · ${periodoNome}`,
-      content: () => <ListaProdutosWindow meta={meta} somenteLeitura={somenteLeitura} />,
-    });
-    if (r.status === "confirmed") recarregar();
-  };
-
   const colunas: DataTableColumn<Colaborador>[] = [
     {
       key: "participa",
@@ -270,30 +290,6 @@ function MetaDoPeriodo({
 
   return (
     <Stack gap="field">
-      {!somenteLeitura && (
-        <Stack direction="row" gap="field" justify="end" wrap>
-          {usaAlvo(meta.tipo) && (
-            <Button variant="outline" onClick={() => void definirAlvo()}>
-              <Target />
-              {avaliacoes ? "Definir valor inicial" : "Definir Alvo"}
-            </Button>
-          )}
-          {meta.tipo.indicador === "lista-produtos" && (
-            <Button variant="outline" onClick={() => void abrirLista()}>
-              <ListChecks />
-              Lista de Produtos
-            </Button>
-          )}
-        </Stack>
-      )}
-      {somenteLeitura && meta.tipo.indicador === "lista-produtos" && (
-        <Stack direction="row" justify="end">
-          <Button variant="outline" onClick={() => void abrirLista()}>
-            <ListChecks />
-            Lista de Produtos
-          </Button>
-        </Stack>
-      )}
       <DataTable
         columns={colunas}
         rows={linhas}
@@ -418,13 +414,13 @@ export function MontarMetas({ periodos, lojas }: { periodos: PeriodoMetas[]; loj
         title="Metas do Período"
         emptyMessage={montagem?.somenteLeitura ? "Este Período fechou sem Metas." : "Nenhuma Meta. Use Adicionar Meta para escolher os Tipos de Meta deste Período."}
         search={{ placeholder: "Buscar Meta" }}
+        rowActions={(m) => montagem && <AcoesDaMeta meta={m} somenteLeitura={montagem.somenteLeitura} periodoNome={periodo?.name ?? ""} recarregar={() => void carregar()} />}
         renderExpanded={(m) =>
           montagem && (
             <MetaDoPeriodo
               meta={m}
               colaboradores={colaboradores}
               somenteLeitura={montagem.somenteLeitura}
-              periodoNome={periodo?.name ?? ""}
               atualizar={atualizar}
               recarregar={() => void carregar()}
             />
