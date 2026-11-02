@@ -17,6 +17,9 @@ import { PostgresFuroEstoqueStore } from "./postgres-furo-estoque-store.js";
 import { declareTiposMetaAudit } from "./tipos-meta-audit.js";
 import { declareMetasAudit } from "./metas-audit.js";
 import { registerMetasRoutes } from "./metas-routes.js";
+import { registerAcompanhamentoRoutes } from "./acompanhamento-routes.js";
+import { MemoryApuracaoStore } from "./apuracao-store.js";
+import { PostgresApuracaoStore } from "./postgres-apuracao-store.js";
 import { registerTiposMetaRoutes } from "./tipos-meta-routes.js";
 import { MemoryTipoMetaStore } from "./tipos-meta-store.js";
 import { MemoryMetaStore } from "./metas-store.js";
@@ -64,7 +67,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
     dependsOn: ["iam", "audit", "closing_period"],
     permissions: INOVAFARMA_PERMISSIONS,
     migrations: INOVAFARMA_MIGRATIONS,
-    register({ routes, permissions, services }) {
+    register({ routes, permissions, services, events }) {
       const audit = services.use<AuditService>("audit", "log");
       declareVinculoAudit(audit);
       declarePreVencidoAudit(audit);
@@ -73,6 +76,8 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declareTiposMetaAudit(audit);
       declareMetasAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
+      const preVencidos = db ? new PostgresPreVencidoStore(db) : new MemoryPreVencidoStore();
+      const avaliacoes = db ? new PostgresAvaliacaoStore(db) : new MemoryAvaliacaoStore();
       const users = services.use<UsersService>("iam", "users");
       const periods = services.use<PeriodsService>("closing_period", "periods");
       registerColaboradoresRoutes({
@@ -89,7 +94,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         permissions,
         auth,
         erpClient: () => erpClients[erpId],
-        store: db ? new PostgresPreVencidoStore(db) : new MemoryPreVencidoStore(),
+        store: preVencidos,
         vinculos: store,
         periods,
         audit,
@@ -99,7 +104,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         permissions,
         auth,
         erpClient: () => erpClients[erpId],
-        store: db ? new PostgresAvaliacaoStore(db) : new MemoryAvaliacaoStore(),
+        store: avaliacoes,
         vinculos: store,
         users,
         periods,
@@ -120,6 +125,20 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       const metas = db ? new PostgresMetaStore(db) : new MemoryMetaStore();
       registerTiposMetaRoutes({ routes, permissions, auth, store: tiposMeta, metas, periods, audit });
       registerMetasRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], tipos: tiposMeta, metas, vinculos: store, periods, audit });
+      registerAcompanhamentoRoutes({
+        routes,
+        permissions,
+        auth,
+        events,
+        erpClient: () => erpClients[erpId],
+        tipos: tiposMeta,
+        metas,
+        vinculos: store,
+        avaliacoes,
+        preVencidos,
+        apuracoes: db ? new PostgresApuracaoStore(db) : new MemoryApuracaoStore(),
+        periods,
+      });
 
       const viewKey = INOVAFARMA_PERMISSIONS.keys["integration:view"];
 

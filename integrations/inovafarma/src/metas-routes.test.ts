@@ -235,7 +235,11 @@ describe("Montar Metas", () => {
 
   it("informa as abas da página que a Permission libera", async () => {
     const { json, req } = await boot();
-    expect(await json("gil", "GET", "/metas/contexto")).toMatchObject({ abas: { tipos: false, montar: true }, periodos: [{ id: "maio" }, { id: "abril" }, { id: "marco" }] });
+    expect(await json("gil", "GET", "/metas/contexto")).toMatchObject({
+      abas: { tipos: false, montar: true, acompanhamento: false },
+      periodos: [{ id: "maio" }, { id: "abril" }, { id: "marco" }],
+      visualizacoes: [],
+    });
     expect((await req("ana", "GET", "/metas/contexto")).status).toBe(403);
   });
 });

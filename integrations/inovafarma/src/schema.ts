@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, doublePrecision, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { IndicadorId } from "./indicadores.js";
+import type { MetaApurada } from "./apuracao-store.js";
 import type { ListaProdutos } from "./metas-store.js";
 import type { Exibicao, RegraPremio } from "./tipos-meta.js";
 
@@ -156,3 +157,12 @@ export const metasParticipantes = inovafarmaSchema.table(
   },
   (t) => [primaryKey({ columns: [t.metaId, t.codigoColaborador] })],
 );
+
+/** Apuração das Metas gravada no fechamento do Closing Period (ADR 0007); a reabertura a apaga. */
+export const apuracoesMetas = inovafarmaSchema.table("apuracoes_metas", {
+  /** Referência lógica a `closing_period.periods`, sem FK entre Modules. */
+  periodoId: text("periodo_id").primaryKey(),
+  /** Metas com o Tipo de Meta e o resultado de cada Participante, como estavam no fechamento. */
+  metas: jsonb("metas").$type<MetaApurada[]>().notNull(),
+  apuradoEm: timestamp("apurado_em").notNull(),
+});

@@ -75,11 +75,11 @@ export const BUSCA_SQL = `
 
 type LinhaProduto = { codigoProduto: number; produtoId: string; nome: string | null; codigoBarra: string | null };
 export type LinhaBusca = { produtoId: string; nome: string | null; codigoBarra: string | null };
-type LinhaVenda = { codigoColaborador: number; produtoId: string; quantidade: number | null };
+export type LinhaVenda = { codigoColaborador: number; produtoId: string; quantidade: number | null };
 
-const LOTE_PRODUTOS = 1000;
+export const LOTE_PRODUTOS = 1000;
 
-const vendasSql = (produtos: number) => `
+export const vendasSql = (produtos: number) => `
   SELECT vp.CodigoFuncionario AS codigoColaborador, CONVERT(varchar(36), p.rowguid) AS produtoId, CAST(SUM(vp.Quantidade) AS float) AS quantidade
   FROM Venda v
   JOIN Venda_Produto vp ON vp.CodigoVenda = v.CodigoVenda

@@ -77,4 +77,14 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite montar as Metas de cada Período de Fechamento: Tipos, Participantes, Alvos e Lista de Produtos.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para montar as Metas.",
   },
+  "metas-geral:view": {
+    label: "Metas: Acompanhamento de todas as Lojas",
+    description: "Permite ver o Acompanhamento das Metas de todos os Colaboradores: Realizado, Atingimento e Prêmio.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas de todas as Lojas.",
+  },
+  "metas-loja:view": {
+    label: "Metas: Acompanhamento por Loja",
+    description: "Permite ver o Acompanhamento das Metas dos Colaboradores das Lojas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas da Loja.",
+  },
 });
