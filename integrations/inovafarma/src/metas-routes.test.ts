@@ -52,13 +52,13 @@ async function boot() {
   declareMetasAudit(audit);
   const auth: MiddlewareHandler = async (c, next) => {
     const sub = c.req.header("x-user") ?? "";
-    c.set("user" as never, { sub, fullname: sub, permissions: sub === "gil" ? [MANAGE] : [] } as never);
+    c.set("user" as never, { sub, fullname: sub, permissions: sub === "gil" ? [MANAGE] : sub === "ana" || sub === "bia" ? ["inovafarma:metas-individual:view"] : [] } as never);
     await next();
   };
   const tipos = new MemoryTipoMetaStore();
   const metas = new MemoryMetaStore();
   const vinculos = new MemoryVinculoStore();
-  await vinculos.gravar({ codigoColaborador: 1, usuarioId: null, lojas: [10], atualizadoPor: "x" }, 0);
+  await vinculos.gravar({ codigoColaborador: 1, usuarioId: "bia", lojas: [10], atualizadoPor: "x" }, 0);
   registerMetasRoutes({
     routes: app,
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
@@ -236,10 +236,15 @@ describe("Montar Metas", () => {
   it("informa as abas da página que a Permission libera", async () => {
     const { json, req } = await boot();
     expect(await json("gil", "GET", "/metas/contexto")).toMatchObject({
-      abas: { tipos: false, montar: true, acompanhamento: false },
+      abas: { tipos: false, montar: true, acompanhamento: false, minhas: false },
       periodos: [{ id: "maio" }, { id: "abril" }, { id: "marco" }],
       visualizacoes: [],
     });
+    // Minhas Metas só com um Colaborador vinculado ao Usuário (fail-closed).
     expect((await req("ana", "GET", "/metas/contexto")).status).toBe(403);
+    expect(await json("bia", "GET", "/metas/contexto")).toMatchObject({
+      abas: { tipos: false, montar: false, acompanhamento: false, minhas: true },
+      periodos: [{ id: "maio" }, { id: "abril" }, { id: "marco" }],
+    });
   });
 });

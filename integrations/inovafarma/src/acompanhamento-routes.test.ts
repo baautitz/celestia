@@ -12,6 +12,7 @@ import { MemoryVinculoStore } from "./vinculo-store";
 
 const GERAL = "inovafarma:metas-geral:view";
 const LOJA = "inovafarma:metas-loja:view";
+const MINHAS = "inovafarma:metas-individual:view";
 
 const cmv: DadosTipoMeta = {
   nome: "CMV",
@@ -47,10 +48,12 @@ async function boot() {
     [1, { totalLiquido: 1000, totalCmv: 250, quantidadeVendas: 10 }],
     [2, { totalLiquido: 1000, totalCmv: 400, quantidadeVendas: 10 }],
   ]);
+  // Unidades vendidas de cada produto da Lista, por Colaborador.
+  const produtos: { codigoColaborador: number; produtoId: string; quantidade: number }[] = [];
   const handlers = new Map<string, (p: object) => unknown>();
   const auth: MiddlewareHandler = async (c, next) => {
     const sub = c.req.header("x-user") ?? "";
-    const permissions = { gil: [GERAL], lia: [LOJA] }[sub] ?? [];
+    const permissions = { gil: [GERAL], lia: [LOJA], ana: [MINHAS], zoe: [MINHAS] }[sub] ?? [];
     c.set("user" as never, { sub, fullname: sub, permissions } as never);
     await next();
   };
@@ -58,7 +61,7 @@ async function boot() {
   const metas = new MemoryMetaStore();
   const vinculos = new MemoryVinculoStore();
   const avaliacoesStore = new MemoryAvaliacaoStore();
-  await vinculos.gravar({ codigoColaborador: 1, usuarioId: null, lojas: [10], atualizadoPor: "x" }, 0);
+  await vinculos.gravar({ codigoColaborador: 1, usuarioId: "ana", lojas: [10], atualizadoPor: "x" }, 0);
   await vinculos.gravar({ codigoColaborador: 9, usuarioId: "lia", lojas: [10], atualizadoPor: "x" }, 0);
   const participantes = [
     { codigoColaborador: 1, nome: "ANA", alvo: 30 },
@@ -73,7 +76,11 @@ async function boot() {
     events: { after: (event, handler) => (handlers.set(event, handler as (p: object) => unknown), () => undefined) },
     erpClient: () => ({
       query: async <T,>(sql: string) =>
-        (sql.includes("totalCmv") ? [...vendas].map(([codigoColaborador, v]) => ({ codigoColaborador, ...v })) : [{ codigoEmpresa: 10, nome: "Centro" }]) as T[],
+        (sql.includes("totalCmv")
+          ? [...vendas].map(([codigoColaborador, v]) => ({ codigoColaborador, ...v }))
+          : sql.includes("produtoId")
+            ? produtos
+            : [{ codigoEmpresa: 10, nome: "Centro" }]) as T[],
     }),
     tipos,
     metas,
@@ -89,7 +96,8 @@ async function boot() {
     periodos[0] = { ...periodos[0]!, status };
     await handlers.get(event)?.({ periodId: "maio", name: "Maio", startDate: "2027-05-01", endDate: "2027-05-31" });
   };
-  return { res, ver, vendas, evento, tipos, metas, avaliacoesStore, participantes };
+  const minhas = (who: string, periodoId = "maio") => app.request(`/metas/minhas?periodoId=${periodoId}`, { headers: { "x-user": who } });
+  return { res, ver, vendas, produtos, minhas, evento, tipos, metas, avaliacoesStore, participantes };
 }
 
 describe("Acompanhamento das Metas", () => {
@@ -140,5 +148,51 @@ describe("Acompanhamento das Metas", () => {
     const reaberta = await ver("gil");
     expect(reaberta.congelada).toBe(false);
     expect(reaberta.linhas[0]!.premioCentavos).toBe(0);
+  });
+});
+
+describe("Minhas Metas", () => {
+  const minhasDe = async (res: Response) => ((await res.json()) as { metas: Record<string, unknown>[] }).metas;
+
+  it("na Exibição Atingida / Não atingida, mostra só a situação e o Prêmio só se atingida", async () => {
+    const { minhas, vendas } = await boot();
+    expect(await minhasDe(await minhas("ana"))).toEqual([{ metaId: expect.any(String), nome: "CMV", exibicao: "atingida", atingida: true, premioCentavos: 10000 }]);
+    vendas.set(1, { totalLiquido: 1000, totalCmv: 500, quantidadeVendas: 10 });
+    expect(await minhasDe(await minhas("ana"))).toEqual([{ metaId: expect.any(String), nome: "CMV", exibicao: "atingida", atingida: false }]);
+  });
+
+  it("no Progresso, mostra Realizado, Alvo e quanto falta, sem o Prêmio que o Tipo esconde", async () => {
+    const { minhas, tipos, metas } = await boot();
+    const tipo = await tipos.criar({ ...cmv, nome: "Ticket", indicador: "ticket-medio", exibicao: "progresso", mostrarPremio: false, alvoPadrao: 12000 });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 12000 }], excluidos: [], lista: null });
+    const ticket = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Ticket");
+    expect(ticket).toEqual({ metaId: expect.any(String), nome: "Ticket", exibicao: "progresso", atingida: false, realizado: "R$ 100,00", alvo: "R$ 120,00", falta: "R$ 20,00" });
+  });
+
+  it("na Contagem, mostra os produtos batidos da Lista", async () => {
+    const { minhas, tipos, metas, produtos } = await boot();
+    const tipo = await tipos.criar({ ...cmv, nome: "Lista", indicador: "lista-produtos", exibicao: "contagem", mostrarPremio: false, alvoPadrao: null });
+    const lista = { produtos: [{ produtoId: "a", nome: "A", quantidade: 2 }, { produtoId: "b", nome: "B", quantidade: 2 }], ajustes: [], minimo: null };
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: null }], excluidos: [], lista });
+    produtos.push({ codigoColaborador: 1, produtoId: "a", quantidade: 3 });
+    const contagem = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Lista");
+    expect(contagem).toEqual({ metaId: expect.any(String), nome: "Lista", exibicao: "contagem", atingida: false, contagem: "1/2 produtos" });
+  });
+
+  it("mostra o Saldo da Meta de Avaliações como Prêmio quando o Tipo permite", async () => {
+    const { minhas, tipos, metas, avaliacoesStore } = await boot();
+    const tipo = await tipos.criar({ ...avaliacoes, exibicao: "progresso" });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [], lista: null });
+    await avaliacoesStore.criar({ periodoId: "maio", codigoColaborador: 1, nomeColaborador: "ANA", codigoLoja: 10, descricao: "Atraso", valorCentavos: 5000, criadoPor: "x" });
+    const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
+    expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true, realizado: "R$ 150,00", alvo: "R$ 200,00", premioCentavos: 15000 });
+  });
+
+  it("só libera ao Usuário com a Permission e um Colaborador vinculado, e só as Metas de que ele é Participante", async () => {
+    const { minhas } = await boot();
+    expect((await minhas("gil")).status).toBe(403);
+    expect((await minhas("zoe")).status).toBe(403);
+    expect((await minhas("ana", "junho")).status).toBe(404);
+    expect((await minhasDe(await minhas("ana"))).map((m) => m.nome)).toEqual(["CMV"]);
   });
 });

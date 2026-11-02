@@ -35,7 +35,7 @@ type TipoApurado = Pick<DadosTipoMeta, "indicador" | "semAlvo" | "regra">;
 const nomeCurto = (indicador: Indicador) => indicador.nome.replace(/ %$/, "");
 const comUnidade = (indicador: Indicador, valor: number) => `${formatarValor(indicador, valor)}${indicador.unidade === "quantidade" ? " un." : ""}`;
 /** Diferença entre dois valores do Indicador: em pontos percentuais quando o Indicador é %. */
-const diferenca = (indicador: Indicador, valor: number) =>
+export const diferenca = (indicador: Indicador, valor: number) =>
   indicador.unidade === "percentual" ? `${formatarValor({ ...indicador, unidade: "quantidade" }, valor)} p.p.` : formatarValor(indicador, valor);
 
 function premio(regra: RegraPremio, atingimento: number | null, atingida: boolean | null, realizado: number, dados: DadosColaborador): number {

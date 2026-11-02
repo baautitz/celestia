@@ -6,6 +6,7 @@ import type { AvaliacaoStore } from "./avaliacoes-store.js";
 import { desempenhoSql } from "./desempenho-vendas.js";
 import type { IndicadorId } from "./indicadores.js";
 import type { MetaStore } from "./metas-store.js";
+import { minhaMeta } from "./minhas-metas.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { conferir } from "./pre-vencidos-conferencia.js";
 import { LOTE_PRODUTOS, vendasSql, type LinhaVenda, type PeriodoResumo, type PeriodsService } from "./pre-vencidos-routes.js";
@@ -59,6 +60,19 @@ export async function visualizacoesDasMetas(
   return { geral, lojas: vinculo?.lojas.length ? vinculo.lojas : null };
 }
 
+/**
+ * Colaborador de Minhas Metas: o vinculado ao Usuário, se ele tem a Permission. Sem Vínculo, null (fail-closed,
+ * como a Visualização Individual de vendas).
+ */
+export async function colaboradorDasMinhasMetas(
+  user: { sub?: string; permissions?: string[] } | undefined,
+  has: (permissions: readonly string[] | undefined, key: string) => boolean,
+  vinculos: VinculoStore,
+): Promise<number | null> {
+  if (!has(user?.permissions, INOVAFARMA_PERMISSIONS.keys["metas-individual:view"]) || !user?.sub) return null;
+  return (await vinculos.list()).find((v) => v.usuarioId === user.sub && !vinculoDesfeito(v))?.codigoColaborador ?? null;
+}
+
 type LinhaDesempenho = { codigoColaborador: number; quantidadeVendas: number | null; totalLiquido: number | null; totalCmv: number | null; vendasComCadastro: number | null } & Record<
   string,
   number | null
@@ -104,6 +118,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
   const { routes, permissions, auth, events, erpClient, tipos, metas, vinculos, avaliacoes, preVencidos, apuracoes, periods } = deps;
   const geralRef = INOVAFARMA_PERMISSIONS.ref("metas-geral:view");
   const lojaRef = INOVAFARMA_PERMISSIONS.ref("metas-loja:view");
+  const individualRef = INOVAFARMA_PERMISSIONS.ref("metas-individual:view");
 
   /** O que o ERP e o Plugin têm de cada Colaborador no Período, somado em todas as Lojas. Lança se o ERP falhar. */
   async function dadosDoPeriodo(periodo: PeriodoResumo, indicadores: Set<IndicadorId>, produtosLista: string[]): Promise<Map<number, DadosColaborador>> {
@@ -237,5 +252,23 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
       .flatMap(({ metaId, tipo, participantes }) => participantes.map((p) => ({ metaId, tipo, ...p, lojas: lojas.get(p.codigoColaborador) ?? [] })))
       .filter((l) => filtro === null || l.lojas.some((codigo) => filtro.includes(codigo)));
     return c.json({ periodo, congelada: resultado.congelada, apuradoEm: resultado.apuracao.apuradoEm, linhas, totais: totaisPorColaborador(linhas) });
+  })
+  // Minhas Metas: só as Participações do Colaborador vinculado, cortadas pela Exibição no servidor.
+  routes.get("/metas/minhas", auth, async (c: AuthContext) => {
+    const codigo = await colaboradorDasMinhasMetas(c.get("user"), permissions.has, vinculos);
+    if (codigo === null) return c.json({ error: individualRef.deniedMessage }, 403);
+    const periodo = (await periods.list()).find((p) => p.id === c.req.query("periodoId"));
+    if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
+    let resultado;
+    try {
+      resultado = await apuracaoDe(periodo);
+    } catch (err: unknown) {
+      return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
+    }
+    const minhas = resultado.apuracao.metas.flatMap(({ metaId, tipo, participantes }) => {
+      const meu = participantes.find((p) => p.codigoColaborador === codigo);
+      return meu ? [minhaMeta(metaId, tipo, meu)] : [];
+    });
+    return c.json({ periodo, congelada: resultado.congelada, metas: minhas });
   });
 }

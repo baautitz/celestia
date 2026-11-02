@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
-import { visualizacoesDasMetas } from "./acompanhamento-routes.js";
+import { colaboradorDasMinhasMetas, visualizacoesDasMetas } from "./acompanhamento-routes.js";
 import { COLABORADORES_SQL, LOJAS_SQL } from "./colaboradores-routes.js";
 import { formatarValor, indicadorPorId } from "./indicadores.js";
 import { META_TARGET, METAS_ACTIONS, METAS_PLUGIN } from "./metas-audit.js";
@@ -129,15 +129,20 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
   // O que a página Metas precisa para abrir: as abas que a Permission libera e os Períodos.
   routes.get("/metas/contexto", auth, async (c: AuthContext) => {
     const acompanhamento = await visualizacoesDasMetas(c.get("user"), permissions.has, vinculos);
-    const abas = { tipos: pode(c, tiposManage), montar: pode(c), acompanhamento: acompanhamento.geral || acompanhamento.lojas !== null };
-    if (!abas.tipos && !abas.montar && !abas.acompanhamento) return c.json({ error: manage.deniedMessage }, 403);
+    const abas = {
+      tipos: pode(c, tiposManage),
+      montar: pode(c),
+      acompanhamento: acompanhamento.geral || acompanhamento.lojas !== null,
+      minhas: (await colaboradorDasMinhasMetas(c.get("user"), permissions.has, vinculos)) !== null,
+    };
+    if (!abas.tipos && !abas.montar && !abas.acompanhamento && !abas.minhas) return c.json({ error: manage.deniedMessage }, 403);
     const lojas = abas.montar || abas.acompanhamento ? await lojasDoErp() : [];
     // Visualizações do Acompanhamento: Geral filtra todas as Lojas; Loja, só as do Vínculo do Usuário.
     const visualizacoes = [
       ...(acompanhamento.geral ? [{ id: "geral" as const, lojas }] : []),
       ...(acompanhamento.lojas ? [{ id: "loja" as const, lojas: acompanhamento.lojas.map((codigo) => lojas.find((l) => l.codigo === codigo) ?? { codigo, nome: "" }) }] : []),
     ];
-    return c.json({ abas, periodos: abas.montar || abas.acompanhamento ? await periodosOrdenados() : [], lojas: abas.montar ? lojas : [], visualizacoes });
+    return c.json({ abas, periodos: abas.montar || abas.acompanhamento || abas.minhas ? await periodosOrdenados() : [], lojas: abas.montar ? lojas : [], visualizacoes });
   });
 
   routes.get("/metas/produtos", auth, async (c: AuthContext) => {
