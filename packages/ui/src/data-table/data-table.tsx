@@ -118,6 +118,8 @@ export interface DataTableProps<TRow> {
   rowActions?: (row: TRow) => React.ReactNode;
   /** Detalhes da linha; quando informado, cada linha ganha um botão de expandir/recolher. */
   renderExpanded?: (row: TRow) => React.ReactNode;
+  /** Com `renderExpanded`, as linhas já começam expandidas. */
+  defaultExpanded?: boolean;
   actionsLabel?: string;
   actionsHeadClassName?: string;
   actionsSkeletonClassName?: string;
@@ -285,6 +287,7 @@ export function DataTable<TRow>({
   emptyMessage = "Nenhum registro encontrado.",
   rowActions,
   renderExpanded,
+  defaultExpanded = false,
   actionsLabel = "Ações",
   actionsHeadClassName = "text-right w-20",
   actionsSkeletonClassName = "h-8 w-8 ml-auto",
@@ -306,7 +309,9 @@ export function DataTable<TRow>({
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [clientPage, setClientPage] = useState(1);
+  // Linhas que o usuário alternou; expandida = alternada XOR `defaultExpanded`.
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
+  const isExpanded = (id: string) => expandedIds.has(id) !== defaultExpanded;
   const [printing, setPrinting] = useState(false);
   const trendTooltip = useTrendTooltipHandle();
   const endPrinting = useCallback(() => setPrinting(false), []);
@@ -358,7 +363,7 @@ export function DataTable<TRow>({
     });
   const expandButton = (row: TRow) => {
     const id = getRowId(row);
-    const expanded = expandedIds.has(id);
+    const expanded = isExpanded(id);
     return (
       <Button
         variant="ghost"
@@ -561,7 +566,7 @@ export function DataTable<TRow>({
                       rowActions?.(row)
                     )
                   }
-                  details={renderExpanded && expandedIds.has(getRowId(row)) ? renderExpanded(row) : undefined}
+                  details={renderExpanded && isExpanded(getRowId(row)) ? renderExpanded(row) : undefined}
                 />
               ))
             )}
@@ -672,7 +677,7 @@ export function DataTable<TRow>({
                     </TableRow>
                   ) : (
                     visible.map((row) => {
-                      const expanded = renderExpanded !== undefined && expandedIds.has(getRowId(row));
+                      const expanded = renderExpanded !== undefined && isExpanded(getRowId(row));
                       return (
                         <React.Fragment key={getRowId(row)}>
                           <TableRow className={cn("group/row hover:bg-muted/30", striped && "even:bg-muted/20")}>
