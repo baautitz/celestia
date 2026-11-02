@@ -291,6 +291,7 @@ export function AcompanhamentoMetas({
         </Alert>
       )}
       <DataTable
+        scroll="page"
         columns={colunasColaborador}
         rows={porColaborador(dados)}
         getRowId={(c) => String(c.codigoColaborador)}
@@ -325,6 +326,7 @@ export function AcompanhamentoMetas({
         defaultExpanded
         renderExpanded={(c) => (
           <DataTable
+            scroll="page"
             columns={colunas}
             rows={c.metas}
             getRowId={(l) => l.metaId}
