@@ -115,6 +115,16 @@ describe("Acompanhamento das Metas", () => {
     ]);
   });
 
+  it("não paga o CMV a quem não vendeu no Período, sem linha no ERP ou com líquido zero", async () => {
+    const { ver, vendas } = await boot();
+    vendas.delete(1);
+    vendas.set(2, { totalLiquido: 0, totalCmv: 0, quantidadeVendas: 0 });
+    expect((await ver("gil")).linhas.map((l) => [l.nome, l.atingimento, l.premioCentavos])).toEqual([
+      ["ANA", 0, 0],
+      ["BIA", 0, 0],
+    ]);
+  });
+
   it("desconta as Avaliações do Período do valor inicial", async () => {
     const { ver, tipos, metas, avaliacoesStore, participantes } = await boot();
     const tipo = await tipos.criar(avaliacoes);
@@ -186,6 +196,14 @@ describe("Minhas Metas", () => {
     await avaliacoesStore.criar({ periodoId: "maio", codigoColaborador: 1, nomeColaborador: "ANA", codigoLoja: 10, descricao: "Atraso", valorCentavos: 5000, criadoPor: "x" });
     const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
     expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true, realizado: "R$ 150,00", alvo: "R$ 200,00", premioCentavos: 15000 });
+  });
+
+  it("esconde o Saldo da Meta de Avaliações quando o Tipo não mostra o Prêmio", async () => {
+    const { minhas, tipos, metas } = await boot();
+    const tipo = await tipos.criar({ ...avaliacoes, exibicao: "progresso", mostrarPremio: false });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [], lista: null });
+    const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
+    expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true });
   });
 
   it("só libera ao Usuário com a Permission e um Colaborador vinculado, e só as Metas de que ele é Participante", async () => {

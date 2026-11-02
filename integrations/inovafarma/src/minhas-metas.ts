@@ -24,7 +24,9 @@ export interface MinhaMeta {
 export function minhaMeta(metaId: string, tipo: TipoApuracao, r: ResultadoParticipante): MinhaMeta {
   const meta: MinhaMeta = { metaId, nome: tipo.nome, exibicao: tipo.exibicao, atingida: r.atingida };
   const indicador = indicadorPorId(tipo.indicador);
-  if (tipo.exibicao === "progresso") {
+  // Na Meta de Avaliações o Saldo e o valor inicial são o próprio Prêmio: só aparecem se o Tipo mostra o Prêmio.
+  const escondePremio = tipo.indicador === "avaliacoes" && !tipo.mostrarPremio;
+  if (tipo.exibicao === "progresso" && !escondePremio) {
     meta.realizado = formatarValor(indicador, r.realizado);
     if (r.alvo !== null) {
       meta.alvo = formatarValor(indicador, r.alvo);
