@@ -66,10 +66,14 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "erp", name: "erps" },
         { schema: "iam", name: "roles" },
         { schema: "iam", name: "users" },
+        { schema: "inovafarma", name: "apuracoes_metas" },
         { schema: "inovafarma", name: "avaliacoes" },
         { schema: "inovafarma", name: "justificativas_ajuste" },
+        { schema: "inovafarma", name: "metas" },
+        { schema: "inovafarma", name: "metas_participantes" },
         { schema: "inovafarma", name: "motivos_ajuste" },
         { schema: "inovafarma", name: "pre_vencidos_lancamentos" },
+        { schema: "inovafarma", name: "tipos_meta" },
         { schema: "inovafarma", name: "vinculos_colaborador" },
       ]);
     });
