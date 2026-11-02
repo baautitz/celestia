@@ -19,6 +19,7 @@ import { declareMetasAudit } from "./metas-audit.js";
 import { registerMetasRoutes } from "./metas-routes.js";
 import { registerAcompanhamentoRoutes } from "./acompanhamento-routes.js";
 import { MemoryApuracaoStore } from "./apuracao-store.js";
+import { declareApuracaoAudit } from "./apuracao-audit.js";
 import { PostgresApuracaoStore } from "./postgres-apuracao-store.js";
 import { registerTiposMetaRoutes } from "./tipos-meta-routes.js";
 import { MemoryTipoMetaStore } from "./tipos-meta-store.js";
@@ -75,6 +76,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declareFuroEstoqueAudit(audit);
       declareTiposMetaAudit(audit);
       declareMetasAudit(audit);
+      declareApuracaoAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
       const preVencidos = db ? new PostgresPreVencidoStore(db) : new MemoryPreVencidoStore();
       const avaliacoes = db ? new PostgresAvaliacaoStore(db) : new MemoryAvaliacaoStore();
@@ -138,6 +140,8 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         preVencidos,
         apuracoes: db ? new PostgresApuracaoStore(db) : new MemoryApuracaoStore(),
         periods,
+        audit,
+        users,
       });
 
       const viewKey = INOVAFARMA_PERMISSIONS.keys["integration:view"];
