@@ -1,9 +1,29 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Printer,
+  Search,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card";
 import { Button } from "../components/button";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "../components/input-group";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "../components/input-group";
 import { MobileCard } from "../components/mobile-card";
 import { Skeleton } from "../components/skeleton";
 import {
@@ -26,16 +46,29 @@ import {
 } from "../components/trend";
 import { useIsMobile } from "../hooks/use-mobile";
 import { cn } from "../lib/utils";
-import { formatCurrency, formatDate, formatDecimal, formatNumber, formatPercent } from "../lib/format";
+import {
+  formatCurrency,
+  formatDate,
+  formatDecimal,
+  formatNumber,
+  formatPercent,
+} from "../lib/format";
 
 export type CellValue = string | number | boolean | null | undefined;
-export type DataTableFormat = "currency" | "date" | "decimal" | "number" | "percent";
+export type DataTableFormat =
+  "currency" | "date" | "decimal" | "number" | "percent";
 
-const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set<TrendFormat>(["currency", "decimal", "number", "percent"]);
-const isNumericFormat = (format?: DataTableFormat): format is TrendFormat => NUMERIC_FORMATS.has(format);
-const isNumericColumn = (col: { format?: DataTableFormat }) => isNumericFormat(col.format);
+const NUMERIC_FORMATS: ReadonlySet<DataTableFormat | undefined> =
+  new Set<TrendFormat>(["currency", "decimal", "number", "percent"]);
+const isNumericFormat = (format?: DataTableFormat): format is TrendFormat =>
+  NUMERIC_FORMATS.has(format);
+const isNumericColumn = (col: { format?: DataTableFormat }) =>
+  isNumericFormat(col.format);
 /** Colunas que não quebram linha na impressão; as demais quebram para a tabela encolher menos. */
-const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([...NUMERIC_FORMATS, "date"]);
+const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([
+  ...NUMERIC_FORMATS,
+  "date",
+]);
 const wrapsInPrint = (col: { format?: DataTableFormat; nowrap?: boolean }) =>
   !col.nowrap && !NOWRAP_PRINT_FORMATS.has(col.format);
 
@@ -43,7 +76,9 @@ function HeaderLabel({ col }: { col: { label: string; tooltip?: string } }) {
   if (!col.tooltip) return <span>{col.label}</span>;
   return (
     <Tooltip>
-      <TooltipTrigger render={<span className="cursor-help">{col.label}</span>} />
+      <TooltipTrigger
+        render={<span className="cursor-help">{col.label}</span>}
+      />
       <TooltipContent>{col.tooltip}</TooltipContent>
     </Tooltip>
   );
@@ -82,13 +117,16 @@ export interface DataTableColumn<TRow> {
    * Valor anterior da célula (ex.: o mesmo Colaborador no Período anterior); `undefined` = sem comparação.
    * Tooltip no desktop, linha abaixo do valor no MobileCard e nada na impressão. Requer `value` numérico.
    */
-  compare?: (row: TRow) => Pick<Trend, "previous" | "label" | "favorable"> | undefined;
+  compare?: (
+    row: TRow,
+  ) => Pick<Trend, "previous" | "label" | "favorable"> | undefined;
 }
 
 /** Valores do Totalizador por `key` de coluna. */
 export type TotalsValues = Record<string, CellValue>;
 
-export type DataTableTotals<TRow> = TotalsValues | ((filteredRows: TRow[]) => TotalsValues);
+export type DataTableTotals<TRow> =
+  TotalsValues | ((filteredRows: TRow[]) => TotalsValues);
 
 export type DataTablePagination =
   | { pageSize: number }
@@ -103,6 +141,8 @@ export interface DataTablePrintOptions {
   description?: string;
   /** Nome sugerido ao salvar como PDF (vira o título da página durante a impressão). Padrão: `title`. */
   fileName?: string;
+  /** Com `renderExpanded`, imprime também os detalhes das linhas expandidas, logo abaixo de cada uma. */
+  expanded?: boolean;
 }
 
 export interface DataTableProps<TRow> {
@@ -145,16 +185,21 @@ export interface DataTableProps<TRow> {
    */
   totals?: DataTableTotals<TRow>;
   /** Valor anterior de cada total, por `key` de coluna (ex.: o total do Período anterior); mesmo efeito do `compare` da coluna. */
-  totalsCompare?: Record<string, Pick<Trend, "previous" | "label" | "favorable">>;
+  totalsCompare?: Record<
+    string,
+    Pick<Trend, "previous" | "label" | "favorable">
+  >;
 }
 /** Chave da coluna do botão de expandir na medição das colunas fixas. */
 const EXPAND_KEY = "__expand";
 
 /** Fundos opacos (mistura sobre `--background`) para as células fixas não deixarem o conteúdo rolado aparecer por baixo. */
-const FROZEN_HEAD_CLASS = "bg-[color-mix(in_oklab,var(--muted)_40%,var(--background))]";
+const FROZEN_HEAD_CLASS =
+  "bg-[color-mix(in_oklab,var(--muted)_40%,var(--background))]";
 const FROZEN_CELL_CLASS =
   "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--muted)_30%,var(--background))]";
-const FROZEN_STRIPED_CELL_CLASS = "group-even/row:bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))]";
+const FROZEN_STRIPED_CELL_CLASS =
+  "group-even/row:bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))]";
 
 /**
  * Linhas de 2px no fim do cabeçalho fixo e da última coluna fixa. Sombra interna em vez de borda:
@@ -166,8 +211,14 @@ const FROZEN_HEADER_EDGE_CLASS = "shadow-[inset_-2px_-2px_0_var(--border)]";
 /** No papel nada rola: as mesmas linhas da tela, como bordas comuns. */
 const PRINT_LINE_COLOR = "border-border";
 
-function mobileLabel(col: { label: string; mobileLabel?: string; group?: string }): string {
-  return col.mobileLabel ?? (col.group ? `${col.group} · ${col.label}` : col.label);
+function mobileLabel(col: {
+  label: string;
+  mobileLabel?: string;
+  group?: string;
+}): string {
+  return (
+    col.mobileLabel ?? (col.group ? `${col.group} · ${col.label}` : col.label)
+  );
 }
 
 /** Linha de cabeçalho com os grupos de colunas; não renderiza nada quando nenhuma coluna tem `group`. */
@@ -184,23 +235,46 @@ function GroupHeaderRow({
   /** Colunas fixas: um grupo não se mescla por cima da fronteira entre fixas e roláveis. */
   frozenKeys?: readonly string[];
   /** Estilo e classes de uma célula fixa, pela chave da primeira e da última coluna que ela cobre. */
-  frozenHead?: (firstKey: string, lastKey: string) => { style?: React.CSSProperties; className?: string | false };
+  frozenHead?: (
+    firstKey: string,
+    lastKey: string,
+  ) => { style?: React.CSSProperties; className?: string | false };
 }) {
   if (!columns.some((c) => c.group)) return null;
   const boundaries = groupBoundaryKeys(columns);
-  const spans: { key: string; lastKey: string; group?: string; frozen: boolean; span: number }[] = [];
+  const spans: {
+    key: string;
+    lastKey: string;
+    group?: string;
+    frozen: boolean;
+    span: number;
+  }[] = [];
   for (const col of columns) {
     const last = spans[spans.length - 1];
     const frozen = frozenKeys.includes(col.key);
     if (last && last.group === col.group && last.frozen === frozen) {
       last.span++;
       last.lastKey = col.key;
-    } else spans.push({ key: col.key, lastKey: col.key, group: col.group, frozen, span: 1 });
+    } else
+      spans.push({
+        key: col.key,
+        lastKey: col.key,
+        group: col.group,
+        frozen,
+        span: 1,
+      });
   }
-  const leadingHead = frozenKeys.length > 0 ? frozenHead?.(EXPAND_KEY, EXPAND_KEY) : undefined;
+  const leadingHead =
+    frozenKeys.length > 0 ? frozenHead?.(EXPAND_KEY, EXPAND_KEY) : undefined;
   return (
     <TableRow className="bg-muted/40">
-      {leading > 0 && <TableHead colSpan={leading} style={leadingHead?.style} className={cn(leadingHead?.className)} />}
+      {leading > 0 && (
+        <TableHead
+          colSpan={leading}
+          style={leadingHead?.style}
+          className={cn(leadingHead?.className)}
+        />
+      )}
       {spans.map(({ key, lastKey, group, frozen, span }) => {
         const head = frozen ? frozenHead?.(key, lastKey) : undefined;
         return (
@@ -208,7 +282,12 @@ function GroupHeaderRow({
             key={key}
             colSpan={span}
             style={head?.style}
-            className={cn("h-8", group && "text-center", boundaries.has(key) && GROUP_BOUNDARY_CLASS, head?.className)}
+            className={cn(
+              "h-8",
+              group && "text-center",
+              boundaries.has(key) && GROUP_BOUNDARY_CLASS,
+              head?.className,
+            )}
           >
             {group}
           </TableHead>
@@ -220,27 +299,37 @@ function GroupHeaderRow({
 }
 
 /** Colunas que começam ou encerram um grupo ganham uma divisória à esquerda, do cabeçalho ao corpo. */
-function groupBoundaryKeys(columns: { key: string; group?: string }[]): ReadonlySet<string> {
+function groupBoundaryKeys(
+  columns: { key: string; group?: string }[],
+): ReadonlySet<string> {
   const keys = new Set<string>();
   columns.forEach((col, i) => {
     const prev = columns[i - 1];
-    if (prev && prev.group !== col.group && (prev.group || col.group)) keys.add(col.key);
+    if (prev && prev.group !== col.group && (prev.group || col.group))
+      keys.add(col.key);
   });
   return keys;
 }
 
 const GROUP_BOUNDARY_CLASS = "border-l border-border";
 
-function columnCellClassName<TRow>(col: DataTableColumn<TRow>, row: TRow): string | undefined {
+function columnCellClassName<TRow>(
+  col: DataTableColumn<TRow>,
+  row: TRow,
+): string | undefined {
   return cn(
     isNumericColumn(col) && "text-right tabular-nums",
     col.nowrap && "whitespace-nowrap",
-    typeof col.cellClassName === "function" ? col.cellClassName(row) : col.cellClassName,
+    typeof col.cellClassName === "function"
+      ? col.cellClassName(row)
+      : col.cellClassName,
   );
 }
 
 /** Classes de uma célula do Totalizador: o alinhamento e a fonte da coluna, sem as que dependem da linha. */
-function totalsCellClassName<TRow>(col: DataTableColumn<TRow>): string | undefined {
+function totalsCellClassName<TRow>(
+  col: DataTableColumn<TRow>,
+): string | undefined {
   return cn(
     isNumericColumn(col) && "text-right tabular-nums",
     col.nowrap && "whitespace-nowrap",
@@ -248,10 +337,14 @@ function totalsCellClassName<TRow>(col: DataTableColumn<TRow>): string | undefin
   );
 }
 
-function cellTrend<TRow>(col: DataTableColumn<TRow>, row: TRow): Trend | undefined {
+function cellTrend<TRow>(
+  col: DataTableColumn<TRow>,
+  row: TRow,
+): Trend | undefined {
   const current = col.value?.(row);
   const compared = col.compare?.(row);
-  if (!compared || typeof current !== "number" || !isNumericFormat(col.format)) return undefined;
+  if (!compared || typeof current !== "number" || !isNumericFormat(col.format))
+    return undefined;
   return { ...compared, current, format: col.format };
 }
 
@@ -271,7 +364,11 @@ const TOTAL_LABEL = "Total";
 const TOTALS_CLASS = "font-bold border-t-2 border-border bg-muted/40";
 
 /** Texto da célula do Totalizador: o rótulo na primeira coluna (prevalece sobre um valor dela), em branco sem valor. */
-function totalCellText(col: { key: string; format?: DataTableFormat }, index: number, totals: TotalsValues): string {
+function totalCellText(
+  col: { key: string; format?: DataTableFormat },
+  index: number,
+  totals: TotalsValues,
+): string {
   if (index === 0) return TOTAL_LABEL;
   return col.key in totals ? formatValue(totals[col.key], col.format) : "";
 }
@@ -310,13 +407,17 @@ export function DataTable<TRow>({
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [clientPage, setClientPage] = useState(1);
   // Linhas que o usuário alternou; expandida = alternada XOR `defaultExpanded`.
-  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
   const isExpanded = (id: string) => expandedIds.has(id) !== defaultExpanded;
   const [printing, setPrinting] = useState(false);
   const trendTooltip = useTrendTooltipHandle();
   const endPrinting = useCallback(() => setPrinting(false), []);
   const headRefs = useRef(new Map<string, HTMLTableCellElement>());
-  const [frozenLeft, setFrozenLeft] = useState<ReadonlyMap<string, number>>(new Map());
+  const [frozenLeft, setFrozenLeft] = useState<ReadonlyMap<string, number>>(
+    new Map(),
+  );
 
   const frozenCount = columns.findIndex((c) => c.key === frozenUntil) + 1;
   const frozenKeys = columns.slice(0, frozenCount).map((c) => c.key);
@@ -341,15 +442,27 @@ export function DataTable<TRow>({
     return () => observer.disconnect();
   }, [frozenSignature, rows]);
 
-  const frozenStyle = (key: string, head = false): React.CSSProperties | undefined =>
+  const frozenStyle = (
+    key: string,
+    head = false,
+  ): React.CSSProperties | undefined =>
     frozenKeys.includes(key) || (key === EXPAND_KEY && frozenCount > 0)
-      ? { position: "sticky", left: frozenLeft.get(key) ?? 0, zIndex: head ? 20 : 1 }
+      ? {
+          position: "sticky",
+          left: frozenLeft.get(key) ?? 0,
+          zIndex: head ? 20 : 1,
+        }
       : undefined;
   const frozenClass = (key: string, head = false) =>
     (frozenKeys.includes(key) || (key === EXPAND_KEY && frozenCount > 0)) &&
-    cn(head ? FROZEN_HEAD_CLASS : cn(FROZEN_CELL_CLASS, striped && FROZEN_STRIPED_CELL_CLASS));
+    cn(
+      head
+        ? FROZEN_HEAD_CLASS
+        : cn(FROZEN_CELL_CLASS, striped && FROZEN_STRIPED_CELL_CLASS),
+    );
   /** Linha inferior do cabeçalho de colunas, que dobra como borda direita na última coluna fixa. */
-  const headerEdgeClass = (key: string) => (key === lastFrozenKey ? FROZEN_HEADER_EDGE_CLASS : HEADER_EDGE_CLASS);
+  const headerEdgeClass = (key: string) =>
+    key === lastFrozenKey ? FROZEN_HEADER_EDGE_CLASS : HEADER_EDGE_CLASS;
   const setHeadRef = (key: string) => (el: HTMLTableCellElement | null) => {
     if (el) headRefs.current.set(key, el);
     else headRefs.current.delete(key);
@@ -385,7 +498,13 @@ export function DataTable<TRow>({
     const q = query.trim().toLowerCase();
     if (q) {
       visible = visible.filter((row) =>
-        columns.some((c) => c.searchable && String(c.value?.(row) ?? "").toLowerCase().includes(q)),
+        columns.some(
+          (c) =>
+            c.searchable &&
+            String(c.value?.(row) ?? "")
+              .toLowerCase()
+              .includes(q),
+        ),
       );
     }
     const sortCol = columns.find((c) => c.key === sortKey);
@@ -395,14 +514,16 @@ export function DataTable<TRow>({
       visible = [...visible].sort((a, b) => {
         const x = get(a);
         const y = get(b);
-        if (typeof x === "number" && typeof y === "number") return (x - y) * dir;
+        if (typeof x === "number" && typeof y === "number")
+          return (x - y) * dir;
         return String(x ?? "").localeCompare(String(y ?? ""), "pt-BR") * dir;
       });
     }
   }
   const count = visible.length;
   const printRows = visible;
-  const totalsValues = typeof totals === "function" ? totals(printRows) : totals;
+  const totalsValues =
+    typeof totals === "function" ? totals(printRows) : totals;
 
   let page = 1;
   let totalPages = 1;
@@ -415,7 +536,10 @@ export function DataTable<TRow>({
     totalPages = Math.max(1, Math.ceil(count / pagination.pageSize));
     page = Math.min(clientPage, totalPages);
     goTo = setClientPage;
-    visible = visible.slice((page - 1) * pagination.pageSize, page * pagination.pageSize);
+    visible = visible.slice(
+      (page - 1) * pagination.pageSize,
+      page * pagination.pageSize,
+    );
   }
 
   const handleSort = (key: string) => {
@@ -435,7 +559,8 @@ export function DataTable<TRow>({
   };
 
   const hasActions = Boolean(rowActions);
-  const primaryCol = columns.find((c) => c.mobileRole === "primary") ?? columns[0];
+  const primaryCol =
+    columns.find((c) => c.mobileRole === "primary") ?? columns[0];
   const secondaryCol = columns.find((c) => c.mobileRole === "secondary");
   const fieldCols = columns.filter(
     (c) => c !== primaryCol && c !== secondaryCol && c.mobileRole !== "hidden",
@@ -455,10 +580,19 @@ export function DataTable<TRow>({
   };
   const boundaries = groupBoundaryKeys(columns);
   /** Comparação de um total; a primeira coluna só tem o rótulo "Total". */
-  const totalTrend = (col: DataTableColumn<TRow>, index: number): Trend | undefined => {
+  const totalTrend = (
+    col: DataTableColumn<TRow>,
+    index: number,
+  ): Trend | undefined => {
     const current = totalsValues?.[col.key];
     const compared = totalsCompare?.[col.key];
-    if (index === 0 || !compared || typeof current !== "number" || !isNumericFormat(col.format)) return undefined;
+    if (
+      index === 0 ||
+      !compared ||
+      typeof current !== "number" ||
+      !isNumericFormat(col.format)
+    )
+      return undefined;
     return { ...compared, current, format: col.format };
   };
 
@@ -473,11 +607,21 @@ export function DataTable<TRow>({
         Página {page} de {totalPages}
       </span>
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="default" disabled={page <= 1} onClick={() => goTo(Math.max(1, page - 1))}>
+        <Button
+          variant="outline"
+          size="default"
+          disabled={page <= 1}
+          onClick={() => goTo(Math.max(1, page - 1))}
+        >
           <ChevronLeft className="size-4 mr-1" />
           Anterior
         </Button>
-        <Button variant="outline" size="default" disabled={page >= totalPages} onClick={() => goTo(page + 1)}>
+        <Button
+          variant="outline"
+          size="default"
+          disabled={page >= totalPages}
+          onClick={() => goTo(page + 1)}
+        >
           Próxima
           <ChevronRight className="size-4 ml-1" />
         </Button>
@@ -486,7 +630,8 @@ export function DataTable<TRow>({
   );
 
   const heading = typeof title === "function" ? title(count) : title;
-  const serverPaged = manual && pagination !== undefined && "onPageChange" in pagination;
+  const serverPaged =
+    manual && pagination !== undefined && "onPageChange" in pagination;
 
   const printButton = print && (
     <Button
@@ -505,14 +650,26 @@ export function DataTable<TRow>({
       {(heading || description || search || print) && (
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            {heading && <CardTitle className="text-base font-semibold">{heading}</CardTitle>}
-            {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+            {heading && (
+              <CardTitle className="text-base font-semibold">
+                {heading}
+              </CardTitle>
+            )}
+            {description && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {description}
+              </p>
+            )}
           </div>
           {(search || printButton) && (
-            <div className={cn("flex items-center gap-2", isMobile && "w-full")}>
+            <div
+              className={cn("flex items-center gap-2", isMobile && "w-full")}
+            >
               {printButton}
               {search && (
-                <InputGroup className={isMobile ? "flex-1" : (search.className ?? "w-72")}>
+                <InputGroup
+                  className={isMobile ? "flex-1" : (search.className ?? "w-72")}
+                >
                   <InputGroupInput
                     type="search"
                     placeholder={search.placeholder ?? "Buscar..."}
@@ -543,19 +700,27 @@ export function DataTable<TRow>({
                   secondary=""
                   fields={fieldCols.map((c) => ({
                     label: mobileLabel(c),
-                    value: <Skeleton className={c.skeletonClassName ?? "h-4 w-20"} />,
+                    value: (
+                      <Skeleton className={c.skeletonClassName ?? "h-4 w-20"} />
+                    ),
                   }))}
                 />
               ))
             ) : visible.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground text-sm">{emptyMessage}</p>
+              <p className="text-center py-8 text-muted-foreground text-sm">
+                {emptyMessage}
+              </p>
             ) : (
               visible.map((row) => (
                 <MobileCard
                   key={getRowId(row)}
                   primary={text(primaryCol, row)}
                   secondary={secondaryCol ? text(secondaryCol, row) : undefined}
-                  fields={fieldCols.map((c) => ({ label: mobileLabel(c), value: mobileCell(c, row), wide: c.mobileWide }))}
+                  fields={fieldCols.map((c) => ({
+                    label: mobileLabel(c),
+                    value: mobileCell(c, row),
+                    wide: c.mobileWide,
+                  }))}
                   actions={
                     renderExpanded ? (
                       <>
@@ -566,7 +731,11 @@ export function DataTable<TRow>({
                       rowActions?.(row)
                     )
                   }
-                  details={renderExpanded && isExpanded(getRowId(row)) ? renderExpanded(row) : undefined}
+                  details={
+                    renderExpanded && isExpanded(getRowId(row))
+                      ? renderExpanded(row)
+                      : undefined
+                  }
                 />
               ))
             )}
@@ -606,7 +775,10 @@ export function DataTable<TRow>({
                     frozenKeys={frozenKeys}
                     frozenHead={(firstKey, lastKey) => ({
                       style: frozenStyle(firstKey, true),
-                      className: cn(frozenClass(firstKey, true), lastKey === lastFrozenKey && FROZEN_EDGE_CLASS),
+                      className: cn(
+                        frozenClass(firstKey, true),
+                        lastKey === lastFrozenKey && FROZEN_EDGE_CLASS,
+                      ),
                     })}
                   />
                   <TableRow className="bg-muted/40 border-b-0!">
@@ -614,7 +786,11 @@ export function DataTable<TRow>({
                       <TableHead
                         ref={setHeadRef(EXPAND_KEY)}
                         style={frozenStyle(EXPAND_KEY, true)}
-                        className={cn("w-12", frozenClass(EXPAND_KEY, true), HEADER_EDGE_CLASS)}
+                        className={cn(
+                          "w-12",
+                          frozenClass(EXPAND_KEY, true),
+                          HEADER_EDGE_CLASS,
+                        )}
                       />
                     )}
                     {columns.map((col) => (
@@ -630,13 +806,28 @@ export function DataTable<TRow>({
                           headerEdgeClass(col.key),
                         )}
                         onClick={() => col.sortable && handleSort(col.key)}
-                        aria-sort={col.sortable && sortKey === col.key ? (order === "asc" ? "ascending" : "descending") : undefined}
+                        aria-sort={
+                          col.sortable && sortKey === col.key
+                            ? order === "asc"
+                              ? "ascending"
+                              : "descending"
+                            : undefined
+                        }
                       >
                         {col.sortable ? (
-                          <div className={cn("flex items-center gap-1", isNumericColumn(col) && "justify-end")}>
+                          <div
+                            className={cn(
+                              "flex items-center gap-1",
+                              isNumericColumn(col) && "justify-end",
+                            )}
+                          >
                             <HeaderLabel col={col} />
                             {sortKey === col.key ? (
-                              order === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+                              order === "asc" ? (
+                                <ArrowUp className="size-3" />
+                              ) : (
+                                <ArrowDown className="size-3" />
+                              )
                             ) : (
                               <ArrowUpDown className="size-3 text-muted-foreground" />
                             )}
@@ -646,7 +837,13 @@ export function DataTable<TRow>({
                         )}
                       </TableHead>
                     ))}
-                    {hasActions && <TableHead className={cn(actionsHeadClassName, HEADER_EDGE_CLASS)}>{actionsLabel}</TableHead>}
+                    {hasActions && (
+                      <TableHead
+                        className={cn(actionsHeadClassName, HEADER_EDGE_CLASS)}
+                      >
+                        {actionsLabel}
+                      </TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -656,7 +853,9 @@ export function DataTable<TRow>({
                         {renderExpanded && <TableCell />}
                         {columns.map((c) => (
                           <TableCell key={c.key}>
-                            <Skeleton className={c.skeletonClassName ?? "h-4 w-full"} />
+                            <Skeleton
+                              className={c.skeletonClassName ?? "h-4 w-full"}
+                            />
                           </TableCell>
                         ))}
                         {hasActions && (
@@ -669,7 +868,11 @@ export function DataTable<TRow>({
                   ) : visible.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={columns.length + (hasActions ? 1 : 0) + (renderExpanded ? 1 : 0)}
+                        colSpan={
+                          columns.length +
+                          (hasActions ? 1 : 0) +
+                          (renderExpanded ? 1 : 0)
+                        }
                         className="text-center py-10 text-muted-foreground"
                       >
                         {emptyMessage}
@@ -677,12 +880,22 @@ export function DataTable<TRow>({
                     </TableRow>
                   ) : (
                     visible.map((row) => {
-                      const expanded = renderExpanded !== undefined && isExpanded(getRowId(row));
+                      const expanded =
+                        renderExpanded !== undefined &&
+                        isExpanded(getRowId(row));
                       return (
                         <React.Fragment key={getRowId(row)}>
-                          <TableRow className={cn("group/row hover:bg-muted/30", striped && "even:bg-muted/20")}>
+                          <TableRow
+                            className={cn(
+                              "group/row hover:bg-muted/30",
+                              striped && "even:bg-muted/20",
+                            )}
+                          >
                             {renderExpanded && (
-                              <TableCell style={frozenStyle(EXPAND_KEY)} className={cn(frozenClass(EXPAND_KEY))}>
+                              <TableCell
+                                style={frozenStyle(EXPAND_KEY)}
+                                className={cn(frozenClass(EXPAND_KEY))}
+                              >
                                 {expandButton(row)}
                               </TableCell>
                             )}
@@ -694,9 +907,11 @@ export function DataTable<TRow>({
                                   style={frozenStyle(col.key)}
                                   className={cn(
                                     columnCellClassName(col, row),
-                                    boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                                    boundaries.has(col.key) &&
+                                      GROUP_BOUNDARY_CLASS,
                                     frozenClass(col.key),
-                                    col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
+                                    col.key === lastFrozenKey &&
+                                      FROZEN_EDGE_CLASS,
                                     trend && "cursor-help",
                                   )}
                                 >
@@ -705,18 +920,31 @@ export function DataTable<TRow>({
                               );
                               // A célula inteira é o gatilho do tooltip compartilhado da tabela.
                               return trend ? (
-                                <TrendTooltipTrigger key={col.key} handle={trendTooltip} trend={trend} title={mobileLabel(col)}>
+                                <TrendTooltipTrigger
+                                  key={col.key}
+                                  handle={trendTooltip}
+                                  trend={trend}
+                                  title={mobileLabel(col)}
+                                >
                                   {cell}
                                 </TrendTooltipTrigger>
                               ) : (
                                 cell
                               );
                             })}
-                            {hasActions && <TableCell className="text-right">{rowActions?.(row)}</TableCell>}
+                            {hasActions && (
+                              <TableCell className="text-right">
+                                {rowActions?.(row)}
+                              </TableCell>
+                            )}
                           </TableRow>
                           {expanded && (
                             <TableRow>
-                              <TableCell colSpan={columns.length + (hasActions ? 1 : 0) + 1}>
+                              <TableCell
+                                colSpan={
+                                  columns.length + (hasActions ? 1 : 0) + 1
+                                }
+                              >
                                 {renderExpanded(row)}
                               </TableCell>
                             </TableRow>
@@ -730,7 +958,10 @@ export function DataTable<TRow>({
                   <TableFooter className={TOTALS_CLASS}>
                     <TableRow>
                       {renderExpanded && (
-                        <TableCell style={frozenStyle(EXPAND_KEY)} className={cn(frozenClass(EXPAND_KEY, true))} />
+                        <TableCell
+                          style={frozenStyle(EXPAND_KEY)}
+                          className={cn(frozenClass(EXPAND_KEY, true))}
+                        />
                       )}
                       {columns.map((col, idx) => {
                         const trend = totalTrend(col, idx);
@@ -750,7 +981,12 @@ export function DataTable<TRow>({
                           </TableCell>
                         );
                         return trend ? (
-                          <TrendTooltipTrigger key={col.key} handle={trendTooltip} trend={trend} title={mobileLabel(col)}>
+                          <TrendTooltipTrigger
+                            key={col.key}
+                            handle={trendTooltip}
+                            trend={trend}
+                            title={mobileLabel(col)}
+                          >
                             {cell}
                           </TrendTooltipTrigger>
                         ) : (
@@ -782,6 +1018,12 @@ export function DataTable<TRow>({
           fileName={print.fileName ?? heading}
           description={print.description ?? description}
           orientation={print.orientation ?? "portrait"}
+          details={
+            print.expanded && renderExpanded
+              ? (row) =>
+                  isExpanded(getRowId(row)) ? renderExpanded(row) : null
+              : undefined
+          }
           onDone={endPrinting}
         />
       )}
@@ -812,6 +1054,8 @@ interface PrintTableProps<TRow> {
   fileName?: string;
   description?: string;
   orientation: DataTablePrintOrientation;
+  /** Detalhes impressos abaixo de cada linha (as linhas expandidas). */
+  details?: (row: TRow) => React.ReactNode;
   onDone: () => void;
 }
 
@@ -833,20 +1077,30 @@ function PrintTable<TRow>({
   fileName,
   description,
   orientation,
+  details,
   onDone,
 }: PrintTableProps<TRow>) {
   const boundaries = groupBoundaryKeys(columns);
-  const frozenEdge = (key: string) => key === lastFrozenKey && cn("border-r-2", PRINT_LINE_COLOR);
-  const frozenKeys = columns.slice(0, columns.findIndex((c) => c.key === lastFrozenKey) + 1).map((c) => c.key);
+  const frozenEdge = (key: string) =>
+    key === lastFrozenKey && cn("border-r-2", PRINT_LINE_COLOR);
+  const frozenKeys = columns
+    .slice(0, columns.findIndex((c) => c.key === lastFrozenKey) + 1)
+    .map((c) => c.key);
   const tableRef = useRef<HTMLTableElement>(null);
   const printed = useRef(false);
   const [issuedAt] = useState(() => issuedAtLabel(new Date()));
-  const pageWidth = Math.floor((PAGE_WIDTH_MM[orientation] - 2 * PAGE_MARGIN_MM) * PX_PER_MM);
+  const pageWidth = Math.floor(
+    (PAGE_WIDTH_MM[orientation] - 2 * PAGE_MARGIN_MM) * PX_PER_MM,
+  );
   const [fit, setFit] = useState<{ width?: number; zoom: number } | null>(null);
 
   useLayoutEffect(() => {
     const tableWidth = tableRef.current?.offsetWidth ?? 0;
-    setFit(tableWidth > pageWidth ? { width: tableWidth, zoom: pageWidth / tableWidth } : { zoom: 1 });
+    setFit(
+      tableWidth > pageWidth
+        ? { width: tableWidth, zoom: pageWidth / tableWidth }
+        : { zoom: 1 },
+    );
   }, [pageWidth]);
 
   // O "Salvar como PDF" do navegador sugere o título da página como nome do arquivo.
@@ -892,20 +1146,27 @@ function PrintTable<TRow>({
       <style>{css}</style>
       <div className="mb-3">
         {title && <h1 className="text-base font-semibold">{title}</h1>}
-        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        {description && (
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        )}
       </div>
       {/* `<table>` direto: o container do `<Table>` tem overflow/max-height e cortaria o papel numa altura de tela. */}
       <table
         ref={tableRef}
         aria-label={title ?? "Impressão"}
-        className={cn("w-full caption-bottom text-[10px]", bordered && cn("border", PRINT_LINE_COLOR))}
+        className={cn(
+          "w-full caption-bottom text-[10px]",
+          bordered && cn("border", PRINT_LINE_COLOR),
+        )}
         style={{ width: fit?.width, zoom: fit?.zoom ?? 1 }}
       >
         <TableHeader className="static">
           <GroupHeaderRow
             columns={columns}
             frozenKeys={frozenKeys}
-            frozenHead={(_firstKey, lastKey) => ({ className: frozenEdge(lastKey) })}
+            frozenHead={(_firstKey, lastKey) => ({
+              className: frozenEdge(lastKey),
+            })}
           />
           <TableRow className={cn("bg-muted/40 border-b-2!", PRINT_LINE_COLOR)}>
             {columns.map((col) => (
@@ -925,24 +1186,44 @@ function PrintTable<TRow>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => (
-            <TableRow key={getRowId(row)} className={cn("break-inside-avoid", striped && "even:bg-muted/30")}>
-              {columns.map((col) => (
-                <TableCell
-                  key={col.key}
+          {rows.map((row) => {
+            const detalhe = details?.(row);
+            return (
+              <Fragment key={getRowId(row)}>
+                <TableRow
                   className={cn(
-                    "p-1.5",
-                    wrapsInPrint(col) && "whitespace-normal",
-                    columnCellClassName(col, row),
-                    boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
-                    frozenEdge(col.key),
+                    "break-inside-avoid",
+                    striped && "even:bg-muted/30",
                   )}
                 >
-                  {cellContent(col, row)}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
+                  {columns.map((col) => (
+                    <TableCell
+                      key={col.key}
+                      className={cn(
+                        "p-1.5",
+                        wrapsInPrint(col) && "whitespace-normal",
+                        columnCellClassName(col, row),
+                        boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                        frozenEdge(col.key),
+                      )}
+                    >
+                      {cellContent(col, row)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+                {detalhe && (
+                  <TableRow className="break-inside-avoid">
+                    <TableCell
+                      colSpan={columns.length}
+                      className="p-1.5 pl-6 whitespace-normal"
+                    >
+                      {detalhe}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            );
+          })}
         </TableBody>
         {totals && rows.length > 0 && (
           // `table-row-group`: um `<tfoot>` comum se repete em toda folha; assim o total sai só depois da última linha.
@@ -951,7 +1232,12 @@ function PrintTable<TRow>({
               {columns.map((col, idx) => (
                 <TableCell
                   key={col.key}
-                  className={cn("p-1.5", totalsCellClassName(col), boundaries.has(col.key) && GROUP_BOUNDARY_CLASS, frozenEdge(col.key))}
+                  className={cn(
+                    "p-1.5",
+                    totalsCellClassName(col),
+                    boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                    frozenEdge(col.key),
+                  )}
                 >
                   {totalCellText(col, idx, totals)}
                 </TableCell>
