@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, MoreHorizontal } from "lucide-react";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
-import { Stack } from "@platform/ui/components/layout";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
+import { Show, Stack } from "@platform/ui/components/layout";
 import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { HeaderActions } from "@platform/ui/context/header-actions";
@@ -69,6 +70,7 @@ function TiposDeMeta() {
     },
     {
       key: "ativo",
+      centered: true,
       label: "Situação",
       value: (t) => (t.ativo ? "Ativo" : "Inativo"),
       render: (t) => <Badge variant={t.ativo ? "success" : "secondary"}>{t.ativo ? "Ativo" : "Inativo"}</Badge>,
@@ -78,10 +80,25 @@ function TiposDeMeta() {
   return (
     <Stack gap="section">
       <HeaderActions>
-        <Button onClick={() => void abrir()}>
-          <Plus />
-          Novo Tipo de Meta
-        </Button>
+        <Show on="lgUp">
+          <Button onClick={() => void abrir()}>
+            <Plus />
+            Novo Tipo de Meta
+          </Button>
+        </Show>
+        <Show on="belowLg">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="Mais ações" />}>
+              <MoreHorizontal />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => void abrir()}>
+                <Plus />
+                Novo Tipo de Meta
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Show>
       </HeaderActions>
       <DataTable
         scroll="page"

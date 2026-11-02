@@ -396,9 +396,10 @@ export function ColaboradoresPage() {
       },
       {
         key: "status",
+        centered: true,
         label: "Status",
         render: (r) => (
-          <Stack direction="row" wrap gap="field">
+          <Stack direction="row" wrap justify="center" gap="field">
             <Badge variant={r.confirmado ? "success" : "warning"}>{r.confirmado ? "Confirmado" : "Pendente"}</Badge>
             {falhas[r.codigoColaborador] && (
               <Badge variant="destructive" title={falhas[r.codigoColaborador]}>

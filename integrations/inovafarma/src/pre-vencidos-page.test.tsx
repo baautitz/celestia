@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { PreVencidosPage } from "./pre-vencidos-page";
+import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { LancamentoWindow } from "./pre-vencido-window";
 
 const apiFetch = vi.hoisted(() => vi.fn());
@@ -44,10 +45,18 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** Destino das ações do cabeçalho, que no app é o shell. */
+const HeaderSlot = () => <>{useHeaderActions().actions}</>;
+
 describe("Tela Pré-vencidos", () => {
   it("abre com o Closing Period aberto de data mais recente selecionado", async () => {
     apiFetch.mockImplementation(async (url: string) => (url.includes("/contexto") ? contexto() : []));
-    render(<PreVencidosPage />);
+    render(
+      <HeaderActionsProvider>
+        <HeaderSlot />
+        <PreVencidosPage />
+      </HeaderActionsProvider>,
+    );
     expect((await screen.findByRole("combobox", { name: "Período de Fechamento" })).textContent).toContain("Abril");
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/lancamentos?periodoId=p-abril")));
   });
@@ -59,7 +68,12 @@ describe("Tela Pré-vencidos", () => {
       if (url.includes("periodoId=p-maio")) return [{ id: "pv_9", nomeProduto: "DIPIRONA 500MG", codigoBarra: null, codigoLoja: 1, quantidade: 2, validade: "2027-08", version: 1, periodoId: "p-maio", produtoId: "g", nomeColaborador: "ANA" }];
       return [];
     });
-    render(<PreVencidosPage />);
+    render(
+      <HeaderActionsProvider>
+        <HeaderSlot />
+        <PreVencidosPage />
+      </HeaderActionsProvider>,
+    );
     await screen.findByText("DIPIRONA 500MG");
     expect((screen.getByRole("button", { name: "Novo lançamento" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByRole("button", { name: /Editar DIPIRONA/ })).toBeNull();
@@ -67,14 +81,24 @@ describe("Tela Pré-vencidos", () => {
 
   it("mostra a aba Conferência só para quem tem a Permission", async () => {
     apiFetch.mockImplementation(async (url: string) => (url.includes("/contexto") ? contexto({ podeLancar: false, podeConferir: true, periodosConferencia: periodos, lojasConferencia: [] }) : []));
-    render(<PreVencidosPage />);
+    render(
+      <HeaderActionsProvider>
+        <HeaderSlot />
+        <PreVencidosPage />
+      </HeaderActionsProvider>,
+    );
     await screen.findByRole("tab", { name: "Conferência" });
     expect(screen.queryByRole("tab", { name: "Meus Lançamentos" })).toBeNull();
   });
 
   it("avisa quem não tem Vínculo, em vez de oferecer o lançamento", async () => {
     apiFetch.mockImplementation(async (url: string) => (url.includes("/contexto") ? contexto({ vinculado: false, lojas: [] }) : []));
-    render(<PreVencidosPage />);
+    render(
+      <HeaderActionsProvider>
+        <HeaderSlot />
+        <PreVencidosPage />
+      </HeaderActionsProvider>,
+    );
     await screen.findByText(/não está vinculado a um Colaborador/);
     expect(screen.queryByRole("button", { name: "Novo lançamento" })).toBeNull();
   });

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, MoreHorizontal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Button } from "@platform/ui/components/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
-import { Stack } from "@platform/ui/components/layout";
+import { Show, Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
+import { HeaderActions } from "@platform/ui/context/header-actions";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
@@ -214,6 +216,27 @@ function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
 
   return (
     <Stack gap="section">
+      <HeaderActions>
+        <Show on="lgUp">
+          <Button disabled={!aberto} onClick={() => void abrir()}>
+            <Plus />
+            Nova Avaliação
+          </Button>
+        </Show>
+        <Show on="belowLg">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="Mais ações" />}>
+              <MoreHorizontal />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={!aberto} onClick={() => void abrir()}>
+                <Plus />
+                Nova Avaliação
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Show>
+      </HeaderActions>
       <Stack direction="row" align="end" justify="between" gap="section" wrap>
         <Stack direction="row" align="end" gap="section" wrap>
           <SeletorPeriodo periodos={contexto.periodos} valor={periodoId} onChange={setPeriodoId} />
@@ -234,10 +257,6 @@ function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
             </Select>
           </Stack>
         </Stack>
-        <Button disabled={!aberto} onClick={() => void abrir()}>
-          <Plus />
-          Nova Avaliação
-        </Button>
       </Stack>
       {!aberto && (
         <Alert>

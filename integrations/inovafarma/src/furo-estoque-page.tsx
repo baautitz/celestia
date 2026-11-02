@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, MessageSquarePlus, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, MessageSquarePlus, Package, Pencil, Plus, Trash2, MoreHorizontal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
-import { Grid, KpiCard, Stack, Text } from "@platform/ui/components/layout";
+import { Grid, KpiCard, Show, Stack, Text } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
@@ -155,7 +156,7 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
   };
 
   const colunas: DataTableColumn<Ajuste>[] = [
-    { key: "data", label: "Data", value: (a) => a.data, render: (a) => dataHora(a.data), sortable: true, nowrap: true, mobileRole: "secondary" },
+    { key: "data", centered: true, label: "Data", value: (a) => a.data, render: (a) => dataHora(a.data), sortable: true, nowrap: true, mobileRole: "secondary" },
     { key: "codigoMovimento", label: "Ajuste", tooltip: "Número da movimentação no InovaFarma.", value: (a) => a.codigoMovimento, searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
     { key: "loja", label: "Loja", value: (a) => nomeLoja(a.codigoLoja), sortable: true },
     { key: "colaborador", label: "Lançado por", tooltip: "Colaborador informado no Ajuste, no InovaFarma.", value: (a) => a.colaborador, searchable: true, sortable: true },
@@ -319,15 +320,30 @@ function Motivos({ motivos, recarregar }: { motivos: Motivo[]; recarregar: () =>
   };
   const colunas: DataTableColumn<Motivo>[] = [
     { key: "nome", label: "Motivo", value: (m) => m.nome, searchable: true, sortable: true },
-    { key: "ativo", label: "Situação", value: (m) => (m.ativo ? "Ativo" : "Inativo"), render: (m) => <Badge variant={m.ativo ? "success" : "secondary"}>{m.ativo ? "Ativo" : "Inativo"}</Badge> },
+    { key: "ativo", centered: true, label: "Situação", value: (m) => (m.ativo ? "Ativo" : "Inativo"), render: (m) => <Badge variant={m.ativo ? "success" : "secondary"}>{m.ativo ? "Ativo" : "Inativo"}</Badge> },
   ];
   return (
     <Stack gap="section">
       <HeaderActions>
-        <Button onClick={() => void abrir()}>
-          <Plus />
-          Novo Motivo
-        </Button>
+        <Show on="lgUp">
+          <Button onClick={() => void abrir()}>
+            <Plus />
+            Novo Motivo
+          </Button>
+        </Show>
+        <Show on="belowLg">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="Mais ações" />}>
+              <MoreHorizontal />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => void abrir()}>
+                <Plus />
+                Novo Motivo
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Show>
       </HeaderActions>
       <DataTable
         scroll="page"

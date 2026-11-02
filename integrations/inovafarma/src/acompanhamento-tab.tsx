@@ -62,6 +62,7 @@ const colunas: DataTableColumn<LinhaAcompanhamento>[] = [
   { key: "resultado", label: "Resultado", value: (l) => l.resultado },
   {
     key: "situacao",
+    centered: true,
     label: "Situação",
     value: (l) =>
       l.atingida === null ? "" : l.atingida ? "Atingida" : "Não atingida",
