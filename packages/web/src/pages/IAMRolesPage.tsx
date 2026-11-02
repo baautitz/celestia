@@ -343,6 +343,7 @@ export const IAMRolesPage: React.FC = () => {
       <PageHeader title="Grupos" description="Gerencie permissões granulares no modelo Permission-First." />
 
       <DataTable
+        scroll="page"
         columns={columns}
         rows={roles}
         getRowId={(r) => r.id}

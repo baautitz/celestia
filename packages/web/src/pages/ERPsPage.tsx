@@ -360,6 +360,7 @@ export const ERPsPage: React.FC = () => {
       <PageHeader title="ERPs" description="Cadastre os ERPs de onde os módulos leem dados. As consultas aos ERPs são somente leitura." />
 
       <DataTable
+        scroll="page"
         columns={columns}
         rows={erps}
         getRowId={(e) => e.id}

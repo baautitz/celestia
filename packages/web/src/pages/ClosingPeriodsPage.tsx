@@ -380,6 +380,7 @@ export const ClosingPeriodsPage: React.FC = () => {
       </HeaderActions>
 
       <DataTable
+        scroll="page"
         columns={columns}
         rows={periods}
         getRowId={(p) => p.id}

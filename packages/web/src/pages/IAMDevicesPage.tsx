@@ -243,6 +243,7 @@ export const IAMDevicesPage: React.FC = () => {
       <PageHeader title="Dispositivos" description="Computadores e celulares homologados a acessar o sistema, cada um com o próprio certificado." />
 
       <DataTable<Device>
+        scroll="page"
         rows={devices}
         getRowId={(d) => d.id}
         loading={loading}
