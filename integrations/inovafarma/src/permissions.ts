@@ -67,4 +67,9 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
   },
+  "tipos-meta:manage": {
+    label: "Metas: Gerenciar Tipos de Meta",
+    description: "Permite cadastrar, alterar, ativar e desativar os Tipos de Meta e aplicar o Alvo padrão às Metas dos Períodos abertos.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerenciar os Tipos de Meta.",
+  },
 });
