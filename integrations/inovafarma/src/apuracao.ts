@@ -81,12 +81,13 @@ export function apurarParticipante(tipo: TipoApurado, lista: ListaProdutos | nul
     atingimento = alvo === null ? null : inicial > 0 ? (realizado / inicial) * 100 : 0;
     resultado = alvo === null ? "Valor inicial pendente" : `Saldo ${reais(realizado)} de ${reais(inicial)} · descontos ${reais(dados.descontosCentavos)}`;
   } else {
-    realizado = dados.indicadores[tipo.indicador] ?? 0;
+    const doErp = dados.indicadores[tipo.indicador];
+    realizado = doErp ?? 0;
     const atual = `${nomeCurto(indicador)} ${comUnidade(indicador, realizado)}`;
     if (tipo.semAlvo) resultado = `${nomeCurto(indicador)} ${formatarValor(indicador, realizado)}`;
     else if (alvo === null) resultado = `${atual} · Alvo pendente`;
-    else if (indicador.direcao === "menor" && realizado <= 0) {
-      // Sem vendas não há CMV: não é o melhor resultado possível, a Meta não é Atingida.
+    else if (indicador.direcao === "menor" && (doErp === undefined || (realizado <= 0 && !indicador.zeroEhResultado))) {
+      // Sem vendas não há CMV nem Desconto: não é o melhor resultado possível, a Meta não é Atingida.
       atingimento = 0;
       resultado = `${nomeCurto(indicador)} sem vendas · Meta: até ${formatarValor(indicador, alvo)}`;
     } else {

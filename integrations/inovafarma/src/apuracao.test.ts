@@ -39,6 +39,19 @@ describe("Apuração de um Participante", () => {
     }
   });
 
+  it("Desconto zero com vendas é o melhor resultado; sem vendas não paga", () => {
+    const desconto = (d: DadosColaborador) => apurarParticipante(tipo({ indicador: "desconto-percent", exibicao: "atingida" }), null, ana(5), d);
+    expect(desconto(dados({ indicadores: { "desconto-percent": 0 } }))).toMatchObject({ atingida: true, premioCentavos: 10000 });
+    expect(desconto(dados({ indicadores: { "desconto-percent": 4 } }))).toMatchObject({ atingida: true, premioCentavos: 10000 });
+    expect(desconto(dados({ indicadores: { "desconto-percent": 6 } }))).toMatchObject({ atingida: false, premioCentavos: 0 });
+    expect(desconto(dados())).toMatchObject({ atingida: false, premioCentavos: 0 });
+  });
+
+  it("Venda Líquida em R$ paga o Fixo ao chegar no Alvo", () => {
+    const r = apurarParticipante(tipo({ indicador: "venda-liquida" }), null, ana(5_000_000), dados({ indicadores: { "venda-liquida": 6_000_000 } }));
+    expect(r).toMatchObject({ atingida: true, premioCentavos: 10000 });
+  });
+
   it("paga a maior Faixa alcançada", () => {
     const faixas = tipo({ regra: { tipo: "faixas", faixas: [{ atingimento: 100, valorCentavos: 10000 }, { atingimento: 80, valorCentavos: 5000 }, { atingimento: 120, valorCentavos: 15000 }] } });
     expect(apurarParticipante(faixas, null, ana(100), dados({ indicadores: { "foco-qtd": 110 } })).premioCentavos).toBe(10000);

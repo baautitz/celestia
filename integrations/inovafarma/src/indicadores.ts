@@ -12,12 +12,23 @@ export interface Indicador {
   nome: string;
   direcao: Direcao;
   unidade: Unidade;
+  /** Quando menor é melhor e zero é o melhor resultado (ex.: Desconto), não falta de vendas (ex.: CMV). */
+  zeroEhResultado?: boolean;
 }
 
-const indicador = <const I extends string>(id: I, nome: string, unidade: Unidade, direcao: Direcao = "maior") => ({ id, nome, direcao, unidade });
+const indicador = <const I extends string>(id: I, nome: string, unidade: Unidade, direcao: Direcao = "maior", zeroEhResultado = false) => ({
+  id,
+  nome,
+  direcao,
+  unidade,
+  zeroEhResultado,
+});
 
 /** Indicadores fixos do Plugin: o cliente não cria Indicador, só escolhe um destes no Tipo de Meta. */
 export const INDICADORES = [
+  indicador("venda-liquida", "Venda Líquida", "reais"),
+  indicador("desconto-percent", "Desconto %", "percentual", "menor", true),
+  indicador("desconto-valor", "Desconto em R$", "reais", "menor", true),
   indicador("cmv", "CMV %", "percentual", "menor"),
   indicador("ticket-medio", "Ticket Médio", "reais"),
   indicador("foco-qtd", "Qtd. Total Foco", "quantidade"),
@@ -49,7 +60,7 @@ export const indicadorPorId = (id: IndicadorId): Indicador => INDICADORES.find((
  * A interface nunca mostra essa conta.
  */
 export function atingimento(indicador: Indicador, realizado: number, alvo: number): number {
-  if (indicador.direcao === "menor") return realizado > 0 ? (alvo / realizado) * 100 : 0;
+  if (indicador.direcao === "menor") return realizado > 0 ? (alvo / realizado) * 100 : indicador.zeroEhResultado ? Infinity : 0;
   return alvo > 0 ? (realizado / alvo) * 100 : 0;
 }
 

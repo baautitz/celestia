@@ -65,7 +65,7 @@ export function problemaDoTipo(t: DadosTipoMeta): string | null {
     return "O Gatilho deve ser menor que o Teto.";
   if (t.regra.tipo === "percentual") {
     const base = indicadorPorId(t.regra.indicadorBase);
-    if (base.unidade !== "reais" || base.id === "avaliacoes" || base.id === "ticket-medio") return "O Percentual se aplica a um Indicador de valor vendido em R$.";
+    if (base.unidade !== "reais" || base.id === "avaliacoes" || base.id === "ticket-medio" || base.direcao === "menor") return "O Percentual se aplica a um Indicador de valor vendido em R$.";
   }
   if (t.regra.tipo === "faixas" && new Set(t.regra.faixas.map((f) => f.atingimento)).size !== t.regra.faixas.length) return "Duas Faixas não podem ter o mesmo Atingimento.";
   if (t.semAlvo) {

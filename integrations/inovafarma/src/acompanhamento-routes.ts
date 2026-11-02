@@ -84,6 +84,9 @@ const INDICADORES_DE_VENDAS: Partial<Record<IndicadorId, (r: LinhaDesempenho) =>
   const categoria = (coluna: string) => ({ qtd: (r: LinhaDesempenho) => n(r[`qtd${coluna}`]), valor: (r: LinhaDesempenho) => Math.round(n(r[`valor${coluna}`]) * 100) });
   const [foco, vitaminas, genericos, similares, incentivos] = [categoria("TotalFoco"), categoria("Vitaminas"), categoria("Genericos"), categoria("Similares"), categoria("Incentivos")];
   return {
+    "venda-liquida": (r) => Math.round(n(r.totalLiquido) * 100),
+    "desconto-valor": (r) => Math.round(n(r.totalDesconto) * 100),
+    "desconto-percent": (r) => (n(r.totalBruto) > 0 ? (n(r.totalDesconto) / n(r.totalBruto)) * 100 : 0),
     cmv: (r) => (n(r.totalLiquido) > 0 ? (n(r.totalCmv) / n(r.totalLiquido)) * 100 : 0),
     "ticket-medio": (r) => Math.round(porVenda(r, n(r.totalLiquido) * 100)),
     "foco-qtd": foco.qtd,
