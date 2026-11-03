@@ -97,7 +97,7 @@ const colunasMetas: DataTableColumn<MetaVista>[] = [
     value: (m) => indicadorPorId(m.tipo.indicador).nome,
     searchable: true,
   },
-  { key: "premio", label: "Prêmio", value: (m) => m.tipo.premio },
+  { key: "premio", label: "Prêmio", value: (m) => m.tipo.premio, cellClassName: "min-w-64 whitespace-normal" },
   {
     key: "participantes",
     label: "Participantes",
