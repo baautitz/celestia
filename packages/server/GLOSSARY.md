@@ -85,11 +85,11 @@ _Avoid_: Perda, Quebra
 ### Metas
 
 **Indicador** (en: Indicator):
-A measure that Celestia knows how to calculate for a Colaborador within a Closing Period, such as CMV %, Ticket Médio, Total Foco, sales with an identified customer, Pré-vencidos sold or the units sold of a Lista de Produtos. Indicadores come ready with the Plugin and are not created by the customer; each one knows whether higher or lower is better.
+A measure that Celestia knows how to calculate for a Colaborador within a Closing Period, such as CMV %, Ticket Médio, Total Foco, sales with an identified customer, Pré-vencidos sold or what was sold of a Lista de Produtos. Indicadores come ready with the Plugin and are not created by the customer; each one knows whether higher or lower is better.
 _Avoid_: Métrica, KPI
 
 **Tipo de Meta** (en: Goal Type):
-A reusable definition kept by the customer: which Indicador it measures, how the result is shown to the Colaborador, whether the Prêmio is shown to them, how the Prêmio is calculated, and optionally a default Alvo for new Participantes. An inactive Tipo de Meta can no longer be used in new Metas.
+A reusable definition kept by the customer: which Indicador it measures (with its Lista de Produtos, for that Indicador), how the result is shown to the Colaborador, whether the Prêmio is shown to them, how the Prêmio is calculated, and optionally a default Alvo for new Participantes. An inactive Tipo de Meta can no longer be used in new Metas.
 _Avoid_: Modelo, Campanha, Plano
 
 **Meta** (en: Goal):
@@ -105,7 +105,7 @@ The value a Participante must reach in the Indicador of a Meta. Each Participant
 _Avoid_: Cota
 
 **Lista de Produtos** (en: Product List):
-The products of a Meta, each with the number of units a Participante must sell. The Meta is Atingida when the Participante reaches the units of a minimum number of the products.
+A set of Produtos, Grupos, Seções and Laboratórios (the ERP's Fabricante), mixed, kept in a Tipo de Meta and reused in every Closing Period. Its Realizado is the total sold of the set, in units or in R$ (net value, with the same rules as Venda Líquida), counting each product sold once within the Meta even when it falls in several entries; different Metas are independent, so the same product counts in each one whose Lista includes it. It works like any other Indicador: Alvo per Participante, default Alvo, Atingida / Não atingida or Progresso, every Prêmio rule, and, in R$, no Alvo or the base of a percentage.
 _Avoid_: Mix, Cesta
 
 **Realizado** (en: Achieved value):
@@ -117,7 +117,7 @@ How far a Participante got towards their Alvo, as a percentage. For an Indicador
 _Avoid_: Progresso, Performance
 
 **Exibição** (en: Display):
-How a Meta's result is shown to the Participante: **Atingida / Não atingida**, only whether it was reached; **Progresso**, the Realizado, the Alvo and how much is left; or **Contagem**, how many products of a Lista de Produtos were reached. Managers always see the full numbers.
+How a Meta's result is shown to the Participante: **Atingida / Não atingida**, only whether it was reached; or **Progresso**, the Realizado, the Alvo and how much is left. Managers always see the full numbers.
 _Avoid_: Modo, Visualização (Visualização is a scope of access)
 
 **Prêmio** (en: Reward):
