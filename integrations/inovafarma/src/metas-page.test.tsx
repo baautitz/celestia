@@ -194,18 +194,50 @@ describe("Metas: construtor de Tipo de Meta", () => {
     expect((await within(modal).findByRole("combobox", { name: "Calcular sobre" })).textContent).toContain("Venda Líquida");
   });
 
-  it("mostra a Lista por tipo e nome, com badge e o aviso de entrada fora do ERP, e busca no tipo escolhido", async () => {
-    const modal = await alterar("Mix");
-    const linhas = () => within(modal).getAllByRole("row").slice(1).map((r) => r.textContent);
-    expect(linhas()).toEqual([expect.stringContaining("ProdutoDipirona 1g"), expect.stringContaining("GrupoVitaminas"), expect.stringContaining("LaboratórioEMS")]);
-    expect(await within(modal).findByText("não encontrado no ERP")).toBeTruthy();
-    expect(within(modal).getAllByRole("row")[2]!.textContent).toContain("não encontrado no ERP");
+  /** Abre a janela "Lista de Produtos" pelo botão "Montar Lista" do construtor. */
+  const montarLista = async (construtor: HTMLElement) => {
+    fireEvent.click(within(construtor).getByRole("button", { name: "Montar Lista" }));
+    await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(2));
+    return screen.getAllByRole("dialog")[1]!;
+  };
 
-    await escolher(within(modal).getByRole("combobox", { name: "Tipo da entrada" }), "Seção");
-    fireEvent.input(within(modal).getByPlaceholderText("Buscar Seção no ERP"), { target: { value: "GEN" }, inputType: "insertText" });
+  it("em O que mede, resume a Lista em uma linha com as entradas fora do ERP", async () => {
+    const modal = await alterar("Mix");
+    expect(within(modal).getByText("1 Produto · 1 Grupo · 1 Laboratório")).toBeTruthy();
+    expect(await within(modal).findByText("1 não encontrado no ERP")).toBeTruthy();
+    expect(within(modal).queryByRole("row")).toBeNull();
+  });
+
+  it("monta a Lista por tipo e nome, com badge e o aviso de entrada fora do ERP, e busca no tipo escolhido", async () => {
+    const construtor = await alterar("Mix");
+    await within(construtor).findByText("1 não encontrado no ERP");
+    const lista = await montarLista(construtor);
+    expect(within(lista).getByRole("heading", { name: "Lista de Produtos" })).toBeTruthy();
+    expect(document.activeElement).toBe(within(lista).getByPlaceholderText("Buscar Produto no ERP"));
+    const linhas = () => within(lista).getAllByRole("row").slice(1).map((r) => r.textContent);
+    expect(linhas()).toEqual([expect.stringContaining("ProdutoDipirona 1g"), expect.stringContaining("GrupoVitaminas"), expect.stringContaining("LaboratórioEMS")]);
+    expect(within(lista).getAllByRole("row")[2]!.textContent).toContain("não encontrado no ERP");
+
+    await escolher(within(lista).getByRole("combobox", { name: "Tipo da entrada" }), "Seção");
+    fireEvent.input(within(lista).getByPlaceholderText("Buscar Seção no ERP"), { target: { value: "GEN" }, inputType: "insertText" });
     fireEvent.click(await screen.findByRole("option", { name: "GENERICOS" }));
     await waitFor(() => expect(linhas()).toContainEqual(expect.stringContaining("SeçãoGENERICOS")));
     expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/tipos-meta/lista/busca?tipo=secao&q=GEN");
+
+    fireEvent.click(within(lista).getByRole("button", { name: "Concluir" }));
+    await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(1));
+    expect(within(construtor).getByText("1 Produto · 1 Grupo · 1 Seção · 1 Laboratório")).toBeTruthy();
+  });
+
+  it("Cancelar na Lista descarta as mudanças feitas nela", async () => {
+    const construtor = await alterar("Mix");
+    const lista = await montarLista(construtor);
+    fireEvent.click(within(lista).getByRole("button", { name: "Remover Laboratório EMS" }));
+    await waitFor(() => expect(within(lista).getAllByRole("row")).toHaveLength(3));
+    fireEvent.click(within(lista).getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Descartar" }));
+    await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(1));
+    expect(within(construtor).getByText("1 Produto · 1 Grupo · 1 Laboratório")).toBeTruthy();
   });
 
   it("ao trocar a Lista de R$ para unidades com Sem Alvo ligado, volta a Regra e a Exibição de antes", async () => {
@@ -231,18 +263,19 @@ describe("Metas: construtor de Tipo de Meta", () => {
     expect(within(modal).getByText("A unidade não muda: as Metas deste Tipo de Meta já têm Alvos nela.")).toBeTruthy();
   });
 
-  it("Esc na busca da Lista fecha primeiro a busca, sem fechar o modal", async () => {
-    const modal = await alterar("Mix");
-    await escolher(within(modal).getByRole("combobox", { name: "Tipo da entrada" }), "Seção");
-    const busca = within(modal).getByPlaceholderText("Buscar Seção no ERP");
+  it("Esc na busca da Lista fecha primeiro a busca, sem fechar o modal da Lista", async () => {
+    const construtor = await alterar("Mix");
+    const lista = await montarLista(construtor);
+    await escolher(within(lista).getByRole("combobox", { name: "Tipo da entrada" }), "Seção");
+    const busca = within(lista).getByPlaceholderText("Buscar Seção no ERP");
     fireEvent.input(busca, { target: { value: "GEN" }, inputType: "insertText" });
     expect(await screen.findByRole("option", { name: "GENERICOS" })).toBeTruthy();
     fireEvent.keyDown(busca, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("option", { name: "GENERICOS" })).toBeNull());
-    expect(screen.getByRole("dialog")).toBe(modal);
-    // Com a busca fechada, o próximo Esc fecha o modal.
+    expect(screen.getAllByRole("dialog")).toEqual([construtor, lista]);
+    // Com a busca fechada, o próximo Esc fecha só o modal da Lista.
     fireEvent.keyDown(busca, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.getAllByRole("dialog")).toEqual([construtor]));
   });
 
   it("mostra o problema que impede salvar ao lado do campo, e a ordem de O que mede", async () => {
