@@ -42,9 +42,10 @@ function TiposDeMeta() {
 
   const abrir = async (tipo?: TipoMetaComPremio) => {
     const resultado = await windows.open<TipoMetaSalvo>({
-      surface: "sheet",
+      surface: "dialog",
+      size: "full",
       title: tipo ? "Alterar Tipo de Meta" : "Novo Tipo de Meta",
-      description: "Indicador, Exibição e regra do Prêmio. Uma alteração afeta só os Períodos abertos.",
+      description: "O que a Meta mede e como paga o Prêmio. Uma alteração afeta só os Períodos abertos.",
       content: () => <TipoMetaWindow tipo={tipo} />,
     });
     void carregar();

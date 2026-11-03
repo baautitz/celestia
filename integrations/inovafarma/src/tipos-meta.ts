@@ -27,7 +27,7 @@ export const REGRA_LABEL: Record<TipoRegra, string> = {
   fixo: "Fixo se atingir",
   proporcional: "Proporcional ao Atingimento",
   faixas: "Faixas",
-  percentual: "Percentual de um Indicador em R$",
+  percentual: "Percentual do valor vendido",
   saldo: "Saldo das Avaliações",
 };
 

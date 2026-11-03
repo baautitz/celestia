@@ -1,22 +1,23 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Button } from "@platform/ui/components/button";
 import { FieldGroup } from "@platform/ui/components/field";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
 import { Input } from "@platform/ui/components/input";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@platform/ui/components/input-group";
 import { Label } from "@platform/ui/components/label";
-import { Stack } from "@platform/ui/components/layout";
+import { Grid, Stack, Text } from "@platform/ui/components/layout";
 import { MoneyInput } from "@platform/ui/components/money-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Switch } from "@platform/ui/components/switch";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
-import { INDICADORES, indicadorPorId, type IndicadorId } from "./indicadores";
+import { INDICADORES, formatarValor, indicadorPorId, valorNoAtingimento, type Indicador, type IndicadorId } from "./indicadores";
 import { EXIBICAO_LABEL, REGRA_LABEL, descreverPremio, problemaDoTipo, type DadosTipoMeta, type Exibicao, type RegraPremio, type TipoMeta, type TipoRegra } from "./tipos-meta";
 
 export const BASE = "/api/m/inovafarma/metas/tipos";
@@ -31,6 +32,9 @@ const BASES_PERCENTUAL = INDICADORES.filter((i) => i.unidade === "reais" && i.id
 /** Sem Alvo, o Prêmio é um Percentual do próprio Indicador: só vale para Indicadores que servem de base. */
 const podeSemAlvo = (indicador: IndicadorId) => BASES_PERCENTUAL.some((i) => i.id === indicador);
 
+/** "Calcular sobre" começa no próprio Indicador quando ele é em R$; senão, vazio. */
+const baseInicial = (indicador: IndicadorId): IndicadorId | "" => (podeSemAlvo(indicador) ? indicador : "");
+
 const schema = z.object({
   nome: z.string().trim().min(1, "Informe o nome do Tipo de Meta.").max(80, "O nome deve ter no máximo 80 caracteres."),
   indicador: z.string() as z.ZodType<IndicadorId>,
@@ -44,7 +48,8 @@ const schema = z.object({
   teto: z.string(),
   faixas: z.array(z.object({ atingimento: z.string(), valor: z.number() })),
   percentual: z.string(),
-  indicadorBase: z.string() as z.ZodType<IndicadorId>,
+  /** Vazio enquanto o gestor não escolhe a base do Percentual. */
+  indicadorBase: z.string() as z.ZodType<IndicadorId | "">,
   soSeAtingir: z.boolean(),
   /** R$ em reais quando o Indicador é em R$; senão, o número digitado. */
   alvoPadrao: z.union([z.number(), z.string()]),
@@ -54,6 +59,8 @@ type Valores = z.infer<typeof schema>;
 
 const centavos = (reais: number) => Math.round(reais * 100);
 const numeroOuNull = (v: string) => (v.trim() === "" ? null : Number(v.replace(",", ".")));
+/** Valor na unidade do Indicador, com "un." nas quantidades. */
+const comUnidade = (indicador: Indicador, valor: number) => `${formatarValor(indicador, valor)}${indicador.unidade === "quantidade" ? " un." : ""}`;
 
 /** Opções de regra que fazem sentido para o Indicador (sem Proporcional quando menor é melhor). */
 export function regrasPermitidas(indicador: IndicadorId, semAlvo: boolean): TipoRegra[] {
@@ -77,7 +84,7 @@ function regraDe(v: Valores): RegraPremio {
     case "faixas":
       return { tipo: "faixas", faixas: v.faixas.map((f) => ({ atingimento: Number(f.atingimento.replace(",", ".")) || 0, valorCentavos: centavos(f.valor) })) };
     case "percentual":
-      return { tipo: "percentual", percentual: numeroOuNull(v.percentual) ?? 0, indicadorBase: v.semAlvo ? v.indicador : v.indicadorBase, soSeAtingir: !v.semAlvo && v.soSeAtingir };
+      return { tipo: "percentual", percentual: numeroOuNull(v.percentual) ?? 0, indicadorBase: (v.semAlvo ? v.indicador : v.indicadorBase) as IndicadorId, soSeAtingir: !v.semAlvo && v.soSeAtingir };
     case "saldo":
       return { tipo: "saldo" };
   }
@@ -99,12 +106,19 @@ export function dadosDe(v: Valores): DadosTipoMeta {
   };
 }
 
+/** O que impede salvar, na ordem em que o gestor preenche; null se o Tipo de Meta é válido. */
+function problemaDoFormulario(v: Valores, dados: DadosTipoMeta): string | null {
+  if (v.regraTipo === "percentual" && !v.semAlvo && !v.indicadorBase) return "Escolha em “Calcular sobre” o Indicador em R$ que é a base do Percentual.";
+  return problemaDoTipo(dados);
+}
+
 function iniciais(tipo?: TipoMeta): Valores {
   const r = tipo?.regra;
-  const emReais = tipo ? indicadorPorId(tipo.indicador).unidade === "reais" : false;
+  const indicador = tipo?.indicador ?? "ticket-medio";
+  const emReais = indicadorPorId(indicador).unidade === "reais";
   return {
     nome: tipo?.nome ?? "",
-    indicador: tipo?.indicador ?? "ticket-medio",
+    indicador,
     semAlvo: tipo?.semAlvo ?? false,
     exibicao: tipo?.exibicao ?? "atingida",
     mostrarPremio: tipo?.mostrarPremio ?? true,
@@ -114,7 +128,7 @@ function iniciais(tipo?: TipoMeta): Valores {
     teto: r?.tipo === "proporcional" && r.teto !== null ? String(r.teto) : "",
     faixas: r?.tipo === "faixas" ? r.faixas.map((f) => ({ atingimento: String(f.atingimento), valor: f.valorCentavos / 100 })) : [{ atingimento: "100", valor: 0 }],
     percentual: r?.tipo === "percentual" ? String(r.percentual) : "",
-    indicadorBase: r?.tipo === "percentual" ? r.indicadorBase : "foco-valor",
+    indicadorBase: r?.tipo === "percentual" ? r.indicadorBase : baseInicial(indicador),
     soSeAtingir: r?.tipo === "percentual" ? r.soSeAtingir : true,
     alvoPadrao: tipo?.alvoPadrao == null ? "" : emReais ? tipo.alvoPadrao / 100 : String(tipo.alvoPadrao),
     ativo: tipo?.ativo ?? true,
@@ -127,11 +141,15 @@ export interface TipoMetaSalvo {
   alvoPadraoMudou: boolean;
 }
 
-/** Janela para cadastrar ou alterar um Tipo de Meta, com a prévia do Prêmio; resolve quando salva. */
+/**
+ * Janela larga para cadastrar ou alterar um Tipo de Meta: "O que mede" à esquerda, "Como paga" à direita e a Prévia do
+ * Prêmio embaixo, sempre visível. Resolve quando salva; pede confirmação ao fechar com alterações.
+ */
 export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
-  const { resolve } = useWindow<TipoMetaSalvo>();
+  const { resolve, setDirtyCheck } = useWindow<TipoMetaSalvo>();
   const { feedback } = useUi();
-  const form = useForm<Valores>({ resolver: zodResolver(schema), defaultValues: iniciais(tipo) });
+  const inicial = useRef(iniciais(tipo));
+  const form = useForm<Valores>({ resolver: zodResolver(schema), defaultValues: inicial.current });
   const antesDoSemAlvo = useRef<Pick<Valores, "regraTipo" | "exibicao"> | null>(null);
   const faixas = useFieldArray({ control: form.control, name: "faixas" });
   const v = useWatch({ control: form.control }) as Valores;
@@ -140,21 +158,26 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
   const regras = regrasPermitidas(v.indicador, v.semAlvo);
   const exibicoes = exibicoesPermitidas(v.indicador, v.semAlvo);
   const dados = dadosDe(v);
-  const problema = problemaDoTipo(dados);
+  const problema = problemaDoFormulario(v, dados);
+
+  useEffect(() => {
+    setDirtyCheck(() => JSON.stringify(form.getValues()) !== JSON.stringify(inicial.current));
+    return () => setDirtyCheck(null);
+  }, [setDirtyCheck, form]);
 
   /** Ao trocar o Indicador ou o "sem Alvo", leva a regra e a Exibição para uma opção válida. */
   const ajustar = (indicadorId: IndicadorId, semAlvoPedido: boolean) => {
     const semAlvo = semAlvoPedido && podeSemAlvo(indicadorId);
-    if (semAlvo !== form.getValues("semAlvo")) form.setValue("semAlvo", semAlvo);
+    if (semAlvo !== form.getValues("semAlvo")) form.setValue("semAlvo", semAlvo, { shouldDirty: true });
     const permitidas = regrasPermitidas(indicadorId, semAlvo);
-    if (!permitidas.includes(form.getValues("regraTipo"))) form.setValue("regraTipo", permitidas[0]!);
+    if (!permitidas.includes(form.getValues("regraTipo"))) form.setValue("regraTipo", permitidas[0]!, { shouldDirty: true });
     const exib = exibicoesPermitidas(indicadorId, semAlvo);
-    if (!exib.includes(form.getValues("exibicao"))) form.setValue("exibicao", exib[0]!);
+    if (!exib.includes(form.getValues("exibicao"))) form.setValue("exibicao", exib[0]!, { shouldDirty: true });
   };
 
   const onSubmit = async (valores: Valores) => {
     const corpo = dadosDe(valores);
-    const erro = problemaDoTipo(corpo);
+    const erro = problemaDoFormulario(valores, corpo);
     if (erro) {
       feedback.notifyError(new Error(erro));
       return;
@@ -170,7 +193,14 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
     }
   };
 
-  const percentualCampo = (name: "gatilho" | "teto" | "percentual", label: string) => (
+  /** Com Alvo padrão, o % de Atingimento na unidade do Indicador (ex.: "= 40 un. com o Alvo padrão de 50 un."). */
+  const equivalente = (texto: string | undefined): string | null => {
+    const pct = numeroOuNull(texto ?? "");
+    if (dados.alvoPadrao === null || pct === null || !Number.isFinite(pct) || pct <= 0) return null;
+    return `= ${comUnidade(indicador, valorNoAtingimento(indicador, dados.alvoPadrao, pct))} com o Alvo padrão de ${comUnidade(indicador, dados.alvoPadrao)}`;
+  };
+
+  const percentualCampo = (name: "gatilho" | "teto" | "percentual", label: string, comEquivalente = false) => (
     <FormField
       control={form.control}
       name={name}
@@ -178,8 +208,14 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
         <FormItem>
           <FormLabel>{label}</FormLabel>
           <FormControl>
-            <Input inputMode="decimal" {...field} />
+            <InputGroup>
+              <InputGroupInput inputMode="decimal" aria-label={label} {...field} />
+              <InputGroupAddon align="inline-end">
+                <InputGroupText>%</InputGroupText>
+              </InputGroupAddon>
+            </InputGroup>
           </FormControl>
+          {comEquivalente && equivalente(field.value) && <FormDescription>{equivalente(field.value)}</FormDescription>}
           <FormMessage />
         </FormItem>
       )}
@@ -202,272 +238,350 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
     />
   );
 
-  const alvoLabel = avaliacoes ? "Valor inicial (opcional)" : `Alvo padrão (opcional, ${indicador.unidade === "percentual" ? "em %" : indicador.unidade === "reais" ? "em R$" : "quantidade"})`;
+  const alvoLabel = avaliacoes ? "Valor inicial (opcional)" : "Alvo padrão (opcional)";
+
+  const nomeCampo = (
+    <FormField
+      control={form.control}
+      name="nome"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Nome</FormLabel>
+          <FormControl>
+            <Input autoFocus maxLength={80} {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+
+  const indicadorCampo = (
+    <FormField
+      control={form.control}
+      name="indicador"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Indicador</FormLabel>
+          <Select
+            value={field.value}
+            disabled={Boolean(tipo)}
+            onValueChange={(id) => {
+              if (!id) return;
+              field.onChange(id);
+              form.setValue("indicadorBase", baseInicial(id as IndicadorId), { shouldDirty: true });
+              ajustar(id as IndicadorId, form.getValues("semAlvo"));
+            }}
+          >
+            <FormControl>
+              <SelectTrigger aria-label="Indicador">
+                <SelectValue>{(id: IndicadorId) => indicadorPorId(id)?.nome ?? "Selecione"}</SelectValue>
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              {INDICADORES.map((i) => (
+                <SelectItem key={i.id} value={i.id}>
+                  {i.nome}
+                  {i.direcao === "menor" ? " (menor é melhor)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {tipo && <FormDescription>O Indicador não muda depois de cadastrado.</FormDescription>}
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+
+  const semAlvoCampo = podeSemAlvo(v.indicador) && (
+    <FormField
+      control={form.control}
+      name="semAlvo"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Sem Alvo (comissão pura)</FormLabel>
+          <FormControl>
+            <Switch
+              checked={field.value}
+              onCheckedChange={(semAlvo: boolean) => {
+                // Ao desligar, volta a Regra e a Exibição que estavam antes de ligar.
+                if (semAlvo) antesDoSemAlvo.current = { regraTipo: form.getValues("regraTipo"), exibicao: form.getValues("exibicao") };
+                else if (antesDoSemAlvo.current) {
+                  form.setValue("regraTipo", antesDoSemAlvo.current.regraTipo, { shouldDirty: true });
+                  form.setValue("exibicao", antesDoSemAlvo.current.exibicao, { shouldDirty: true });
+                }
+                field.onChange(semAlvo);
+                ajustar(form.getValues("indicador"), semAlvo);
+              }}
+              aria-label="Sem Alvo (comissão pura)"
+            />
+          </FormControl>
+          <FormDescription>Paga um percentual do que foi vendido, sem Alvo a atingir.</FormDescription>
+        </FormItem>
+      )}
+    />
+  );
+
+  const alvoCampo = temAlvoPadrao(v.indicador, v.semAlvo) && (
+    <FormField
+      control={form.control}
+      name="alvoPadrao"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{alvoLabel}</FormLabel>
+          <FormControl>
+            {indicador.unidade === "reais" ? (
+              <MoneyInput value={typeof field.value === "number" ? field.value : null} onValueChange={field.onChange} aria-label={alvoLabel} />
+            ) : (
+              <InputGroup>
+                <InputGroupInput inputMode="decimal" value={String(field.value)} onChange={field.onChange} aria-label={alvoLabel} />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupText>{indicador.unidade === "percentual" ? "%" : "un."}</InputGroupText>
+                </InputGroupAddon>
+              </InputGroup>
+            )}
+          </FormControl>
+          <FormDescription>
+            {avaliacoes ? "Valor com que cada Participante começa o Período." : "Alvo com que cada Participante entra na Meta; dá para mudar por Participante em Montar Metas."}
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+
+  const exibicaoCampo = (
+    <FormField
+      control={form.control}
+      name="exibicao"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Exibição para o Colaborador</FormLabel>
+          <Select value={field.value} onValueChange={(e) => e && field.onChange(e)}>
+            <FormControl>
+              <SelectTrigger aria-label="Exibição para o Colaborador">
+                <SelectValue>{(e: Exibicao) => EXIBICAO_LABEL[e]}</SelectValue>
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              {exibicoes.map((e) => (
+                <SelectItem key={e} value={e}>
+                  {EXIBICAO_LABEL[e]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormItem>
+      )}
+    />
+  );
+
+  const mostrarPremioCampo = (
+    <FormField
+      control={form.control}
+      name="mostrarPremio"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Mostrar o Prêmio ao Colaborador</FormLabel>
+          <FormControl>
+            <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Mostrar o Prêmio ao Colaborador" />
+          </FormControl>
+        </FormItem>
+      )}
+    />
+  );
+
+  const ativoCampo = tipo && (
+    <FormField
+      control={form.control}
+      name="ativo"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Ativo</FormLabel>
+          <FormControl>
+            <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Ativo" />
+          </FormControl>
+        </FormItem>
+      )}
+    />
+  );
+
+  const regraCampo = (
+    <FormField
+      control={form.control}
+      name="regraTipo"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Regra do Prêmio</FormLabel>
+          <Select value={field.value} onValueChange={(r) => r && field.onChange(r)}>
+            <FormControl>
+              <SelectTrigger aria-label="Regra do Prêmio">
+                <SelectValue>{(r: TipoRegra) => REGRA_LABEL[r]}</SelectValue>
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              {regras.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {REGRA_LABEL[r]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormItem>
+      )}
+    />
+  );
+
+  const faixasCampo = (
+    <Stack gap="field">
+      <Label>Faixas (% de Atingimento e Prêmio)</Label>
+      {faixas.fields.map((f, i) => (
+        <Stack key={f.id} gap="tight">
+          <Stack direction="row" gap="field" align="end">
+            <FormField
+              control={form.control}
+              name={`faixas.${i}.atingimento`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <InputGroup>
+                      <InputGroupInput inputMode="decimal" aria-label={`Atingimento da Faixa ${i + 1}`} {...field} />
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupText>%</InputGroupText>
+                      </InputGroupAddon>
+                    </InputGroup>
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name={`faixas.${i}.valor`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <MoneyInput value={field.value} onValueChange={field.onChange} aria-label={`Prêmio da Faixa ${i + 1}`} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              tone="destructive"
+              aria-label={`Remover Faixa ${i + 1}`}
+              disabled={faixas.fields.length === 1}
+              onClick={() => faixas.remove(i)}
+            >
+              <Trash2 />
+            </Button>
+          </Stack>
+          {equivalente(v.faixas[i]?.atingimento) && (
+            <Text variant="caption" tone="muted">
+              {equivalente(v.faixas[i]?.atingimento)}
+            </Text>
+          )}
+        </Stack>
+      ))}
+      <Button type="button" variant="outline" onClick={() => faixas.append({ atingimento: "", valor: 0 })}>
+        <Plus />
+        Adicionar Faixa
+      </Button>
+    </Stack>
+  );
+
+  const percentualCampos = (
+    <>
+      {percentualCampo("percentual", "Percentual do valor vendido")}
+      {!v.semAlvo && (
+        <FormField
+          control={form.control}
+          name="indicadorBase"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Calcular sobre</FormLabel>
+              <Select value={field.value} onValueChange={(id) => id && field.onChange(id)}>
+                <FormControl>
+                  <SelectTrigger aria-label="Calcular sobre">
+                    <SelectValue>{(id: IndicadorId | "") => (id ? indicadorPorId(id)?.nome : undefined) ?? "Escolha um Indicador em R$"}</SelectValue>
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {BASES_PERCENTUAL.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {i.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>O valor vendido no Período sobre o qual o Percentual é calculado.</FormDescription>
+            </FormItem>
+          )}
+        />
+      )}
+      {!v.semAlvo && (
+        <FormField
+          control={form.control}
+          name="soSeAtingir"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Só paga se atingir o Alvo</FormLabel>
+              <FormControl>
+                <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Só paga se atingir o Alvo" />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      )}
+    </>
+  );
 
   return (
     <>
       <Form {...form}>
         <form id="tipo-meta-form" noValidate onSubmit={form.handleSubmit(onSubmit)}>
-          <FieldGroup>
-            <FormField
-              control={form.control}
-              name="nome"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome</FormLabel>
-                  <FormControl>
-                    <Input autoFocus maxLength={80} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="indicador"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Indicador</FormLabel>
-                  <Select
-                    value={field.value}
-                    disabled={Boolean(tipo)}
-                    onValueChange={(id) => {
-                      if (!id) return;
-                      field.onChange(id);
-                      ajustar(id as IndicadorId, form.getValues("semAlvo"));
-                    }}
-                  >
-                    <FormControl>
-                      <SelectTrigger aria-label="Indicador">
-                        <SelectValue>{(id: IndicadorId) => indicadorPorId(id)?.nome ?? "Selecione"}</SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {INDICADORES.map((i) => (
-                        <SelectItem key={i.id} value={i.id}>
-                          {i.nome}
-                          {i.direcao === "menor" ? " (menor é melhor)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {podeSemAlvo(v.indicador) && (
-              <FormField
-                control={form.control}
-                name="semAlvo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sem Alvo (comissão pura)</FormLabel>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={(semAlvo: boolean) => {
-                          // Ao desligar, volta a Regra e a Exibição que estavam antes de ligar.
-                          if (semAlvo) antesDoSemAlvo.current = { regraTipo: form.getValues("regraTipo"), exibicao: form.getValues("exibicao") };
-                          else if (antesDoSemAlvo.current) {
-                            form.setValue("regraTipo", antesDoSemAlvo.current.regraTipo);
-                            form.setValue("exibicao", antesDoSemAlvo.current.exibicao);
-                          }
-                          field.onChange(semAlvo);
-                          ajustar(form.getValues("indicador"), semAlvo);
-                        }}
-                        aria-label="Sem Alvo (comissão pura)"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            )}
-            <FormField
-              control={form.control}
-              name="exibicao"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Exibição para o Colaborador</FormLabel>
-                  <Select value={field.value} onValueChange={(e) => e && field.onChange(e)}>
-                    <FormControl>
-                      <SelectTrigger aria-label="Exibição para o Colaborador">
-                        <SelectValue>{(e: Exibicao) => EXIBICAO_LABEL[e]}</SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {exibicoes.map((e) => (
-                        <SelectItem key={e} value={e}>
-                          {EXIBICAO_LABEL[e]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="mostrarPremio"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mostrar o Prêmio ao Colaborador</FormLabel>
-                  <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Mostrar o Prêmio ao Colaborador" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="regraTipo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Regra do Prêmio</FormLabel>
-                  <Select value={field.value} onValueChange={(r) => r && field.onChange(r)}>
-                    <FormControl>
-                      <SelectTrigger aria-label="Regra do Prêmio">
-                        <SelectValue>{(r: TipoRegra) => REGRA_LABEL[r]}</SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {regras.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {REGRA_LABEL[r]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
-            {v.regraTipo === "fixo" && valorCampo("Prêmio se atingir")}
-            {v.regraTipo === "proporcional" && (
-              <>
-                {valorCampo("Prêmio a 100% de Atingimento")}
-                {percentualCampo("gatilho", "Gatilho (% de Atingimento, opcional)")}
-                {percentualCampo("teto", "Teto (% de Atingimento, opcional)")}
-              </>
-            )}
-            {v.regraTipo === "faixas" && (
-              <Stack gap="field">
-                <Label>Faixas (% de Atingimento e Prêmio)</Label>
-                {faixas.fields.map((f, i) => (
-                  <Stack key={f.id} direction="row" gap="field" align="end">
-                    <FormField
-                      control={form.control}
-                      name={`faixas.${i}.atingimento`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Input inputMode="decimal" aria-label={`Atingimento da Faixa ${i + 1}`} {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`faixas.${i}.valor`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <MoneyInput value={field.value} onValueChange={field.onChange} aria-label={`Prêmio da Faixa ${i + 1}`} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="button" size="icon" variant="ghost" tone="destructive" aria-label={`Remover Faixa ${i + 1}`} disabled={faixas.fields.length === 1} onClick={() => faixas.remove(i)}>
-                      <Trash2 />
-                    </Button>
-                  </Stack>
-                ))}
-                <Button type="button" variant="outline" onClick={() => faixas.append({ atingimento: "", valor: 0 })}>
-                  <Plus />
-                  Adicionar Faixa
-                </Button>
+          <Stack gap="section">
+            <Grid columns="split">
+              <Stack gap="group">
+                <Text as="h2" variant="eyebrow" tone="muted">
+                  O que mede
+                </Text>
+                <FieldGroup>
+                  {nomeCampo}
+                  {indicadorCampo}
+                  {semAlvoCampo}
+                  {alvoCampo}
+                  {exibicaoCampo}
+                  {mostrarPremioCampo}
+                  {ativoCampo}
+                </FieldGroup>
               </Stack>
-            )}
-            {v.regraTipo === "percentual" && (
-              <>
-                {percentualCampo("percentual", "Percentual (%)")}
-                {!v.semAlvo && (
-                  <FormField
-                    control={form.control}
-                    name="indicadorBase"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sobre o Indicador</FormLabel>
-                        <Select value={field.value} onValueChange={(id) => id && field.onChange(id)}>
-                          <FormControl>
-                            <SelectTrigger aria-label="Sobre o Indicador">
-                              <SelectValue>{(id: IndicadorId) => indicadorPorId(id)?.nome ?? "Selecione"}</SelectValue>
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {BASES_PERCENTUAL.map((i) => (
-                              <SelectItem key={i.id} value={i.id}>
-                                {i.nome}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
+              <Stack gap="group">
+                <Text as="h2" variant="eyebrow" tone="muted">
+                  Como paga
+                </Text>
+                <FieldGroup>
+                  {regraCampo}
+                  {v.regraTipo === "fixo" && valorCampo("Prêmio se atingir")}
+                  {v.regraTipo === "proporcional" && (
+                    <>
+                      {valorCampo("Prêmio a 100% de Atingimento")}
+                      {percentualCampo("gatilho", "Gatilho (% de Atingimento, opcional)", true)}
+                      {percentualCampo("teto", "Teto (% de Atingimento, opcional)", true)}
+                    </>
                   )}
-                />
-                )}
-                {!v.semAlvo && (
-                  <FormField
-                    control={form.control}
-                    name="soSeAtingir"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Só paga se atingir o Alvo</FormLabel>
-                        <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Só paga se atingir o Alvo" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </>
-            )}
-            {temAlvoPadrao(v.indicador, v.semAlvo) && (
-              <FormField
-                control={form.control}
-                name="alvoPadrao"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{alvoLabel}</FormLabel>
-                    <FormControl>
-                      {indicador.unidade === "reais" ? (
-                        <MoneyInput value={typeof field.value === "number" ? field.value : null} onValueChange={field.onChange} aria-label={alvoLabel} />
-                      ) : (
-                        <Input inputMode="decimal" value={String(field.value)} onChange={field.onChange} aria-label={alvoLabel} />
-                      )}
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            {tipo && (
-              <FormField
-                control={form.control}
-                name="ativo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ativo</FormLabel>
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Ativo" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            )}
-            <Alert variant={problema ? "destructive" : "default"}>
+                  {v.regraTipo === "faixas" && faixasCampo}
+                  {v.regraTipo === "percentual" && percentualCampos}
+                </FieldGroup>
+              </Stack>
+            </Grid>
+            <Alert variant={problema ? "destructive" : "default"} aria-live="polite">
               <AlertTitle>Prévia do Prêmio</AlertTitle>
               <AlertDescription>{problema ?? descreverPremio(dados)}</AlertDescription>
             </Alert>
-          </FieldGroup>
+          </Stack>
         </form>
       </Form>
       <WindowActions>
