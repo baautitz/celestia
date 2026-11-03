@@ -1,7 +1,7 @@
 import { diferenca, type ResultadoParticipante } from "./apuracao.js";
 import type { TipoApuracao } from "./apuracao-store.js";
 import { formatarValor } from "./indicadores.js";
-import { indicadorDoTipo, type Exibicao } from "./tipos-meta.js";
+import { descreverEntrada, indicadorDoTipo, ordenarEntradas, type Exibicao } from "./tipos-meta.js";
 
 /** Uma Meta como o Participante a vê em Minhas Metas: só o que a Exibição e o Tipo de Meta liberam. */
 export interface MinhaMeta {
@@ -14,6 +14,8 @@ export interface MinhaMeta {
   realizado?: string;
   alvo?: string;
   falta?: string;
+  /** Na Lista de Produtos: o que conta, por tipo e depois por nome (ex.: "Grupo Vitaminas", "Laboratório EMS"). */
+  lista?: string[];
   /** O que falta para haver Realizado (ex.: nenhum Pré-vencido lançado). */
   aviso?: string;
   /** Só se o Tipo mostra o Prêmio; na Exibição Atingida / Não atingida, só com a Meta atingida. */
@@ -36,6 +38,7 @@ export function minhaMeta(metaId: string, tipo: TipoApuracao, r: ResultadoPartic
     }
   }
   if (r.aviso) meta.aviso = r.aviso;
+  if (tipo.lista) meta.lista = ordenarEntradas(tipo.lista.entradas).map(descreverEntrada);
   if (tipo.mostrarPremio && (tipo.exibicao !== "atingida" || r.atingida === true)) meta.premioCentavos = r.premioCentavos;
   return meta;
 }
