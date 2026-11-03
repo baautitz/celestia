@@ -26,10 +26,18 @@ import { MemoryTipoMetaStore } from "./tipos-meta-store.js";
 import { MemoryMetaStore } from "./metas-store.js";
 import { PostgresTipoMetaStore } from "./postgres-tipos-meta-store.js";
 import { PostgresMetaStore } from "./postgres-meta-store.js";
-import { declarePreVencidoAudit } from "./pre-vencidos-audit.js";
 import { registerPreVencidosRoutes, type PeriodsService } from "./pre-vencidos-routes.js";
-import { MemoryPreVencidoStore } from "./pre-vencidos-store.js";
-import { PostgresPreVencidoStore } from "./postgres-pre-vencido-store.js";
+import { declareItemPreVencidoAudit } from "./estoque-pre-vencidos-audit.js";
+import { registerEstoquePreVencidosRoutes } from "./estoque-pre-vencidos-routes.js";
+import { registerBaixasPreVencidosRoutes } from "./baixas-pre-vencidos-routes.js";
+import { MemoryEstoquePreVencidoStore } from "./estoque-pre-vencidos-store.js";
+import { MemoryBaixasCongeladasStore } from "./baixas-congeladas-store.js";
+import { PostgresBaixasCongeladasStore } from "./postgres-baixas-congeladas-store.js";
+import { registerCongelamentoBaixas, type BaixasDoPeriodoDeps } from "./baixas-do-periodo.js";
+import { MemoryCorrecaoBaixaStore } from "./correcoes-baixa-store.js";
+import { PostgresCorrecaoBaixaStore } from "./postgres-correcoes-baixa-store.js";
+import { declareCorrecaoBaixaAudit } from "./correcoes-baixa-audit.js";
+import { PostgresEstoquePreVencidoStore } from "./postgres-estoque-pre-vencidos-store.js";
 import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
 import { MemoryVinculoStore } from "./vinculo-store.js";
 import { CATEGORIAS, desempenhoSql, porCategoria, type CategoriaColuna, type CategoriaTotais } from "./desempenho-vendas.js";
@@ -71,14 +79,14 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
     register({ routes, permissions, services, events }) {
       const audit = services.use<AuditService>("audit", "log");
       declareVinculoAudit(audit);
-      declarePreVencidoAudit(audit);
+      declareItemPreVencidoAudit(audit);
+      declareCorrecaoBaixaAudit(audit);
       declareAvaliacaoAudit(audit);
       declareFuroEstoqueAudit(audit);
       declareTiposMetaAudit(audit);
       declareMetasAudit(audit);
       declareApuracaoAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
-      const preVencidos = db ? new PostgresPreVencidoStore(db) : new MemoryPreVencidoStore();
       const avaliacoes = db ? new PostgresAvaliacaoStore(db) : new MemoryAvaliacaoStore();
       const users = services.use<UsersService>("iam", "users");
       const periods = services.use<PeriodsService>("closing_period", "periods");
@@ -96,11 +104,16 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         permissions,
         auth,
         erpClient: () => erpClients[erpId],
-        store: preVencidos,
         vinculos: store,
         periods,
-        audit,
       });
+      const estoquePreVencidos = db ? new PostgresEstoquePreVencidoStore(db) : new MemoryEstoquePreVencidoStore();
+      const baixasCongeladas = db ? new PostgresBaixasCongeladasStore(db) : new MemoryBaixasCongeladasStore();
+      const correcoesBaixa = db ? new PostgresCorrecaoBaixaStore(db) : new MemoryCorrecaoBaixaStore();
+      const baixasDeps: BaixasDoPeriodoDeps = { erpClient: () => erpClients[erpId], store: estoquePreVencidos, congeladas: baixasCongeladas, correcoes: correcoesBaixa };
+      registerCongelamentoBaixas({ events, periods, ...baixasDeps });
+      registerEstoquePreVencidosRoutes({ routes, permissions, auth, ...baixasDeps, vinculos: store, periods, audit });
+      registerBaixasPreVencidosRoutes({ routes, permissions, auth, ...baixasDeps, vinculos: store, periods, audit });
       registerAvaliacoesRoutes({
         routes,
         permissions,
@@ -137,7 +150,9 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         metas,
         vinculos: store,
         avaliacoes,
-        preVencidos,
+        estoque: estoquePreVencidos,
+        congeladas: baixasCongeladas,
+        correcoes: correcoesBaixa,
         apuracoes: db ? new PostgresApuracaoStore(db) : new MemoryApuracaoStore(),
         periods,
         audit,

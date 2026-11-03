@@ -4,7 +4,9 @@ import { registerAcompanhamentoRoutes } from "./acompanhamento-routes";
 import { MemoryApuracaoStore } from "./apuracao-store";
 import { MemoryAvaliacaoStore } from "./avaliacoes-store";
 import { MemoryMetaStore } from "./metas-store";
-import { MemoryPreVencidoStore } from "./pre-vencidos-store";
+import { MemoryEstoquePreVencidoStore } from "./estoque-pre-vencidos-store";
+import { MemoryBaixasCongeladasStore } from "./baixas-congeladas-store";
+import { MemoryCorrecaoBaixaStore } from "./correcoes-baixa-store";
 import type { PeriodoResumo } from "./pre-vencidos-routes";
 import { MemoryTipoMetaStore } from "./tipos-meta-store";
 import type { DadosTipoMeta } from "./tipos-meta";
@@ -54,6 +56,10 @@ async function boot() {
   // Total vendido da Lista de Produtos por Colaborador (unidades e valor líquido em R$), e os parâmetros de cada consulta.
   const listaVendas: { codigoColaborador: number; quantidade: number; valor: number }[] = [];
   const consultasLista: Record<string, unknown>[] = [];
+  // Linhas de venda de cada Loja no ERP, para as Baixas de Pré-vencido.
+  const vendasDaLoja: { codigoLoja: number; vendaId: number; data: string; cancelada: boolean; codigoColaborador: number; nomeColaborador: string; produtoId: string; quantidade: number }[] = [];
+  const estoque = new MemoryEstoquePreVencidoStore();
+  const correcoes = new MemoryCorrecaoBaixaStore();
   const handlers = new Map<string, (p: object) => unknown>();
   const antes = new Map<string, (ctx: { payload: object; cancel(reason: string): void }) => unknown>();
   const registros: { action: string; actor: { id: string; name: string }; attributes: unknown }[] = [];
@@ -89,6 +95,7 @@ async function boot() {
     erpClient: () => ({
       query: async <T,>(sql: string, params: Record<string, unknown> = {}) => {
         if (erp.falha) throw new Error("ERP fora do ar");
+        if (sql.includes("@codigoLoja")) return vendasDaLoja.filter((v) => v.codigoLoja === params.codigoLoja && v.data >= String(params.dataInicio)) as T[];
         if (!sql.includes("totalCmv") && sql.includes(" AS valor")) {
           consultasLista.push(params);
           return listaVendas as T[];
@@ -104,7 +111,9 @@ async function boot() {
     metas,
     vinculos,
     avaliacoes: avaliacoesStore,
-    preVencidos: new MemoryPreVencidoStore(),
+    estoque,
+    congeladas: new MemoryBaixasCongeladasStore(),
+    correcoes,
     apuracoes: new MemoryApuracaoStore(),
     periods: { list: async () => periodos },
   });
@@ -123,7 +132,7 @@ async function boot() {
   /** Fecha o Período sem passar pelo Plugin: como um fechamento anterior à Apuração gravada. */
   const fecharSemPlugin = () => (periodos[0] = { ...periodos[0], status: "closed" });
   const minhas = (who: string, periodoId = "maio") => app.request(`/metas/minhas?periodoId=${periodoId}`, { headers: { "x-user": who } });
-  return { res, ver, vendas, produtos, listaVendas, consultasLista, minhas, evento, fecharSemPlugin, erp, registros, tipos, metas, avaliacoesStore, participantes };
+  return { res, ver, vendas, produtos, vendasDaLoja, estoque, correcoes, listaVendas, consultasLista, minhas, evento, fecharSemPlugin, erp, registros, tipos, metas, avaliacoesStore, participantes };
 }
 
 describe("Acompanhamento das Metas", () => {
@@ -283,6 +292,80 @@ describe("Acompanhamento da Lista de Produtos", () => {
       lista: ["Produto Dipirona 1g", "Grupo Vitaminas", "Laboratório EMS"],
       premioCentavos: 0,
     });
+  });
+});
+
+describe("Acompanhamento de Pré-vencidos vendidos", () => {
+  const preVencidos: DadosTipoMeta = { ...cmv, nome: "Pré-vencidos", indicador: "pre-vencidos", exibicao: "progresso", alvoPadrao: 5 };
+  const item = (codigoLoja: number, quantidade: number) => ({
+    codigoLoja,
+    produtoId: "p1",
+    codigoProduto: 1,
+    nomeProduto: "Dipirona 1g",
+    codigoBarra: "789",
+    validade: "2027-06",
+    quantidade,
+    incluidoEm: "2027-04-01T12:00:00.000Z",
+  });
+  const venda = (codigoLoja: number, vendaId: number, data: string, codigoColaborador: number, quantidade: number, cancelada = false) => ({
+    codigoLoja,
+    vendaId,
+    data,
+    cancelada,
+    codigoColaborador,
+    nomeColaborador: codigoColaborador === 1 ? "ANA" : "BIA",
+    produtoId: "p1",
+    quantidade,
+  });
+
+  async function comPreVencidos() {
+    const ctx = await boot();
+    const tipo = await ctx.tipos.criar(preVencidos);
+    await ctx.metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: ctx.participantes.map((p) => ({ ...p, alvo: 5 })), excluidos: [] });
+    await ctx.estoque.criar(item(10, 10));
+    await ctx.estoque.criar(item(20, 4));
+    ctx.vendasDaLoja.push(
+      // Em abril, antes do Período: gasta o Item, mas não conta no Período.
+      venda(10, 100, "2027-04-20 10:00:00", 1, 1),
+      venda(10, 101, "2027-05-03 10:00:00", 1, 2),
+      // Cancelada no ERP: não baixa.
+      venda(10, 102, "2027-05-04 10:00:00", 1, 3, true),
+      // Em outra Loja: soma no mesmo Colaborador; só há 4 no Estoque dela.
+      venda(20, 200, "2027-05-05 10:00:00", 1, 6),
+    );
+    return ctx;
+  }
+
+  it("o Realizado é a soma das Baixas do Participante no Período, em todas as Lojas", async () => {
+    const { ver } = await comPreVencidos();
+    const linhas = (await ver("gil")).linhas.filter((l) => l.tipo.nome === "Pré-vencidos");
+    expect(linhas.map((l) => [l.nome, l.atingimento, l.premioCentavos, l.resultado])).toEqual([
+      ["ANA", 120, 10000, "Pré-vencidos vendidos 6 de 5 un. · ✓ 1 acima"],
+      ["BIA", 0, 0, "Pré-vencidos vendidos 0 de 5 un. · faltam 5"],
+    ]);
+  });
+
+  it("em Minhas Metas, o Colaborador vê o Realizado e as suas Baixas do Período por venda", async () => {
+    const { minhas } = await comPreVencidos();
+    const corpo = (await (await minhas("ana")).json()) as { metas: Record<string, unknown>[]; baixas: unknown[] };
+    expect(corpo.metas.find((m) => m.nome === "Pré-vencidos")).toMatchObject({ realizado: "6", alvo: "5" });
+    expect(corpo.baixas).toEqual([
+      { vendaId: 101, data: "2027-05-03 10:00:00", produtoId: "p1", nomeProduto: "Dipirona 1g", codigoBarra: "789", quantidadeVendida: 2, quantidade: 2 },
+      { vendaId: 200, data: "2027-05-05 10:00:00", produtoId: "p1", nomeProduto: "Dipirona 1g", codigoBarra: "789", quantidadeVendida: 6, quantidade: 4 },
+    ]);
+  });
+
+  it("em Minhas Metas, o Colaborador vê a Correção de Baixa e o motivo, e o Realizado já a reflete", async () => {
+    const { minhas, correcoes } = await comPreVencidos();
+    await correcoes.criar({ periodoId: "maio", codigoLoja: 10, vendaId: 101, produtoId: "p1", quantidade: 1, motivo: "Uma unidade era da prateleira comum", autorId: "gil", autorNome: "Gil" });
+    const corpo = (await (await minhas("ana")).json()) as { metas: Record<string, unknown>[]; baixas: Record<string, unknown>[] };
+    expect(corpo.metas.find((m) => m.nome === "Pré-vencidos")).toMatchObject({ realizado: "5" });
+    expect(corpo.baixas[0]).toMatchObject({ vendaId: 101, quantidadeVendida: 2, quantidade: 1, correcao: { quantidade: 1, motivo: "Uma unidade era da prateleira comum" } });
+  });
+
+  it("sem Meta de Pré-vencidos, Minhas Metas não traz Baixas", async () => {
+    const { minhas } = await boot();
+    expect(((await (await minhas("ana")).json()) as { baixas: unknown[] }).baixas).toEqual([]);
   });
 });
 

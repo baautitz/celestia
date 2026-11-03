@@ -32,15 +32,30 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite vincular, alterar e desfazer o vínculo de um Colaborador do InovaFarma.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para alterar os vínculos dos Colaboradores do InovaFarma.",
   },
-  "pre-vencidos-lancamento:manage": {
-    label: "Lançar Pré-vencidos",
-    description: "Permite lançar, editar e excluir os próprios Lançamentos de Pré-vencidos no Closing Period aberto.",
-    deniedMessage: "Acesso negado: o usuário não possui permissão para lançar Pré-vencidos.",
+  "pre-vencidos-estoque:manage": {
+    label: "Pré-vencidos: Gerir o Estoque",
+    description: "Permite incluir, editar e excluir Itens de Pré-vencido no Estoque das Lojas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir o Estoque de Pré-vencidos.",
   },
-  "pre-vencidos-conferencia:view": {
-    label: "Conferir Pré-vencidos",
-    description: "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
-    deniedMessage: "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
+  "pre-vencidos-baixas:manage": {
+    label: "Pré-vencidos: Gerir as Baixas",
+    description: "Permite fazer Correções de Baixa nas Lojas do Colaborador vinculado ao Usuário e incluir Itens com data de inclusão retroativa. Ver as Baixas depende das Visualizações.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir as Baixas de Pré-vencidos.",
+  },
+  "pre-vencidos-baixas-geral:view": {
+    label: "Baixas de Pré-vencido: Visualização Geral",
+    description: "Permite ver as Baixas de Pré-vencido de todas as Lojas e de todos os Colaboradores.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para a Visualização Geral das Baixas de Pré-vencido.",
+  },
+  "pre-vencidos-baixas-loja:view": {
+    label: "Baixas de Pré-vencido: Visualização Loja",
+    description: "Permite ver as Baixas de Pré-vencido das Lojas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para a Visualização Loja das Baixas de Pré-vencido.",
+  },
+  "pre-vencidos-baixas-individual:view": {
+    label: "Baixas de Pré-vencido: Visualização Individual",
+    description: "Permite ver as Baixas de Pré-vencido do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para a Visualização Individual das Baixas de Pré-vencido.",
   },
   "avaliacoes-individual:view": {
     label: "Avaliações: Visualização Individual",

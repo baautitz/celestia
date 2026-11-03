@@ -1,5 +1,6 @@
 import { diferenca, type ResultadoParticipante } from "./apuracao.js";
 import type { TipoApuracao } from "./apuracao-store.js";
+import type { BaixaPublica } from "./baixas-do-periodo.js";
 import { formatarValor } from "./indicadores.js";
 import { descreverEntrada, indicadorDoTipo, ordenarEntradas, type Exibicao } from "./tipos-meta.js";
 
@@ -16,11 +17,15 @@ export interface MinhaMeta {
   falta?: string;
   /** Na Lista de Produtos: o que conta, por tipo e depois por nome (ex.: "Grupo Vitaminas", "Laboratório EMS"). */
   lista?: string[];
-  /** O que falta para haver Realizado (ex.: nenhum Pré-vencido lançado). */
-  aviso?: string;
   /** Só se o Tipo mostra o Prêmio; na Exibição Atingida / Não atingida, só com a Meta atingida. */
   premioCentavos?: number;
 }
+
+/** Uma Baixa de Pré-vencido do Colaborador em Minhas Metas. Nunca o código do produto no ERP. */
+export type MinhaBaixa = Omit<BaixaPublica, "correcao"> & {
+  /** Correção de Baixa feita pelo gestor nesta venda, com o motivo. */
+  correcao?: Pick<NonNullable<BaixaPublica["correcao"]>, "quantidade" | "motivo">;
+};
 
 /** Corta do resultado do Participante o que o gestor não liberou: o servidor nunca envia o resto. */
 export function minhaMeta(metaId: string, tipo: TipoApuracao, r: ResultadoParticipante): MinhaMeta {
@@ -37,7 +42,6 @@ export function minhaMeta(metaId: string, tipo: TipoApuracao, r: ResultadoPartic
       if (falta > 0 && tipo.indicador !== "avaliacoes") meta.falta = diferenca(indicador, falta);
     }
   }
-  if (r.aviso) meta.aviso = r.aviso;
   if (tipo.lista) meta.lista = ordenarEntradas(tipo.lista.entradas).map(descreverEntrada);
   if (tipo.mostrarPremio && (tipo.exibicao !== "atingida" || r.atingida === true)) meta.premioCentavos = r.premioCentavos;
   return meta;

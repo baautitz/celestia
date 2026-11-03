@@ -1,7 +1,12 @@
 import type { Context } from "hono";
 import { vinculoDesfeito, type VinculoColaborador, type VinculoStore } from "./vinculo-store.js";
 
-/** O que as rotas das Metas compartilham: o Usuário autenticado, o autor no Audit Log, as recusas e o Vínculo. */
+/** O que as rotas das Metas e dos Pré-vencidos compartilham: o Usuário autenticado, o autor no Audit Log, o ERP, as recusas e o Vínculo. */
+
+/** Cliente do ERP InovaFarma como as rotas o usam. */
+export interface ErpQuery {
+  query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
+}
 
 /** Usuário autenticado como as rotas das Metas o leem. */
 export type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
@@ -11,6 +16,8 @@ export const ator = (c: AuthContext) => ({ id: c.get("user")?.sub ?? "", name: c
 
 export const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
 export const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
+/** Mensagem do 503 de uma falha do ERP: sem conexão, ou indisponível. */
+export const erroDoErp = (err: unknown) => ({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL });
 export const PERIODO_NAO_ENCONTRADO = "Período de Fechamento não encontrado.";
 export const META_DESATUALIZADA = { error: "A Meta foi alterada por outra pessoa. A tela foi recarregada.", code: "versao_desatualizada" };
 

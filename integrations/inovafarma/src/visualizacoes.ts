@@ -12,6 +12,13 @@ export const VISUALIZACAO_PERMISSION = {
   individual: "inovafarma:vendas-individual:view",
 } as const satisfies Record<Visualizacao, string>;
 
+/** As Visualizações das Baixas de Pré-vencido, com as mesmas regras das do Desempenho de Vendas. */
+export const VISUALIZACAO_PERMISSION_BAIXAS = {
+  geral: "inovafarma:pre-vencidos-baixas-geral:view",
+  loja: "inovafarma:pre-vencidos-baixas-loja:view",
+  individual: "inovafarma:pre-vencidos-baixas-individual:view",
+} as const satisfies Record<Visualizacao, string>;
+
 export const SEM_VISUALIZACAO = "Seu perfil não possui nenhuma visualização disponível.";
 
 export interface VisualizacoesDoUsuario {
@@ -24,17 +31,19 @@ export interface VisualizacoesDoUsuario {
 
 /**
  * Loja e Individual dependem da Permission e do vínculo do Usuário (#53): sem vínculo, ou sem Lojas
- * no vínculo, a Visualização não está disponível. Nunca cai para Geral (fail-closed).
+ * no vínculo, a Visualização não está disponível. Nunca cai para Geral (fail-closed). `permissoes` diz a Permission
+ * de cada Visualização (padrão: as do Desempenho de Vendas).
  */
 export function visualizacoesDoUsuario(
   permissions: readonly string[] | undefined,
   vinculo: Pick<VinculoColaborador, "codigoColaborador" | "lojas"> | null,
   has: (permissions: readonly string[] | undefined, key: string) => boolean,
+  permissoes: Readonly<Record<Visualizacao, string>> = VISUALIZACAO_PERMISSION,
 ): VisualizacoesDoUsuario {
   const lojas = vinculo?.lojas ?? [];
   const codigoColaborador = vinculo?.codigoColaborador ?? null;
   const disponiveis = VISUALIZACOES.filter((v) => {
-    if (!has(permissions, VISUALIZACAO_PERMISSION[v])) return false;
+    if (!has(permissions, permissoes[v])) return false;
     if (v === "loja") return lojas.length > 0;
     if (v === "individual") return codigoColaborador !== null;
     return true;

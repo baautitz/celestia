@@ -58,6 +58,7 @@ const minhas = {
     { metaId: "met_1", nome: "CMV", exibicao: "atingida", atingida: true, premioCentavos: 10000 },
     { metaId: "met_2", nome: "Ticket", exibicao: "progresso", atingida: false, realizado: "R$ 100,00", alvo: "R$ 120,00", falta: "R$ 20,00" },
   ],
+  baixas: [] as unknown[],
 };
 const metaCmv = { id: "met_1", periodoId: "abril", tipoId: "tme_1", participantes, excluidos: [], version: 1, tipo: cmv, pendentes: 1 };
 const montagem = {
@@ -349,5 +350,23 @@ describe("Metas: Minhas Metas", () => {
     expect(screen.getAllByText("Atingida").length).toBeGreaterThan(0);
     expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/minhas?periodoId=abril");
     expect(screen.queryByRole("button", { name: /Imprimir/ })).toBeNull();
+    expect(screen.queryByText("Minhas Baixas de Pré-vencido")).toBeNull();
+  });
+
+  it("mostra as Baixas de Pré-vencido do Colaborador no Período, por venda", async () => {
+    minhas.baixas = [
+      { vendaId: 101, data: "2026-04-03 10:15:00", produtoId: "p1", nomeProduto: "Dipirona 1g", codigoBarra: "789", quantidadeVendida: 3, quantidade: 2 },
+      { vendaId: 102, data: "2026-04-04 10:15:00", produtoId: "p1", nomeProduto: "Dipirona 1g", codigoBarra: "789", quantidadeVendida: 2, quantidade: 0, correcao: { quantidade: 0, motivo: "Venda da prateleira comum" } },
+    ];
+    try {
+      renderizar();
+      fireEvent.click(await screen.findByRole("tab", { name: "Minhas Metas" }));
+      expect((await screen.findAllByText("Minhas Baixas de Pré-vencido")).length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Dipirona 1g").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("03/04/2026 10:15").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Corrigida: Venda da prateleira comum").length).toBeGreaterThan(0);
+    } finally {
+      minhas.baixas = [];
+    }
   });
 });

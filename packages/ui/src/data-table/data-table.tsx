@@ -15,6 +15,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Printer,
   Search,
 } from "lucide-react";
@@ -185,7 +187,12 @@ export interface DataTableProps<TRow> {
   actionsLabel?: string;
   actionsHeadClassName?: string;
   actionsSkeletonClassName?: string;
-  search?: { placeholder?: string; className?: string };
+  search?: {
+    placeholder?: string;
+    className?: string;
+    /** Textos a mais que a busca local considera além das colunas `searchable` (ex.: o que está na linha expandida). */
+    fields?: (row: TRow) => string[];
+  };
   pagination?: DataTablePagination;
   /** Ordenação/busca/paginação feitas fora: a tabela só exibe `rows`. */
   manual?: boolean;
@@ -636,7 +643,10 @@ export function DataTable<TRow>({
     // Busca por palavras (acentos e um erro de digitação tolerados), da mais relevante à menos.
     // Uma ordenação escolhida no cabeçalho prevalece; como é estável, a relevância desempata.
     const searchCols = columns.filter((c) => c.searchable);
-    visible = rankBySearch(visible, query, (row) => searchCols.map((c) => String(c.value?.(row) ?? "")));
+    visible = rankBySearch(visible, query, (row) => [
+      ...searchCols.map((c) => String(c.value?.(row) ?? "")),
+      ...(search?.fields?.(row) ?? []),
+    ]);
     const sortCol = columns.find((c) => c.key === sortKey);
     if (sortCol?.value) {
       const get = sortCol.value;
@@ -671,6 +681,39 @@ export function DataTable<TRow>({
       page * pagination.pageSize,
     );
   }
+
+  // Expandir ou recolher todas as linhas visíveis de uma vez; as de outras páginas ficam como estão.
+  const allExpanded = visible.length > 0 && visible.every((row) => isExpanded(getRowId(row)));
+  const toggleAll = () =>
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      // Alternada = diferente de `defaultExpanded`.
+      const toggled = !allExpanded !== defaultExpanded;
+      for (const row of visible) {
+        if (toggled) next.add(getRowId(row));
+        else next.delete(getRowId(row));
+      }
+      return next;
+    });
+  const toggleAllLabel = allExpanded ? "Recolher todas" : "Expandir todas";
+  const toggleAllButton = (mobile: boolean) =>
+    mobile ? (
+      <Button variant="outline" size="default" onClick={toggleAll} disabled={visible.length === 0}>
+        {allExpanded ? <ChevronsDownUp /> : <ChevronsUpDown />}
+        {toggleAllLabel}
+      </Button>
+    ) : (
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={`${toggleAllLabel} as linhas`}
+        title={toggleAllLabel}
+        onClick={toggleAll}
+        disabled={visible.length === 0}
+      >
+        {allExpanded ? <ChevronsDownUp className="size-4" /> : <ChevronsUpDown className="size-4" />}
+      </Button>
+    );
 
   const handleSort = (key: string) => {
     const first = columns.find((c) => c.key === key)?.firstSort ?? "asc";
@@ -801,7 +844,9 @@ export function DataTable<TRow>({
                           frozenClass(EXPAND_KEY, true),
                           HEADER_EDGE_CLASS,
                         )}
-                      />
+                      >
+                        {!printing && toggleAllButton(false)}
+                      </TableHead>
                     )}
                     {columns.map((col) => (
                       <TableHead
@@ -920,6 +965,9 @@ export function DataTable<TRow>({
       <CardContent className={nested ? "px-0" : undefined}>
         {isMobile ? (
           <div className="flex flex-col gap-3">
+            {renderExpanded && !loading && visible.length > 0 && (
+              <div className="flex justify-end">{toggleAllButton(true)}</div>
+            )}
             {loading ? (
               Array.from({ length: skeletonRows }).map((_, idx) => (
                 <MobileCard

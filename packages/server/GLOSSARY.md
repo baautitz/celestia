@@ -58,9 +58,25 @@ _Avoid_: Mapping, External
 A product, as registered in an ERP, whose expiry date is close enough that the business wants it sold before it is lost.
 _Avoid_: Vencido, Próximo do vencimento
 
-**Lançamento de Pré-vencido** (en: Near-expiry Entry):
-A record made by a Colaborador, through their linked User, that they sold a quantity of a Pré-vencido with a given expiry date in a Loja, within an open Closing Period. The same product can be entered more than once.
-_Avoid_: Pré-vendido, Registro
+**Estoque de Pré-vencidos** (en: Near-expiry Stock):
+The Itens de Pré-vencido of a Loja, kept by whoever looks after its stock. It is not tied to a Closing Period: Itens stay until sales use them up. The Colaborador declares nothing; the shelf puts Pré-vencidos up front, so sales are assumed to take them first.
+_Avoid_: Contagem, Lançamento, Inventário
+
+**Item de Pré-vencido** (en: Near-expiry Item):
+A quantity of one Pré-vencido with a given expiry month in a Loja's Estoque de Pré-vencidos, with the date it was included. Only sales from that date on use it up. The inclusion date may be set back, but never before the start of the open Closing Period (the earliest one, even if it has already ended). The same product and expiry may be included more than once, each as its own Item.
+_Avoid_: Lançamento, Registro
+
+**Restante** (en: Remaining):
+What is left of an Item de Pré-vencido after its Baixas. An Item with nothing Restante is used up but stays in its history.
+_Avoid_: Saldo, Sobra
+
+**Baixa de Pré-vencido** (en: Near-expiry Write-off):
+The quantity of a sale in the ERP that used up Itens de Pré-vencido of the Loja where it was made, credited to the Colaborador who made the sale. A sale uses up the nearest expiry first, and among equal expiries the Item included first; it keeps doing so after the expiry passes, until the Item is used up. A cancelled sale loses its Baixa and gives the quantity back. Baixas of a closed Closing Period no longer change.
+_Avoid_: Venda de Pré-vencido, Lançamento, Ajuste
+
+**Correção de Baixa** (en: Write-off Correction):
+A change by a manager, with a reason, to how much of a sale was really Pré-vencido, from zero up to what that sale had and the Estoque had left for it. What is taken off goes back to the Restante and can be used up by later sales. Only in the open Closing Period. The Colaborador sees the correction and its reason.
+_Avoid_: Ajuste, Estorno
 
 **Avaliação do Colaborador** (en: Collaborator Assessment):
 A record made by a manager about a Colaborador of one of their Lojas, within a Closing Period, with a description and an amount to discount from the Colaborador, which may be zero. It keeps the Loja it was made in, even if the Colaborador later changes Loja. A Colaborador can be assessed without a Vínculo or a User. Their Lojas are only those confirmed in their Vínculo; a Colaborador with no Loja confirmed appears only under all Lojas, never under the Loja the ERP gives them. The Colaborador sees their own Avaliações only through their linked User.
@@ -113,7 +129,7 @@ A set of Produtos, Grupos, Seções and Laboratórios (the ERP's Fabricante), mi
 _Avoid_: Mix, Cesta
 
 **Realizado** (en: Achieved value):
-The value of a Meta's Indicador actually reached by a Participante in the Closing Period. For Pré-vencidos it counts only what the ERP confirms was sold, up to what was entered.
+The value of a Meta's Indicador actually reached by a Participante in the Closing Period. For Pré-vencidos it is the sum of the Participante's Baixas de Pré-vencido in the Closing Period.
 _Avoid_: Resultado, Atingido (alone; the percentage is % Atingido)
 
 **% Atingido** (en: Attainment):

@@ -27,7 +27,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 ## Listas de opções
 
 - `Select`: a lista abre com no mínimo a largura do campo e cresce até o espaço disponível na tela; opções longas quebram em mais de uma linha, nunca são cortadas. Não limite a largura da lista por `className`.
-- Escolha entre resultados de uma busca (produto, usuário, cadastro grande) usa `Combobox`, não `Select`. Quando os resultados vêm do servidor, o campo é um só: `filter={null}`, `inputValue`/`onInputValueChange` controlados, busca com espera curta (cerca de 300 ms) a partir do mínimo de caracteres, e um único resultado já fica escolhido. Sem botão "Buscar" nem segundo campo. Exemplo: `integrations/inovafarma/src/pre-vencido-window.tsx`.
+- Escolha entre resultados de uma busca (produto, usuário, cadastro grande) usa `Combobox`, não `Select`. Quando os resultados vêm do servidor, o campo é um só: `filter={null}`, `inputValue`/`onInputValueChange` controlados, busca com espera curta (cerca de 300 ms) a partir do mínimo de caracteres, e um único resultado já fica escolhido. Sem botão "Buscar" nem segundo campo. Exemplo: `integrations/inovafarma/src/produto-busca.tsx`.
 - Abas (`Tabs`): `Tabs` com só a `TabsList`, controlada por `value`/`onValueChange`; o conteúdo da aba ativa vem logo abaixo, os dois dentro de `<Stack gap="section">`. Não use `Stack padding` em volta do conteúdo (a largura estoura) nem `TabsContent`, que cola o conteúdo na lista de abas. Aba ativa na URL com `useTabParam` (`@platform/ui/hooks/use-tab-param`): recebe as abas visíveis em ordem (a primeira é a padrão e fica fora da URL), grava `?tab=` com `replace` e o setter vai direto no `onValueChange`.
 - Estado de sucesso em etiqueta: `Badge variant="success"` (verde), com `destructive` para o oposto.
 
@@ -36,7 +36,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 - Toda tela que lista dados do servidor e grava (criar, editar, excluir, salvar em lote) busca a lista de novo quando a gravação termina, **deu certo ou não**. O estado local não é a verdade: status, avisos, sugestões, totais e as outras linhas dependem do que o servidor tem agora (outra pessoa pode ter gravado, e uma gravação pode afetar outras linhas).
 - Depois de uma falha, a revalidação não apaga o rascunho de quem falhou: ele continua com a `version` de quando a edição começou, e o conflito (409) segue aparecendo.
 - Atualizar só a linha gravada com a resposta do `PUT` é um adiantamento para a tela responder na hora; não substitui a revalidação. Quem carrega por `useEffect` mantém uma consulta por vez (só a última resposta vale) para que uma resposta atrasada não sobrescreva a mais nova.
-- Teste: depois da gravação, a lista volta do servidor com uma mudança que só a revalidação traz (por exemplo, outra linha que passou a Confirmada) e o teste espera ver isso na tela. Um teste com `UiProvider` real cobre a ida e volta de uma janela (`integrations/inovafarma/src/pre-vencidos-lancar.test.tsx`).
+- Teste: depois da gravação, a lista volta do servidor com uma mudança que só a revalidação traz (por exemplo, outra linha que passou a Confirmada) e o teste espera ver isso na tela. Um teste com `UiProvider` real cobre a ida e volta de uma janela (`integrations/inovafarma/src/estoque-pre-vencidos-tab.test.tsx`).
 
 ## Botões
 

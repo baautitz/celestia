@@ -63,12 +63,51 @@ describe.each([
     setViewport(width);
     renderTable();
     const button = await screen.findByRole("button", { name: "Expandir linha" });
-    await userEvent.tab();
-    expect(document.activeElement).toBe(button);
+    button.focus();
     await userEvent.keyboard("{Enter}");
     expect(screen.getByText("Detalhe de Alfa")).toBeTruthy();
     await userEvent.keyboard(" ");
     expect(screen.queryByText("Detalhe de Alfa")).toBeNull();
+  });
+});
+
+describe.each([
+  ["desktop", 1280],
+  ["mobile", 500],
+])("DataTable expandir e recolher todas (%s)", (_name, width) => {
+  it("expande e recolhe todas as linhas de uma vez", async () => {
+    setViewport(width);
+    render(
+      <DataTable
+        columns={columns}
+        rows={[{ id: "1", name: "Alfa" }, { id: "2", name: "Beta" }]}
+        getRowId={(r) => r.id}
+        renderExpanded={(r) => <span>Detalhe de {r.name}</span>}
+      />,
+    );
+    await userEvent.click((await screen.findAllByRole("button", { name: /Expandir todas/ }))[0]!);
+    expect(screen.getByText("Detalhe de Alfa")).toBeTruthy();
+    expect(screen.getByText("Detalhe de Beta")).toBeTruthy();
+
+    await userEvent.click(screen.getAllByRole("button", { name: /Recolher todas/ })[0]!);
+    expect(screen.queryByText("Detalhe de Alfa")).toBeNull();
+    expect(screen.queryByText("Detalhe de Beta")).toBeNull();
+  });
+
+  it("com uma linha já aberta, expande as que faltam", async () => {
+    setViewport(width);
+    render(
+      <DataTable
+        columns={columns}
+        rows={[{ id: "1", name: "Alfa" }, { id: "2", name: "Beta" }]}
+        getRowId={(r) => r.id}
+        renderExpanded={(r) => <span>Detalhe de {r.name}</span>}
+      />,
+    );
+    await userEvent.click((await screen.findAllByRole("button", { name: "Expandir linha" }))[0]!);
+    await userEvent.click(screen.getAllByRole("button", { name: /Expandir todas/ })[0]!);
+    expect(screen.getByText("Detalhe de Alfa")).toBeTruthy();
+    expect(screen.getByText("Detalhe de Beta")).toBeTruthy();
   });
 });
 

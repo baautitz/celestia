@@ -7,17 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import type { MinhaMeta } from "./minhas-metas";
+import { dataHora } from "./datas";
+import type { MinhaBaixa, MinhaMeta } from "./minhas-metas";
 import type { PeriodoMetas } from "./montar-metas-tab";
 
 interface MinhasMetas {
   congelada: boolean;
   metas: MinhaMeta[];
+  /** Baixas de Pré-vencido do Colaborador no Período: só quem tem Meta de Pré-vencidos. */
+  baixas: MinhaBaixa[];
 }
 
 /** O resultado na Exibição do Tipo de Meta; o servidor já cortou o que o Colaborador não vê. */
 function resultado(m: MinhaMeta): string {
-  if (m.aviso) return m.aviso;
   if (m.realizado === undefined) return "";
   const alvo = m.alvo ? ` de ${m.alvo}` : "";
   return `Realizado ${m.realizado}${alvo}${m.falta ? ` · faltam ${m.falta}` : ""}`;
@@ -53,6 +55,15 @@ const colunas: DataTableColumn<MinhaMeta>[] = [
     render: (m) => (m.atingida === null ? null : <Badge variant={m.atingida ? "default" : "outline"}>{m.atingida ? "Atingida" : "Não atingida"}</Badge>),
   },
   { key: "premio", label: "Prêmio", value: (m) => (m.premioCentavos === undefined ? null : m.premioCentavos / 100), format: "currency" },
+];
+
+const colunasBaixa: DataTableColumn<MinhaBaixa>[] = [
+  { key: "venda", label: "Venda", value: (b) => String(b.vendaId), mobileRole: "primary" },
+  { key: "data", centered: true, label: "Data", value: (b) => b.data, render: (b) => dataHora(b.data) },
+  { key: "produto", label: "Produto", value: (b) => b.nomeProduto },
+  { key: "vendida", label: "Qtde vendida", value: (b) => b.quantidadeVendida, format: "number" },
+  { key: "quantidade", label: "Pré-vencido", value: (b) => b.quantidade, format: "number" },
+  { key: "correcao", label: "Correção", value: (b) => (b.correcao ? `Corrigida: ${b.correcao.motivo}` : "") },
 ];
 
 const periodoInicial = (periodos: PeriodoMetas[]) => (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
@@ -122,6 +133,16 @@ export function MinhasMetas({ periodos }: { periodos: PeriodoMetas[] }) {
         emptyMessage="Você não participa de nenhuma Meta neste Período."
         striped
       />
+      {dados && dados.baixas.length > 0 && (
+        <DataTable
+          scroll="page"
+          columns={colunasBaixa}
+          rows={dados.baixas}
+          getRowId={(b) => `${b.vendaId}|${b.produtoId}`}
+          title="Minhas Baixas de Pré-vencido"
+          description="As suas vendas no Período que gastaram o Estoque de Pré-vencidos: é o que conta em Pré-vencidos vendidos."
+        />
+      )}
     </Stack>
   );
 }
