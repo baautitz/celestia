@@ -52,7 +52,8 @@ describe("Furo de Estoque", () => {
     ajustes = [ajuste(100, -500, null), ajuste(300, 500, null)];
     renderizar();
     const furo = await screen.findByRole("button", { name: "Furo" }, { timeout: 5000 });
-    expect(within(furo.parentElement!).getByText("R$ 500,00")).toBeTruthy();
+    // Os cards aparecem antes dos Ajustes chegarem: espera os valores, em vez de lê-los na hora.
+    expect(await within(furo.parentElement!).findByText("R$ 500,00")).toBeTruthy();
     expect(within(screen.getByRole("button", { name: "Entradas não justificadas" }).parentElement!).getByText("R$ 500,00")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Justificar Ajuste 300" })).toBeNull();
   });
@@ -63,7 +64,8 @@ describe("Furo de Estoque", () => {
     const furo = await screen.findByRole("button", { name: "Furo" }, { timeout: 5000 });
     expect(furo.getAttribute("aria-pressed")).toBe("true");
     const justificados = screen.getByRole("button", { name: "Justificados" });
-    expect(within(justificados.parentElement!).getByText("R$ 9,00")).toBeTruthy();
+    // Os cards aparecem antes dos Ajustes chegarem: espera os valores, em vez de lê-los na hora.
+    expect(await within(justificados.parentElement!).findByText("R$ 9,00")).toBeTruthy();
     expect(within(justificados.parentElement!).getByText("1 de 3 ajustes (33%)")).toBeTruthy();
 
     fireEvent.click(justificados);
