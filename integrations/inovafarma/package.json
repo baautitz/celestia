@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./server": {
+      "source": "./src/server.ts",
       "types": "./dist/server.d.ts",
       "default": "./dist/server.js"
     },

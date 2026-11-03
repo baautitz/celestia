@@ -7,11 +7,11 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "dev": "tsx watch --env-file=../../.env src/main.ts",
+    "dev": "tsx watch --conditions=source --env-file=../../.env src/main.ts",
     "start": "node dist/main.js",
     "test": "vitest run",
-    "db:migrate": "tsx --env-file=../../.env src/migrate.ts",
-    "create-ca": "tsx --env-file=../../.env src/cli/create-ca.ts",
+    "db:migrate": "tsx --conditions=source --env-file=../../.env src/migrate.ts",
+    "create-ca": "tsx --conditions=source --env-file=../../.env src/cli/create-ca.ts",
     "lint": "eslint ."
   },
   "dependencies": {

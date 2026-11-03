@@ -7,30 +7,37 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./fields": {
+      "source": "./src/fields.ts",
       "types": "./dist/fields.d.ts",
       "default": "./dist/fields.js"
     },
     "./permissions": {
+      "source": "./src/permissions.ts",
       "types": "./dist/permissions.d.ts",
       "default": "./dist/permissions.js"
     },
     "./events": {
+      "source": "./src/events.ts",
       "types": "./dist/events.d.ts",
       "default": "./dist/events.js"
     },
     "./module": {
+      "source": "./src/module.ts",
       "types": "./dist/module.d.ts",
       "default": "./dist/module.js"
     },
     "./loader": {
+      "source": "./src/loader.ts",
       "types": "./dist/loader.d.ts",
       "default": "./dist/loader.js"
     },
     "./migrations": {
+      "source": "./src/migrations.ts",
       "types": "./dist/migrations.d.ts",
       "default": "./dist/migrations.js"
     }
