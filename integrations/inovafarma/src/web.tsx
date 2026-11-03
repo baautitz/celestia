@@ -793,14 +793,10 @@ export const inovafarmaWebModule = defineWebModule({
       path: "/inovafarma/pre-vencidos",
       section: "inovafarma-lancamentos",
       order: 20,
-      permission: "inovafarma:pre-vencidos-lancamento:manage",
+      permission: "inovafarma:pre-vencidos-estoque:manage",
       component: PreVencidosPage,
-      // Quem só confere, só gere o Estoque ou só gere as Baixas também abre a tela; ela mostra as abas que a Permission libera.
-      variants: [
-        { permission: "inovafarma:pre-vencidos-conferencia:view", component: PreVencidosPage },
-        { permission: "inovafarma:pre-vencidos-estoque:manage", component: PreVencidosPage },
-        { permission: "inovafarma:pre-vencidos-baixas:manage", component: PreVencidosPage },
-      ],
+      // Quem só gere as Baixas também abre a tela; ela mostra as abas que a Permission libera.
+      variants: [{ permission: "inovafarma:pre-vencidos-baixas:manage", component: PreVencidosPage }],
     },
     {
       id: "inovafarma-avaliacoes",

@@ -13,7 +13,7 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
 import { ItemPreVencidoWindow, type ItemPreVencido, type ItemSalvo } from "./item-pre-vencido-window";
-import type { LojaOpcao } from "./pre-vencido-window";
+import type { LojaOpcao } from "./loja-opcao";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
 

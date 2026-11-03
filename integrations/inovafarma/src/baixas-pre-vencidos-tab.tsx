@@ -7,7 +7,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
-import type { LojaOpcao } from "./pre-vencido-window";
+import type { LojaOpcao } from "./loja-opcao";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
 

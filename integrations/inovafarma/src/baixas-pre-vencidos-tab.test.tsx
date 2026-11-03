@@ -14,13 +14,9 @@ const periodos = [
   { id: "p-marco", name: "Março", startDate: "2027-03-01", endDate: "2027-03-31", status: "closed" },
 ];
 const contexto = (extra: Record<string, unknown> = {}) => ({
-  podeLancar: false,
-  podeConferir: false,
   podeEstoque: false,
   podeBaixas: true,
-  vinculado: true,
   periodos,
-  lojas: [],
   lojasBaixas: [{ codigo: 1, nome: "Centro" }],
   ...extra,
 });

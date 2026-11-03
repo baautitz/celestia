@@ -23,7 +23,7 @@ const item = (extra: Record<string, unknown> = {}) => ({
   version: 1,
   ...extra,
 });
-const contexto = { podeLancar: false, podeConferir: false, podeEstoque: true, vinculado: true, periodos: [], lojas: [], lojasEstoque: [{ codigo: 1, nome: "Centro" }] };
+const contexto = { podeEstoque: true, podeBaixas: false, periodos: [], lojasEstoque: [{ codigo: 1, nome: "Centro" }] };
 let itens: Record<string, unknown>[] = [];
 
 beforeEach(() => {
@@ -76,6 +76,12 @@ describe("aba Estoque", () => {
     expect(screen.getByRole("cell", { name: "06/2027" })).toBeTruthy();
     expect(screen.getByRole("cell", { name: "10/04/2027" })).toBeTruthy();
     expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/estoque/itens?codigoLoja=1"));
+  });
+
+  it("mostra só as abas que a Permission libera", async () => {
+    renderizar();
+    await screen.findByRole("tab", { name: "Estoque" });
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Estoque"]);
   });
 
   it("mostra o Restante e traz os Itens zerados só pelo filtro", async () => {
