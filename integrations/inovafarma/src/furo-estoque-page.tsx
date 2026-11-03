@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, MessageSquarePlus, Package, Pencil, Plus, Trash2, MoreHorizontal } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, CheckCircle2, MessageSquarePlus, Pencil, Plus, Trash2, MoreHorizontal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
@@ -63,19 +63,22 @@ export interface Ajuste {
   justificativa: Justificativa | null;
 }
 
-type Situacao = "todos" | "pendentes" | "justificados";
+/** Grupo de Ajustes de um card; sem grupo escolhido, a tabela mostra todos. */
+type Grupo = "furo" | "entradas" | "justificados";
 
 const periodoLabel = (p: Periodo) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})${p.status === "closed" ? " · fechado" : ""}`;
 const periodoInicial = (periodos: Periodo[]) => (periodos.find((p) => p.status !== "closed") ?? periodos[0])?.id ?? "";
 /** `AAAA-MM-DD HH:mm` → `DD/MM/AAAA HH:mm`. */
 const dataHora = (data: string) => `${data.slice(8, 10)}/${data.slice(5, 7)}/${data.slice(0, 4)} ${data.slice(11, 16)}`;
 const somaCusto = (ajustes: Ajuste[]) => ajustes.reduce((n, a) => n + a.totalCusto, 0);
+/** Soma sem sinal, para os cards: o sentido já está no nome do card. */
+const somaAbsoluta = (ajustes: Ajuste[]) => ajustes.reduce((n, a) => n + Math.abs(a.totalCusto), 0);
 
 function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: Motivo[] }) {
   const { feedback, windows } = useUi();
   const [periodoId, setPeriodoId] = useState(periodoInicial(contexto.periodos));
   const [loja, setLoja] = useState(contexto.todasAsLojas || contexto.lojasGerenciadas.length !== 1 ? TODAS : String(contexto.lojasGerenciadas[0]!.codigo));
-  const [situacao, setSituacao] = useState<Situacao>("pendentes");
+  const [grupo, setGrupo] = useState<Grupo | null>("furo");
   const [ajustes, setAjustes] = useState<Ajuste[]>([]);
   const [carregando, setCarregando] = useState(false);
   const consulta = useRef(0);
@@ -103,9 +106,16 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
     void carregar();
   }, [carregar]);
 
-  const pendentes = useMemo(() => ajustes.filter((a) => !a.justificativa), [ajustes]);
-  const justificados = useMemo(() => ajustes.filter((a) => a.justificativa), [ajustes]);
-  const visiveis = situacao === "pendentes" ? pendentes : situacao === "justificados" ? justificados : ajustes;
+  const grupos = useMemo(
+    () => ({
+      furo: ajustes.filter((a) => !a.justificativa && a.operacao === "-"),
+      entradas: ajustes.filter((a) => !a.justificativa && a.operacao === "+"),
+      justificados: ajustes.filter((a) => a.justificativa),
+    }),
+    [ajustes],
+  );
+  const visiveis = grupo ? grupos[grupo] : ajustes;
+  const alternar = (g: Grupo) => setGrupo((atual) => (atual === g ? null : g));
 
   if (!contexto.todasAsLojas && contexto.lojasGerenciadas.length === 0) {
     return (
@@ -234,19 +244,6 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
             </SelectContent>
           </Select>
         </Stack>
-        <Stack gap="field">
-          <Label>Situação</Label>
-          <Select value={situacao} onValueChange={(v) => v && setSituacao(v as Situacao)}>
-            <SelectTrigger aria-label="Situação">
-              <SelectValue>{(v: string) => ({ todos: "Todos", pendentes: "Não justificados", justificados: "Justificados" })[v as Situacao]}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pendentes">Não justificados</SelectItem>
-              <SelectItem value="justificados">Justificados</SelectItem>
-              <SelectItem value="todos">Todos</SelectItem>
-            </SelectContent>
-          </Select>
-        </Stack>
       </Stack>
 
       {!aberto && (
@@ -257,16 +254,36 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
       )}
 
       <Grid columns="cards">
-        <KpiCard loading={carregando} label="Ajustes no período" value={formatNumber(ajustes.length)} hint={`Custo líquido ${formatCurrency(somaCusto(ajustes))}`} icon={<Package />} tone="info" />
         <KpiCard
           loading={carregando}
-          label="Não justificados (furo)"
-          value={formatCurrency(somaCusto(pendentes))}
-          hint={`${formatNumber(pendentes.length)} ajustes sem Justificativa`}
+          label="Furo"
+          value={formatCurrency(somaAbsoluta(grupos.furo))}
+          hint={`${formatNumber(grupos.furo.length)} ajustes de saída sem Justificativa`}
           icon={<AlertTriangle />}
           tone="warning"
+          selected={grupo === "furo"}
+          onSelect={() => alternar("furo")}
         />
-        <KpiCard loading={carregando} label="Justificados" value={formatCurrency(somaCusto(justificados))} hint={`${formatNumber(justificados.length)} ajustes`} icon={<CheckCircle2 />} tone="success" />
+        <KpiCard
+          loading={carregando}
+          label="Entradas não justificadas"
+          value={formatCurrency(somaAbsoluta(grupos.entradas))}
+          hint={`${formatNumber(grupos.entradas.length)} ajustes de entrada`}
+          icon={<ArrowDownToLine />}
+          tone="info"
+          selected={grupo === "entradas"}
+          onSelect={() => alternar("entradas")}
+        />
+        <KpiCard
+          loading={carregando}
+          label="Justificados"
+          value={formatCurrency(somaAbsoluta(grupos.justificados))}
+          hint={`${formatNumber(grupos.justificados.length)} de ${formatNumber(ajustes.length)} ajustes (${ajustes.length ? Math.round((grupos.justificados.length / ajustes.length) * 100) : 0}%)`}
+          icon={<CheckCircle2 />}
+          tone="success"
+          selected={grupo === "justificados"}
+          onSelect={() => alternar("justificados")}
+        />
       </Grid>
 
       <DataTable
@@ -276,7 +293,15 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
         getRowId={(a) => String(a.codigoMovimento)}
         loading={carregando}
         title="Ajustes de Estoque"
-        emptyMessage={situacao === "pendentes" ? "Nenhum Ajuste de Estoque sem Justificativa neste período." : "Nenhum Ajuste de Estoque neste período."}
+        emptyMessage={
+          grupo === "furo"
+            ? "Nenhuma saída sem Justificativa neste período."
+            : grupo === "entradas"
+              ? "Nenhuma entrada sem Justificativa neste período."
+              : grupo === "justificados"
+                ? "Nenhum Ajuste justificado neste período."
+                : "Nenhum Ajuste de Estoque neste período."
+        }
         search={{ placeholder: "Buscar Ajuste, Colaborador ou Motivo" }}
         totals={(linhas) => ({ quantidade: linhas.reduce((n, a) => n + a.quantidade, 0), totalCusto: somaCusto(linhas) })}
         renderExpanded={(a) => (
