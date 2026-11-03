@@ -4,7 +4,7 @@ import type { ModuleContext } from "@platform/core/module";
 import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { PRODUTO_SQL, type LinhaProduto } from "./produtos-erp.js";
-import { baixasDaLoja } from "./baixas-da-loja.js";
+import { BaixasSemErpError, type BaixasPreVencidos } from "./baixas-do-periodo.js";
 import { ITEM_PRE_VENCIDO_ACTIONS, ITEM_PRE_VENCIDO_PLUGIN, ITEM_PRE_VENCIDO_TARGET, type AtributosItemPreVencido } from "./estoque-pre-vencidos-audit.js";
 import type { EstoquePreVencidoStore, ItemPreVencido } from "./estoque-pre-vencidos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
@@ -20,6 +20,7 @@ export interface EstoquePreVencidosRoutesDeps {
   auth: MiddlewareHandler;
   erpClient: () => ErpQuery | undefined;
   store: EstoquePreVencidoStore;
+  baixas: BaixasPreVencidos;
   vinculos: VinculoStore;
   audit: AuditService;
 }
@@ -49,7 +50,7 @@ export async function lojasDoVinculo(vinculos: VinculoStore, usuarioId: string |
 }
 
 /** Rotas do Estoque de Pré-vencidos: incluir, listar, editar e excluir Itens nas Lojas do Vínculo. */
-export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient, store, vinculos, audit }: EstoquePreVencidosRoutesDeps): void {
+export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient, store, baixas, vinculos, audit }: EstoquePreVencidosRoutesDeps): void {
   const gerir = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-estoque:manage");
   const pode = (c: AuthContext) => permissions.has(c.get("user")?.permissions, gerir.key);
 
@@ -101,14 +102,12 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, er
     const recusa = await recusaLoja(c, codigoLoja);
     if (recusa) return recusa;
     const itens = await store.listar(codigoLoja);
-    if (itens.length === 0) return c.json([]);
-    const client = erpClient();
-    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
     let restante: Record<string, number>;
     try {
-      ({ restante } = await baixasDaLoja(client, codigoLoja, itens));
-    } catch {
-      return c.json({ error: ERP_INDISPONIVEL }, 503);
+      restante = await baixas.restante(codigoLoja, itens);
+    } catch (err) {
+      if (err instanceof BaixasSemErpError) return c.json({ error: err.semConexao ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
+      throw err;
     }
     // Os zerados saem da lista por padrão; `zerados=true` os traz de volta.
     const zerados = c.req.query("zerados") === "true";

@@ -1,4 +1,5 @@
 import { calcularBaixas, type ResultadoBaixas, type VendaParaBaixa } from "./baixas-pre-vencidos.js";
+import type { BaixasCongeladas } from "./baixas-congeladas-store.js";
 import type { ItemPreVencido } from "./estoque-pre-vencidos-store.js";
 
 interface ErpQuery {
@@ -20,7 +21,11 @@ export function horaDoErp(iso: string): string {
 
 /** Linha de venda do ERP com o nome de quem vendeu, para a aba Baixas. */
 export interface VendaDaLoja extends VendaParaBaixa {
+  codigoLoja: number;
   nomeColaborador: string;
+  /** Do Item: a Baixa gravada no fechamento guarda o produto mesmo que o Item seja excluído depois. */
+  nomeProduto: string;
+  codigoBarra: string | null;
 }
 
 type LinhaVendaErp = { vendaId: number; data: string; cancelada: boolean | number; codigoColaborador: number; nomeColaborador: string | null; produtoId: string; quantidade: number | null };
@@ -50,17 +55,36 @@ export const vendasDaLojaSql = (produtos: number) => `
   GROUP BY v.CodigoVenda, v.DataVenda, v.Eliminado, p.rowguid
 `;
 
+/** Restante de partida de cada Item no congelamento, acompanhando uma edição da quantidade feita depois dele. */
+const restanteCongelado = (itens: readonly ItemPreVencido[], base: BaixasCongeladas): Record<string, number> =>
+  Object.fromEntries(
+    itens.flatMap((i) => {
+      const congelado = base.itens[i.id];
+      return congelado ? [[i.id, Math.max(0, congelado.restante + i.quantidade - congelado.quantidade)]] : [];
+    }),
+  );
+
+export interface OpcoesBaixasDaLoja {
+  /** Congelamento de onde partir: as vendas até ele já estão contadas. */
+  base?: BaixasCongeladas | null;
+  /** Só as vendas até esta hora do ERP (inclusive). */
+  ate?: string;
+}
+
 /**
- * Baixas e Restante do Estoque de uma Loja: busca no ERP as vendas da Loja desde a inclusão mais antiga, só dos
- * produtos dos Itens, e roda o motor. Lança se o ERP falhar.
+ * Baixas e Restante do Estoque de uma Loja: busca no ERP as vendas da Loja desde a inclusão mais antiga (ou desde o
+ * congelamento de partida), só dos produtos dos Itens, e roda o motor. Lança se o ERP falhar.
  */
-export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: readonly ItemPreVencido[]): Promise<ResultadoBaixas<VendaDaLoja>> {
+export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: readonly ItemPreVencido[], { base = null, ate }: OpcoesBaixasDaLoja = {}): Promise<ResultadoBaixas<VendaDaLoja>> {
   const paraMotor = itens.map((i) => ({ id: i.id, produtoId: i.produtoId, validade: i.validade, quantidade: i.quantidade, incluidoEm: horaDoErp(i.incluidoEm) }));
+  const congelado = base ? { ate: base.ate, restante: restanteCongelado(itens, base) } : null;
   if (paraMotor.length === 0) return calcularBaixas({ itens: [], vendas: [] });
 
-  const dataInicio = paraMotor.map((i) => i.incluidoEm).sort()[0]!;
+  const inclusao = paraMotor.map((i) => i.incluidoEm).sort()[0]!;
+  const dataInicio = congelado && congelado.ate > inclusao ? congelado.ate : inclusao;
   // Em lotes de produtos: o SQL Server aceita cerca de 2100 parâmetros por consulta.
   const codigos = [...new Set(itens.map((i) => i.codigoProduto))];
+  const produtos = new Map(itens.map((i) => [i.produtoId, { nomeProduto: i.nomeProduto, codigoBarra: i.codigoBarra }]));
   const vendas: VendaDaLoja[] = [];
   for (let i = 0; i < codigos.length; i += LOTE_PRODUTOS) {
     const lote = codigos.slice(i, i + LOTE_PRODUTOS);
@@ -72,12 +96,14 @@ export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: 
         vendaId: Number(l.vendaId),
         data: String(l.data),
         cancelada: l.cancelada === true || Number(l.cancelada) === 1,
+        codigoLoja,
         codigoColaborador: Number(l.codigoColaborador),
         nomeColaborador: (l.nomeColaborador ?? "").trim() || `Colaborador cód. ${l.codigoColaborador}`,
         produtoId: l.produtoId,
+        ...(produtos.get(l.produtoId) ?? { nomeProduto: "", codigoBarra: null }),
         quantidade: Number(l.quantidade) || 0,
       })),
     );
   }
-  return calcularBaixas({ itens: paraMotor, vendas });
+  return calcularBaixas({ itens: paraMotor, vendas: ate === undefined ? vendas : vendas.filter((v) => v.data <= ate), congelado });
 }

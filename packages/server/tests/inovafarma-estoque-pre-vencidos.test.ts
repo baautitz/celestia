@@ -67,7 +67,7 @@ const usuario = (id: string, roleId: string): User => ({ id, username: id, fulln
 async function boot() {
   const userStore = new TestUserStore({
     roles: [
-      { id: "adm", name: "Adm", permissions: ["inovafarma:colaboradores:update", "inovafarma:colaboradores:view", "closing_period:period:create"] },
+      { id: "adm", name: "Adm", permissions: ["inovafarma:colaboradores:update", "inovafarma:colaboradores:view", "closing_period:period:create", "closing_period:period:close", "closing_period:period:reopen", "closing_period:period:read"] },
       { id: "est", name: "Estoque", permissions: [ESTOQUE] },
       { id: "ger", name: "Gestor", permissions: [BAIXAS] },
       { id: "outro", name: "Outro", permissions: ["inovafarma:colaboradores:view"] },
@@ -234,5 +234,60 @@ describe("Baixas de Pré-vencido", () => {
     const contexto = await (await req("gil", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
     expect(contexto).toMatchObject({ podeBaixas: true, podeEstoque: false, lojasBaixas: [{ codigo: 1, nome: "Centro" }] });
     expect(contexto.periodos.map((p: { id: string }) => p.id)).toEqual([periodoId]);
+  });
+});
+
+describe("Congelamento das Baixas no fechamento do Closing Period", () => {
+  async function comDoisPeriodos() {
+    const ctx = await boot();
+    const criado = await ctx.req("adm", "POST", "/api/closing-periods", { name: "Seguinte", startDate: dia(11), endDate: dia(40) });
+    const { id: seguinteId } = (await criado.json()) as { id: string };
+    const baixas = async (periodoId: string) =>
+      ((await (await ctx.req("gil", "GET", `/api/m/inovafarma/pre-vencidos/baixas?codigoLoja=1&periodoId=${periodoId}`)).json()) as Grupo[]).map((g) => [g.codigoColaborador, g.quantidade, g.vendas.map((v) => [v.vendaId, v.quantidade])]);
+    const fechar = (id: string) => ctx.req("adm", "POST", `/api/closing-periods/${id}/close`);
+    const reabrir = (id: string) => ctx.req("adm", "POST", `/api/closing-periods/${id}/reopen`);
+    return { ...ctx, seguinteId, baixas, fechar, reabrir };
+  }
+
+  it("o Período fechado mostra as Baixas gravadas: venda cancelada depois do fechamento não o muda, e o Período aberto parte do Restante congelado", async () => {
+    const { incluir, listar, periodoId, seguinteId, baixas, fechar } = await comDoisPeriodos();
+    await incluir("ana", { quantidade: 5 });
+    vendas = [venda(1, 2, 2), venda(2, 3, 1, { codigoColaborador: 8, nomeColaborador: "GIL COSTA" }), venda(3, 15, 4)];
+    expect((await fechar(periodoId)).status).toBe(200);
+
+    vendas = vendas.map((v) => (v.vendaId === 1 ? { ...v, cancelada: true } : v));
+    expect(await baixas(periodoId)).toEqual([
+      [7, 2, [[1, 2]]],
+      [8, 1, [[2, 1]]],
+    ]);
+    // A venda 1 cancelada não devolve ao Restante: o Período fechado já a contou.
+    expect(await baixas(seguinteId)).toEqual([[7, 2, [[3, 2]]]]);
+    expect((await listar("ana", 1)).map((i) => i.restante)).toEqual([]);
+  });
+
+  it("recusa o fechamento com o ERP indisponível, sem gravar nada", async () => {
+    const { incluir, req, periodoId, baixas, fechar } = await comDoisPeriodos();
+    await incluir("ana", { quantidade: 5 });
+    vendas = [venda(1, 2, 2)];
+    erpFora = true;
+    const recusa = await fechar(periodoId);
+    expect(recusa.status).toBe(409);
+    expect(await recusa.json()).toMatchObject({ error: expect.stringContaining("indisponível") });
+    erpFora = false;
+    expect(await (await req("adm", "GET", `/api/closing-periods/${periodoId}`)).json()).toMatchObject({ status: "open" });
+    vendas = [venda(1, 2, 2, { cancelada: true })];
+    expect(await baixas(periodoId)).toEqual([]);
+  });
+
+  it("reabrir descarta o congelado e volta a calcular ao vivo", async () => {
+    const { incluir, periodoId, seguinteId, baixas, fechar, reabrir } = await comDoisPeriodos();
+    await incluir("ana", { quantidade: 5 });
+    vendas = [venda(1, 2, 2), venda(3, 15, 4)];
+    expect((await fechar(periodoId)).status).toBe(200);
+    vendas = [venda(1, 2, 2, { cancelada: true }), venda(3, 15, 4)];
+    expect(await baixas(periodoId)).toEqual([[7, 2, [[1, 2]]]]);
+    expect((await reabrir(periodoId)).status).toBe(200);
+    expect(await baixas(periodoId)).toEqual([]);
+    expect(await baixas(seguinteId)).toEqual([[7, 4, [[3, 4]]]]);
   });
 });

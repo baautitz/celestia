@@ -34,6 +34,9 @@ import { declareItemPreVencidoAudit } from "./estoque-pre-vencidos-audit.js";
 import { registerEstoquePreVencidosRoutes } from "./estoque-pre-vencidos-routes.js";
 import { registerBaixasPreVencidosRoutes } from "./baixas-pre-vencidos-routes.js";
 import { MemoryEstoquePreVencidoStore } from "./estoque-pre-vencidos-store.js";
+import { MemoryBaixasCongeladasStore } from "./baixas-congeladas-store.js";
+import { PostgresBaixasCongeladasStore } from "./postgres-baixas-congeladas-store.js";
+import { baixasPreVencidos as criarBaixasPreVencidos, registerCongelamentoBaixas } from "./baixas-do-periodo.js";
 import { PostgresEstoquePreVencidoStore } from "./postgres-estoque-pre-vencidos-store.js";
 import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
 import { MemoryVinculoStore } from "./vinculo-store.js";
@@ -108,8 +111,12 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         audit,
       });
       const estoquePreVencidos = db ? new PostgresEstoquePreVencidoStore(db) : new MemoryEstoquePreVencidoStore();
-      registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: estoquePreVencidos, vinculos: store, audit });
-      registerBaixasPreVencidosRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: estoquePreVencidos, vinculos: store, periods });
+      const baixasCongeladas = db ? new PostgresBaixasCongeladasStore(db) : new MemoryBaixasCongeladasStore();
+      // `baixasPreVencidos.baixasDoPeriodo` é a fonte das Baixas de um Período (gravadas se fechado, ao vivo se aberto).
+      const baixasPreVencidos = criarBaixasPreVencidos({ erpClient: () => erpClients[erpId], estoque: estoquePreVencidos, congeladas: baixasCongeladas });
+      registerCongelamentoBaixas({ events, periods, baixas: baixasPreVencidos, congeladas: baixasCongeladas });
+      registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: estoquePreVencidos, baixas: baixasPreVencidos, vinculos: store, audit });
+      registerBaixasPreVencidosRoutes({ routes, permissions, auth, baixas: baixasPreVencidos, vinculos: store, periods });
       registerAvaliacoesRoutes({
         routes,
         permissions,
