@@ -26,6 +26,14 @@ const gaps = {
   /** 16px: blocos da página e cards entre si. */
   section: "gap-4",
 } as const
+/** `gaps` para `Grid columns="masonry"`: `gap` vira o espaço entre colunas e o espaço vertical vem do padding inferior de cada bloco. */
+const masonryGaps: Record<Gap, string> = {
+  none: "gap-0",
+  tight: "gap-1 *:pb-1",
+  field: "gap-2 *:pb-2",
+  group: "gap-3 *:pb-3",
+  section: "gap-4 *:pb-4",
+}
 const paddings = {
   /** 8px: linhas de lista, pílulas. */
   compact: "p-2",
@@ -112,12 +120,16 @@ function Stack({
 }
 
 interface GridProps extends Omit<React.ComponentProps<"div">, "className" | "style"> {
-  /** `2` = duas colunas fixas; `split` = uma coluna abaixo de `lg` e duas a partir dele; `cards` = 1/2/4 colunas responsivas. */
-  columns: 2 | "split" | "cards"
+  /** `2` = duas colunas fixas; `split` = uma coluna abaixo de `lg` e duas a partir dele; `cards` = 1/2/4 colunas responsivas;
+   * `masonry` = como `split`, mas cada bloco segue logo abaixo do anterior na coluna, sem alinhar linhas (blocos de alturas diferentes). */
+  columns: 2 | "split" | "cards" | "masonry"
   gap?: Gap
 }
 
 function Grid({ columns, gap = "section", ...props }: GridProps) {
+  if (columns === "masonry") {
+    return <div className={cn("lg:columns-2 *:break-inside-avoid", masonryGaps[gap])} {...props} />
+  }
   return (
     <div
       className={cn(

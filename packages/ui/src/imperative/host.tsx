@@ -9,12 +9,12 @@ import type { WindowController } from "./controller.ts"
 import { WindowContext, WindowFooterContext } from "./use-window.tsx"
 import type { WindowHandle } from "./use-window.tsx"
 
-/** Largura do diálogo por `size`; `medium` é o padrão. `full` ocupa a tela toda no celular e rola quando passa da altura. */
+/** Largura do diálogo por `size`; `medium` é o padrão. `full` ocupa a tela toda no celular e rola só o corpo, com cabeçalho e rodapé fixos. */
 const DIALOG_WIDTH: Record<WindowSize, string> = {
   small: "sm:max-w-md",
   medium: "sm:max-w-lg",
   large: "sm:max-w-3xl",
-  full: "h-svh max-w-full overflow-y-auto sm:h-auto sm:max-h-[90svh] sm:max-w-6xl",
+  full: "flex h-svh max-w-full flex-col gap-0 p-0 sm:h-auto sm:max-h-[90svh] sm:max-w-6xl",
 }
 
 /** Conteúdo de uma janela: componente sem props (quem abre fecha sobre os dados). */
@@ -85,14 +85,25 @@ function ManagedWindow({ entry, controller }: {
           </Sheet>
         ) : (
           <Dialog open onOpenChange={onOpenChange}>
-            <DialogContent className={DIALOG_WIDTH[options.size ?? "medium"]}>
-              <DialogHeader>
-                <DialogTitle>{title}</DialogTitle>
-                {options.description && <DialogDescription>{options.description}</DialogDescription>}
-              </DialogHeader>
-              {body}
-              <DialogFooter ref={setFooter} className="gap-2 empty:hidden" />
-            </DialogContent>
+            {options.size === "full" ? (
+              <DialogContent className={DIALOG_WIDTH.full}>
+                <DialogHeader className="p-4 border-b shrink-0">
+                  <DialogTitle>{title}</DialogTitle>
+                  {options.description && <DialogDescription>{options.description}</DialogDescription>}
+                </DialogHeader>
+                <div className="flex-1 min-h-0 overflow-y-auto p-4">{body}</div>
+                <DialogFooter ref={setFooter} className="p-4 border-t shrink-0 gap-2 empty:hidden" />
+              </DialogContent>
+            ) : (
+              <DialogContent className={DIALOG_WIDTH[options.size ?? "medium"]}>
+                <DialogHeader>
+                  <DialogTitle>{title}</DialogTitle>
+                  {options.description && <DialogDescription>{options.description}</DialogDescription>}
+                </DialogHeader>
+                {body}
+                <DialogFooter ref={setFooter} className="gap-2 empty:hidden" />
+              </DialogContent>
+            )}
           </Dialog>
         )}
       </WindowFooterContext.Provider>
