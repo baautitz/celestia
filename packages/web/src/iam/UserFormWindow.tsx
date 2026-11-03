@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { User, Role, JWTAccessPayload } from "@platform/shared";
 import { Button } from "@platform/ui/components/button";
-import { Grid, Text } from "@platform/ui/components/layout";
+import { Text } from "@platform/ui/components/layout";
 import { Input } from "@platform/ui/components/input";
 import { PasswordInput } from "@platform/ui/components/password-input";
 import { PasswordRequirements } from "@/iam/PasswordRequirements";
@@ -117,34 +117,33 @@ export const UserFormWindow: React.FC<UserFormWindowProps> = ({ user, roles, cur
               )}
             />
 
-            <Grid columns={2}>
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome de Usuário</FormLabel>
-                    <FormControl>
-                      <Input placeholder="carlos.silva" disabled={isEditMode} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>E-mail</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="carlos@empresa.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </Grid>
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome de Usuário</FormLabel>
+                  <FormControl>
+                    <Input placeholder="carlos.silva" disabled={isEditMode} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>E-mail</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="carlos@empresa.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
