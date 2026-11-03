@@ -10,7 +10,7 @@ import { ERP_INDISPONIVEL, erroDoErp, SEM_CONEXAO } from "./metas-comum.js";
 import { inclusaoRetroativa, lojasDoErp, recusaDeLoja } from "./pre-vencidos-comum.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
 import { ITEM_PRE_VENCIDO_ACTIONS, ITEM_PRE_VENCIDO_PLUGIN, ITEM_PRE_VENCIDO_TARGET, type AtributosItemPreVencido } from "./estoque-pre-vencidos-audit.js";
-import type { EstoquePreVencidoStore, ItemPreVencido } from "./estoque-pre-vencidos-store.js";
+import type { ItemPreVencido } from "./estoque-pre-vencidos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
 import type { VinculoStore } from "./vinculo-store.js";
 
