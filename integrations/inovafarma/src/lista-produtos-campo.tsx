@@ -13,7 +13,14 @@ import { TIPOS_ENTRADA, TIPO_ENTRADA_LABEL, ordenarEntradas, type EntradaLista, 
 const BASE_LISTA = "/api/m/inovafarma/metas/lista";
 const ESPERA_BUSCA_MS = 300;
 /** Mínimo de caracteres por tipo, como o servidor. */
-const MIN_BUSCA: Record<TipoEntrada, number> = { produto: 3 };
+const MIN_BUSCA: Record<TipoEntrada, number> = { produto: 3, grupo: 1, secao: 1, laboratorio: 2 };
+
+const NENHUM: Record<TipoEntrada, string> = {
+  produto: "Nenhum Produto encontrado.",
+  grupo: "Nenhum Grupo encontrado.",
+  secao: "Nenhuma Seção encontrada.",
+  laboratorio: "Nenhum Laboratório encontrado.",
+};
 
 interface Resultado {
   tipo: TipoEntrada;
@@ -90,7 +97,7 @@ export function ListaProdutosCampo({ entradas, onChange, erro }: { entradas: Ent
         ? "Buscando no ERP…"
         : busca.estado === "erro"
           ? busca.mensagem
-          : `Nenhum ${nomeTipo} encontrado.`;
+          : NENHUM[tipo];
 
   const colunas: DataTableColumn<EntradaLista>[] = [
     { key: "tipo", label: "Tipo", value: (e) => TIPO_ENTRADA_LABEL[e.tipo], render: (e) => <Badge variant="secondary">{TIPO_ENTRADA_LABEL[e.tipo]}</Badge>, nowrap: true },
@@ -139,7 +146,7 @@ export function ListaProdutosCampo({ entradas, onChange, erro }: { entradas: Ent
                   {(r: Resultado) => (
                     <ComboboxItem key={chave(r)} value={r} disabled={incluidas.has(chave(r))}>
                       {r.detalhe ? `${r.detalhe} · ${r.nome}` : r.nome}
-                      {incluidas.has(chave(r)) ? " (já incluído)" : ""}
+                      {incluidas.has(chave(r)) ? " · já está na Lista" : ""}
                     </ComboboxItem>
                   )}
                 </ComboboxList>

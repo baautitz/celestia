@@ -7,15 +7,19 @@ export type Exibicao = (typeof EXIBICOES)[number];
 export const EXIBICAO_LABEL: Record<Exibicao, string> = { atingida: "Atingida / Não atingida", progresso: "Progresso" };
 
 /** Tipo de uma entrada da Lista de Produtos: o que casa com o produto vendido no ERP. */
-export const TIPOS_ENTRADA = ["produto"] as const;
+export const TIPOS_ENTRADA = ["produto", "grupo", "secao", "laboratorio"] as const;
 export type TipoEntrada = (typeof TIPOS_ENTRADA)[number];
-export const TIPO_ENTRADA_LABEL: Record<TipoEntrada, string> = { produto: "Produto" };
+export const TIPO_ENTRADA_LABEL: Record<TipoEntrada, string> = { produto: "Produto", grupo: "Grupo", secao: "Seção", laboratorio: "Laboratório" };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** O id de cada tipo no ERP: `Produto.rowguid` no Produto; o código do Grupo, da Seção ou do Fabricante nos demais. */
+const idValido = (e: Pick<EntradaLista, "tipo" | "id">) => (e.tipo === "produto" ? UUID.test(e.id) : /^\d{1,10}$/.test(e.id));
 
 /** O que a Lista de Produtos mede: unidades vendidas. */
 export const UNIDADES_LISTA = ["unidades"] as const;
 export type UnidadeLista = (typeof UNIDADES_LISTA)[number];
 
-/** Entrada da Lista: o id no ERP (`Produto.rowguid`) e o nome gravado, legível se a entrada sair do ERP. */
+/** Entrada da Lista: o id no ERP e o nome gravado, legível se a entrada sair do ERP. O Laboratório é o Fabricante do ERP. */
 export const EntradaLista = z.object({
   tipo: z.enum(TIPOS_ENTRADA),
   id: z.string().trim().min(1).max(64),
@@ -34,7 +38,7 @@ export type ListaTipo = z.infer<typeof ListaTipo>;
 export const ordenarEntradas = <E extends Pick<EntradaLista, "tipo" | "nome">>(entradas: readonly E[]): E[] =>
   [...entradas].sort((a, b) => TIPOS_ENTRADA.indexOf(a.tipo) - TIPOS_ENTRADA.indexOf(b.tipo) || a.nome.localeCompare(b.nome, "pt-BR"));
 
-/** Entrada em texto, como o Colaborador e o Audit Log a veem (ex.: "Produto Dipirona 1g"). */
+/** Entrada em texto, como o Colaborador e o Audit Log a veem (ex.: "Laboratório EMS"). */
 export const descreverEntrada = (e: Pick<EntradaLista, "tipo" | "nome">) => `${TIPO_ENTRADA_LABEL[e.tipo]} ${e.nome}`;
 
 const Centavos = z.number().int().min(1, "Informe o valor do Prêmio.");
@@ -93,6 +97,7 @@ export function problemaDoTipo(t: DadosTipoMeta): string | null {
   if (avaliacoes && t.semAlvo) return "A Meta de Avaliações precisa do valor inicial.";
   if (t.indicador === "lista-produtos" && !t.lista) return "Adicione pelo menos uma entrada à Lista.";
   if (t.indicador !== "lista-produtos" && t.lista) return "Só o Indicador Lista de Produtos tem Lista.";
+  if (t.lista && !t.lista.entradas.every(idValido)) return "Uma entrada da Lista tem um identificador inválido.";
   if (t.lista && new Set(t.lista.entradas.map((e) => `${e.tipo}:${e.id}`)).size !== t.lista.entradas.length) return "Uma entrada aparece duas vezes na Lista.";
   if (t.regra.tipo === "proporcional" && indicador.direcao === "menor") return `O Proporcional não se aplica a ${indicador.nome}, em que menor é melhor.`;
   if (t.regra.tipo === "proporcional" && t.regra.gatilho !== null && t.regra.teto !== null && t.regra.gatilho >= t.regra.teto)

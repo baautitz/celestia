@@ -69,7 +69,7 @@ describe("regras do Tipo de Meta", () => {
   });
 
   it("a Lista é obrigatória no Indicador Lista de Produtos e proibida nos outros", () => {
-    const lista = { entradas: [{ tipo: "produto" as const, id: "P1", nome: "DIPIRONA" }], unidade: "unidades" as const };
+    const lista = { entradas: [{ tipo: "produto" as const, id: "8F14E45F-CEEA-467F-A8F4-5E1D2C3B4A01", nome: "DIPIRONA" }], unidade: "unidades" as const };
     expect(problemaDoTipo(tipo({ indicador: "lista-produtos" }))).toMatch(/entrada à Lista/);
     expect(problemaDoTipo(tipo({ lista }))).toMatch(/Só o Indicador Lista de Produtos/);
     expect(problemaDoTipo(tipo({ indicador: "lista-produtos", lista }))).toBeNull();
