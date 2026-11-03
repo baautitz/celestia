@@ -1,11 +1,15 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
-import type { VendaDaLoja } from "./baixas-da-loja.js";
-import { BaixasSemErpError, type BaixasPreVencidos, type PeriodoDasBaixas } from "./baixas-do-periodo.js";
-import type { BaixaDeVenda } from "./baixas-pre-vencidos.js";
+import { baixasDoPeriodo, type BaixaDoPeriodo, type PeriodoDasBaixas } from "./baixas-do-periodo.js";
 import { ERP_INDISPONIVEL, LOJA_FORA_DO_VINCULO, SEM_CONEXAO, SEM_VINCULO, lojasDoVinculo } from "./estoque-pre-vencidos-routes.js";
+import type { BaixasCongeladasStore } from "./baixas-congeladas-store.js";
+import type { EstoquePreVencidoStore } from "./estoque-pre-vencidos-store.js";
 import type { VinculoStore } from "./vinculo-store.js";
+
+interface ErpQuery {
+  query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
+}
 
 /** Forma do serviço `periods` do Module `closing_period`; o Plugin não importa `@platform/server` (ADR 0002). */
 interface PeriodsService {
@@ -16,7 +20,9 @@ export interface BaixasPreVencidosRoutesDeps {
   routes: ModuleContext["routes"];
   permissions: ModuleContext["permissions"];
   auth: MiddlewareHandler;
-  baixas: BaixasPreVencidos;
+  erpClient: () => ErpQuery | undefined;
+  store: EstoquePreVencidoStore;
+  congeladas: BaixasCongeladasStore;
   vinculos: VinculoStore;
   periods: PeriodsService;
 }
@@ -42,19 +48,19 @@ export interface BaixasDoColaborador {
 }
 
 /** Agrupa as Baixas por Colaborador (pelo nome), cada um com as suas vendas na ordem da data. */
-export function porColaborador(baixas: readonly BaixaDeVenda<VendaDaLoja>[]): BaixasDoColaborador[] {
+export function porColaborador(baixas: readonly BaixaDoPeriodo[]): BaixasDoColaborador[] {
   const grupos = new Map<number, BaixasDoColaborador>();
-  for (const { venda, quantidade } of baixas) {
+  for (const { venda, quantidade, nomeProduto, codigoBarra } of baixas) {
     const grupo = grupos.get(venda.codigoColaborador) ?? { codigoColaborador: venda.codigoColaborador, nomeColaborador: venda.nomeColaborador, quantidade: 0, vendas: [] };
     grupo.quantidade += quantidade;
-    grupo.vendas.push({ vendaId: venda.vendaId, data: venda.data, produtoId: venda.produtoId, nomeProduto: venda.nomeProduto, codigoBarra: venda.codigoBarra, quantidadeVendida: venda.quantidade, quantidade });
+    grupo.vendas.push({ vendaId: venda.vendaId, data: venda.data, produtoId: venda.produtoId, nomeProduto, codigoBarra, quantidadeVendida: venda.quantidade, quantidade });
     grupos.set(venda.codigoColaborador, grupo);
   }
   return [...grupos.values()].sort((a, b) => a.nomeColaborador.localeCompare(b.nomeColaborador, "pt-BR") || a.codigoColaborador - b.codigoColaborador);
 }
 
 /** Aba Baixas: as Baixas de Pré-vencido de uma Loja do Vínculo num Closing Period. */
-export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, baixas, vinculos, periods }: BaixasPreVencidosRoutesDeps): void {
+export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, erpClient, store, congeladas, vinculos, periods }: BaixasPreVencidosRoutesDeps): void {
   const gerir = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-baixas:manage");
 
   routes.get("/pre-vencidos/baixas", auth, async (c: AuthContext) => {
@@ -69,10 +75,9 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, bai
     if (!periodo) return c.json({ error: "Período de Fechamento não encontrado." }, 404);
 
     try {
-      return c.json(porColaborador(await baixas.baixasDoPeriodo(periodo, [codigoLoja])));
-    } catch (err) {
-      if (err instanceof BaixasSemErpError) return c.json({ error: err.semConexao ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
-      throw err;
+      return c.json(porColaborador(await baixasDoPeriodo({ erpClient, store, congeladas }, periodo, [codigoLoja])));
+    } catch (err: unknown) {
+      return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
     }
   });
 }

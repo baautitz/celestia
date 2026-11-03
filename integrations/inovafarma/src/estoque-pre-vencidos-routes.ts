@@ -5,7 +5,8 @@ import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { PRODUTO_SQL, type LinhaProduto } from "./produtos-erp.js";
 import { horaDoErp, inicioDoDiaNoErp } from "./baixas-da-loja.js";
-import { BaixasSemErpError, type BaixasPreVencidos, type PeriodoDasBaixas } from "./baixas-do-periodo.js";
+import type { BaixasCongeladasStore } from "./baixas-congeladas-store.js";
+import { restanteDoEstoque, type PeriodoDasBaixas } from "./baixas-do-periodo.js";
 import { ITEM_PRE_VENCIDO_ACTIONS, ITEM_PRE_VENCIDO_PLUGIN, ITEM_PRE_VENCIDO_TARGET, type AtributosItemPreVencido } from "./estoque-pre-vencidos-audit.js";
 import type { EstoquePreVencidoStore, ItemPreVencido } from "./estoque-pre-vencidos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
@@ -21,7 +22,8 @@ export interface EstoquePreVencidosRoutesDeps {
   auth: MiddlewareHandler;
   erpClient: () => ErpQuery | undefined;
   store: EstoquePreVencidoStore;
-  baixas: BaixasPreVencidos;
+  /** Baixas gravadas no fechamento: o Restante de agora parte do último congelamento. */
+  congeladas: BaixasCongeladasStore;
   vinculos: VinculoStore;
   /** Serviço `periods` do Module `closing_period`: a inclusão retroativa vai até o início do Período aberto. */
   periods: { list(): Promise<PeriodoDasBaixas[]> };
@@ -60,7 +62,7 @@ export async function lojasDoVinculo(vinculos: VinculoStore, usuarioId: string |
 }
 
 /** Rotas do Estoque de Pré-vencidos: incluir, listar, editar e excluir Itens nas Lojas do Vínculo. */
-export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient, store, baixas, vinculos, periods, audit }: EstoquePreVencidosRoutesDeps): void {
+export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient, store, congeladas, vinculos, periods, audit }: EstoquePreVencidosRoutesDeps): void {
   const gerir = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-estoque:manage");
   const pode = (c: AuthContext) => permissions.has(c.get("user")?.permissions, gerir.key);
   const gerirBaixas = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-baixas:manage");
@@ -130,10 +132,9 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, er
     const itens = await store.listar(codigoLoja);
     let restante: Record<string, number>;
     try {
-      restante = await baixas.restante(codigoLoja, itens);
+      restante = await restanteDoEstoque({ erpClient, store, congeladas }, codigoLoja, itens);
     } catch (err) {
-      if (err instanceof BaixasSemErpError) return c.json({ error: err.semConexao ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
-      throw err;
+      return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
     }
     // Os zerados saem da lista por padrão; `zerados=true` os traz de volta.
     const zerados = c.req.query("zerados") === "true";

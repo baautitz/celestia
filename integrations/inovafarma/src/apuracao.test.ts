@@ -52,11 +52,9 @@ describe("Apuração de um Participante", () => {
     expect(r).toMatchObject({ atingida: true, premioCentavos: 10000 });
   });
 
-  it("Pré-vencidos sem lançamento no Período avisa em vez de mostrar zero", () => {
+  it("Pré-vencidos sem Baixas no Período têm Realizado zero", () => {
     const r = apurarParticipante(tipo({ indicador: "pre-vencidos" }), ana(50), dados());
-    expect(r).toMatchObject({ atingida: false, premioCentavos: 0, aviso: "Nenhum Pré-vencido lançado no Período" });
-    expect(r.resultado).toBe("Nenhum Pré-vencido lançado no Período · Meta: 50");
-    expect(apurarParticipante(tipo({ indicador: "pre-vencidos" }), ana(50), dados({ indicadores: { "pre-vencidos": 0 } })).aviso).toBeUndefined();
+    expect(r).toMatchObject({ realizado: 0, atingida: false, premioCentavos: 0, resultado: "Pré-vencidos vendidos 0 de 50 un. · faltam 50" });
   });
 
   it("usa o Prêmio próprio do Participante quando é do mesmo tipo de regra do Tipo de Meta", () => {

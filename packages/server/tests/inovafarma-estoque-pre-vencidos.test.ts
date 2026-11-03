@@ -129,6 +129,13 @@ describe("Estoque de Pré-vencidos", () => {
     expect(vazamentos).not.toContain(String(CODIGO_PRODUTO_SECRETO));
   });
 
+  it("a busca de produto devolve nome e código de barras, nunca o código do produto, e só para quem gere o Estoque", async () => {
+    const { req } = await boot();
+    const res = await req("ana", "GET", "/api/m/inovafarma/pre-vencidos/produtos?q=dipirona");
+    expect(await res.json()).toEqual([{ id: PRODUTO.produtoId, nome: PRODUTO.nome, codigoBarra: PRODUTO.codigoBarra }]);
+    expect((await req("gil", "GET", "/api/m/inovafarma/pre-vencidos/produtos?q=dipirona")).status).toBe(403);
+  });
+
   it("recusa Loja fora do Vínculo, validade fora de AAAA-MM, quantidade inválida e produto inexistente", async () => {
     const { incluir, req } = await boot();
     expect((await incluir("ana", { codigoLoja: 2 })).status).toBe(403);

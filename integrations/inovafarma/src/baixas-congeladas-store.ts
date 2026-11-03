@@ -1,5 +1,4 @@
-import type { BaixaDeVenda } from "./baixas-pre-vencidos.js";
-import type { VendaDaLoja } from "./baixas-da-loja.js";
+import type { BaixaDoPeriodo } from "./baixas-do-periodo.js";
 
 /** Um Item no congelamento: a quantidade de então (para acompanhar uma edição posterior) e o Restante. */
 export interface ItemCongelado {
@@ -14,7 +13,7 @@ export interface BaixasCongeladas {
   /** Fim do Período na hora do ERP: as vendas até aqui (inclusive) já estão contadas. */
   ate: string;
   /** Baixas das vendas do Período. */
-  baixas: BaixaDeVenda<VendaDaLoja>[];
+  baixas: BaixaDoPeriodo[];
   /** Quantidade e Restante de cada Item no fim do Período, pelo id. */
   itens: Record<string, ItemCongelado>;
   congeladoEm: string;

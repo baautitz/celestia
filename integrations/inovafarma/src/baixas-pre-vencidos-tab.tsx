@@ -7,7 +7,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
-import type { LojaOpcao } from "./pre-vencido-window";
+import type { LojaOpcao } from "./loja-opcao";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
 
@@ -39,7 +39,7 @@ interface BaixasDoColaborador {
 }
 
 /** `AAAA-MM-DD HH:MM:SS` (hora do ERP) como `DD/MM/AAAA HH:MM`, sem conversão de fuso. */
-const dataHora = (data: string) => {
+export const dataHora = (data: string) => {
   const [dia = "", hora = ""] = data.split(" ");
   return `${dia.split("-").reverse().join("/")} ${hora.slice(0, 5)}`.trim();
 };

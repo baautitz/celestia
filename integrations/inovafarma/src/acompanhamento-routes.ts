@@ -11,11 +11,12 @@ import { ator, ERP_INDISPONIVEL, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, vinculoDoU
 import type { MetaStore } from "./metas-store.js";
 import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
 import type { UsersService } from "./colaboradores-routes.js";
-import { minhaMeta } from "./minhas-metas.js";
+import { minhaMeta, type MinhaBaixa } from "./minhas-metas.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
-import { conferir } from "./pre-vencidos-conferencia.js";
-import { LOTE_PRODUTOS, vendasSql, type LinhaVenda, type PeriodoResumo, type PeriodsService } from "./pre-vencidos-routes.js";
-import type { PreVencidoStore } from "./pre-vencidos-store.js";
+import type { PeriodoResumo, PeriodsService } from "./pre-vencidos-routes.js";
+import { baixasDoPeriodo } from "./baixas-do-periodo.js";
+import type { EstoquePreVencidoStore } from "./estoque-pre-vencidos-store.js";
+import type { BaixasCongeladasStore } from "./baixas-congeladas-store.js";
 import { descreverPremio, temLista, type TipoMeta } from "./tipos-meta.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
 import type { ErpQueryClient } from "./server.js";
@@ -32,7 +33,10 @@ export interface AcompanhamentoRoutesDeps {
   metas: MetaStore;
   vinculos: VinculoStore;
   avaliacoes: AvaliacaoStore;
-  preVencidos: PreVencidoStore;
+  /** Estoque de Pré-vencidos: as Baixas dão o Indicador "Pré-vencidos vendidos". */
+  estoque: EstoquePreVencidoStore;
+  /** Baixas gravadas no fechamento: num Período fechado, o Indicador soma as gravadas. */
+  congeladas: BaixasCongeladasStore;
   apuracoes: ApuracaoStore;
   periods: PeriodsService;
   audit: AuditService;
@@ -106,7 +110,7 @@ const INDICADORES_DE_VENDAS: Partial<Record<IndicadorId, (r: LinhaDesempenho) =>
 })();
 
 export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): void {
-  const { routes, permissions, auth, events, erpClient, tipos, metas, vinculos, avaliacoes, preVencidos, apuracoes, periods, audit, users } = deps;
+  const { routes, permissions, auth, events, erpClient, tipos, metas, vinculos, avaliacoes, estoque, congeladas, apuracoes, periods, audit, users } = deps;
   const montagem = metasDoPeriodo({ erpClient, tipos, metas, audit });
   const geralRef = INOVAFARMA_PERMISSIONS.ref("metas-geral:view");
   const lojaRef = INOVAFARMA_PERMISSIONS.ref("metas-loja:view");
@@ -130,7 +134,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     };
     const datas = { dataInicio: `${periodo.startDate} 00:00:00`, dataFim: `${periodo.endDate} 23:59:59` };
     const deVendas = [...indicadores].filter((i) => INDICADORES_DE_VENDAS[i]);
-    const precisaErp = deVendas.length > 0 || tiposLista.length > 0 || indicadores.has("pre-vencidos");
+    const precisaErp = deVendas.length > 0 || tiposLista.length > 0;
     const conectado = erpClient();
     if (precisaErp && !conectado) throw new Error(SEM_CONEXAO);
     const client = {
@@ -156,19 +160,10 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
       listas.set(tipo.id, porColaborador);
     }
     if (indicadores.has("pre-vencidos")) {
-      // Só o vendido que a Conferência confirma, limitado ao que foi lançado.
-      const lancamentos = await preVencidos.listar({ periodoId: periodo.id });
-      const codigos = [...new Set(lancamentos.map((l) => l.codigoProduto))];
-      const vendas: LinhaVenda[] = [];
-      for (let i = 0; i < codigos.length; i += LOTE_PRODUTOS) {
-        const lote = codigos.slice(i, i + LOTE_PRODUTOS);
-        const params: Record<string, unknown> = { ...datas };
-        lote.forEach((codigo, n) => (params[`p${n}`] = codigo));
-        vendas.push(...(await client.query<LinhaVenda>(vendasSql(lote.length), params)));
-      }
-      const conferencia = conferir(lancamentos, vendas.map((v) => ({ codigoColaborador: Number(v.codigoColaborador), produtoId: v.produtoId, quantidade: Number(v.quantidade) || 0 })));
-      for (const linha of conferencia) {
-        de(linha.codigoColaborador).indicadores["pre-vencidos"] = linha.detalhe.reduce((acc, p) => acc + Math.min(p.quantidadeVendida, p.quantidadeLancada), 0);
+      // O vendido de Pré-vencido é o que as Baixas do Período creditam ao Colaborador, em todas as Lojas.
+      for (const b of await baixasDoPeriodo({ erpClient, store: estoque, congeladas }, periodo)) {
+        const d = de(b.venda.codigoColaborador);
+        d.indicadores["pre-vencidos"] = (d.indicadores["pre-vencidos"] ?? 0) + b.quantidade;
       }
     }
     if (indicadores.has("avaliacoes")) {
@@ -342,8 +337,20 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     }
     const minhas = resultado.apuracao.metas.flatMap(({ metaId, tipo, participantes }) => {
       const meu = participantes.find((p) => p.codigoColaborador === codigo);
-      return meu ? [minhaMeta(metaId, tipo, meu)] : [];
+      return meu ? [{ minha: minhaMeta(metaId, tipo, meu), indicador: tipo.indicador }] : [];
     });
-    return c.json({ periodo, congelada: resultado.congelada, metas: minhas });
+    // Quem tem Meta de Pré-vencidos vê as Baixas que formam o Realizado: venda, produto e quantidade.
+    let baixas: MinhaBaixa[] = [];
+    if (minhas.some((m) => m.indicador === "pre-vencidos")) {
+      try {
+        baixas = (await baixasDoPeriodo({ erpClient, store: estoque, congeladas }, periodo))
+          .filter((b) => b.venda.codigoColaborador === codigo)
+          .sort((a, b) => a.venda.data.localeCompare(b.venda.data) || a.venda.vendaId - b.venda.vendaId)
+          .map(({ venda, quantidade, nomeProduto, codigoBarra }) => ({ vendaId: venda.vendaId, data: venda.data, produtoId: venda.produtoId, nomeProduto, codigoBarra, quantidadeVendida: venda.quantidade, quantidade }));
+      } catch (err: unknown) {
+        return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
+      }
+    }
+    return c.json({ periodo, congelada: resultado.congelada, metas: minhas.map((m) => m.minha), baixas });
   });
 }

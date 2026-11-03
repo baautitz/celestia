@@ -1,0 +1,1 @@
+DROP TABLE "inovafarma"."pre_vencidos_lancamentos";

@@ -28,14 +28,14 @@ export class PostgresEstoquePreVencidoStore implements EstoquePreVencidoStore {
     return (await this.db.select().from(t).where(eq(t.codigoLoja, codigoLoja)).orderBy(asc(t.incluidoEm), asc(t.criadoEm), asc(t.id))).map(toRecord);
   }
 
-  async get(id: string): Promise<ItemPreVencido | null> {
-    const [row] = await this.db.select().from(preVencidosItens).where(eq(preVencidosItens.id, id));
-    return row ? toRecord(row) : null;
-  }
-
   async lojas(): Promise<number[]> {
     const t = preVencidosItens;
     return (await this.db.selectDistinct({ codigoLoja: t.codigoLoja }).from(t).orderBy(asc(t.codigoLoja))).map((r) => r.codigoLoja);
+  }
+
+  async get(id: string): Promise<ItemPreVencido | null> {
+    const [row] = await this.db.select().from(preVencidosItens).where(eq(preVencidosItens.id, id));
+    return row ? toRecord(row) : null;
   }
 
   async atualizar(id: string, valores: { quantidade: number; validade: string }, expectedVersion: number): Promise<ItemPreVencido | null> {

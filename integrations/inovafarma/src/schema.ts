@@ -2,8 +2,7 @@ import { sql } from "drizzle-orm";
 import { boolean, doublePrecision, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { IndicadorId } from "./indicadores.js";
 import type { MetaApurada } from "./apuracao-store.js";
-import type { BaixaDeVenda } from "./baixas-pre-vencidos.js";
-import type { VendaDaLoja } from "./baixas-da-loja.js";
+import type { BaixaDoPeriodo } from "./baixas-do-periodo.js";
 import type { ItemCongelado } from "./baixas-congeladas-store.js";
 import type { Exibicao, ListaTipo, RegraPremio } from "./tipos-meta.js";
 
@@ -20,32 +19,6 @@ export const vinculosColaborador = inovafarmaSchema.table("vinculos_colaborador"
   atualizadoPor: text("atualizado_por").notNull(),
   atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
 });
-
-export const preVencidosLancamentos = inovafarmaSchema.table(
-  "pre_vencidos_lancamentos",
-  {
-    id: text("id").primaryKey(),
-    /** Referência lógica a `closing_period.periods`, sem FK entre Modules. */
-    periodoId: text("periodo_id").notNull(),
-    codigoColaborador: integer("codigo_colaborador").notNull(),
-    nomeColaborador: text("nome_colaborador").notNull(),
-    usuarioId: text("usuario_id").notNull(),
-    codigoLoja: integer("codigo_loja").notNull(),
-    /** Identificador opaco do produto (`Produto.rowguid`): é o que a API expõe. */
-    produtoId: text("produto_id").notNull(),
-    /** Código do produto no ERP: o ERP bloqueia a exibição dele, então fica só no servidor. */
-    codigoProduto: integer("codigo_produto").notNull(),
-    nomeProduto: text("nome_produto").notNull(),
-    codigoBarra: text("codigo_barra"),
-    quantidade: integer("quantidade").notNull(),
-    /** Mês e ano da validade, `AAAA-MM`. */
-    validade: text("validade").notNull(),
-    version: integer("version").notNull().default(1),
-    criadoEm: timestamp("criado_em").notNull().defaultNow(),
-    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
-  },
-  (t) => [index("pre_vencidos_lancamentos_periodo_idx").on(t.periodoId, t.codigoColaborador)],
-);
 
 /** Itens de Pré-vencido do Estoque de cada Loja: contínuo, sem Closing Period. */
 export const preVencidosItens = inovafarmaSchema.table(
@@ -206,7 +179,7 @@ export const preVencidosBaixasCongeladas = inovafarmaSchema.table(
     /** Fim do Período na hora do ERP (`AAAA-MM-DD HH:MM:SS`): as vendas até aqui já estão contadas. */
     ate: text("ate").notNull(),
     /** Baixas das vendas do Período, como estavam no fechamento. */
-    baixas: jsonb("baixas").$type<BaixaDeVenda<VendaDaLoja>[]>().notNull(),
+    baixas: jsonb("baixas").$type<BaixaDoPeriodo[]>().notNull(),
     /** Quantidade e Restante de cada Item no fim do Período, pelo id do Item. */
     itens: jsonb("itens").$type<Record<string, ItemCongelado>>().notNull(),
     congeladoEm: timestamp("congelado_em").notNull(),
