@@ -8,6 +8,7 @@ import { Label } from "@platform/ui/components/label";
 import { Show, Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
+import { useTabParam } from "@platform/ui/hooks/use-tab-param";
 import { HeaderActions } from "@platform/ui/context/header-actions";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
@@ -317,7 +318,9 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
 export function PreVencidosPage() {
   const { feedback } = useUi();
   const [contexto, setContexto] = useState<Contexto | null>(null);
-  const [aba, setAba] = useState<"lancamentos" | "conferencia" | null>(null);
+  const [aba, setAba] = useTabParam<"lancamentos" | "conferencia">(
+    contexto ? [contexto.podeLancar && "lancamentos", contexto.podeConferir && "conferencia"] : [],
+  );
 
   useEffect(() => {
     apiFetch<Contexto>(`${BASE}/contexto`)
@@ -325,17 +328,16 @@ export function PreVencidosPage() {
       .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar os Pré-vencidos.")));
   }, [feedback]);
 
-  if (!contexto) return null;
-  const abaAtual = aba ?? (contexto.podeLancar ? "lancamentos" : "conferencia");
+  if (!contexto || !aba) return null;
   return (
     <Stack gap="section">
-      <Tabs value={abaAtual} onValueChange={(v) => setAba(v === "conferencia" ? "conferencia" : "lancamentos")}>
+      <Tabs value={aba} onValueChange={setAba}>
         <TabsList>
           {contexto.podeLancar && <TabsTrigger value="lancamentos">Meus Lançamentos</TabsTrigger>}
           {contexto.podeConferir && <TabsTrigger value="conferencia">Conferência</TabsTrigger>}
         </TabsList>
       </Tabs>
-      {abaAtual === "lancamentos" ? <MeusLancamentos contexto={contexto} /> : <Conferencia contexto={contexto} />}
+      {aba === "lancamentos" ? <MeusLancamentos contexto={contexto} /> : <Conferencia contexto={contexto} />}
     </Stack>
   );
 }

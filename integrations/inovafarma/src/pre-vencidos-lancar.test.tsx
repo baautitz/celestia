@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
@@ -46,8 +47,7 @@ describe("lançar na tela", () => {
           <HeaderSlot />
           <PreVencidosPage />
         </HeaderActionsProvider>
-      </UiProvider>,
-    );
+      </UiProvider>, { wrapper: MemoryRouter });
     fireEvent.click(await screen.findByRole("button", { name: "Novo lançamento" }));
     const campo = (await screen.findByLabelText("Produto (bipe o código de barras ou digite o nome)")) as HTMLInputElement;
     fireEvent.change(campo, { target: { value: "7891234567895" } });

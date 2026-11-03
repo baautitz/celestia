@@ -8,6 +8,7 @@ import { Label } from "@platform/ui/components/label";
 import { Grid, KpiCard, Show, Stack, Text } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
+import { useTabParam } from "@platform/ui/hooks/use-tab-param";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useUi } from "@platform/ui/imperative/provider";
@@ -366,7 +367,7 @@ function Motivos({ motivos, recarregar }: { motivos: Motivo[]; recarregar: () =>
 export function FuroEstoquePage() {
   const { feedback } = useUi();
   const [contexto, setContexto] = useState<Contexto | null>(null);
-  const [aba, setAba] = useState<"ajustes" | "motivos">("ajustes");
+  const [aba, setAba] = useTabParam<"ajustes" | "motivos">(contexto ? ["ajustes", contexto.podeGerenciarMotivos && "motivos"] : []);
 
   const carregar = useCallback(() => {
     apiFetch<Contexto>(`${BASE}/contexto`)
@@ -379,14 +380,14 @@ export function FuroEstoquePage() {
   return (
     <Stack gap="section">
       {contexto.podeGerenciarMotivos && (
-        <Tabs value={aba} onValueChange={(v) => setAba(v === "motivos" ? "motivos" : "ajustes")}>
+        <Tabs value={aba} onValueChange={setAba}>
           <TabsList>
             <TabsTrigger value="ajustes">Ajustes de Estoque</TabsTrigger>
             <TabsTrigger value="motivos">Motivos</TabsTrigger>
           </TabsList>
         </Tabs>
       )}
-      {aba === "motivos" && contexto.podeGerenciarMotivos ? (
+      {aba === "motivos" ? (
         <Motivos motivos={contexto.motivos} recarregar={carregar} />
       ) : (
         <AjustesDoPeriodo contexto={contexto} motivos={contexto.motivos} />

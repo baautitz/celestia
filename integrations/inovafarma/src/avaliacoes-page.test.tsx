@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
@@ -50,8 +51,7 @@ const renderizar = () =>
         <HeaderSlot />
         <AvaliacoesPage />
       </HeaderActionsProvider>
-    </UiProvider>,
-  );
+    </UiProvider>, { wrapper: MemoryRouter });
 
 describe("Avaliações", () => {
   it("mostra só as abas que a Permission libera", async () => {

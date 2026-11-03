@@ -7,6 +7,7 @@ import { Label } from "@platform/ui/components/label";
 import { Show, Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
+import { useTabParam } from "@platform/ui/hooks/use-tab-param";
 import { HeaderActions } from "@platform/ui/context/header-actions";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
@@ -305,7 +306,7 @@ function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
 export function AvaliacoesPage() {
   const { feedback } = useUi();
   const [contexto, setContexto] = useState<Contexto | null>(null);
-  const [aba, setAba] = useState<"minhas" | "loja" | null>(null);
+  const [aba, setAba] = useTabParam<"minhas" | "loja">(contexto ? [contexto.podeVer && "minhas", contexto.podeGerenciar && "loja"] : []);
 
   useEffect(() => {
     apiFetch<Contexto>(`${BASE}/contexto`)
@@ -313,17 +314,16 @@ export function AvaliacoesPage() {
       .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar as Avaliações.")));
   }, [feedback]);
 
-  if (!contexto) return null;
-  const abaAtual = aba ?? (contexto.podeVer ? "minhas" : "loja");
+  if (!contexto || !aba) return null;
   return (
     <Stack gap="section">
-      <Tabs value={abaAtual} onValueChange={(v) => setAba(v === "loja" ? "loja" : "minhas")}>
+      <Tabs value={aba} onValueChange={setAba}>
         <TabsList>
           {contexto.podeVer && <TabsTrigger value="minhas">Minhas Avaliações</TabsTrigger>}
           {contexto.podeGerenciar && <TabsTrigger value="loja">Avaliações da Loja</TabsTrigger>}
         </TabsList>
       </Tabs>
-      {abaAtual === "minhas" ? <MinhasAvaliacoes contexto={contexto} /> : <AvaliacoesDaLoja contexto={contexto} />}
+      {aba === "minhas" ? <MinhasAvaliacoes contexto={contexto} /> : <AvaliacoesDaLoja contexto={contexto} />}
     </Stack>
   );
 }

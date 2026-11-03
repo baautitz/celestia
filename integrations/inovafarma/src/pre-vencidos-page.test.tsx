@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { PreVencidosPage } from "./pre-vencidos-page";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
@@ -55,8 +56,7 @@ describe("Tela Pré-vencidos", () => {
       <HeaderActionsProvider>
         <HeaderSlot />
         <PreVencidosPage />
-      </HeaderActionsProvider>,
-    );
+      </HeaderActionsProvider>, { wrapper: MemoryRouter });
     expect((await screen.findByRole("combobox", { name: "Período de Fechamento" })).textContent).toContain("Abril");
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/lancamentos?periodoId=p-abril")));
   });
@@ -72,8 +72,7 @@ describe("Tela Pré-vencidos", () => {
       <HeaderActionsProvider>
         <HeaderSlot />
         <PreVencidosPage />
-      </HeaderActionsProvider>,
-    );
+      </HeaderActionsProvider>, { wrapper: MemoryRouter });
     await screen.findByText("DIPIRONA 500MG");
     expect((screen.getByRole("button", { name: "Novo lançamento" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByRole("button", { name: /Editar DIPIRONA/ })).toBeNull();
@@ -85,8 +84,7 @@ describe("Tela Pré-vencidos", () => {
       <HeaderActionsProvider>
         <HeaderSlot />
         <PreVencidosPage />
-      </HeaderActionsProvider>,
-    );
+      </HeaderActionsProvider>, { wrapper: MemoryRouter });
     await screen.findByRole("tab", { name: "Conferência" });
     expect(screen.queryByRole("tab", { name: "Meus Lançamentos" })).toBeNull();
   });
@@ -97,8 +95,7 @@ describe("Tela Pré-vencidos", () => {
       <HeaderActionsProvider>
         <HeaderSlot />
         <PreVencidosPage />
-      </HeaderActionsProvider>,
-    );
+      </HeaderActionsProvider>, { wrapper: MemoryRouter });
     await screen.findByText(/não está vinculado a um Colaborador/);
     expect(screen.queryByRole("button", { name: "Novo lançamento" })).toBeNull();
   });

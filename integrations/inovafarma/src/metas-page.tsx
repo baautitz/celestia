@@ -5,6 +5,7 @@ import { Button } from "@platform/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Show, Stack } from "@platform/ui/components/layout";
 import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
+import { useTabParam } from "@platform/ui/hooks/use-tab-param";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useUi } from "@platform/ui/imperative/provider";
@@ -133,21 +134,20 @@ type Aba = keyof Contexto["abas"];
 export function MetasPage() {
   const { feedback } = useUi();
   const [contexto, setContexto] = useState<Contexto | null>(null);
-  const [aba, setAba] = useState<Aba | null>(null);
+  const [aba, setAba] = useTabParam<Aba>(
+    contexto ? [contexto.abas.tipos && "tipos", contexto.abas.montar && "montar", contexto.abas.acompanhamento && "acompanhamento", contexto.abas.minhas && "minhas"] : [],
+  );
 
   useEffect(() => {
     apiFetch<Contexto>("/api/m/inovafarma/metas/contexto")
-      .then((c) => {
-        setContexto(c);
-        setAba(c.abas.tipos ? "tipos" : c.abas.montar ? "montar" : c.abas.acompanhamento ? "acompanhamento" : "minhas");
-      })
+      .then(setContexto)
       .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao abrir as Metas.")));
   }, [feedback]);
 
   if (!contexto || !aba) return null;
   return (
     <Stack gap="section">
-      <Tabs value={aba} onValueChange={(v) => setAba(v === "montar" || v === "acompanhamento" || v === "minhas" ? v : "tipos")}>
+      <Tabs value={aba} onValueChange={setAba}>
         <TabsList>
           {contexto.abas.tipos && <TabsTrigger value="tipos">Tipos de Meta</TabsTrigger>}
           {contexto.abas.montar && <TabsTrigger value="montar">Montar Metas</TabsTrigger>}

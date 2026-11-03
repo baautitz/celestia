@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
@@ -103,8 +104,7 @@ const renderizar = () =>
         <HeaderSlot />
         <MetasPage />
       </HeaderActionsProvider>
-    </UiProvider>,
-  );
+    </UiProvider>, { wrapper: MemoryRouter });
 
 describe("Metas: Tipos de Meta", () => {
   it("lista os Tipos de Meta com a prévia do Prêmio", async () => {

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { cleanup, render, screen } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { FuroEstoquePage } from "./furo-estoque-page";
@@ -33,7 +34,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const renderizar = () => render(<UiProvider><FuroEstoquePage /></UiProvider>);
+const renderizar = () => render(<UiProvider><FuroEstoquePage /></UiProvider>, { wrapper: MemoryRouter });
 
 describe("Furo de Estoque", () => {
   it("abre nos não justificados e soma o furo", async () => {
