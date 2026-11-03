@@ -234,7 +234,12 @@ function KpiCard({
 }) {
   const descricao = React.useId()
   return (
-    <Card className={cn(onSelect && "relative transition-shadow has-[>button:hover]:ring-foreground/25", selected && "ring-2 ring-primary has-[>button:hover]:ring-primary")}>
+    <Card
+      className={cn(
+        onSelect && "relative transition-colors has-[>button:hover]:bg-[color-mix(in_oklab,var(--primary)_5%,var(--card))] has-[>button:hover]:ring-foreground/25",
+        selected && "bg-[color-mix(in_oklab,var(--primary)_15%,var(--card))]! ring-2 ring-primary has-[>button:hover]:ring-primary",
+      )}
+    >
       <CardContent>
         <Stack gap="tight">
           <Stack direction="row" align="center" justify="between" gap="section">
