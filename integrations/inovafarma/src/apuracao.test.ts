@@ -25,7 +25,7 @@ describe("Apuração de um Participante", () => {
     expect(r.resultado).toBe("Qtd. Total Foco 80 de 100 un. · faltam 20");
   });
 
-  it("em que menor é melhor, o Atingimento é Alvo ÷ Realizado e o resultado fala em p.p. abaixo", () => {
+  it("em que menor é melhor, o % Atingido é Alvo ÷ Realizado e o resultado fala em p.p. abaixo", () => {
     const r = apurarParticipante(tipo({ indicador: "cmv", exibicao: "atingida" }), ana(30), dados({ indicadores: { cmv: 25 } }));
     expect(r).toMatchObject({ atingimento: 120, atingida: true, premioCentavos: 10000 });
     expect(r.resultado).toBe("CMV 25% · Meta: até 30% · ✓ 5 p.p. abaixo");

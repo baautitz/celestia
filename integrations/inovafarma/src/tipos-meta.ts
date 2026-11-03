@@ -52,7 +52,7 @@ export const descreverEntrada = (e: Pick<EntradaLista, "tipo" | "nome">) => `${T
 const Centavos = z.number().int().min(1, "Informe o valor do Prêmio.");
 const Pct = z.number().positive();
 
-/** Regra do Prêmio. Valores em R$ em centavos; Gatilho, Teto e Faixas em % de Atingimento. */
+/** Regra do Prêmio. Valores em R$ em centavos; Gatilho, Teto e Faixas em % Atingido. */
 export const RegraPremio = z.discriminatedUnion("tipo", [
   z.object({ tipo: z.literal("fixo"), valorCentavos: Centavos }),
   z.object({ tipo: z.literal("proporcional"), valorCentavos: Centavos, gatilho: Pct.nullable(), teto: Pct.nullable() }),
@@ -146,7 +146,7 @@ export function problemaNoCampo(t: DadosTipoMeta): ProblemaDoTipo | null {
 /** Regras que dependem de mais de um campo; null se o Tipo de Meta é válido. */
 export const problemaDoTipo = (t: DadosTipoMeta): string | null => problemaNoCampo(t)?.mensagem ?? null;
 
-/** Ponto da regra: na unidade do Indicador quando há Alvo padrão; senão, em % de Atingimento. */
+/** Ponto da regra: na unidade do Indicador quando há Alvo padrão; senão, em % Atingido. */
 const limiar = (indicador: Indicador, alvo: number | null, pct: number) =>
   alvo === null
     ? porcentagem(pct)

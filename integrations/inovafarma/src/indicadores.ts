@@ -1,4 +1,4 @@
-/** Se o Atingimento cresce com o Realizado (`maior`) ou cai (`menor`, como o CMV %). */
+/** Se o % Atingido cresce com o Realizado (`maior`) ou cai (`menor`, como o CMV %). */
 export type Direcao = "maior" | "menor";
 
 /**
@@ -65,8 +65,8 @@ export const INDICADOR_IDS = INDICADORES.map((i) => i.id) as [IndicadorId, ...In
 export const indicadorPorId = (id: IndicadorId): Indicador => INDICADORES.find((i) => i.id === id)!;
 
 /**
- * Atingimento em %: Realizado ÷ Alvo; quando menor é melhor, Alvo ÷ Realizado (ficar abaixo do Alvo passa de 100%).
- * Quando menor é melhor, Realizado zero é falta de vendas, não o melhor resultado: Atingimento 0.
+ * % Atingido: Realizado ÷ Alvo; quando menor é melhor, Alvo ÷ Realizado (ficar abaixo do Alvo passa de 100%).
+ * Quando menor é melhor, Realizado zero é falta de vendas, não o melhor resultado: % Atingido 0.
  * A interface nunca mostra essa conta.
  */
 export function atingimento(indicador: Indicador, realizado: number, alvo: number): number {
@@ -74,7 +74,7 @@ export function atingimento(indicador: Indicador, realizado: number, alvo: numbe
   return alvo > 0 ? (realizado / alvo) * 100 : 0;
 }
 
-/** Valor do Indicador que dá o Atingimento pedido, para mostrar as regras na unidade do Indicador. */
+/** Valor do Indicador que dá o % Atingido pedido, para mostrar as regras na unidade do Indicador. */
 export const valorNoAtingimento = (indicador: Indicador, alvo: number, pct: number): number =>
   indicador.direcao === "menor" ? alvo / (pct / 100) : alvo * (pct / 100);
 

@@ -330,7 +330,7 @@ describe("Metas: Montar Metas", () => {
 });
 
 describe("Metas: Acompanhamento", () => {
-  it("mostra o resultado em palavras, o Atingimento e o Prêmio, filtrando pela Loja", async () => {
+  it("mostra o resultado em palavras, o % Atingido e o Prêmio, filtrando pela Loja", async () => {
     renderizar();
     fireEvent.click(await screen.findByRole("tab", { name: "Acompanhamento" }));
     // Uma linha por Colaborador, já expandida com as Metas dele.

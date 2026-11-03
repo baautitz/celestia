@@ -114,34 +114,34 @@ _Avoid_: Mix, Cesta
 
 **Realizado** (en: Achieved value):
 The value of a Meta's Indicador actually reached by a Participante in the Closing Period. For Pré-vencidos it counts only what the ERP confirms was sold, up to what was entered.
-_Avoid_: Resultado, Atingido
+_Avoid_: Resultado, Atingido (alone; the percentage is % Atingido)
 
-**Atingimento** (en: Attainment):
+**% Atingido** (en: Attainment):
 How far a Participante got towards their Alvo, as a percentage. For an Indicador where lower is better, getting below the Alvo is above 100%.
-_Avoid_: Progresso, Performance
+_Avoid_: Atingimento, Progresso, Performance
 
 **Exibição** (en: Display):
 How a Meta's result is shown to the Participante: **Atingida / Não atingida**, only whether it was reached; or **Progresso**, the Realizado, the Alvo and how much is left. Managers always see the full numbers.
 _Avoid_: Modo, Visualização (Visualização is a scope of access)
 
 **Prêmio** (en: Reward):
-The amount of money a Participante earns from a Meta in a Closing Period: a fixed amount when Atingida, an amount proportional to the Atingimento, an amount by Faixa, or a percentage of an amount sold.
+The amount of money a Participante earns from a Meta in a Closing Period: a fixed amount when Atingida, an amount proportional to the % Atingido, an amount by Faixa, or a percentage of an amount sold.
 _Avoid_: Comissão, Bônus, Premiação
 
 **Gatilho** (en: Threshold):
-The minimum Atingimento below which a Meta pays no Prêmio.
+The minimum % Atingido below which a Meta pays no Prêmio.
 _Avoid_: Piso, Mínimo
 
 **Teto** (en: Cap):
-The maximum Atingimento a Prêmio proportional to the Atingimento takes into account.
+The maximum % Atingido a Prêmio proportional to the % Atingido takes into account.
 _Avoid_: Limite
 
 **Faixa** (en: Tier):
-A range of Atingimento that pays one fixed Prêmio, such as 80% pays R$ 50 and 100% pays R$ 100.
+A range of % Atingido that pays one fixed Prêmio, such as 80% pays R$ 50 and 100% pays R$ 100.
 _Avoid_: Régua, Degrau
 
 **Apuração** (en: Calculation):
-The calculation of the Realizado, Atingimento and Prêmio of every Participante of the Metas of a Closing Period.
+The calculation of the Realizado, % Atingido and Prêmio of every Participante of the Metas of a Closing Period.
 _Avoid_: Cálculo, Fechamento
 
 **Meta de Avaliações** (en: Assessment Goal):

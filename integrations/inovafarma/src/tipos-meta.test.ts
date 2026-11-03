@@ -20,7 +20,7 @@ describe("prévia do Prêmio", () => {
     expect(descreverPremio(cmv)).toBe("CMV % até 30% paga R$ 100,00 · até 27% paga R$ 150,00");
   });
 
-  it("sem Alvo padrão, mostra as Faixas em Atingimento", () => {
+  it("sem Alvo padrão, mostra as Faixas em % Atingido", () => {
     const ticket = tipo({ indicador: "ticket-medio", regra: { tipo: "faixas", faixas: [{ atingimento: 80, valorCentavos: 5000 }, { atingimento: 100, valorCentavos: 10000 }] } });
     expect(descreverPremio(ticket)).toBe("80% atingido paga R$ 50,00 · 100% atingido paga R$ 100,00");
   });

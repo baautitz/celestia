@@ -138,7 +138,7 @@ const porColaborador = (dados: Acompanhamento | null): LinhaColaborador[] =>
         }))
         .sort((a, b) => a.nome.localeCompare(b.nome));
 
-/** Aba Acompanhamento: Realizado, Atingimento e Prêmio de cada Participante, com o total por Colaborador. */
+/** Aba Acompanhamento: Realizado, % Atingido e Prêmio de cada Participante, com o total por Colaborador. */
 export function AcompanhamentoMetas({
   periodos,
   visualizacoes,

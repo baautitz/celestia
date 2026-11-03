@@ -225,7 +225,7 @@ describe("Acompanhamento da Lista de Produtos", () => {
   ];
   const lista: DadosTipoMeta = { ...cmv, nome: "Mix", indicador: "lista-produtos", alvoPadrao: 10, lista: { unidade: "unidades", entradas } };
 
-  it("em unidades, o Realizado é o vendido da Lista, com Atingimento e Prêmio como num Indicador comum", async () => {
+  it("em unidades, o Realizado é o vendido da Lista, com % Atingido e Prêmio como num Indicador comum", async () => {
     const { ver, tipos, metas, listaVendas, consultasLista } = await boot();
     const tipo = await tipos.criar(lista);
     await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 10 }, { codigoColaborador: 2, nome: "BIA", alvo: 10 }], excluidos: [] });
@@ -257,7 +257,7 @@ describe("Acompanhamento da Lista de Produtos", () => {
     expect([linha!.atingimento, linha!.premioCentavos, linha!.resultado]).toEqual([null, 3001, "Lista de Produtos R$ 1.500,50"]);
   });
 
-  it("em R$ com Alvo, o Atingimento é sobre o valor vendido", async () => {
+  it("em R$ com Alvo, o % Atingido é sobre o valor vendido", async () => {
     const { ver, tipos, metas, listaVendas } = await boot();
     const tipo = await tipos.criar({ ...lista, nome: "Mix R$", alvoPadrao: 100000, lista: { unidade: "reais", entradas } });
     await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 100000 }], excluidos: [] });

@@ -235,7 +235,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
   };
 
   /**
-   * Com Alvo padrão, o % de Atingimento na unidade do Indicador: com o nome da unidade quando o Indicador tem
+   * Com Alvo padrão, o % Atingido na unidade do Indicador: com o nome da unidade quando o Indicador tem
    * (ex.: "= 40 incentivos com o Alvo padrão de 50"); senão, "un." nas quantidades (ex.: "= 40 un. com o Alvo padrão de 50 un.").
    */
   const equivalente = (texto: string | undefined): string | null => {

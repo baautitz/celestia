@@ -17,7 +17,7 @@ export interface ResultadoParticipante {
   alvo: number | null;
   /** Na unidade do Indicador (o Saldo nas Avaliações). */
   realizado: number;
-  /** % de Atingimento; null sem Alvo ou com o Alvo pendente. */
+  /** % Atingido; null sem Alvo ou com o Alvo pendente. */
   atingimento: number | null;
   /** null no Tipo sem Alvo, que nunca é Atingida nem Não atingida. */
   atingida: boolean | null;
@@ -53,7 +53,7 @@ function premio(regra: RegraPremio, atingimento: number | null, atingida: boolea
   }
 }
 
-/** Realizado, Atingimento e Prêmio de um Participante numa Meta, com o resultado em palavras. */
+/** Realizado, % Atingido e Prêmio de um Participante numa Meta, com o resultado em palavras. */
 /** O Prêmio próprio do Participante vale enquanto for do mesmo tipo de regra do Tipo de Meta; senão, vale o do Tipo. */
 export const regraDoParticipante = (regra: RegraPremio, participante: Pick<ParticipanteMeta, "premio">): RegraPremio =>
   participante.premio && participante.premio.tipo === regra.tipo ? participante.premio : regra;
