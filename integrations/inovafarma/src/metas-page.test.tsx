@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { MetasPage } from "./metas-page";
@@ -128,6 +128,84 @@ describe("Metas: Tipos de Meta", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/tipos/tme_1/aplicar-alvo-padrao", expect.anything()));
     const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/aplicar-alvo-padrao"))!;
     expect(JSON.parse(String(init.body))).toEqual({ aplicacoes: [{ metaId: "met_1", version: 3, codigos: [2] }] });
+  });
+});
+
+describe("Metas: construtor de Tipo de Meta", () => {
+  const DIPIRONA = "8F14E45F-CEEA-467F-A8F4-5E1D2C3B4A01";
+  const foco = { ...cmv, id: "tme_2", nome: "Foco", indicador: "foco-qtd", regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: 80, teto: null }, alvoPadrao: 50, premio: "…" };
+  const venda = { ...cmv, id: "tme_3", nome: "Venda", indicador: "venda-liquida", regra: { tipo: "fixo", valorCentavos: 10000 }, alvoPadrao: null, premio: "…" };
+  const mix = {
+    ...cmv,
+    id: "tme_4",
+    nome: "Mix",
+    indicador: "lista-produtos",
+    regra: { tipo: "fixo", valorCentavos: 10000 },
+    alvoPadrao: 10,
+    lista: {
+      unidade: "unidades",
+      entradas: [
+        { tipo: "laboratorio", id: "414", nome: "EMS" },
+        { tipo: "grupo", id: "44", nome: "Vitaminas" },
+        { tipo: "produto", id: DIPIRONA, nome: "Dipirona 1g" },
+      ],
+    },
+    premio: "…",
+  };
+  const comTipos = () => {
+    const padrao = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/metas/lista/conferir")) return { ausentes: [{ tipo: "grupo", id: "44" }] };
+      if (url.includes("/metas/lista/busca?tipo=secao")) return [{ tipo: "secao", id: "261", nome: "GENERICOS", detalhe: null }];
+      if (url.endsWith("/metas/tipos") && !init) return [cmv, foco, venda, mix];
+      return padrao(url, init);
+    });
+  };
+  /** O Select só aceita o clique num item destacado, e o destaque vem do movimento do mouse. */
+  const escolher = async (combobox: HTMLElement, opcao: string) => {
+    fireEvent.click(combobox);
+    const item = await screen.findByRole("option", { name: opcao });
+    fireEvent.mouseMove(item);
+    fireEvent.click(item);
+  };
+  const alterar = async (nome: string) => {
+    comTipos();
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: `Alterar Tipo de Meta ${nome}` }));
+    return screen.findByRole("dialog");
+  };
+
+  it("abre num modal com O que mede e Como paga lado a lado e a Prévia do Prêmio embaixo", async () => {
+    const modal = await alterar("CMV");
+    expect(within(modal).getByText("O que mede")).toBeTruthy();
+    expect(within(modal).getByText("Como paga")).toBeTruthy();
+    expect(within(modal).getByText("Prévia do Prêmio")).toBeTruthy();
+    expect((within(modal).getByLabelText("Alvo padrão (opcional)") as HTMLInputElement).value).toBe("30");
+  });
+
+  it("mostra embaixo do Gatilho o valor equivalente com o Alvo padrão", async () => {
+    const modal = await alterar("Foco");
+    expect(within(modal).getByText("= 40 un. com o Alvo padrão de 50 un.")).toBeTruthy();
+  });
+
+  it("no Percentual do valor vendido, Calcular sobre começa no próprio Indicador em R$", async () => {
+    const modal = await alterar("Venda");
+    await escolher(within(modal).getByRole("combobox", { name: "Regra do Prêmio" }), "Percentual do valor vendido");
+    expect((await within(modal).findByRole("combobox", { name: "Calcular sobre" })).textContent).toContain("Venda Líquida");
+  });
+
+  it("mostra a Lista por tipo e nome, com badge e o aviso de entrada fora do ERP, e busca no tipo escolhido", async () => {
+    const modal = await alterar("Mix");
+    const linhas = () => within(modal).getAllByRole("row").slice(1).map((r) => r.textContent);
+    expect(linhas()).toEqual([expect.stringContaining("ProdutoDipirona 1g"), expect.stringContaining("GrupoVitaminas"), expect.stringContaining("LaboratórioEMS")]);
+    expect(await within(modal).findByText("não encontrado no ERP")).toBeTruthy();
+    expect(within(modal).getAllByRole("row")[2]!.textContent).toContain("não encontrado no ERP");
+
+    await escolher(within(modal).getByRole("combobox", { name: "Tipo da entrada" }), "Seção");
+    fireEvent.input(within(modal).getByPlaceholderText("Buscar Seção no ERP"), { target: { value: "GEN" }, inputType: "insertText" });
+    fireEvent.click(await screen.findByRole("option", { name: "GENERICOS" }));
+    await waitFor(() => expect(linhas()).toContainEqual(expect.stringContaining("SeçãoGENERICOS")));
+    expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/lista/busca?tipo=secao&q=GEN");
   });
 });
 
