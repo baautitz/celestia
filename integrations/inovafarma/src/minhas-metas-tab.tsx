@@ -63,6 +63,7 @@ const colunasBaixa: DataTableColumn<MinhaBaixa>[] = [
   { key: "produto", label: "Produto", value: (b) => b.nomeProduto },
   { key: "vendida", label: "Qtde vendida", value: (b) => b.quantidadeVendida, format: "number" },
   { key: "quantidade", label: "Pré-vencido", value: (b) => b.quantidade, format: "number" },
+  { key: "correcao", label: "Correção", value: (b) => (b.correcao ? `Corrigida: ${b.correcao.motivo}` : "") },
 ];
 
 const periodoInicial = (periodos: PeriodoMetas[]) => (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
