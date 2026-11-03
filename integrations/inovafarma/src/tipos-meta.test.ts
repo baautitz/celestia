@@ -22,7 +22,7 @@ describe("prévia do Prêmio", () => {
 
   it("sem Alvo padrão, mostra as Faixas em Atingimento", () => {
     const ticket = tipo({ indicador: "ticket-medio", regra: { tipo: "faixas", faixas: [{ atingimento: 80, valorCentavos: 5000 }, { atingimento: 100, valorCentavos: 10000 }] } });
-    expect(descreverPremio(ticket)).toBe("Atingimento de 80% paga R$ 50,00 · 100% paga R$ 100,00");
+    expect(descreverPremio(ticket)).toBe("80% atingido paga R$ 50,00 · 100% atingido paga R$ 100,00");
   });
 
   it("mostra o Fixo de um Indicador em que maior é melhor a partir do Alvo padrão", () => {
@@ -31,7 +31,7 @@ describe("prévia do Prêmio", () => {
 
   it("mostra o Proporcional com Gatilho e Teto", () => {
     const foco = tipo({ indicador: "foco-qtd", alvoPadrao: 200, regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: 80, teto: 120 } });
-    expect(descreverPremio(foco)).toBe("Qtd. Total Foco: R$ 100,00 ao chegar a 200, proporcional ao Atingimento · nada abaixo de 160 · no máximo R$ 120,00 a partir de 240");
+    expect(descreverPremio(foco)).toBe("Qtd. Total Foco: R$ 100,00 ao chegar a 200, proporcional ao % Atingido · nada abaixo de 160 · no máximo R$ 120,00 a partir de 240");
   });
 
   it("mostra o Percentual de outro Indicador e se só paga ao atingir", () => {

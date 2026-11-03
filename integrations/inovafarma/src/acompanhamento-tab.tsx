@@ -75,7 +75,7 @@ const colunas: DataTableColumn<LinhaAcompanhamento>[] = [
   },
   {
     key: "atingimento",
-    label: "Atingimento",
+    label: "% Atingido",
     value: (l) =>
       l.atingimento === null || !Number.isFinite(l.atingimento)
         ? null

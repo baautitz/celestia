@@ -68,7 +68,7 @@ export type RegraPremio = z.infer<typeof RegraPremio>;
 export type TipoRegra = RegraPremio["tipo"];
 export const REGRA_LABEL: Record<TipoRegra, string> = {
   fixo: "Fixo se atingir",
-  proporcional: "Proporcional ao Atingimento",
+  proporcional: "Proporcional ao % Atingido",
   faixas: "Faixas",
   percentual: "Percentual do valor vendido",
   saldo: "Saldo das Avaliações",
@@ -161,12 +161,12 @@ export function descreverPremio(t: Pick<DadosTipoMeta, "indicador" | "regra" | "
     case "fixo":
       return alvo === null ? `Atingir o Alvo paga ${reais(r.valorCentavos)}` : `${indicador.nome} ${limiar(indicador, alvo, 100)} paga ${reais(r.valorCentavos)}`;
     case "faixas": {
-      const faixas = [...r.faixas].sort((a, b) => a.atingimento - b.atingimento).map((f) => `${limiar(indicador, alvo, f.atingimento)} paga ${reais(f.valorCentavos)}`);
-      return `${alvo === null ? "Atingimento de" : indicador.nome} ${faixas.join(" · ")}`;
+      const faixas = [...r.faixas].sort((a, b) => a.atingimento - b.atingimento).map((f) => `${limiar(indicador, alvo, f.atingimento)}${alvo === null ? " atingido" : ""} paga ${reais(f.valorCentavos)}`);
+      return alvo === null ? faixas.join(" · ") : `${indicador.nome} ${faixas.join(" · ")}`;
     }
     case "proporcional": {
-      const ponto = (pct: number) => (alvo === null ? `${porcentagem(pct)} de Atingimento` : formatarValor(indicador, valorNoAtingimento(indicador, alvo, pct)));
-      const partes = [`${indicador.nome}: ${reais(r.valorCentavos)} ao chegar a ${ponto(100)}, proporcional ao Atingimento`];
+      const ponto = (pct: number) => (alvo === null ? `${porcentagem(pct)} atingido` : formatarValor(indicador, valorNoAtingimento(indicador, alvo, pct)));
+      const partes = [`${indicador.nome}: ${reais(r.valorCentavos)} ${alvo === null ? "a" : "ao chegar a"} ${ponto(100)}, proporcional ao % Atingido`];
       if (r.gatilho !== null) partes.push(`nada abaixo de ${ponto(r.gatilho)}`);
       if (r.teto !== null) partes.push(`no máximo ${reais(Math.round((r.valorCentavos * r.teto) / 100))} a partir de ${ponto(r.teto)}`);
       return partes.join(" · ");
