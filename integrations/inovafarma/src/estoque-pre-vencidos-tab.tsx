@@ -1,29 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Button } from "@platform/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
 import { Show, Stack } from "@platform/ui/components/layout";
 import { Switch } from "@platform/ui/components/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { HeaderActions } from "@platform/ui/context/header-actions";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
-import { ItemPreVencidoWindow, type ItemPreVencido, type ItemSalvo } from "./item-pre-vencido-window";
+import { dataBr } from "./datas";
+import { ItemPreVencidoWindow, type InclusaoRetroativa, type ItemPreVencido, type ItemSalvo } from "./item-pre-vencido-window";
 import type { LojaOpcao } from "./loja-opcao";
+import { LojaSelect, SemLojas } from "./loja-select";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
 
-const validadeLabel = (validade: string) => validade.split("-").reverse().join("/");
-
 /**
  * Aba Estoque: os Itens de Pré-vencido de uma Loja do Vínculo, com inclusão, edição e exclusão em janela.
- * `retroagirAte` (`AAAA-MM-DD`), só para quem gere as Baixas: a inclusão pode ter data retroativa até esse dia.
+ * `retroativa`, só para quem gere as Baixas: os limites da data de inclusão retroativa que o servidor calculou.
  */
-export function EstoquePreVencidosTab({ lojas, retroagirAte }: { lojas: LojaOpcao[]; retroagirAte?: string }) {
+export function EstoquePreVencidosTab({ lojas, retroativa }: { lojas: LojaOpcao[]; retroativa?: InclusaoRetroativa }) {
   const { feedback, windows } = useUi();
   const [loja, setLoja] = useState(lojas.length > 0 ? String(lojas[0]!.codigo) : "");
   const [zerados, setZerados] = useState(false);
@@ -50,14 +48,7 @@ export function EstoquePreVencidosTab({ lojas, retroagirAte }: { lojas: LojaOpca
     void carregar();
   }, [carregar]);
 
-  if (lojas.length === 0) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Sem Lojas</AlertTitle>
-        <AlertDescription>Seu Usuário não está vinculado a um Colaborador com Lojas. Peça o vínculo a quem administra os Colaboradores.</AlertDescription>
-      </Alert>
-    );
-  }
+  if (lojas.length === 0) return <SemLojas />;
 
   const abrir = async (item?: ItemPreVencido) => {
     const resultado = await windows.open<ItemSalvo>({
@@ -65,7 +56,7 @@ export function EstoquePreVencidosTab({ lojas, retroagirAte }: { lojas: LojaOpca
       size: "small",
       title: item ? "Editar Item" : "Incluir Item",
       description: item ? item.nomeProduto : "Inclua um Pré-vencido que está na prateleira da Loja.",
-      content: () => <ItemPreVencidoWindow codigoLoja={Number(loja)} item={item} retroagirAte={retroagirAte} />,
+      content: () => <ItemPreVencidoWindow codigoLoja={Number(loja)} item={item} retroativa={retroativa} />,
     });
     if (resultado.status !== "confirmed") return;
     // O Item salvo já aparece na tabela; a recarga confirma com o servidor.
@@ -82,7 +73,7 @@ export function EstoquePreVencidosTab({ lojas, retroagirAte }: { lojas: LojaOpca
   const excluir = async (item: ItemPreVencido) => {
     const ok = await windows.confirm({
       title: "Excluir Item",
-      description: `Excluir o Item de ${item.quantidade} un. de "${item.nomeProduto}" (validade ${validadeLabel(item.validade)})?`,
+      description: `Excluir o Item de ${item.quantidade} un. de "${item.nomeProduto}" (validade ${dataBr(item.validade)})?`,
       confirmLabel: "Excluir",
       destructive: true,
     });
@@ -99,7 +90,7 @@ export function EstoquePreVencidosTab({ lojas, retroagirAte }: { lojas: LojaOpca
   const colunas: DataTableColumn<ItemPreVencido>[] = [
     { key: "produto", label: "Produto", value: (i) => i.nomeProduto, searchable: true, sortable: true },
     { key: "codigoBarra", label: "Código de barras", value: (i) => i.codigoBarra ?? "", searchable: true },
-    { key: "validade", centered: true, label: "Validade", value: (i) => i.validade, render: (i) => validadeLabel(i.validade), sortable: true },
+    { key: "validade", centered: true, label: "Validade", value: (i) => i.validade, render: (i) => dataBr(i.validade), sortable: true },
     { key: "quantidade", label: "Quantidade", value: (i) => i.quantidade, format: "number", sortable: true },
     { key: "restante", label: "Restante", value: (i) => i.restante, format: "number", sortable: true },
     { key: "incluidoEm", centered: true, label: "Incluído em", value: (i) => i.incluidoEm, render: (i) => formatDate(i.incluidoEm), sortable: true },
@@ -128,21 +119,7 @@ export function EstoquePreVencidosTab({ lojas, retroagirAte }: { lojas: LojaOpca
           </DropdownMenu>
         </Show>
       </HeaderActions>
-      <Stack gap="field">
-        <Label>Loja</Label>
-        <Select value={loja} onValueChange={(v) => v && setLoja(v)}>
-          <SelectTrigger aria-label="Loja">
-            <SelectValue>{(v: string) => lojas.find((l) => String(l.codigo) === v)?.nome || `Loja ${v}`}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {lojas.map((l) => (
-              <SelectItem key={l.codigo} value={String(l.codigo)}>
-                {l.nome || `Loja ${l.codigo}`}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Stack>
+      <LojaSelect lojas={lojas} value={loja} onChange={setLoja} />
       <Stack direction="row" align="center" gap="field">
         <Switch id="estoque-zerados" checked={zerados} onCheckedChange={(on: boolean) => setZerados(on)} aria-label="Mostrar Itens zerados" />
         <Label htmlFor="estoque-zerados">Mostrar Itens zerados</Label>

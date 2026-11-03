@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Pencil, Undo2 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Button } from "@platform/ui/components/button";
 import { Label } from "@platform/ui/components/label";
 import { Stack } from "@platform/ui/components/layout";
@@ -10,7 +9,10 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
 import { CorrecaoBaixaWindow, type CorrecaoDaBaixa } from "./correcao-baixa-window";
+import type { BaixaPublica } from "./baixas-do-periodo";
+import { dataHora } from "./datas";
 import type { LojaOpcao } from "./loja-opcao";
+import { LojaSelect, SemLojas } from "./loja-select";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
 
@@ -23,18 +25,7 @@ interface Periodo {
 }
 
 /** Uma Baixa: a venda do ERP e quanto dela foi Pré-vencido. */
-interface Baixa {
-  vendaId: number;
-  /** Hora do ERP, `AAAA-MM-DD HH:MM:SS`. */
-  data: string;
-  produtoId: string;
-  nomeProduto: string;
-  codigoBarra: string | null;
-  quantidadeVendida: number;
-  quantidade: number;
-  /** Correção de Baixa da venda: `quantidade` já a reflete. */
-  correcao?: CorrecaoDaBaixa;
-}
+type Baixa = Omit<BaixaPublica, "correcao"> & { correcao?: CorrecaoDaBaixa };
 
 interface BaixasDoColaborador {
   codigoColaborador: number;
@@ -43,11 +34,6 @@ interface BaixasDoColaborador {
   vendas: Baixa[];
 }
 
-/** `AAAA-MM-DD HH:MM:SS` (hora do ERP) como `DD/MM/AAAA HH:MM`, sem conversão de fuso. */
-export const dataHora = (data: string) => {
-  const [dia = "", hora = ""] = data.split(" ");
-  return `${dia.split("-").reverse().join("/")} ${hora.slice(0, 5)}`.trim();
-};
 const periodoLabel = (p: Periodo) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})${p.status === "closed" ? " · fechado" : ""}`;
 
 const colunasVenda: DataTableColumn<Baixa>[] = [
@@ -88,14 +74,7 @@ export function BaixasPreVencidosTab({ lojas, periodos }: { lojas: LojaOpcao[]; 
       });
   }, [loja, periodoId, feedback, recarga]);
 
-  if (lojas.length === 0) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Sem Lojas</AlertTitle>
-        <AlertDescription>Seu Usuário não está vinculado a um Colaborador com Lojas. Peça o vínculo a quem administra os Colaboradores.</AlertDescription>
-      </Alert>
-    );
-  }
+  if (lojas.length === 0) return <SemLojas />;
 
   // Só se corrige Baixa no Período aberto.
   const aberto = periodos.find((p) => p.id === periodoId)?.status !== "closed";
@@ -151,21 +130,7 @@ export function BaixasPreVencidosTab({ lojas, periodos }: { lojas: LojaOpcao[]; 
   return (
     <Stack gap="section">
       <Stack direction="row" align="end" gap="section" wrap>
-        <Stack gap="field">
-          <Label>Loja</Label>
-          <Select value={loja} onValueChange={(v) => v && setLoja(v)}>
-            <SelectTrigger aria-label="Loja">
-              <SelectValue>{(v: string) => lojas.find((l) => String(l.codigo) === v)?.nome || `Loja ${v}`}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {lojas.map((l) => (
-                <SelectItem key={l.codigo} value={String(l.codigo)}>
-                  {l.nome || `Loja ${l.codigo}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Stack>
+        <LojaSelect lojas={lojas} value={loja} onChange={setLoja} />
         <Stack gap="field">
           <Label>Período de Fechamento</Label>
           <Select value={periodoId} onValueChange={(v) => v && setPeriodoId(v)}>

@@ -17,7 +17,7 @@ const contexto = (extra: Record<string, unknown> = {}) => ({
   podeEstoque: false,
   podeBaixas: true,
   periodos,
-  lojasBaixas: [{ codigo: 1, nome: "Centro" }],
+  lojas: [{ codigo: 1, nome: "Centro" }],
   ...extra,
 });
 const grupos = [

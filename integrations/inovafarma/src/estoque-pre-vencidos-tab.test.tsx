@@ -24,7 +24,7 @@ const item = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 let contexto: Record<string, unknown> = {};
-const contextoEstoque = { podeEstoque: true, podeBaixas: false, periodos: [], lojasEstoque: [{ codigo: 1, nome: "Centro" }] };
+const contextoEstoque = { podeEstoque: true, podeBaixas: false, periodos: [], lojas: [{ codigo: 1, nome: "Centro" }] };
 let itens: Record<string, unknown>[] = [];
 
 /** Dia local a `dias` de hoje, `AAAA-MM-DD`. */
@@ -139,7 +139,7 @@ describe("aba Estoque", () => {
   });
 
   it("com a Permission de Baixas, inclui com data de inclusão retroativa até o início do Closing Period aberto", async () => {
-    contexto = { ...contextoEstoque, podeBaixas: true, lojasBaixas: [{ codigo: 1, nome: "Centro" }], periodos: [{ id: "p1", name: "Atual", startDate: dia(-5), endDate: dia(10), status: "open" }] };
+    contexto = { ...contextoEstoque, podeBaixas: true, inclusaoRetroativa: { inicio: dia(-5), hoje: dia(0) }, periodos: [{ id: "p1", name: "Atual", startDate: dia(-5), endDate: dia(10), status: "open" }] };
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
     fireEvent.click(screen.getByRole("button", { name: "Incluir Item" }));
@@ -164,7 +164,7 @@ describe("aba Estoque", () => {
   });
 
   it("com a Permission de Baixas, ajusta a data de inclusão na edição e só envia a data se ela mudou", async () => {
-    contexto = { ...contextoEstoque, podeBaixas: true, lojasBaixas: [{ codigo: 1, nome: "Centro" }], periodos: [{ id: "p1", name: "Atual", startDate: dia(-5), endDate: dia(10), status: "open" }] };
+    contexto = { ...contextoEstoque, podeBaixas: true, inclusaoRetroativa: { inicio: dia(-5), hoje: dia(0) }, periodos: [{ id: "p1", name: "Atual", startDate: dia(-5), endDate: dia(10), status: "open" }] };
     itens = [item({ incluidoEm: new Date().toISOString() })];
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });

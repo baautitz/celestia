@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import { dataHora } from "./baixas-pre-vencidos-tab";
+import { dataHora } from "./datas";
 import type { MinhaBaixa, MinhaMeta } from "./minhas-metas";
 import type { PeriodoMetas } from "./montar-metas-tab";
 

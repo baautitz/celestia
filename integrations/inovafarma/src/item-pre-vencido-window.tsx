@@ -10,6 +10,7 @@ import { MonthPicker } from "@platform/ui/components/month-picker";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
+import { dataBr } from "./datas";
 import { ProdutoBusca } from "./produto-busca";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
@@ -32,17 +33,18 @@ export interface ItemPreVencido {
 /** O que a gravação devolve: a edição vem sem o Restante, que depende das vendas do ERP. */
 export type ItemSalvo = Omit<ItemPreVencido, "restante"> & { restante?: number };
 
-/** Dia local `AAAA-MM-DD` de uma data. */
+/** Limites da data de inclusão retroativa, calculados pelo servidor na hora do ERP (`AAAA-MM-DD`). */
+export interface InclusaoRetroativa {
+  /** Início do Closing Period aberto: a data não vai antes dele. */
+  inicio: string;
+  /** Hoje: a data não vai para o futuro. */
+  hoje: string;
+}
+
+/** Dia `AAAA-MM-DD` escolhido no calendário. */
 const diaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const dataBr = (dia: string) => dia.split("-").reverse().join("/");
 
-/** Início do Closing Period aberto de hoje: até onde a inclusão de um Item pode retroagir. */
-export const inicioDoPeriodoAbertoHoje = (periodos: readonly { startDate: string; endDate: string; status?: "open" | "closed" }[]) => {
-  const hoje = diaLocal(new Date());
-  return periodos.find((p) => p.status !== "closed" && p.startDate <= hoje && hoje <= p.endDate)?.startDate;
-};
-
-const esquema = (retroagirAte: string | undefined) =>
+const esquema = (retroativa: InclusaoRetroativa | undefined) =>
   z
     .object({
       produtoId: z.string().min(1, "Busque e selecione o produto."),
@@ -51,10 +53,10 @@ const esquema = (retroagirAte: string | undefined) =>
       incluidoEm: z.date().optional(),
     })
     .superRefine(({ incluidoEm }, ctx) => {
-      if (!incluidoEm || !retroagirAte) return;
+      if (!incluidoEm || !retroativa) return;
       const dia = diaLocal(incluidoEm);
-      if (dia > diaLocal(new Date())) ctx.addIssue({ code: "custom", path: ["incluidoEm"], message: "A data de inclusão não pode ser no futuro." });
-      else if (dia < retroagirAte) ctx.addIssue({ code: "custom", path: ["incluidoEm"], message: `A data de inclusão não pode ser antes do início do Período aberto (${dataBr(retroagirAte)}).` });
+      if (dia > retroativa.hoje) ctx.addIssue({ code: "custom", path: ["incluidoEm"], message: "A data de inclusão não pode ser no futuro." });
+      else if (dia < retroativa.inicio) ctx.addIssue({ code: "custom", path: ["incluidoEm"], message: `A data de inclusão não pode ser antes do início do Período aberto (${dataBr(retroativa.inicio)}).` });
     });
 type Valores = z.infer<ReturnType<typeof esquema>>;
 
@@ -63,20 +65,20 @@ interface Props {
   /** Presente na edição: só quantidade e validade mudam. */
   item?: ItemPreVencido;
   /**
-   * Só para quem gere as Baixas: a data de inclusão pode retroagir até este dia (`AAAA-MM-DD`). Na edição, só se o Item
-   * foi incluído a partir dele (o incluído antes já entrou num Período fechado).
+   * Só para quem gere as Baixas: a data de inclusão pode retroagir até o início do Período aberto. Na edição, só se o
+   * Item foi incluído a partir dele (o incluído antes já entrou num Período fechado).
    */
-  retroagirAte?: string;
+  retroativa?: InclusaoRetroativa;
 }
 
 /** Janela de Item de Pré-vencido (incluir ou editar) no Estoque de uma Loja; resolve com o Item salvo. */
-export function ItemPreVencidoWindow({ codigoLoja, item, retroagirAte }: Props) {
+export function ItemPreVencidoWindow({ codigoLoja, item, retroativa }: Props) {
   const { resolve } = useWindow<ItemSalvo>();
   const { feedback } = useUi();
   const diaIncluido = item ? diaLocal(new Date(item.incluidoEm)) : undefined;
-  const comData = retroagirAte !== undefined && (diaIncluido === undefined || diaIncluido >= retroagirAte);
+  const comData = retroativa !== undefined && (diaIncluido === undefined || diaIncluido >= retroativa.inicio);
   const form = useForm<Valores>({
-    resolver: zodResolver(esquema(retroagirAte)),
+    resolver: zodResolver(esquema(retroativa)),
     defaultValues: {
       produtoId: item?.produtoId ?? "",
       quantidade: item ? String(item.quantidade) : "",
@@ -167,7 +169,7 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroagirAte }: Props) 
                       <DatePicker value={field.value} onChange={field.onChange} />
                     </FormControl>
                     <FormDescription>
-                      {item ? "" : "Em branco, agora. "}Pode retroagir até {dataBr(retroagirAte)}, para que as vendas desde então gerem Baixas.
+                      {item ? "" : "Em branco, agora. "}Pode retroagir até {dataBr(retroativa.inicio)}, para que as vendas desde então gerem Baixas.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
