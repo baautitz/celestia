@@ -72,6 +72,38 @@ describe.each([
   });
 });
 
+describe("busca", () => {
+  type Item = { id: string; name: string };
+  const items: Item[] = [
+    { id: "1", name: "Caixas da Loja" },
+    { id: "2", name: "Fechou o período" },
+    { id: "3", name: "Caixa 1" },
+    { id: "4", name: "Dispositivo do balcão" },
+  ];
+  const itemColumns = [{ key: "name", label: "Nome", sortable: true, searchable: true, value: (r: Item) => r.name }];
+  const names = () => screen.getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell")[0]!.textContent);
+
+  it("busca por palavras, sem acento e com um erro, da mais relevante à menos", async () => {
+    setViewport(1280);
+    render(<DataTable columns={itemColumns} rows={items} getRowId={(r) => r.id} search={{}} />);
+    await userEvent.type(screen.getByRole("searchbox"), "caixa");
+    expect(names()).toEqual(["Caixa 1", "Caixas da Loja"]);
+    await userEvent.clear(screen.getByRole("searchbox"));
+    await userEvent.type(screen.getByRole("searchbox"), "balcao dispositvo");
+    expect(names()).toEqual(["Dispositivo do balcão"]);
+  });
+
+  it("a ordenação escolhida no cabeçalho prevalece sobre a relevância", async () => {
+    setViewport(1280);
+    render(<DataTable columns={itemColumns} rows={items} getRowId={(r) => r.id} search={{}} />);
+    await userEvent.type(screen.getByRole("searchbox"), "caixa");
+    await userEvent.click(screen.getByRole("columnheader", { name: "Nome" }));
+    expect(names()).toEqual(["Caixa 1", "Caixas da Loja"].sort((a, b) => a.localeCompare(b, "pt-BR")));
+    await userEvent.click(screen.getByRole("columnheader", { name: "Nome" }));
+    expect(names()).toEqual(["Caixas da Loja", "Caixa 1"]);
+  });
+});
+
 describe("tooltip do cabeçalho", () => {
   it("mostra a explicação da coluna ao passar o mouse sobre o rótulo", async () => {
     setViewport(1280);

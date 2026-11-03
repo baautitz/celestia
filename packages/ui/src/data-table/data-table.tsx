@@ -47,6 +47,7 @@ import {
 } from "../components/trend";
 import { useIsMobile } from "../hooks/use-mobile";
 import { cn } from "../lib/utils";
+import { rankBySearch } from "../lib/fuzzy-search";
 import {
   formatCurrency,
   formatDate,
@@ -632,18 +633,10 @@ export function DataTable<TRow>({
 
   let visible = rows;
   if (!manual) {
-    const q = query.trim().toLowerCase();
-    if (q) {
-      visible = visible.filter((row) =>
-        columns.some(
-          (c) =>
-            c.searchable &&
-            String(c.value?.(row) ?? "")
-              .toLowerCase()
-              .includes(q),
-        ),
-      );
-    }
+    // Busca por palavras (acentos e um erro de digitação tolerados), da mais relevante à menos.
+    // Uma ordenação escolhida no cabeçalho prevalece; como é estável, a relevância desempata.
+    const searchCols = columns.filter((c) => c.searchable);
+    visible = rankBySearch(visible, query, (row) => searchCols.map((c) => String(c.value?.(row) ?? "")));
     const sortCol = columns.find((c) => c.key === sortKey);
     if (sortCol?.value) {
       const get = sortCol.value;
