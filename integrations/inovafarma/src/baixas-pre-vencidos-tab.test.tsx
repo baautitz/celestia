@@ -83,10 +83,10 @@ describe("aba Baixas", () => {
     apiFetch.mockImplementation(async (url: string) => (url.endsWith("/contexto") ? contexto() : dois));
     renderizar();
     expect(await screen.findByRole("cell", { name: "BRUNO LIMA" })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Produto"), { target: { value: "dipirona" } });
+    fireEvent.change(screen.getByPlaceholderText("Buscar Colaborador ou produto"), { target: { value: "dipirona" } });
     expect(screen.queryByRole("cell", { name: "BRUNO LIMA" })).toBeNull();
     expect(screen.getByRole("cell", { name: "ANA SOUZA" })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Produto"), { target: { value: "456" } });
+    fireEvent.change(screen.getByPlaceholderText("Buscar Colaborador ou produto"), { target: { value: "456" } });
     expect(screen.queryByRole("cell", { name: "ANA SOUZA" })).toBeNull();
     expect(screen.getByRole("cell", { name: "BRUNO LIMA" })).toBeTruthy();
   });

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Pencil, Search, Undo2 } from "lucide-react";
+import { Pencil, Undo2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Button } from "@platform/ui/components/button";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@platform/ui/components/input-group";
 import { Label } from "@platform/ui/components/label";
 import { Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
@@ -10,6 +9,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
+import { searchScore } from "@platform/ui/lib/fuzzy-search";
 import { CorrecaoBaixaWindow, type CorrecaoDaBaixa } from "./correcao-baixa-window";
 import type { BaixaPublica } from "./baixas-do-periodo";
 import { dataHora } from "./datas";
@@ -43,13 +43,18 @@ interface BaixasDoColaborador {
   vendas: Baixa[];
 }
 
-/** Só as vendas do produto buscado (nome ou código de barras), com o total do Colaborador refeito; sem busca, tudo. */
+const camposDoProduto = (b: Baixa) => [b.nomeProduto, b.codigoBarra ?? ""];
+
+/**
+ * A busca casa o Colaborador ou o produto (nome ou código de barras). Casando só pelo produto, o Colaborador mostra
+ * só as vendas daquele produto, com o total refeito.
+ */
 function filtrarPorProduto(grupos: BaixasDoColaborador[], busca: string): BaixasDoColaborador[] {
-  const termo = busca.trim().toLocaleLowerCase("pt-BR");
-  if (!termo) return grupos;
-  return grupos.flatMap((g) => {
-    const vendas = g.vendas.filter((b) => b.nomeProduto.toLocaleLowerCase("pt-BR").includes(termo) || (b.codigoBarra ?? "").includes(termo));
-    return vendas.length ? [{ ...g, vendas, quantidade: vendas.reduce((s, b) => s + b.quantidade, 0) }] : [];
+  if (!busca.trim()) return grupos;
+  return grupos.map((g) => {
+    if (searchScore(busca, [g.nomeColaborador]) !== null) return g;
+    const vendas = g.vendas.filter((b) => searchScore(busca, camposDoProduto(b)) !== null);
+    return vendas.length === g.vendas.length ? g : { ...g, vendas, quantidade: vendas.reduce((s, b) => s + b.quantidade, 0) };
   });
 }
 
@@ -87,7 +92,7 @@ export function BaixasPreVencidosTab({ visualizacoes, periodos, lojasDaCorrecao 
   const [periodoId, setPeriodoId] = useState((periodos.find((p) => p.status !== "closed") ?? periodos[0])?.id ?? "");
   const [grupos, setGrupos] = useState<BaixasDoColaborador[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [produto, setProduto] = useState("");
+  const [busca, setBusca] = useState("");
   // Muda a cada Correção salva ou desfeita: recarrega as Baixas do servidor.
   const [recarga, setRecarga] = useState(0);
 
@@ -217,26 +222,18 @@ export function BaixasPreVencidosTab({ visualizacoes, periodos, lojasDaCorrecao 
             </SelectContent>
           </Select>
         </Stack>
-        <Stack gap="field">
-          <Label htmlFor="baixas-produto">Produto</Label>
-          <InputGroup>
-            <InputGroupAddon>
-              <Search />
-            </InputGroupAddon>
-            <InputGroupInput id="baixas-produto" placeholder="Nome ou código de barras" value={produto} onChange={(e) => setProduto(e.target.value)} />
-          </InputGroup>
-        </Stack>
       </Stack>
       <DataTable
         scroll="page"
         columns={colunas}
-        rows={filtrarPorProduto(grupos, produto)}
+        rows={filtrarPorProduto(grupos, busca)}
         getRowId={(g) => String(g.codigoColaborador)}
         loading={carregando}
         title="Baixas de Pré-vencido"
         description="As vendas no período que gastaram o Estoque de Pré-vencidos, por Colaborador."
         emptyMessage="Nenhuma Baixa no período."
-        search={{ placeholder: "Buscar Colaborador" }}
+        search={{ placeholder: "Buscar Colaborador ou produto", fields: (g) => g.vendas.flatMap(camposDoProduto) }}
+        onSearchChange={setBusca}
         renderExpanded={(g) => (
           <DataTable
             scroll="page"
