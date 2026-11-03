@@ -33,6 +33,11 @@ export class PostgresEstoquePreVencidoStore implements EstoquePreVencidoStore {
     return row ? toRecord(row) : null;
   }
 
+  async lojas(): Promise<number[]> {
+    const t = preVencidosItens;
+    return (await this.db.selectDistinct({ codigoLoja: t.codigoLoja }).from(t).orderBy(asc(t.codigoLoja))).map((r) => r.codigoLoja);
+  }
+
   async atualizar(id: string, valores: { quantidade: number; validade: string }, expectedVersion: number): Promise<ItemPreVencido | null> {
     const t = preVencidosItens;
     const [row] = await this.db

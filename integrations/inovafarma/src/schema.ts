@@ -2,6 +2,9 @@ import { sql } from "drizzle-orm";
 import { boolean, doublePrecision, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { IndicadorId } from "./indicadores.js";
 import type { MetaApurada } from "./apuracao-store.js";
+import type { BaixaDeVenda } from "./baixas-pre-vencidos.js";
+import type { VendaDaLoja } from "./baixas-da-loja.js";
+import type { ItemCongelado } from "./baixas-congeladas-store.js";
 import type { Exibicao, ListaTipo, RegraPremio } from "./tipos-meta.js";
 
 /** Um schema Postgres por Module. */
@@ -192,3 +195,21 @@ export const apuracoesMetas = inovafarmaSchema.table("apuracoes_metas", {
   metas: jsonb("metas").$type<MetaApurada[]>().notNull(),
   apuradoEm: timestamp("apurado_em").notNull(),
 });
+
+/** Baixas de Pré-vencido de cada Loja gravadas no fechamento do Closing Period; a reabertura as apaga. */
+export const preVencidosBaixasCongeladas = inovafarmaSchema.table(
+  "pre_vencidos_baixas_congeladas",
+  {
+    /** Referência lógica a `closing_period.periods`, sem FK entre Modules. */
+    periodoId: text("periodo_id").notNull(),
+    codigoLoja: integer("codigo_loja").notNull(),
+    /** Fim do Período na hora do ERP (`AAAA-MM-DD HH:MM:SS`): as vendas até aqui já estão contadas. */
+    ate: text("ate").notNull(),
+    /** Baixas das vendas do Período, como estavam no fechamento. */
+    baixas: jsonb("baixas").$type<BaixaDeVenda<VendaDaLoja>[]>().notNull(),
+    /** Quantidade e Restante de cada Item no fim do Período, pelo id do Item. */
+    itens: jsonb("itens").$type<Record<string, ItemCongelado>>().notNull(),
+    congeladoEm: timestamp("congelado_em").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.periodoId, t.codigoLoja] }), index("pre_vencidos_baixas_congeladas_loja_idx").on(t.codigoLoja, t.ate)],
+);

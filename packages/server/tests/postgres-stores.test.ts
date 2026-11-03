@@ -13,6 +13,7 @@ import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
 import { PostgresPreVencidoStore } from "../../../integrations/inovafarma/src/postgres-pre-vencido-store.js";
 import { PostgresEstoquePreVencidoStore } from "../../../integrations/inovafarma/src/postgres-estoque-pre-vencidos-store.js";
+import { PostgresBaixasCongeladasStore } from "../../../integrations/inovafarma/src/postgres-baixas-congeladas-store.js";
 import { PostgresAvaliacaoStore } from "../../../integrations/inovafarma/src/postgres-avaliacao-store.js";
 import { PostgresFuroEstoqueStore } from "../../../integrations/inovafarma/src/postgres-furo-estoque-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
@@ -48,7 +49,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
         // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA) e a que troca Excluir por Inativar Usuários; o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos, a das Avaliações, a do Furo de Estoque e as cinco das Metas (Tipos de Meta, Montar Metas, Apuração, Prêmio do Participante e Lista de Produtos no Tipo de Meta); os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 6 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 11 : 1);
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 6 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 12 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -73,6 +74,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "inovafarma", name: "metas" },
         { schema: "inovafarma", name: "metas_participantes" },
         { schema: "inovafarma", name: "motivos_ajuste" },
+        { schema: "inovafarma", name: "pre_vencidos_baixas_congeladas" },
         { schema: "inovafarma", name: "pre_vencidos_itens" },
         { schema: "inovafarma", name: "pre_vencidos_lancamentos" },
         { schema: "inovafarma", name: "tipos_meta" },
@@ -126,7 +128,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_lancamentos, inovafarma.pre_vencidos_itens, inovafarma.avaliacoes, inovafarma.justificativas_ajuste CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_lancamentos, inovafarma.pre_vencidos_itens, inovafarma.pre_vencidos_baixas_congeladas, inovafarma.avaliacoes, inovafarma.justificativas_ajuste CASCADE`);
     });
 
     describe("Users e Roles", () => {
@@ -286,6 +288,29 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         expect(await store.excluir(criado.id, 1)).toBe(false);
         expect(await store.excluir(criado.id, 2)).toBe(true);
         expect(await store.get(criado.id)).toBeNull();
+      });
+
+      it("lista as Lojas que têm Itens", async () => {
+        const store = new PostgresEstoquePreVencidoStore(db);
+        await store.criar({ ...novo, codigoLoja: 2 });
+        await store.criar(novo);
+        await store.criar(novo);
+        expect(await store.lojas()).toEqual([1, 2]);
+      });
+
+      it("grava as Baixas congeladas do Período por Loja, substitui ao gravar de novo e descarta na reabertura", async () => {
+        const store = new PostgresBaixasCongeladasStore(db);
+        const venda = { vendaId: 1, data: "2027-04-12 10:00:00", cancelada: false, codigoLoja: 1, codigoColaborador: 7, nomeColaborador: "ANA", produtoId: "guid-1", nomeProduto: "DIPIRONA", codigoBarra: null, quantidade: 2 };
+        const congelada = (periodoId: string, codigoLoja: number, ate: string) => ({ periodoId, codigoLoja, ate, baixas: [{ venda, quantidade: 2, itens: [{ itemId: "i1", quantidade: 2 }] }], itens: { i1: { quantidade: 3, restante: 1 } }, congeladoEm: "2027-05-01T12:00:00.000Z" });
+        await store.gravar("maio", [congelada("maio", 1, "2027-05-31 23:59:59")]);
+        await store.gravar("abril", [congelada("abril", 1, "2027-04-30 23:59:59"), congelada("abril", 2, "2027-04-30 23:59:59")]);
+        expect(await store.doPeriodo("abril")).toHaveLength(2);
+        expect((await store.daLoja(1)).map((c) => c.periodoId)).toEqual(["abril", "maio"]);
+        expect((await store.daLoja(1))[0]).toEqual(congelada("abril", 1, "2027-04-30 23:59:59"));
+        await store.gravar("abril", [congelada("abril", 2, "2027-04-30 23:59:59")]);
+        expect((await store.doPeriodo("abril")).map((c) => c.codigoLoja)).toEqual([2]);
+        await store.descartar("abril");
+        expect(await store.doPeriodo("abril")).toEqual([]);
       });
     });
 
