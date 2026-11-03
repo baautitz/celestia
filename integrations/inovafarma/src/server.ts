@@ -146,7 +146,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         metas,
         vinculos: store,
         avaliacoes,
-        preVencidos,
+        estoque: estoquePreVencidos,
         apuracoes: db ? new PostgresApuracaoStore(db) : new MemoryApuracaoStore(),
         periods,
         audit,

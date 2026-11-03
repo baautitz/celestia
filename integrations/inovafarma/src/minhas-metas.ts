@@ -16,10 +16,22 @@ export interface MinhaMeta {
   falta?: string;
   /** Na Lista de Produtos: o que conta, por tipo e depois por nome (ex.: "Grupo Vitaminas", "Laboratório EMS"). */
   lista?: string[];
-  /** O que falta para haver Realizado (ex.: nenhum Pré-vencido lançado). */
-  aviso?: string;
   /** Só se o Tipo mostra o Prêmio; na Exibição Atingida / Não atingida, só com a Meta atingida. */
   premioCentavos?: number;
+}
+
+/** Uma Baixa de Pré-vencido do Colaborador em Minhas Metas. Nunca o código do produto no ERP. */
+export interface MinhaBaixa {
+  vendaId: number;
+  /** Hora do ERP, `AAAA-MM-DD HH:MM:SS`. */
+  data: string;
+  /** Identificador opaco do produto. */
+  produtoId: string;
+  nomeProduto: string;
+  codigoBarra: string | null;
+  quantidadeVendida: number;
+  /** Quanto da venda foi Pré-vencido. */
+  quantidade: number;
 }
 
 /** Corta do resultado do Participante o que o gestor não liberou: o servidor nunca envia o resto. */
@@ -37,7 +49,6 @@ export function minhaMeta(metaId: string, tipo: TipoApuracao, r: ResultadoPartic
       if (falta > 0 && tipo.indicador !== "avaliacoes") meta.falta = diferenca(indicador, falta);
     }
   }
-  if (r.aviso) meta.aviso = r.aviso;
   if (tipo.lista) meta.lista = ordenarEntradas(tipo.lista.entradas).map(descreverEntrada);
   if (tipo.mostrarPremio && (tipo.exibicao !== "atingida" || r.atingida === true)) meta.premioCentavos = r.premioCentavos;
   return meta;

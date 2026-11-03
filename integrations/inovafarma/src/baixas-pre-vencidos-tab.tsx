@@ -39,7 +39,7 @@ interface BaixasDoColaborador {
 }
 
 /** `AAAA-MM-DD HH:MM:SS` (hora do ERP) como `DD/MM/AAAA HH:MM`, sem conversão de fuso. */
-const dataHora = (data: string) => {
+export const dataHora = (data: string) => {
   const [dia = "", hora = ""] = data.split(" ");
   return `${dia.split("-").reverse().join("/")} ${hora.slice(0, 5)}`.trim();
 };

@@ -25,6 +25,8 @@ export interface EstoquePreVencidoStore {
   criar(novo: NovoItemPreVencido): Promise<ItemPreVencido>;
   /** Itens da Loja, o incluído antes primeiro. */
   listar(codigoLoja: number): Promise<ItemPreVencido[]>;
+  /** Lojas que têm algum Item, em ordem. */
+  lojas(): Promise<number[]>;
   get(id: string): Promise<ItemPreVencido | null>;
   /** Compare-and-set pela `version`; devolve null se o Item mudou ou sumiu. */
   atualizar(id: string, valores: { quantidade: number; validade: string }, expectedVersion: number): Promise<ItemPreVencido | null>;
@@ -49,6 +51,10 @@ export class MemoryEstoquePreVencidoStore implements EstoquePreVencidoStore {
 
   async listar(codigoLoja: number): Promise<ItemPreVencido[]> {
     return [...this.itens.values()].filter((i) => i.codigoLoja === codigoLoja).sort(porInclusao);
+  }
+
+  async lojas(): Promise<number[]> {
+    return [...new Set([...this.itens.values()].map((i) => i.codigoLoja))].sort((a, b) => a - b);
   }
 
   async get(id: string): Promise<ItemPreVencido | null> {

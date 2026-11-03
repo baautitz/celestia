@@ -1,8 +1,7 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
-import { baixasDaLoja, type VendaDaLoja } from "./baixas-da-loja.js";
-import type { BaixaDeVenda } from "./baixas-pre-vencidos.js";
+import { baixasDoPeriodo, type BaixaDoPeriodo } from "./baixas-do-periodo.js";
 import { ERP_INDISPONIVEL, LOJA_FORA_DO_VINCULO, SEM_CONEXAO, SEM_VINCULO, lojasDoVinculo } from "./estoque-pre-vencidos-routes.js";
 import type { EstoquePreVencidoStore } from "./estoque-pre-vencidos-store.js";
 import type { VinculoStore } from "./vinculo-store.js";
@@ -47,12 +46,12 @@ export interface BaixasDoColaborador {
 }
 
 /** Agrupa as Baixas por Colaborador (pelo nome), cada um com as suas vendas na ordem da data. */
-export function porColaborador(baixas: readonly BaixaDeVenda<VendaDaLoja>[], produto: (produtoId: string) => { nomeProduto: string; codigoBarra: string | null }): BaixasDoColaborador[] {
+export function porColaborador(baixas: readonly BaixaDoPeriodo[]): BaixasDoColaborador[] {
   const grupos = new Map<number, BaixasDoColaborador>();
-  for (const { venda, quantidade } of baixas) {
+  for (const { venda, quantidade, nomeProduto, codigoBarra } of baixas) {
     const grupo = grupos.get(venda.codigoColaborador) ?? { codigoColaborador: venda.codigoColaborador, nomeColaborador: venda.nomeColaborador, quantidade: 0, vendas: [] };
     grupo.quantidade += quantidade;
-    grupo.vendas.push({ vendaId: venda.vendaId, data: venda.data, produtoId: venda.produtoId, ...produto(venda.produtoId), quantidadeVendida: venda.quantidade, quantidade });
+    grupo.vendas.push({ vendaId: venda.vendaId, data: venda.data, produtoId: venda.produtoId, nomeProduto, codigoBarra, quantidadeVendida: venda.quantidade, quantidade });
     grupos.set(venda.codigoColaborador, grupo);
   }
   return [...grupos.values()].sort((a, b) => a.nomeColaborador.localeCompare(b.nomeColaborador, "pt-BR") || a.codigoColaborador - b.codigoColaborador);
@@ -73,21 +72,10 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, erp
     const periodo = (await periods.list()).find((p) => p.id === periodoId);
     if (!periodo) return c.json({ error: "Período de Fechamento não encontrado." }, 404);
 
-    const itens = await store.listar(codigoLoja);
-    if (itens.length === 0) return c.json([]);
-    const client = erpClient();
-    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
-    let baixas: BaixaDeVenda<VendaDaLoja>[];
     try {
-      ({ baixas } = await baixasDaLoja(client, codigoLoja, itens));
-    } catch {
-      return c.json({ error: ERP_INDISPONIVEL }, 503);
+      return c.json(porColaborador(await baixasDoPeriodo({ erpClient, store }, periodo, [codigoLoja])));
+    } catch (err: unknown) {
+      return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
     }
-
-    const inicio = `${periodo.startDate} 00:00:00`;
-    const fim = `${periodo.endDate} 23:59:59`;
-    const doPeriodo = baixas.filter((b) => b.venda.data >= inicio && b.venda.data <= fim);
-    const produtos = new Map(itens.map((i) => [i.produtoId, { nomeProduto: i.nomeProduto, codigoBarra: i.codigoBarra }]));
-    return c.json(porColaborador(doPeriodo, (id) => produtos.get(id) ?? { nomeProduto: "", codigoBarra: null }));
   });
 }

@@ -24,8 +24,6 @@ export interface ResultadoParticipante {
   premioCentavos: number;
   /** Resultado na unidade do Indicador e em palavras, como o gestor vê. */
   resultado: string;
-  /** O que falta para haver Realizado (ex.: nenhum Pré-vencido lançado); o Colaborador também vê. */
-  aviso?: string;
 }
 
 type TipoApurado = Pick<DadosTipoMeta, "indicador" | "semAlvo" | "regra"> & { lista?: DadosTipoMeta["lista"] };
@@ -91,9 +89,6 @@ export function apurarParticipante(tipo: TipoApurado, participante: Participante
     }
   }
 
-  // Pré-vencidos só contam o que o Colaborador lançou: sem lançamento, não há o que conferir.
-  const aviso = tipo.indicador === "pre-vencidos" && dados.indicadores["pre-vencidos"] === undefined ? "Nenhum Pré-vencido lançado no Período" : undefined;
-  if (aviso) resultado = `${aviso}${alvo === null ? "" : ` · Meta: ${formatarValor(indicador, alvo)}`}`;
   const atingida = tipo.semAlvo ? null : tipo.indicador === "avaliacoes" ? realizado > 0 : atingimento !== null && atingimento >= 100;
   return {
     codigoColaborador,
@@ -104,7 +99,6 @@ export function apurarParticipante(tipo: TipoApurado, participante: Participante
     atingida,
     premioCentavos: premio(regraDoParticipante(tipo.regra, participante), atingimento, atingida, realizado, dados),
     resultado,
-    ...(aviso ? { aviso } : {}),
   };
 }
 
