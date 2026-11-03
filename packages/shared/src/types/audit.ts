@@ -21,8 +21,15 @@ export interface AuditLogFilter {
   targetId?: string;
   actorId?: string;
   plugin?: string;
-  /** YYYY-MM-DD */
+  /** Dia local YYYY-MM-DD; o cliente envia o início desse dia como instante ISO. */
   from?: string;
-  /** YYYY-MM-DD */
+  /** Dia local YYYY-MM-DD, inclusivo; o cliente envia o fim desse dia como instante ISO. */
   to?: string;
+}
+
+/** Valores presentes no Audit Log, para os filtros da consulta. */
+export interface AuditLogFacets {
+  /** Quem já agiu, com o nome da entrada mais recente. */
+  actors: { id: string; name: string }[];
+  plugins: string[];
 }

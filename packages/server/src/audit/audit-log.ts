@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { z } from "zod";
-import type { AuditFilter, AuditStore, LogEntry } from "./audit-store.js";
+import type { AuditFacets, AuditFilter, AuditStore, LogEntry } from "./audit-store.js";
 import { currentDevice, type RequestDevice } from "./request-device.js";
 
 export interface AuditActionDef<S extends z.ZodTypeAny = z.ZodTypeAny> {
@@ -63,5 +63,9 @@ export class AuditLog {
   /** Leitura não depende dos schemas: funciona mesmo sem o Plugin que escreveu a entrada. */
   list(filter: AuditFilter): Promise<LogEntry[]> {
     return this.store.list(filter);
+  }
+
+  facets(): Promise<AuditFacets> {
+    return this.store.facets();
   }
 }

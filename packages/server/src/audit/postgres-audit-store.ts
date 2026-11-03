@@ -1,7 +1,7 @@
-import { and, desc, eq, gte, lte, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { auditLogEntries } from "./schema.js";
-import type { AuditFilter, AuditStore, LogEntry } from "./audit-store.js";
+import type { AuditFacets, AuditFilter, AuditStore, LogEntry } from "./audit-store.js";
 
 export class PostgresAuditStore implements AuditStore {
   constructor(private db: NodePgDatabase) {}
@@ -24,5 +24,20 @@ export class PostgresAuditStore implements AuditStore {
       .where(and(...conditions))
       .orderBy(desc(auditLogEntries.occurredAt));
     return filter.limit ? query.limit(filter.limit) : query;
+  }
+
+  async facets(): Promise<AuditFacets> {
+    const t = auditLogEntries;
+    // DISTINCT ON fica com a primeira linha de cada actorId na ordem pedida: a mais recente, com o nome atual.
+    const latest = this.db
+      .selectDistinctOn([t.actorId], { id: t.actorId, name: t.actorName })
+      .from(t)
+      .orderBy(t.actorId, desc(t.occurredAt))
+      .as("latest");
+    const [actors, plugins] = await Promise.all([
+      this.db.select().from(latest).orderBy(asc(latest.name)),
+      this.db.selectDistinct({ plugin: t.plugin }).from(t).orderBy(asc(t.plugin)),
+    ]);
+    return { actors, plugins: plugins.map((p) => p.plugin) };
   }
 }

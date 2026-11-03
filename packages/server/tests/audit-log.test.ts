@@ -51,7 +51,7 @@ describe("Audit Log", () => {
 
   it("só recebe acréscimos: o store não expõe alteração nem remoção", () => {
     const { store } = setup();
-    expect(Object.getOwnPropertyNames(Object.getPrototypeOf(store)).sort()).toEqual(["append", "constructor", "list"]);
+    expect(Object.getOwnPropertyNames(Object.getPrototypeOf(store)).sort()).toEqual(["append", "constructor", "facets", "list"]);
   });
 
   it("continua legível quando o Plugin que escreveu não está no build", async () => {

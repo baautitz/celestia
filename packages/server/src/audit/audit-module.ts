@@ -36,6 +36,7 @@ export function createAuditModule({ auditLog, auth }: AuditModuleDeps): ModuleDe
       routes.get("/", auth, requirePermission("system:audit:read"), zValidator("query", Query), async (c) =>
         c.json(await auditLog.list(c.req.valid("query"))),
       );
+      routes.get("/facets", auth, requirePermission("system:audit:read"), async (c) => c.json(await auditLog.facets()));
     },
   });
 }

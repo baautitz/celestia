@@ -60,3 +60,35 @@ describe("GET /api/audit", () => {
     expect((await get("/api/audit?from=lixo", token)).status).toBe(400);
   });
 });
+
+describe("GET /api/audit/facets", () => {
+  it("exige system:audit:read", async () => {
+    const { login, get } = await boot();
+    expect((await get("/api/audit/facets")).status).toBe(401);
+    expect((await get("/api/audit/facets", await login("joao.silva"))).status).toBe(403);
+  });
+
+  it("lista quem agiu (com o nome mais recente) e os Plugins presentes no Audit Log", async () => {
+    const { auditLog, login, get } = await boot();
+    const rec = (actor: { id: string; name: string }, at: string) =>
+      auditLog.record({
+        plugin: "erp",
+        action: "closing.close",
+        actor,
+        target: { type: "closing_period", id: "cp" },
+        attributes: {},
+        occurredAt: new Date(at),
+      });
+    await rec({ id: "u1", name: "Ana Antiga" }, "2026-01-01T00:00:00Z");
+    await rec({ id: "u1", name: "Ana" }, "2026-02-01T00:00:00Z");
+    await rec({ id: "u2", name: "Bruno" }, "2026-01-15T00:00:00Z");
+    const res = await get("/api/audit/facets", await login("carlos.admin"));
+    expect(await res.json()).toEqual({
+      actors: [
+        { id: "u1", name: "Ana" },
+        { id: "u2", name: "Bruno" },
+      ],
+      plugins: ["erp"],
+    });
+  });
+});

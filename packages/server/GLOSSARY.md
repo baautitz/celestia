@@ -191,3 +191,11 @@ _Avoid_: History, event log, trail
 **Log Entry**:
 One record in the Audit Log: who did what, when. Each Log Entry has attributes that the Plugin writing it defines, so the Audit Log needs no fixed set of fields. A Log Entry stays readable after its Plugin is removed from the build, and its author stays identifiable after the User is deactivated.
 _Avoid_: Event, row, audit record
+
+**Actor**:
+The User who did what a Log Entry records, kept by id and by the name the User had at that moment.
+_Avoid_: Author, user (in the Audit Log)
+
+**Audit Log Facets**:
+The distinct Actors (with their most recent name) and Plugins present in the Audit Log, offered as choices when filtering it.
+_Avoid_: Filter options, lookups

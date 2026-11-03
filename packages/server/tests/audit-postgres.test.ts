@@ -41,6 +41,12 @@ describe.skipIf(!dbTestsEnabled)("Audit Log contra Postgres real", () => {
     expect((await log.list({}))[0]).toMatchObject({ attributes: { n: 1 }, schemaVersion: 1, summary: "n=1", actorName: "Ana" });
   });
 
+  it("facets: quem agiu, com o nome mais recente, e os Plugins", async () => {
+    await rec("x", "2026-01-01T00:00:00Z");
+    await log.record({ plugin: "erp", action: "a", actor: { id: "u1", name: "Ana Nova" }, target: { type: "t", id: "y" }, attributes: { n: 1 }, occurredAt: new Date("2026-02-01T00:00:00Z") });
+    expect(await log.facets()).toEqual({ actors: [{ id: "u1", name: "Ana Nova" }], plugins: ["erp"] });
+  });
+
   it("o banco recusa alterar ou remover entradas", async () => {
     await rec("x", "2026-01-01T00:00:00Z");
     await expect(db.execute(sql`UPDATE audit.audit_log_entries SET summary = 'x'`)).rejects.toThrow();

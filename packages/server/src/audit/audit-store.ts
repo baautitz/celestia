@@ -26,11 +26,21 @@ export interface AuditFilter {
   limit?: number;
 }
 
+/** Valores presentes no Audit Log, para os filtros da consulta. */
+export interface AuditFacets {
+  /** Quem já agiu, com o nome da entrada mais recente, em ordem alfabética. */
+  actors: { id: string; name: string }[];
+  plugins: string[];
+}
+
 /** Somente acréscimo: de propósito não há como alterar nem remover uma entrada. */
 export interface AuditStore {
   append(entry: LogEntry): Promise<void>;
   list(filter: AuditFilter): Promise<LogEntry[]>;
+  facets(): Promise<AuditFacets>;
 }
+
+const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "pt-BR");
 
 export function matchesFilter(e: LogEntry, f: AuditFilter): boolean {
   return (
@@ -55,5 +65,17 @@ export class MemoryAuditStore implements AuditStore {
       .filter((e) => matchesFilter(e, filter))
       .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
     return structuredClone(filter.limit ? rows.slice(0, filter.limit) : rows);
+  }
+
+  async facets(): Promise<AuditFacets> {
+    const latest = new Map<string, LogEntry>();
+    for (const e of this.entries) {
+      const seen = latest.get(e.actorId);
+      if (!seen || e.occurredAt > seen.occurredAt) latest.set(e.actorId, e);
+    }
+    return {
+      actors: [...latest.values()].map((e) => ({ id: e.actorId, name: e.actorName })).sort(byName),
+      plugins: [...new Set(this.entries.map((e) => e.plugin))].sort(),
+    };
   }
 }
