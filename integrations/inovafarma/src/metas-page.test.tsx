@@ -133,7 +133,7 @@ describe("Metas: Tipos de Meta", () => {
 
 describe("Metas: construtor de Tipo de Meta", () => {
   const DIPIRONA = "8F14E45F-CEEA-467F-A8F4-5E1D2C3B4A01";
-  const foco = { ...cmv, id: "tme_2", nome: "Foco", indicador: "foco-qtd", regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: 80, teto: null }, alvoPadrao: 50, premio: "…" };
+  const foco = { ...cmv, id: "tme_2", nome: "Foco", indicador: "incentivos-qtd", regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: 80, teto: null }, alvoPadrao: 50, premio: "…" };
   const venda = { ...cmv, id: "tme_3", nome: "Venda", indicador: "venda-liquida", regra: { tipo: "fixo", valorCentavos: 10000 }, alvoPadrao: null, premio: "…" };
   const mix = {
     ...cmv,
@@ -155,8 +155,8 @@ describe("Metas: construtor de Tipo de Meta", () => {
   const comTipos = () => {
     const padrao = apiFetch.getMockImplementation()!;
     apiFetch.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (url.endsWith("/metas/lista/conferir")) return { ausentes: [{ tipo: "grupo", id: "44" }] };
-      if (url.includes("/metas/lista/busca?tipo=secao")) return [{ tipo: "secao", id: "261", nome: "GENERICOS", detalhe: null }];
+      if (url.endsWith("/tipos-meta/lista/conferir")) return { ausentes: [{ tipo: "grupo", id: "44" }] };
+      if (url.includes("/tipos-meta/lista/busca?tipo=secao")) return [{ tipo: "secao", id: "261", nome: "GENERICOS", detalhe: null }];
       if (url.endsWith("/metas/tipos") && !init) return [cmv, foco, venda, mix];
       return padrao(url, init);
     });
@@ -185,7 +185,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
 
   it("mostra embaixo do Gatilho o valor equivalente com o Alvo padrão", async () => {
     const modal = await alterar("Foco");
-    expect(within(modal).getByText("= 40 un. com o Alvo padrão de 50 un.")).toBeTruthy();
+    expect(within(modal).getByText("= 40 incentivos com o Alvo padrão de 50")).toBeTruthy();
   });
 
   it("no Percentual do valor vendido, Calcular sobre começa no próprio Indicador em R$", async () => {
@@ -205,7 +205,61 @@ describe("Metas: construtor de Tipo de Meta", () => {
     fireEvent.input(within(modal).getByPlaceholderText("Buscar Seção no ERP"), { target: { value: "GEN" }, inputType: "insertText" });
     fireEvent.click(await screen.findByRole("option", { name: "GENERICOS" }));
     await waitFor(() => expect(linhas()).toContainEqual(expect.stringContaining("SeçãoGENERICOS")));
-    expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/lista/busca?tipo=secao&q=GEN");
+    expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/tipos-meta/lista/busca?tipo=secao&q=GEN");
+  });
+
+  it("ao trocar a Lista de R$ para unidades com Sem Alvo ligado, volta a Regra e a Exibição de antes", async () => {
+    const modal = await alterar("Mix");
+    await escolher(within(modal).getByRole("combobox", { name: "A Lista mede" }), "Valor vendido (R$)");
+    fireEvent.click(await within(modal).findByRole("switch", { name: "Sem Alvo (comissão pura)" }));
+    await waitFor(() => expect(within(modal).getByRole("combobox", { name: "Regra do Prêmio" }).textContent).toContain("Percentual do valor vendido"));
+    await escolher(within(modal).getByRole("combobox", { name: "A Lista mede" }), "Unidades vendidas");
+    await waitFor(() => expect(within(modal).getByRole("combobox", { name: "Regra do Prêmio" }).textContent).toContain("Fixo se atingir"));
+    expect(within(modal).getByRole("combobox", { name: "Exibição para o Colaborador" }).textContent).toContain("Atingida / Não atingida");
+    expect(within(modal).queryByRole("switch", { name: "Sem Alvo (comissão pura)" })).toBeNull();
+  });
+
+  it("não deixa trocar a unidade da Lista quando o Tipo de Meta já tem Metas", async () => {
+    const padrao = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation(async (url: string, init?: RequestInit) =>
+      url.endsWith("/metas/tipos") && !init ? [{ ...mix, temMetas: true }] : padrao(url, init),
+    );
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Alterar Tipo de Meta Mix" }));
+    const modal = await screen.findByRole("dialog");
+    expect(within(modal).getByRole("combobox", { name: "A Lista mede" }).hasAttribute("data-disabled")).toBe(true);
+    expect(within(modal).getByText("A unidade não muda: as Metas deste Tipo de Meta já têm Alvos nela.")).toBeTruthy();
+  });
+
+  it("Esc na busca da Lista fecha primeiro a busca, sem fechar o modal", async () => {
+    const modal = await alterar("Mix");
+    await escolher(within(modal).getByRole("combobox", { name: "Tipo da entrada" }), "Seção");
+    const busca = within(modal).getByPlaceholderText("Buscar Seção no ERP");
+    fireEvent.input(busca, { target: { value: "GEN" }, inputType: "insertText" });
+    expect(await screen.findByRole("option", { name: "GENERICOS" })).toBeTruthy();
+    fireEvent.keyDown(busca, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("option", { name: "GENERICOS" })).toBeNull());
+    expect(screen.getByRole("dialog")).toBe(modal);
+    // Com a busca fechada, o próximo Esc fecha o modal.
+    fireEvent.keyDown(busca, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("mostra o problema que impede salvar ao lado do campo, e a ordem de O que mede", async () => {
+    const modal = await alterar("Venda");
+    const rotulos = within(modal).getAllByText(/^(Nome|Indicador|Sem Alvo \(comissão pura\)|Alvo padrão \(opcional\)|Exibição para o Colaborador|Mostrar o Prêmio ao Colaborador)$/);
+    expect(rotulos.map((r) => r.textContent)).toEqual(["Nome", "Indicador", "Sem Alvo (comissão pura)", "Alvo padrão (opcional)", "Exibição para o Colaborador", "Mostrar o Prêmio ao Colaborador"]);
+    await escolher(within(modal).getByRole("combobox", { name: "Regra do Prêmio" }), "Faixas");
+    fireEvent.click(within(modal).getByRole("button", { name: "Adicionar Faixa" }));
+    fireEvent.change(within(modal).getByLabelText("Atingimento da Faixa 2"), { target: { value: "100" } });
+    fireEvent.click(within(modal).getByRole("button", { name: "Salvar" }));
+    const erro = await waitFor(() => {
+      const achado = within(modal).getAllByText("Duas Faixas não podem ter o mesmo Atingimento.").find((e) => e.getAttribute("role") === "alert");
+      expect(achado).toBeTruthy();
+      return achado!;
+    });
+    // Logo abaixo das Faixas, antes do botão de adicionar outra.
+    expect(erro.nextElementSibling?.textContent).toContain("Adicionar Faixa");
   });
 });
 

@@ -17,7 +17,7 @@ import { Switch } from "@platform/ui/components/switch";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
-import { INDICADORES, formatarValor, indicadorPorId, valorNoAtingimento, type Indicador, type IndicadorId } from "./indicadores";
+import { INDICADORES, comUnidade, formatarValor, indicadorPorId, valorNoAtingimento, type Indicador, type IndicadorId } from "./indicadores";
 import { ListaProdutosCampo } from "./lista-produtos-campo";
 import {
   EXIBICAO_LABEL,
@@ -26,30 +26,35 @@ import {
   UNIDADES_LISTA,
   UNIDADE_LISTA_LABEL,
   descreverPremio,
-  ehValorVendido,
   indicadorDoTipo,
-  problemaDoTipo,
+  problemaNoCampo,
+  temLista,
+  type CampoDoTipo,
+  type ProblemaDoTipo,
   type UnidadeLista,
   type DadosTipoMeta, type Exibicao, type RegraPremio, type TipoMeta, type TipoRegra } from "./tipos-meta";
 
 export const BASE = "/api/m/inovafarma/metas/tipos";
 
-export type TipoMetaComPremio = TipoMeta & { premio: string };
+/** Como a API devolve o Tipo de Meta: com a prévia do Prêmio e se já tem Metas em algum Período. */
+export type TipoMetaComPremio = TipoMeta & { premio: string; temMetas?: boolean };
 
 const json = (method: string, body: unknown) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 /** Indicadores de valor vendido em R$, base do Percentual. */
-const BASES_PERCENTUAL = INDICADORES.filter(ehValorVendido);
+const BASES_PERCENTUAL = INDICADORES.filter((i: Indicador) => Boolean(i.valorVendido));
 
 /** O Indicador com a unidade escolhida (a Lista de Produtos mede unidades ou R$). */
 const indicadorDe = (indicador: IndicadorId, unidadeLista: UnidadeLista) => indicadorDoTipo({ indicador, lista: { unidade: unidadeLista } });
 
 /** Bases do Percentual: os Indicadores em R$ e, num Tipo de Lista em R$, a própria Lista. */
-const basesPercentual = (indicador: IndicadorId, unidadeLista: UnidadeLista) =>
-  indicador === "lista-produtos" && unidadeLista === "reais" ? [indicadorDe(indicador, unidadeLista), ...BASES_PERCENTUAL] : BASES_PERCENTUAL;
+const basesPercentual = (indicador: IndicadorId, unidadeLista: UnidadeLista): Indicador[] => {
+  const proprio = indicadorDe(indicador, unidadeLista);
+  return temLista(indicador) && proprio.valorVendido ? [proprio, ...BASES_PERCENTUAL] : BASES_PERCENTUAL;
+};
 
 /** Sem Alvo, o Prêmio é um Percentual do próprio Indicador: só vale para Indicadores que servem de base. */
-const podeSemAlvo = (indicador: IndicadorId, unidadeLista: UnidadeLista) => ehValorVendido(indicadorDe(indicador, unidadeLista));
+const podeSemAlvo = (indicador: IndicadorId, unidadeLista: UnidadeLista) => Boolean(indicadorDe(indicador, unidadeLista).valorVendido);
 
 /** "Calcular sobre" começa no próprio Indicador quando ele é em R$; senão, vazio. */
 const baseInicial = (indicador: IndicadorId, unidadeLista: UnidadeLista): IndicadorId | "" => (podeSemAlvo(indicador, unidadeLista) ? indicador : "");
@@ -81,8 +86,6 @@ type Valores = z.infer<typeof schema>;
 
 const centavos = (reais: number) => Math.round(reais * 100);
 const numeroOuNull = (v: string) => (v.trim() === "" ? null : Number(v.replace(",", ".")));
-/** Valor na unidade do Indicador, com "un." nas quantidades. */
-const comUnidade = (indicador: Indicador, valor: number) => `${formatarValor(indicador, valor)}${indicador.unidade === "quantidade" ? " un." : ""}`;
 
 /** Opções de regra que fazem sentido para o Indicador (sem Proporcional quando menor é melhor). */
 export function regrasPermitidas(indicador: IndicadorId, semAlvo: boolean): TipoRegra[] {
@@ -123,15 +126,16 @@ export function dadosDe(v: Valores): DadosTipoMeta {
     semAlvo: v.semAlvo,
     regra: regraDe(v),
     alvoPadrao: alvo === null ? null : emReais ? centavos(alvo) : alvo,
-    lista: v.indicador === "lista-produtos" && v.entradas.length > 0 ? { entradas: v.entradas, unidade: v.unidadeLista } : null,
+    lista: temLista(v.indicador) && v.entradas.length > 0 ? { entradas: v.entradas, unidade: v.unidadeLista } : null,
     ativo: v.ativo,
   };
 }
 
-/** O que impede salvar, na ordem em que o gestor preenche; null se o Tipo de Meta é válido. */
-function problemaDoFormulario(v: Valores, dados: DadosTipoMeta): string | null {
-  if (v.regraTipo === "percentual" && !v.semAlvo && !v.indicadorBase) return "Escolha em “Calcular sobre” o Indicador em R$ que é a base do Percentual.";
-  return problemaDoTipo(dados);
+/** O que impede salvar e o campo a que se refere, na ordem em que o gestor preenche; null se o Tipo de Meta é válido. */
+function problemaDoFormulario(v: Valores, dados: DadosTipoMeta): ProblemaDoTipo | null {
+  if (v.regraTipo === "percentual" && !v.semAlvo && !v.indicadorBase)
+    return { campo: "indicadorBase", mensagem: "Escolha em “Calcular sobre” o Indicador em R$ que é a base do Percentual." };
+  return problemaNoCampo(dados);
 }
 
 function iniciais(tipo?: TipoMeta): Valores {
@@ -170,7 +174,7 @@ export interface TipoMetaSalvo {
  * Janela larga para cadastrar ou alterar um Tipo de Meta: "O que mede" à esquerda, "Como paga" à direita e a Prévia do
  * Prêmio embaixo, sempre visível. Resolve quando salva; pede confirmação ao fechar com alterações.
  */
-export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
+export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolean } }) {
   const { resolve, setDirtyCheck } = useWindow<TipoMetaSalvo>();
   const { feedback } = useUi();
   const inicial = useRef(iniciais(tipo));
@@ -191,10 +195,20 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
     return () => setDirtyCheck(null);
   }, [setDirtyCheck, form]);
 
-  /** Ao trocar o Indicador ou o "sem Alvo", leva a regra e a Exibição para uma opção válida. */
+  /**
+   * Ao trocar o Indicador, a unidade da Lista ou o "sem Alvo", leva a regra e a Exibição para uma opção válida. Quando o
+   * Sem Alvo desliga, por qualquer motivo, volta a Regra e a Exibição que estavam antes de ligar.
+   */
   const ajustar = (indicadorId: IndicadorId, semAlvoPedido: boolean) => {
     const semAlvo = semAlvoPedido && podeSemAlvo(indicadorId, form.getValues("unidadeLista"));
-    if (semAlvo !== form.getValues("semAlvo")) form.setValue("semAlvo", semAlvo, { shouldDirty: true });
+    const estava = form.getValues("semAlvo");
+    if (semAlvo && !estava) antesDoSemAlvo.current = { regraTipo: form.getValues("regraTipo"), exibicao: form.getValues("exibicao") };
+    if (!semAlvo && estava && antesDoSemAlvo.current) {
+      form.setValue("regraTipo", antesDoSemAlvo.current.regraTipo, { shouldDirty: true });
+      form.setValue("exibicao", antesDoSemAlvo.current.exibicao, { shouldDirty: true });
+      antesDoSemAlvo.current = null;
+    }
+    if (semAlvo !== estava) form.setValue("semAlvo", semAlvo, { shouldDirty: true });
     const permitidas = regrasPermitidas(indicadorId, semAlvo);
     if (!permitidas.includes(form.getValues("regraTipo"))) form.setValue("regraTipo", permitidas[0]!, { shouldDirty: true });
     const exib = exibicoesPermitidas(semAlvo);
@@ -206,7 +220,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
     const corpo = dadosDe(valores);
     const erro = problemaDoFormulario(valores, corpo);
     if (erro) {
-      feedback.notifyError(new Error(erro));
+      feedback.notifyError(new Error(erro.mensagem));
       return;
     }
     try {
@@ -220,12 +234,26 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
     }
   };
 
-  /** Com Alvo padrão, o % de Atingimento na unidade do Indicador (ex.: "= 40 un. com o Alvo padrão de 50 un."). */
+  /**
+   * Com Alvo padrão, o % de Atingimento na unidade do Indicador: com o nome da unidade quando o Indicador tem
+   * (ex.: "= 40 incentivos com o Alvo padrão de 50"); senão, "un." nas quantidades (ex.: "= 40 un. com o Alvo padrão de 50 un.").
+   */
   const equivalente = (texto: string | undefined): string | null => {
     const pct = numeroOuNull(texto ?? "");
     if (dados.alvoPadrao === null || pct === null || !Number.isFinite(pct) || pct <= 0) return null;
-    return `= ${comUnidade(indicador, valorNoAtingimento(indicador, dados.alvoPadrao, pct))} com o Alvo padrão de ${comUnidade(indicador, dados.alvoPadrao)}`;
+    const valor = valorNoAtingimento(indicador, dados.alvoPadrao, pct);
+    return indicador.substantivo
+      ? `= ${formatarValor(indicador, valor)} ${indicador.substantivo} com o Alvo padrão de ${formatarValor(indicador, dados.alvoPadrao)}`
+      : `= ${comUnidade(indicador, valor)} com o Alvo padrão de ${comUnidade(indicador, dados.alvoPadrao)}`;
   };
+
+  /** O problema que impede salvar, ao lado do campo a que se refere, depois da primeira tentativa de salvar. */
+  const erroEm = (campo: CampoDoTipo) =>
+    tentouSalvar && problema?.campo === campo ? (
+      <Text variant="small" tone="destructive" role="alert">
+        {problema.mensagem}
+      </Text>
+    ) : null;
 
   const percentualCampo = (name: "gatilho" | "teto" | "percentual", label: string, comEquivalente = false) => (
     <FormField
@@ -243,6 +271,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
             </InputGroup>
           </FormControl>
           {comEquivalente && equivalente(field.value) && <FormDescription>{equivalente(field.value)}</FormDescription>}
+          {name === "teto" && erroEm("teto")}
           <FormMessage />
         </FormItem>
       )}
@@ -331,46 +360,42 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
           <FormControl>
             <Switch
               checked={field.value}
-              onCheckedChange={(semAlvo: boolean) => {
-                // Ao desligar, volta a Regra e a Exibição que estavam antes de ligar.
-                if (semAlvo) antesDoSemAlvo.current = { regraTipo: form.getValues("regraTipo"), exibicao: form.getValues("exibicao") };
-                else if (antesDoSemAlvo.current) {
-                  form.setValue("regraTipo", antesDoSemAlvo.current.regraTipo, { shouldDirty: true });
-                  form.setValue("exibicao", antesDoSemAlvo.current.exibicao, { shouldDirty: true });
-                }
-                field.onChange(semAlvo);
-                ajustar(form.getValues("indicador"), semAlvo);
-              }}
+              onCheckedChange={(semAlvo: boolean) => ajustar(form.getValues("indicador"), semAlvo)}
               aria-label="Sem Alvo (comissão pura)"
             />
           </FormControl>
           <FormDescription>Paga um percentual do que foi vendido, sem Alvo a atingir.</FormDescription>
+          {erroEm("semAlvo")}
         </FormItem>
       )}
     />
   );
 
   /** No Tipo de Lista, a base pode ser a própria Lista (em R$). */
-  const nomeBase = (id: IndicadorId) => (id === "lista-produtos" ? "Lista de Produtos deste Tipo de Meta" : indicadorPorId(id)?.nome);
+  const nomeBase = (id: IndicadorId) => (temLista(id) ? "Lista de Produtos deste Tipo de Meta" : indicadorPorId(id)?.nome);
 
   /** Ao trocar a unidade da Lista, o Alvo padrão recomeça (outra unidade) e o Sem Alvo e a base do Percentual se ajustam. */
   const trocarUnidade = (unidade: UnidadeLista) => {
     form.setValue("unidadeLista", unidade, { shouldDirty: true });
     form.setValue("alvoPadrao", "", { shouldDirty: true });
     const base = form.getValues("indicadorBase");
-    if (unidade === "reais" && base === "") form.setValue("indicadorBase", "lista-produtos", { shouldDirty: true });
-    if (unidade === "unidades" && base === "lista-produtos") form.setValue("indicadorBase", "", { shouldDirty: true });
+    const propria = form.getValues("indicador");
+    if (unidade === "reais" && base === "") form.setValue("indicadorBase", propria, { shouldDirty: true });
+    if (unidade === "unidades" && base === propria) form.setValue("indicadorBase", "", { shouldDirty: true });
     ajustar(form.getValues("indicador"), form.getValues("semAlvo"));
   };
 
-  const unidadeCampo = v.indicador === "lista-produtos" && (
+  /** Os Alvos gravados nas Metas estão na unidade da Lista: com Metas, ela não muda (o servidor também recusa). */
+  const unidadeFixa = Boolean(tipo?.temMetas);
+
+  const unidadeCampo = temLista(v.indicador) && (
     <FormField
       control={form.control}
       name="unidadeLista"
       render={({ field }) => (
         <FormItem>
           <FormLabel>A Lista mede</FormLabel>
-          <Select value={field.value} onValueChange={(u) => u && trocarUnidade(u as UnidadeLista)}>
+          <Select value={field.value} disabled={unidadeFixa} onValueChange={(u) => u && trocarUnidade(u as UnidadeLista)}>
             <FormControl>
               <SelectTrigger aria-label="A Lista mede">
                 <SelectValue>{(u: UnidadeLista) => UNIDADE_LISTA_LABEL[u]}</SelectValue>
@@ -384,13 +409,17 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
               ))}
             </SelectContent>
           </Select>
-          <FormDescription>Soma tudo o que foi vendido da Lista, com as regras da Venda Líquida; cada produto conta uma vez.</FormDescription>
+          <FormDescription>
+            {unidadeFixa
+              ? "A unidade não muda: as Metas deste Tipo de Meta já têm Alvos nela."
+              : "Soma tudo o que foi vendido da Lista, com as regras da Venda Líquida; cada produto conta uma vez."}
+          </FormDescription>
         </FormItem>
       )}
     />
   );
 
-  const listaCampo = v.indicador === "lista-produtos" && (
+  const listaCampo = temLista(v.indicador) && (
     <FormField
       control={form.control}
       name="entradas"
@@ -398,7 +427,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
         <ListaProdutosCampo
           entradas={field.value}
           onChange={field.onChange}
-          erro={tentouSalvar && field.value.length === 0 ? "Adicione pelo menos uma entrada à Lista." : null}
+          erro={tentouSalvar && problema?.campo === "lista" ? problema.mensagem : null}
         />
       )}
     />
@@ -426,6 +455,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
           <FormDescription>
             {avaliacoes ? "Valor com que cada Participante começa o Período." : "Alvo com que cada Participante entra na Meta; dá para mudar por Participante em Montar Metas."}
           </FormDescription>
+          {erroEm("alvoPadrao")}
           <FormMessage />
         </FormItem>
       )}
@@ -453,6 +483,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
               ))}
             </SelectContent>
           </Select>
+          {erroEm("exibicao")}
         </FormItem>
       )}
     />
@@ -509,6 +540,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
               ))}
             </SelectContent>
           </Select>
+          {erroEm("regra")}
         </FormItem>
       )}
     />
@@ -566,6 +598,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
           )}
         </Stack>
       ))}
+      {erroEm("faixas")}
       <Button type="button" variant="outline" onClick={() => faixas.append({ atingimento: "", valor: 0 })}>
         <Plus />
         Adicionar Faixa
@@ -598,6 +631,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
                 </SelectContent>
               </Select>
               <FormDescription>O valor vendido no Período sobre o qual o Percentual é calculado.</FormDescription>
+              {erroEm("indicadorBase")}
             </FormItem>
           )}
         />
@@ -632,10 +666,10 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
                 <FieldGroup>
                   {nomeCampo}
                   {indicadorCampo}
-                  {listaCampo}
-                  {unidadeCampo}
                   {semAlvoCampo}
                   {alvoCampo}
+                  {unidadeCampo}
+                  {listaCampo}
                   {exibicaoCampo}
                   {mostrarPremioCampo}
                   {ativoCampo}
@@ -662,7 +696,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
             </Grid>
             <Alert variant={problema ? "destructive" : "default"} aria-live="polite">
               <AlertTitle>Prévia do Prêmio</AlertTitle>
-              <AlertDescription>{problema ?? descreverPremio(dados)}</AlertDescription>
+              <AlertDescription>{problema?.mensagem ?? descreverPremio(dados)}</AlertDescription>
             </Alert>
           </Stack>
         </form>

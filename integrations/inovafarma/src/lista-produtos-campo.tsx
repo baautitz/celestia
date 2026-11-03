@@ -8,12 +8,10 @@ import { Stack, Text } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { apiFetch } from "@platform/ui/lib/api";
-import { TIPOS_ENTRADA, TIPO_ENTRADA_LABEL, ordenarEntradas, type EntradaLista, type TipoEntrada } from "./tipos-meta";
+import { MIN_BUSCA_LISTA, TIPOS_ENTRADA, TIPO_ENTRADA_LABEL, ordenarEntradas, type EntradaLista, type TipoEntrada } from "./tipos-meta";
 
-const BASE_LISTA = "/api/m/inovafarma/metas/lista";
+const BASE_LISTA = "/api/m/inovafarma/tipos-meta/lista";
 const ESPERA_BUSCA_MS = 300;
-/** Mínimo de caracteres por tipo, como o servidor. */
-const MIN_BUSCA: Record<TipoEntrada, number> = { produto: 3, grupo: 1, secao: 1, laboratorio: 2 };
 
 const NENHUM: Record<TipoEntrada, string> = {
   produto: "Nenhum Produto encontrado.",
@@ -65,7 +63,7 @@ export function ListaProdutosCampo({ entradas, onChange, erro }: { entradas: Ent
 
   useEffect(() => {
     const q = termo.trim();
-    if (q.length < MIN_BUSCA[tipo]) {
+    if (q.length < MIN_BUSCA_LISTA[tipo]) {
       setBusca({ estado: "parado" });
       return;
     }
@@ -91,8 +89,8 @@ export function ListaProdutosCampo({ entradas, onChange, erro }: { entradas: Ent
   const nomeTipo = TIPO_ENTRADA_LABEL[tipo];
   const achados = busca.estado === "pronto" ? busca.achados : [];
   const vazio =
-    termo.trim().length < MIN_BUSCA[tipo]
-      ? `Digite ao menos ${MIN_BUSCA[tipo]} caracteres.`
+    termo.trim().length < MIN_BUSCA_LISTA[tipo]
+      ? `Digite ao menos ${MIN_BUSCA_LISTA[tipo]} caracteres.`
       : busca.estado === "carregando"
         ? "Buscando no ERP…"
         : busca.estado === "erro"
