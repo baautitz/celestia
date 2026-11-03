@@ -79,8 +79,12 @@ One of a list of reasons, kept by the customer, that classifies a Justificativa 
 _Avoid_: Causa, Tipo
 
 **Furo de Estoque** (en: Stock Shortfall):
-The report that gathers the Ajustes de Estoque of a Closing Period with their Justificativas. The Ajustes without a Justificativa are what the business treats as the unexplained shortfall.
+The report that gathers the Ajustes de Estoque of a Closing Period with their Justificativas. The **Furo** itself is the cost of the outgoing (`-`) Ajustes without a Justificativa: it is summed without sign and never offset by incoming Ajustes.
 _Avoid_: Perda, Quebra
+
+**Entrada não justificada** (en: Unjustified Incoming Adjustment):
+An incoming (`+`) Ajuste de Estoque without a Justificativa. It needs a Justificativa like any other Ajuste, but it is reported apart from the Furo and never reduces it, since it can hide an outgoing one.
+_Avoid_: Sobra
 
 ### Metas
 
