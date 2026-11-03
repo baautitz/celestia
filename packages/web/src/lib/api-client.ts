@@ -11,6 +11,7 @@ import type {
   Erp,
   ErpInput,
   AuditLogEntry,
+  AuditLogFacets,
   AuditLogFilter,
   Device,
   IssuedDevice,
@@ -252,8 +253,15 @@ class ApiClient {
   audit = {
     list: async (filter: AuditLogFilter = {}): Promise<AuditLogEntry[]> => {
       const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(filter)) if (value) params.set(key, value);
+      const { from, to, ...rest } = filter;
+      for (const [key, value] of Object.entries(rest)) if (value) params.set(key, value);
+      // As datas do filtro são dias locais: "De" vale do início do dia e "Até" inclui o dia inteiro.
+      if (from) params.set("from", new Date(`${from}T00:00:00`).toISOString());
+      if (to) params.set("to", new Date(`${to}T23:59:59.999`).toISOString());
       return this.request<AuditLogEntry[]>(`/api/audit?${params.toString()}`);
+    },
+    facets: async (): Promise<AuditLogFacets> => {
+      return this.request<AuditLogFacets>("/api/audit/facets");
     },
   };
 

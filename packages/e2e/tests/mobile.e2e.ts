@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ADMIN_PASSWORD, ADMIN_USERNAME } from "./credentials";
 
-const PAGES = ["Usuários", "Grupos", "Dispositivos", "ERPs", "Períodos de Fechamento"];
+const PAGES = ["Usuários", "Grupos", "Dispositivos", "ERPs", "Períodos de Fechamento", "Auditoria"];
 
 /** Campos com fonte menor que 16px fazem o Safari do iPhone dar zoom ao focar. */
 async function smallInputs(page: Page): Promise<string[]> {
