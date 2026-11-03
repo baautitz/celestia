@@ -70,7 +70,8 @@ const schema = z.object({
   valor: z.number(),
   gatilho: z.string(),
   teto: z.string(),
-  faixas: z.array(z.object({ atingimento: z.string(), valor: z.number() })),
+  /** `percentual`: % do Prêmio nas Faixas em % do Prêmio; vazio paga o próprio % Atingido. */
+  faixas: z.array(z.object({ atingimento: z.string(), valor: z.number(), percentual: z.string() })),
   percentual: z.string(),
   /** Vazio enquanto o gestor não escolhe a base do Percentual. */
   indicadorBase: z.string() as z.ZodType<IndicadorId | "">,
@@ -91,7 +92,7 @@ const numeroOuNull = (v: string) => (v.trim() === "" ? null : Number(v.replace("
 export function regrasPermitidas(indicador: IndicadorId, semAlvo: boolean): TipoRegra[] {
   if (indicador === "avaliacoes") return ["saldo"];
   if (semAlvo) return ["percentual"];
-  const regras: TipoRegra[] = ["fixo", "proporcional", "faixas", "percentual"];
+  const regras: TipoRegra[] = ["fixo", "proporcional", "faixas", "faixasPercentuais", "percentual"];
   return indicadorPorId(indicador).direcao === "menor" ? regras.filter((r) => r !== "proporcional") : regras;
 }
 
@@ -107,6 +108,15 @@ function regraDe(v: Valores): RegraPremio {
       return { tipo: "proporcional", valorCentavos: centavos(v.valor), gatilho: numeroOuNull(v.gatilho), teto: numeroOuNull(v.teto) };
     case "faixas":
       return { tipo: "faixas", faixas: v.faixas.map((f) => ({ atingimento: Number(f.atingimento.replace(",", ".")) || 0, valorCentavos: centavos(f.valor) })) };
+    case "faixasPercentuais":
+      return {
+        tipo: "faixasPercentuais",
+        valorCentavos: centavos(v.valor),
+        faixas: v.faixas.map((f) => {
+          const atingimento = Number(f.atingimento.replace(",", ".")) || 0;
+          return { atingimento, percentual: numeroOuNull(f.percentual) ?? atingimento };
+        }),
+      };
     case "percentual":
       return { tipo: "percentual", percentual: numeroOuNull(v.percentual) ?? 0, indicadorBase: (v.semAlvo ? v.indicador : v.indicadorBase) as IndicadorId, soSeAtingir: !v.semAlvo && v.soSeAtingir };
     case "saldo":
@@ -150,10 +160,15 @@ function iniciais(tipo?: TipoMeta): Valores {
     exibicao: tipo?.exibicao ?? "atingida",
     mostrarPremio: tipo?.mostrarPremio ?? false,
     regraTipo: r?.tipo ?? "fixo",
-    valor: r && (r.tipo === "fixo" || r.tipo === "proporcional") ? r.valorCentavos / 100 : 0,
+    valor: r && (r.tipo === "fixo" || r.tipo === "proporcional" || r.tipo === "faixasPercentuais") ? r.valorCentavos / 100 : 0,
     gatilho: r?.tipo === "proporcional" && r.gatilho !== null ? String(r.gatilho) : "",
     teto: r?.tipo === "proporcional" && r.teto !== null ? String(r.teto) : "",
-    faixas: r?.tipo === "faixas" ? r.faixas.map((f) => ({ atingimento: String(f.atingimento), valor: f.valorCentavos / 100 })) : [{ atingimento: "100", valor: 0 }],
+    faixas:
+      r?.tipo === "faixas"
+        ? r.faixas.map((f) => ({ atingimento: String(f.atingimento), valor: f.valorCentavos / 100, percentual: "" }))
+        : r?.tipo === "faixasPercentuais"
+          ? r.faixas.map((f) => ({ atingimento: String(f.atingimento), valor: 0, percentual: f.percentual === f.atingimento ? "" : String(f.percentual) }))
+          : [{ atingimento: "100", valor: 0, percentual: "" }],
     percentual: r?.tipo === "percentual" ? String(r.percentual) : "",
     indicadorBase: r?.tipo === "percentual" ? r.indicadorBase : baseInicial(indicador, unidadeLista),
     soSeAtingir: r?.tipo === "percentual" ? r.soSeAtingir : true,
@@ -546,9 +561,10 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
     />
   );
 
+  const emPercentual = v.regraTipo === "faixasPercentuais";
   const faixasCampo = (
     <Stack gap="field">
-      <Label>Faixas (% Atingido e Prêmio)</Label>
+      <Label>{emPercentual ? "Faixas (% Atingido e % do Prêmio)" : "Faixas (% Atingido e Prêmio)"}</Label>
       {faixas.fields.map((f, i) => (
         <Stack key={f.id} gap="tight">
           <Stack direction="row" gap="field" align="end">
@@ -568,17 +584,36 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name={`faixas.${i}.valor`}
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <MoneyInput value={field.value} onValueChange={field.onChange} aria-label={`Prêmio da Faixa ${i + 1}`} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            {emPercentual ? (
+              <FormField
+                control={form.control}
+                name={`faixas.${i}.percentual`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <InputGroup>
+                        <InputGroupInput inputMode="decimal" placeholder={v.faixas[i]?.atingimento ?? ""} aria-label={`% do Prêmio da Faixa ${i + 1}`} {...field} />
+                        <InputGroupAddon align="inline-end">
+                          <InputGroupText>% do Prêmio</InputGroupText>
+                        </InputGroupAddon>
+                      </InputGroup>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name={`faixas.${i}.valor`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <MoneyInput value={field.value} onValueChange={field.onChange} aria-label={`Prêmio da Faixa ${i + 1}`} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
             <Button
               type="button"
               size="icon"
@@ -599,7 +634,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
         </Stack>
       ))}
       {erroEm("faixas")}
-      <Button type="button" variant="outline" onClick={() => faixas.append({ atingimento: "", valor: 0 })}>
+      <Button type="button" variant="outline" onClick={() => faixas.append({ atingimento: "", valor: 0, percentual: "" })}>
         <Plus />
         Adicionar Faixa
       </Button>
@@ -690,6 +725,12 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
                     </>
                   )}
                   {v.regraTipo === "faixas" && faixasCampo}
+                  {v.regraTipo === "faixasPercentuais" && (
+                    <>
+                      {valorCampo("Prêmio a 100% atingido")}
+                      {faixasCampo}
+                    </>
+                  )}
                   {v.regraTipo === "percentual" && percentualCampos}
                 </FieldGroup>
               </Stack>

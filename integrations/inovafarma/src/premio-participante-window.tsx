@@ -21,6 +21,8 @@ export function resumoPremio(regra: RegraPremio): string {
       return `${reais(regra.valorCentavos)} a 100%`;
     case "faixas":
       return regra.faixas.map((f) => reais(f.valorCentavos)).join(" / ");
+    case "faixasPercentuais":
+      return `${regra.faixas.map((f) => porcentagem(f.percentual)).join(" / ")} de ${reais(regra.valorCentavos)}`;
     case "percentual":
       return porcentagem(regra.percentual);
     case "saldo":
@@ -44,6 +46,7 @@ export function PremioParticipanteWindow<M extends MetaDoPremio>({ meta, partici
   const proprio = Boolean(participante.premio && participante.premio.tipo === meta.tipo.regra.tipo);
   const [regra, setRegra] = useState<RegraPremio>(() => regraDoParticipante(meta.tipo.regra, participante));
   const [percentual, setPercentual] = useState(regra.tipo === "percentual" ? String(regra.percentual).replace(".", ",") : "");
+  const [percentuaisFaixas, setPercentuaisFaixas] = useState(regra.tipo === "faixasPercentuais" ? regra.faixas.map((f) => String(f.percentual).replace(".", ",")) : []);
   const [enviando, setEnviando] = useState(false);
 
   const gravar = async (premio: RegraPremio | null) => {
@@ -67,7 +70,7 @@ export function PremioParticipanteWindow<M extends MetaDoPremio>({ meta, partici
   return (
     <>
       <Stack gap="section">
-        {(regra.tipo === "fixo" || regra.tipo === "proporcional") && (
+        {(regra.tipo === "fixo" || regra.tipo === "proporcional" || regra.tipo === "faixasPercentuais") && (
           <Stack gap="field">
             <Label>{regra.tipo === "fixo" ? "Prêmio se atingir" : "Prêmio a 100% atingido"}</Label>
             <MoneyInput autoFocus value={regra.valorCentavos / 100} onValueChange={(v) => setRegra({ ...regra, valorCentavos: centavos(v) })} aria-label="Valor do Prêmio" />
@@ -81,6 +84,22 @@ export function PremioParticipanteWindow<M extends MetaDoPremio>({ meta, partici
                 value={f.valorCentavos / 100}
                 onValueChange={(v) => setRegra({ ...regra, faixas: regra.faixas.map((x, j) => (j === i ? { ...x, valorCentavos: centavos(v) } : x)) })}
                 aria-label={`Prêmio da Faixa ${i + 1}`}
+              />
+            </Stack>
+          ))}
+        {regra.tipo === "faixasPercentuais" &&
+          regra.faixas.map((f, i) => (
+            <Stack key={i} gap="field">
+              <Label>{`Faixa ${i + 1}: a partir de ${porcentagem(f.atingimento)} atingido (% do Prêmio)`}</Label>
+              <Input
+                inputMode="decimal"
+                value={percentuaisFaixas[i] ?? ""}
+                aria-label={`% do Prêmio da Faixa ${i + 1}`}
+                onChange={(e) => {
+                  setPercentuaisFaixas((atuais) => atuais.map((x, j) => (j === i ? e.target.value : x)));
+                  const n = Number(e.target.value.replace(",", "."));
+                  if (Number.isFinite(n) && n > 0) setRegra({ ...regra, faixas: regra.faixas.map((x, j) => (j === i ? { ...x, percentual: n } : x)) });
+                }}
               />
             </Stack>
           ))}

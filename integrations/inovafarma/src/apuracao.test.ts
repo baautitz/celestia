@@ -31,6 +31,12 @@ describe("Apuração de um Participante", () => {
     expect(r.resultado).toBe("CMV 25% · Meta: até 30% · ✓ 5 p.p. abaixo");
   });
 
+  it("nas Faixas em % do Prêmio, paga o % da maior Faixa atingida sobre o Prêmio a 100%", () => {
+    const regra = { tipo: "faixasPercentuais" as const, valorCentavos: 100000, faixas: [{ atingimento: 100, percentual: 100 }, { atingimento: 80, percentual: 80 }, { atingimento: 90, percentual: 90 }] };
+    const premio = (realizado: number) => apurarParticipante(tipo({ regra }), ana(100), dados({ indicadores: { "foco-qtd": realizado } })).premioCentavos;
+    expect([premio(79), premio(87), premio(90), premio(130)]).toEqual([0, 80000, 90000, 100000]);
+  });
+
   it("em que menor é melhor, sem vendas no Período não é Atingida nem paga", () => {
     const semVendas = (d: DadosColaborador) => apurarParticipante(tipo({ indicador: "cmv", regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: null, teto: null } }), ana(30), d);
     for (const d of [dados(), dados({ indicadores: { cmv: 0 } })]) {

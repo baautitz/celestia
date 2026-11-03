@@ -43,6 +43,10 @@ function premio(regra: RegraPremio, atingimento: number | null, atingida: boolea
       return Math.round((regra.valorCentavos * Math.min(pct, regra.teto ?? Infinity)) / 100);
     case "faixas":
       return regra.faixas.filter((f) => pct >= f.atingimento).reduce((maior, f) => (f.atingimento > maior.atingimento ? f : maior), { atingimento: -1, valorCentavos: 0 }).valorCentavos;
+    case "faixasPercentuais": {
+      const faixa = regra.faixas.filter((f) => pct >= f.atingimento).reduce<{ atingimento: number; percentual: number } | null>((maior, f) => (!maior || f.atingimento > maior.atingimento ? f : maior), null);
+      return faixa ? Math.round((regra.valorCentavos * faixa.percentual) / 100) : 0;
+    }
     case "percentual":
       if (regra.soSeAtingir && !atingida) return 0;
       return Math.round(((dados.indicadores[regra.indicadorBase] ?? 0) * regra.percentual) / 100);

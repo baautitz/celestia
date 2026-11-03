@@ -60,6 +60,12 @@ export const RegraPremio = z.discriminatedUnion("tipo", [
     tipo: z.literal("faixas"),
     faixas: z.array(z.object({ atingimento: Pct, valorCentavos: Centavos })).min(1, "Informe ao menos uma Faixa.").max(20),
   }),
+  /** Faixas que pagam um % do Prêmio a 100% atingido, em degraus. */
+  z.object({
+    tipo: z.literal("faixasPercentuais"),
+    valorCentavos: Centavos,
+    faixas: z.array(z.object({ atingimento: Pct, percentual: Pct })).min(1, "Informe ao menos uma Faixa.").max(20),
+  }),
   z.object({ tipo: z.literal("percentual"), percentual: Pct.max(100), indicadorBase: z.enum(INDICADOR_IDS), soSeAtingir: z.boolean() }),
   /** Meta de Avaliações: o Prêmio é o Saldo. */
   z.object({ tipo: z.literal("saldo") }),
@@ -69,7 +75,8 @@ export type TipoRegra = RegraPremio["tipo"];
 export const REGRA_LABEL: Record<TipoRegra, string> = {
   fixo: "Fixo se atingir",
   proporcional: "Proporcional ao % Atingido",
-  faixas: "Faixas",
+  faixas: "Faixas em R$",
+  faixasPercentuais: "Faixas em % do Prêmio",
   percentual: "Percentual do valor vendido",
   saldo: "Saldo das Avaliações",
 };
@@ -133,7 +140,7 @@ export function problemaNoCampo(t: DadosTipoMeta): ProblemaDoTipo | null {
     const base = t.regra.indicadorBase === t.indicador ? indicador : temLista(t.regra.indicadorBase) ? null : indicadorPorId(t.regra.indicadorBase);
     if (!base?.valorVendido) return problemaEm("indicadorBase", "O Percentual se aplica a um Indicador de valor vendido em R$.");
   }
-  if (t.regra.tipo === "faixas" && new Set(t.regra.faixas.map((f) => f.atingimento)).size !== t.regra.faixas.length) return problemaEm("faixas", "Duas Faixas não podem ter o mesmo % Atingido.");
+  if ((t.regra.tipo === "faixas" || t.regra.tipo === "faixasPercentuais") && new Set(t.regra.faixas.map((f) => f.atingimento)).size !== t.regra.faixas.length) return problemaEm("faixas", "Duas Faixas não podem ter o mesmo % Atingido.");
   if (t.semAlvo) {
     if (t.regra.tipo !== "percentual" || t.regra.soSeAtingir) return problemaEm("regra", "Um Tipo de Meta sem Alvo só paga o Percentual, sem depender de atingir.");
     if (t.regra.indicadorBase !== t.indicador) return problemaEm("indicadorBase", "Um Tipo de Meta sem Alvo paga o Percentual sobre o próprio Indicador.");
@@ -162,6 +169,13 @@ export function descreverPremio(t: Pick<DadosTipoMeta, "indicador" | "regra" | "
       return alvo === null ? `Atingir o Alvo paga ${reais(r.valorCentavos)}` : `${indicador.nome} ${limiar(indicador, alvo, 100)} paga ${reais(r.valorCentavos)}`;
     case "faixas": {
       const faixas = [...r.faixas].sort((a, b) => a.atingimento - b.atingimento).map((f) => `${limiar(indicador, alvo, f.atingimento)}${alvo === null ? " atingido" : ""} paga ${reais(f.valorCentavos)}`);
+      return alvo === null ? faixas.join(" · ") : `${indicador.nome} ${faixas.join(" · ")}`;
+    }
+    case "faixasPercentuais": {
+      const total = r.valorCentavos;
+      const faixas = [...r.faixas]
+        .sort((a, b) => a.atingimento - b.atingimento)
+        .map((f, i) => `${limiar(indicador, alvo, f.atingimento)}${alvo === null ? " atingido" : ""} paga ${porcentagem(f.percentual)}${i === 0 ? ` de ${reais(total)}` : ""} (${reais(Math.round((total * f.percentual) / 100))})`);
       return alvo === null ? faixas.join(" · ") : `${indicador.nome} ${faixas.join(" · ")}`;
     }
     case "proporcional": {

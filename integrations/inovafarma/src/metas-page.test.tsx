@@ -283,7 +283,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
     const modal = await alterar("Venda");
     const rotulos = within(modal).getAllByText(/^(Nome|Indicador|Sem Alvo \(comissão pura\)|Alvo padrão \(opcional\)|Exibição para o Colaborador|Mostrar o Prêmio ao Colaborador)$/);
     expect(rotulos.map((r) => r.textContent)).toEqual(["Nome", "Indicador", "Sem Alvo (comissão pura)", "Alvo padrão (opcional)", "Exibição para o Colaborador", "Mostrar o Prêmio ao Colaborador"]);
-    await escolher(within(modal).getByRole("combobox", { name: "Regra do Prêmio" }), "Faixas");
+    await escolher(within(modal).getByRole("combobox", { name: "Regra do Prêmio" }), "Faixas em R$");
     fireEvent.click(within(modal).getByRole("button", { name: "Adicionar Faixa" }));
     fireEvent.change(within(modal).getByLabelText("% Atingido da Faixa 2"), { target: { value: "100" } });
     fireEvent.click(within(modal).getByRole("button", { name: "Salvar" }));
