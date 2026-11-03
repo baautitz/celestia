@@ -32,6 +32,8 @@ export interface MinhaBaixa {
   quantidadeVendida: number;
   /** Quanto da venda foi Pré-vencido. */
   quantidade: number;
+  /** Correção de Baixa feita pelo gestor nesta venda, com o motivo. */
+  correcao?: { quantidade: number; motivo: string };
 }
 
 /** Corta do resultado do Participante o que o gestor não liberou: o servidor nunca envia o resto. */

@@ -6,6 +6,7 @@ import { MemoryAvaliacaoStore } from "./avaliacoes-store";
 import { MemoryMetaStore } from "./metas-store";
 import { MemoryEstoquePreVencidoStore } from "./estoque-pre-vencidos-store";
 import { MemoryBaixasCongeladasStore } from "./baixas-congeladas-store";
+import { MemoryCorrecaoBaixaStore } from "./correcoes-baixa-store";
 import type { PeriodoResumo } from "./pre-vencidos-routes";
 import { MemoryTipoMetaStore } from "./tipos-meta-store";
 import type { DadosTipoMeta } from "./tipos-meta";
@@ -58,6 +59,7 @@ async function boot() {
   // Linhas de venda de cada Loja no ERP, para as Baixas de Pré-vencido.
   const vendasDaLoja: { codigoLoja: number; vendaId: number; data: string; cancelada: boolean; codigoColaborador: number; nomeColaborador: string; produtoId: string; quantidade: number }[] = [];
   const estoque = new MemoryEstoquePreVencidoStore();
+  const correcoes = new MemoryCorrecaoBaixaStore();
   const handlers = new Map<string, (p: object) => unknown>();
   const antes = new Map<string, (ctx: { payload: object; cancel(reason: string): void }) => unknown>();
   const registros: { action: string; actor: { id: string; name: string }; attributes: unknown }[] = [];
@@ -111,6 +113,7 @@ async function boot() {
     avaliacoes: avaliacoesStore,
     estoque,
     congeladas: new MemoryBaixasCongeladasStore(),
+    correcoes,
     apuracoes: new MemoryApuracaoStore(),
     periods: { list: async () => periodos },
   });
@@ -129,7 +132,7 @@ async function boot() {
   /** Fecha o Período sem passar pelo Plugin: como um fechamento anterior à Apuração gravada. */
   const fecharSemPlugin = () => (periodos[0] = { ...periodos[0], status: "closed" });
   const minhas = (who: string, periodoId = "maio") => app.request(`/metas/minhas?periodoId=${periodoId}`, { headers: { "x-user": who } });
-  return { res, ver, vendas, produtos, vendasDaLoja, estoque, listaVendas, consultasLista, minhas, evento, fecharSemPlugin, erp, registros, tipos, metas, avaliacoesStore, participantes };
+  return { res, ver, vendas, produtos, vendasDaLoja, estoque, correcoes, listaVendas, consultasLista, minhas, evento, fecharSemPlugin, erp, registros, tipos, metas, avaliacoesStore, participantes };
 }
 
 describe("Acompanhamento das Metas", () => {
@@ -350,6 +353,14 @@ describe("Acompanhamento de Pré-vencidos vendidos", () => {
       { vendaId: 101, data: "2027-05-03 10:00:00", produtoId: "p1", nomeProduto: "Dipirona 1g", codigoBarra: "789", quantidadeVendida: 2, quantidade: 2 },
       { vendaId: 200, data: "2027-05-05 10:00:00", produtoId: "p1", nomeProduto: "Dipirona 1g", codigoBarra: "789", quantidadeVendida: 6, quantidade: 4 },
     ]);
+  });
+
+  it("em Minhas Metas, o Colaborador vê a Correção de Baixa e o motivo, e o Realizado já a reflete", async () => {
+    const { minhas, correcoes } = await comPreVencidos();
+    await correcoes.criar({ periodoId: "maio", codigoLoja: 10, vendaId: 101, produtoId: "p1", quantidade: 1, motivo: "Uma unidade era da prateleira comum", autorId: "gil", autorNome: "Gil" });
+    const corpo = (await (await minhas("ana")).json()) as { metas: Record<string, unknown>[]; baixas: Record<string, unknown>[] };
+    expect(corpo.metas.find((m) => m.nome === "Pré-vencidos")).toMatchObject({ realizado: "5" });
+    expect(corpo.baixas[0]).toMatchObject({ vendaId: 101, quantidadeVendida: 2, quantidade: 1, correcao: { quantidade: 1, motivo: "Uma unidade era da prateleira comum" } });
   });
 
   it("sem Meta de Pré-vencidos, Minhas Metas não traz Baixas", async () => {

@@ -73,13 +73,15 @@ export interface OpcoesBaixasDaLoja {
   base?: Pick<BaixasCongeladas, "ate" | "itens"> | null;
   /** Só as vendas até esta hora do ERP (inclusive). */
   ate?: string;
+  /** Correções de Baixa da Loja: a quantidade fixada pela `chaveDaLinha`. */
+  correcoes?: Readonly<Record<string, number>>;
 }
 
 /**
  * Baixas e Restante do Estoque de uma Loja: busca no ERP as vendas da Loja desde a inclusão mais antiga (ou desde o
  * congelamento de partida), só dos produtos dos Itens, e roda o motor. Lança se o ERP falhar.
  */
-export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: readonly ItemPreVencido[], { base = null, ate }: OpcoesBaixasDaLoja = {}): Promise<ResultadoBaixas<VendaDaLoja>> {
+export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: readonly ItemPreVencido[], { base = null, ate, correcoes }: OpcoesBaixasDaLoja = {}): Promise<ResultadoBaixas<VendaDaLoja>> {
   const paraMotor = itens.map((i) => ({ id: i.id, produtoId: i.produtoId, validade: i.validade, quantidade: i.quantidade, incluidoEm: horaDoErp(i.incluidoEm) }));
   const congelado = base ? { ate: base.ate, restante: restanteCongelado(itens, base) } : null;
   if (paraMotor.length === 0) return calcularBaixas({ itens: [], vendas: [] });
@@ -106,5 +108,5 @@ export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: 
       })),
     );
   }
-  return calcularBaixas({ itens: paraMotor, vendas: ate === undefined ? vendas : vendas.filter((v) => v.data <= ate), congelado });
+  return calcularBaixas({ itens: paraMotor, vendas: ate === undefined ? vendas : vendas.filter((v) => v.data <= ate), congelado, correcoes });
 }

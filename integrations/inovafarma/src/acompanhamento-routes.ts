@@ -17,6 +17,7 @@ import type { PeriodoResumo, PeriodsService } from "./pre-vencidos-routes.js";
 import { baixasDoPeriodo } from "./baixas-do-periodo.js";
 import type { EstoquePreVencidoStore } from "./estoque-pre-vencidos-store.js";
 import type { BaixasCongeladasStore } from "./baixas-congeladas-store.js";
+import type { CorrecaoBaixaStore } from "./correcoes-baixa-store.js";
 import { descreverPremio, temLista, type TipoMeta } from "./tipos-meta.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
 import type { ErpQueryClient } from "./server.js";
@@ -37,6 +38,8 @@ export interface AcompanhamentoRoutesDeps {
   estoque: EstoquePreVencidoStore;
   /** Baixas gravadas no fechamento: num Período fechado, o Indicador soma as gravadas. */
   congeladas: BaixasCongeladasStore;
+  /** Correções de Baixa: fixam quanto uma venda baixa. */
+  correcoes: CorrecaoBaixaStore;
   apuracoes: ApuracaoStore;
   periods: PeriodsService;
   audit: AuditService;
@@ -110,7 +113,7 @@ const INDICADORES_DE_VENDAS: Partial<Record<IndicadorId, (r: LinhaDesempenho) =>
 })();
 
 export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): void {
-  const { routes, permissions, auth, events, erpClient, tipos, metas, vinculos, avaliacoes, estoque, congeladas, apuracoes, periods, audit, users } = deps;
+  const { routes, permissions, auth, events, erpClient, tipos, metas, vinculos, avaliacoes, estoque, congeladas, correcoes, apuracoes, periods, audit, users } = deps;
   const montagem = metasDoPeriodo({ erpClient, tipos, metas, audit });
   const geralRef = INOVAFARMA_PERMISSIONS.ref("metas-geral:view");
   const lojaRef = INOVAFARMA_PERMISSIONS.ref("metas-loja:view");
@@ -161,7 +164,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     }
     if (indicadores.has("pre-vencidos")) {
       // O vendido de Pré-vencido é o que as Baixas do Período creditam ao Colaborador, em todas as Lojas.
-      for (const b of await baixasDoPeriodo({ erpClient, store: estoque, congeladas }, periodo)) {
+      for (const b of await baixasDoPeriodo({ erpClient, store: estoque, congeladas, correcoes }, periodo)) {
         const d = de(b.venda.codigoColaborador);
         d.indicadores["pre-vencidos"] = (d.indicadores["pre-vencidos"] ?? 0) + b.quantidade;
       }
@@ -343,10 +346,19 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     let baixas: MinhaBaixa[] = [];
     if (minhas.some((m) => m.indicador === "pre-vencidos")) {
       try {
-        baixas = (await baixasDoPeriodo({ erpClient, store: estoque, congeladas }, periodo))
+        baixas = (await baixasDoPeriodo({ erpClient, store: estoque, congeladas, correcoes }, periodo))
           .filter((b) => b.venda.codigoColaborador === codigo)
           .sort((a, b) => a.venda.data.localeCompare(b.venda.data) || a.venda.vendaId - b.venda.vendaId)
-          .map(({ venda, quantidade, nomeProduto, codigoBarra }) => ({ vendaId: venda.vendaId, data: venda.data, produtoId: venda.produtoId, nomeProduto, codigoBarra, quantidadeVendida: venda.quantidade, quantidade }));
+          .map(({ venda, quantidade, nomeProduto, codigoBarra, correcao }) => ({
+            vendaId: venda.vendaId,
+            data: venda.data,
+            produtoId: venda.produtoId,
+            nomeProduto,
+            codigoBarra,
+            quantidadeVendida: venda.quantidade,
+            quantidade,
+            ...(correcao ? { correcao: { quantidade: correcao.quantidade, motivo: correcao.motivo } } : {}),
+          }));
       } catch (err: unknown) {
         return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
       }

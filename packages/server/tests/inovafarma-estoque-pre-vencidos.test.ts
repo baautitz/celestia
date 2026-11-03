@@ -342,3 +342,86 @@ describe("Inclusão retroativa de Item", () => {
     expect(eventos.find((e) => e.action === "item_pre_vencido_update")?.summary).toContain("Data de inclusão de");
   });
 });
+
+type Correcao = { id: string; version: number; quantidade: number; motivo: string };
+type GrupoComCorrecao = Grupo & { vendas: (Grupo["vendas"][number] & { produtoId: string; correcao?: { id: string; quantidade: number; motivo: string; version: number } })[] };
+
+describe("Correção de Baixa", () => {
+  async function comBaixas() {
+    const ctx = await boot();
+    await ctx.incluir("ana", { quantidade: 3 });
+    vendas = [venda(1, 1, 2), venda(2, 2, 2, { codigoColaborador: 8, nomeColaborador: "GIL COSTA" })];
+    const baixas = async () => (await (await ctx.req("gil", "GET", `/api/m/inovafarma/pre-vencidos/baixas?codigoLoja=1&periodoId=${ctx.periodoId}`)).json()) as GrupoComCorrecao[];
+    const corrigir = (who: "gil" | "lia" | "ana" | "rui", body: Record<string, unknown> = {}) =>
+      ctx.req(who, "POST", "/api/m/inovafarma/pre-vencidos/baixas/correcoes", { codigoLoja: 1, periodoId: ctx.periodoId, vendaId: 1, produtoId: PRODUTO.produtoId, quantidade: 1, motivo: "Uma unidade não era Pré-vencido", ...body });
+    return { ...ctx, baixas, corrigir };
+  }
+  const resumo = (grupos: GrupoComCorrecao[]) => grupos.map((g) => [g.codigoColaborador, g.vendas.map((v) => [v.vendaId, v.quantidade])]);
+
+  it("corrige a Baixa de uma venda: o que sai volta ao Restante e é gasto pelas vendas seguintes", async () => {
+    const { baixas, corrigir, listar } = await comBaixas();
+    expect(resumo(await baixas())).toEqual([[7, [[1, 2]]], [8, [[2, 1]]]]);
+    const res = await corrigir("gil");
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ quantidade: 1, motivo: "Uma unidade não era Pré-vencido", version: 1 });
+    const grupos = await baixas();
+    expect(resumo(grupos)).toEqual([[7, [[1, 1]]], [8, [[2, 2]]]]);
+    expect(grupos[0]!.vendas[0]!.correcao).toMatchObject({ quantidade: 1, motivo: "Uma unidade não era Pré-vencido" });
+    expect(await listar("ana")).toEqual([]);
+  });
+
+  it("corrige para zero e mantém a venda na lista, mas não acima do que a venda teve, sem motivo ou duas vezes", async () => {
+    const { baixas, corrigir } = await comBaixas();
+    expect((await corrigir("gil", { quantidade: 3 })).status).toBe(400);
+    expect((await corrigir("gil", { quantidade: -1 })).status).toBe(400);
+    expect((await corrigir("gil", { motivo: "  " })).status).toBe(400);
+    expect((await corrigir("gil", { vendaId: 99 })).status).toBe(404);
+    expect((await corrigir("gil", { quantidade: 0 })).status).toBe(201);
+    expect((await corrigir("gil", { quantidade: 2 })).status).toBe(409);
+    expect(resumo(await baixas())).toEqual([[7, [[1, 0]]], [8, [[2, 2]]]]);
+  });
+
+  it("recusa sem a Permission, fora das Lojas do Vínculo e no Período fechado", async () => {
+    const { corrigir, req, periodoId } = await comBaixas();
+    expect((await corrigir("ana")).status).toBe(403);
+    expect((await corrigir("lia")).status).toBe(403);
+    expect((await req("adm", "POST", `/api/closing-periods/${periodoId}/close`)).status).toBe(200);
+    expect((await corrigir("gil")).status).toBe(409);
+  });
+
+  it("edita e desfaz a Correção pela version, com 409 quando ela está desatualizada", async () => {
+    const { baixas, corrigir, req } = await comBaixas();
+    const criada = (await (await corrigir("gil")).json()) as Correcao;
+    const url = `/api/m/inovafarma/pre-vencidos/baixas/correcoes/${criada.id}`;
+    expect((await req("gil", "PUT", url, { quantidade: 0, motivo: "Nenhuma era", version: 1 })).status).toBe(200);
+    expect((await req("gil", "PUT", url, { quantidade: 2, motivo: "Todas eram", version: 1 })).status).toBe(409);
+    expect((await req("lia", "PUT", url, { quantidade: 2, motivo: "Todas eram", version: 2 })).status).toBe(403);
+    expect(resumo(await baixas())).toEqual([[7, [[1, 0]]], [8, [[2, 2]]]]);
+    expect((await req("gil", "DELETE", `${url}?version=1`)).status).toBe(409);
+    expect((await req("gil", "DELETE", `${url}?version=2`)).status).toBe(200);
+    expect(resumo(await baixas())).toEqual([[7, [[1, 2]]], [8, [[2, 1]]]]);
+  });
+
+  it("registra a Correção no Audit Log com o antes, o depois e o motivo", async () => {
+    const { corrigir, req } = await comBaixas();
+    const criada = (await (await corrigir("gil")).json()) as Correcao;
+    await req("gil", "PUT", `/api/m/inovafarma/pre-vencidos/baixas/correcoes/${criada.id}`, { quantidade: 0, motivo: "Nenhuma era", version: 1 });
+    await req("gil", "DELETE", `/api/m/inovafarma/pre-vencidos/baixas/correcoes/${criada.id}?version=2`);
+    const eventos = (await (await req("auditor", "GET", "/api/audit?plugin=inovafarma")).json()) as { action: string; summary: string }[];
+    const resumoDe = (action: string) => eventos.find((e) => e.action === action)?.summary;
+    expect(resumoDe("correcao_baixa_create")).toContain("de 2 para 1 un. Motivo: Uma unidade não era Pré-vencido");
+    expect(resumoDe("correcao_baixa_update")).toContain("de 1 para 0 un. Motivo: Nenhuma era");
+    expect(resumoDe("correcao_baixa_delete")).toContain("era 0 un.");
+    expect(JSON.stringify(eventos)).not.toContain(String(CODIGO_PRODUTO_SECRETO));
+  });
+
+  it("o Período fechado guarda a Correção com as Baixas congeladas", async () => {
+    const { baixas, corrigir, req, periodoId } = await comBaixas();
+    expect((await corrigir("gil")).status).toBe(201);
+    expect((await req("adm", "POST", `/api/closing-periods/${periodoId}/close`)).status).toBe(200);
+    const grupos = await baixas();
+    expect(resumo(grupos)).toEqual([[7, [[1, 1]]], [8, [[2, 2]]]]);
+    expect(grupos[0]!.vendas[0]!.correcao).toMatchObject({ motivo: "Uma unidade não era Pré-vencido" });
+  });
+});
+

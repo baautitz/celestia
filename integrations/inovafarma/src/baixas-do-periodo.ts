@@ -1,6 +1,8 @@
 import type { ModuleContext } from "@platform/core/module";
 import { baixasDaLoja, type VendaDaLoja } from "./baixas-da-loja.js";
 import type { BaixasCongeladas, BaixasCongeladasStore } from "./baixas-congeladas-store.js";
+import { chaveDaLinha } from "./baixas-pre-vencidos.js";
+import type { CorrecaoBaixa, CorrecaoBaixaStore } from "./correcoes-baixa-store.js";
 import type { EstoquePreVencidoStore, ItemPreVencido } from "./estoque-pre-vencidos-store.js";
 import { SEM_CONEXAO } from "./metas-comum.js";
 
@@ -24,6 +26,8 @@ export interface BaixaDoPeriodo {
   quantidade: number;
   nomeProduto: string;
   codigoBarra: string | null;
+  /** Correção de Baixa da venda, se houver: a `quantidade` acima já a reflete. */
+  correcao?: Pick<CorrecaoBaixa, "id" | "quantidade" | "motivo" | "autorNome" | "version">;
 }
 
 export interface BaixasDoPeriodoDeps {
@@ -31,6 +35,8 @@ export interface BaixasDoPeriodoDeps {
   store: EstoquePreVencidoStore;
   /** Baixas gravadas no fechamento dos Closing Periods. */
   congeladas: BaixasCongeladasStore;
+  /** Correções de Baixa: fixam quanto uma venda baixa. */
+  correcoes: CorrecaoBaixaStore;
 }
 
 /** Limites do Período na hora do ERP, comparáveis como texto com a data da venda. */
@@ -46,14 +52,30 @@ const cliente = (erpClient: BaixasDoPeriodoDeps["erpClient"]) => {
  * Baixas da Loja ao vivo nas vendas do Período e Restante de cada Item no fim dele, partindo do último congelamento
  * anterior ao Período (as vendas até ele já estão contadas).
  */
-async function aoVivo({ erpClient, congeladas }: BaixasDoPeriodoDeps, periodo: PeriodoDasBaixas, codigoLoja: number, itens: readonly ItemPreVencido[]) {
+/** As Correções da Loja pela `chaveDaLinha`. */
+async function correcoesDaLoja(correcoes: CorrecaoBaixaStore, codigoLoja: number) {
+  return new Map((await correcoes.daLoja(codigoLoja)).map((c) => [chaveDaLinha(c), c]));
+}
+const quantidades = (porLinha: Map<string, CorrecaoBaixa>) => Object.fromEntries([...porLinha].map(([chave, c]) => [chave, c.quantidade]));
+
+async function aoVivo({ erpClient, congeladas, correcoes }: BaixasDoPeriodoDeps, periodo: PeriodoDasBaixas, codigoLoja: number, itens: readonly ItemPreVencido[]) {
   const { inicio, fim } = limites(periodo);
   const base = (await congeladas.daLoja(codigoLoja)).filter((c) => c.ate < inicio).at(-1) ?? null;
-  const { baixas, restante } = await baixasDaLoja(cliente(erpClient), codigoLoja, itens, { base, ate: fim });
+  const porLinha = await correcoesDaLoja(correcoes, codigoLoja);
+  const { baixas, restante } = await baixasDaLoja(cliente(erpClient), codigoLoja, itens, { base, ate: fim, correcoes: quantidades(porLinha) });
   const produtos = new Map(itens.map((i) => [i.produtoId, { nomeProduto: i.nomeProduto, codigoBarra: i.codigoBarra }]));
   const doPeriodo: BaixaDoPeriodo[] = baixas
     .filter(({ venda }) => venda.data >= inicio)
-    .map(({ venda, quantidade }) => ({ codigoLoja, venda, quantidade, ...(produtos.get(venda.produtoId) ?? { nomeProduto: "", codigoBarra: null }) }));
+    .map(({ venda, quantidade }) => {
+      const correcao = porLinha.get(chaveDaLinha(venda));
+      return {
+        codigoLoja,
+        venda,
+        quantidade,
+        ...(produtos.get(venda.produtoId) ?? { nomeProduto: "", codigoBarra: null }),
+        ...(correcao ? { correcao: { id: correcao.id, quantidade: correcao.quantidade, motivo: correcao.motivo, autorNome: correcao.autorNome, version: correcao.version } } : {}),
+      };
+    });
   return { baixas: doPeriodo, restante };
 }
 
@@ -77,10 +99,11 @@ export async function baixasDoPeriodo(deps: BaixasDoPeriodoDeps, periodo: Period
 }
 
 /** Restante de agora de cada Item da Loja, a partir do último congelamento. Lança como `baixasDoPeriodo`. */
-export async function restanteDoEstoque({ erpClient, congeladas }: BaixasDoPeriodoDeps, codigoLoja: number, itens: readonly ItemPreVencido[]): Promise<Record<string, number>> {
+export async function restanteDoEstoque({ erpClient, congeladas, correcoes }: BaixasDoPeriodoDeps, codigoLoja: number, itens: readonly ItemPreVencido[]): Promise<Record<string, number>> {
   if (itens.length === 0) return {};
   const base = (await congeladas.daLoja(codigoLoja)).at(-1) ?? null;
-  return (await baixasDaLoja(cliente(erpClient), codigoLoja, itens, { base })).restante;
+  const correcoesDeAgora = quantidades(await correcoesDaLoja(correcoes, codigoLoja));
+  return (await baixasDaLoja(cliente(erpClient), codigoLoja, itens, { base, correcoes: correcoesDeAgora })).restante;
 }
 
 /** O que o fechamento do Período grava: em cada Loja com Itens, as Baixas dele e o Restante no seu fim. Só lê. */
