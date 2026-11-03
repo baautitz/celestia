@@ -79,6 +79,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
 ## KPIs
 
 - `KpiCard` aceita `trend={{ current, previous, label, format, favorable? }}`: uma linha `▲ 12,2%` abaixo do valor e, ao passar o mouse, o mesmo detalhe do tooltip da tabela. `favorable` define a cor: `up` (padrão) pinta a alta de verde, `down` de vermelho (ex.: Descontos, CMV %) e `neutral` não pinta.
+- `KpiCard` com `onSelect` e `selected` vira filtro: um botão alternável (`aria-pressed`, nome = `label`) sobre o cartão. Clicar no cartão ativo de novo limpa o filtro; quem usa decide o que o filtro faz.
 
 ## Cabeçalho
 

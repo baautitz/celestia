@@ -205,7 +205,7 @@ function IconBadge({ tone = "primary", children }: { tone?: keyof typeof kpiTone
   )
 }
 
-/** Cartão de indicador (KPI) com ícone. */
+/** Cartão de indicador (KPI) com ícone. Com `onSelect`, ganha um botão alternável (`aria-pressed`) sobre o cartão, útil como filtro. */
 function KpiCard({
   label,
   value,
@@ -215,6 +215,8 @@ function KpiCard({
   highlight,
   loading,
   trend,
+  selected,
+  onSelect,
 }: {
   label: string
   value: React.ReactNode
@@ -226,9 +228,13 @@ function KpiCard({
   loading?: boolean
   /** Comparação com um valor anterior: linha abaixo do valor e detalhe ao passar o mouse. */
   trend?: Trend
+  /** Destaca o cartão como escolhido; só tem efeito junto com `onSelect`. */
+  selected?: boolean
+  onSelect?: () => void
 }) {
+  const descricao = React.useId()
   return (
-    <Card>
+    <Card className={cn(onSelect && "relative transition-shadow has-[>button:hover]:ring-foreground/25", selected && "ring-2 ring-primary has-[>button:hover]:ring-primary")}>
       <CardContent>
         <Stack gap="tight">
           <Stack direction="row" align="center" justify="between" gap="section">
@@ -239,13 +245,13 @@ function KpiCard({
               {loading ? (
                 <Skeleton className="h-8 w-32" />
               ) : (
-                <Text variant="kpi" tone={highlight ? "success" : "default"}>
+                <Text id={`${descricao}-valor`} variant="kpi" tone={highlight ? "success" : "default"}>
                   {value}
                 </Text>
               )}
               {trend && !loading && (
                 <TrendTooltip trend={trend} title={label}>
-                  <TrendLine trend={trend} className="cursor-help" />
+                  <TrendLine trend={trend} className="relative z-10 cursor-help" />
                 </TrendTooltip>
               )}
             </Stack>
@@ -255,12 +261,22 @@ function KpiCard({
             (loading ? (
               <Skeleton className="h-4 w-24" />
             ) : (
-              <Text variant="caption" tone="muted">
+              <Text id={`${descricao}-dica`} variant="caption" tone="muted">
                 {hint}
               </Text>
             ))}
         </Stack>
       </CardContent>
+      {onSelect && (
+        <button
+          type="button"
+          aria-label={label}
+          aria-describedby={loading ? undefined : [`${descricao}-valor`, hint ? `${descricao}-dica` : ""].filter(Boolean).join(" ")}
+          aria-pressed={!!selected}
+          onClick={onSelect}
+          className="absolute inset-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        />
+      )}
     </Card>
   )
 }
