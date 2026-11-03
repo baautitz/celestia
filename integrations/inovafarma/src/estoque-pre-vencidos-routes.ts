@@ -1,44 +1,32 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
-import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { PRODUTO_SQL, type LinhaProduto } from "./produtos-erp.js";
 import { horaDoErp, inicioDoDiaNoErp } from "./baixas-da-loja.js";
-import type { BaixasCongeladasStore } from "./baixas-congeladas-store.js";
-import type { CorrecaoBaixaStore } from "./correcoes-baixa-store.js";
-import { restanteDoEstoque, type PeriodoDasBaixas } from "./baixas-do-periodo.js";
+import { restanteDoEstoque, type BaixasDoPeriodoDeps } from "./baixas-do-periodo.js";
+import { dataBr } from "./datas.js";
+import { ERP_INDISPONIVEL, erroDoErp, SEM_CONEXAO } from "./metas-comum.js";
+import { inclusaoRetroativa, lojasDoErp, recusaDeLoja } from "./pre-vencidos-comum.js";
+import type { PeriodsService } from "./pre-vencidos-routes.js";
 import { ITEM_PRE_VENCIDO_ACTIONS, ITEM_PRE_VENCIDO_PLUGIN, ITEM_PRE_VENCIDO_TARGET, type AtributosItemPreVencido } from "./estoque-pre-vencidos-audit.js";
 import type { EstoquePreVencidoStore, ItemPreVencido } from "./estoque-pre-vencidos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
-import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
+import type { VinculoStore } from "./vinculo-store.js";
 
-interface ErpQuery {
-  query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
-}
-
-export interface EstoquePreVencidosRoutesDeps {
+/** Estoque, congelamentos e Correções (`BaixasDoPeriodoDeps`): o Restante de agora parte do último congelamento. */
+export interface EstoquePreVencidosRoutesDeps extends BaixasDoPeriodoDeps {
   routes: ModuleContext["routes"];
   permissions: ModuleContext["permissions"];
   auth: MiddlewareHandler;
-  erpClient: () => ErpQuery | undefined;
-  store: EstoquePreVencidoStore;
-  /** Baixas gravadas no fechamento: o Restante de agora parte do último congelamento. */
-  congeladas: BaixasCongeladasStore;
-  /** Correções de Baixa: o que tiram volta ao Restante. */
-  correcoes: CorrecaoBaixaStore;
   vinculos: VinculoStore;
   /** Serviço `periods` do Module `closing_period`: a inclusão retroativa vai até o início do Período aberto. */
-  periods: { list(): Promise<PeriodoDasBaixas[]> };
+  periods: PeriodsService;
   audit: AuditService;
 }
 
 type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
 
-export const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
-export const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
-export const SEM_VINCULO = "Seu Usuário não está vinculado a um Colaborador. Peça o vínculo a quem administra os Colaboradores.";
-export const LOJA_FORA_DO_VINCULO = "A Loja informada não está vinculada ao seu Colaborador.";
 const VERSAO_DESATUALIZADA = { error: "O Item foi alterado por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -58,47 +46,31 @@ const Edicao = z.object({ quantidade: Quantidade, validade: Validade, incluidoEm
 /** O que a API devolve: nunca o código do produto no ERP. */
 export const itemPublico = ({ codigoProduto: _codigoProduto, ...resto }: ItemPreVencido) => resto;
 
-/** Lojas do Vínculo (não desfeito) do Usuário; vazio sem Vínculo. */
-export async function lojasDoVinculo(vinculos: VinculoStore, usuarioId: string | undefined): Promise<number[] | null> {
-  if (!usuarioId) return null;
-  const vinculo = (await vinculos.list()).find((v) => v.usuarioId === usuarioId && !vinculoDesfeito(v));
-  return vinculo ? vinculo.lojas : null;
-}
-
 /** Rotas do Estoque de Pré-vencidos: incluir, listar, editar e excluir Itens nas Lojas do Vínculo. */
-export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient, store, congeladas, correcoes, vinculos, periods, audit }: EstoquePreVencidosRoutesDeps): void {
+export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vinculos, periods, audit, ...baixasDeps }: EstoquePreVencidosRoutesDeps): void {
+  const { erpClient, store } = baixasDeps;
   const gerir = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-estoque:manage");
   const pode = (c: AuthContext) => permissions.has(c.get("user")?.permissions, gerir.key);
   const gerirBaixas = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-baixas:manage");
 
   /**
    * Instante de inclusão de um Item novo: agora, ou o início do dia retroativo pedido, que só quem gere as Baixas
-   * informa e que vai até o início do Closing Period aberto de hoje, nunca antes nem para o futuro. Na edição,
+   * informa e que vai até o início do Closing Period aberto (mesmo já terminado), nunca antes nem para o futuro. Na edição,
    * `atual` é a data de inclusão de agora: um Item incluído antes do Período aberto já entrou num Período fechado e
    * não muda de data.
    */
   const inclusao = async (c: AuthContext, dia: string | undefined, atual?: string): Promise<{ incluidoEm: string } | { erro: string; status: 400 | 403 }> => {
     if (dia === undefined) return { incluidoEm: new Date().toISOString() };
     if (!permissions.has(c.get("user")?.permissions, gerirBaixas.key)) return { erro: gerirBaixas.deniedMessage ?? "Acesso negado.", status: 403 };
-    const hoje = horaDoErp(new Date().toISOString()).slice(0, 10);
-    if (dia > hoje) return { erro: "A data de inclusão não pode ser no futuro.", status: 400 };
-    const aberto = (await periods.list()).find((p) => p.status === "open" && p.startDate <= hoje && hoje <= p.endDate);
-    if (!aberto) return { erro: "Não há Período aberto hoje: a data de inclusão não pode retroagir.", status: 400 };
-    if (atual !== undefined && horaDoErp(atual).slice(0, 10) < aberto.startDate) return { erro: "O Item foi incluído antes do Período aberto: a data de inclusão dele não muda mais.", status: 400 };
-    if (dia < aberto.startDate) return { erro: `A data de inclusão não pode ser antes do início do Período aberto (${aberto.startDate.split("-").reverse().join("/")}).`, status: 400 };
+    const limites = await inclusaoRetroativa(periods);
+    if (!limites) return { erro: "Não há Período aberto: a data de inclusão não pode retroagir.", status: 400 };
+    if (dia > limites.hoje) return { erro: "A data de inclusão não pode ser no futuro.", status: 400 };
+    if (atual !== undefined && horaDoErp(atual).slice(0, 10) < limites.inicio) return { erro: "O Item foi incluído antes do Período aberto: a data de inclusão dele não muda mais.", status: 400 };
+    if (dia < limites.inicio) return { erro: `A data de inclusão não pode ser antes do início do Período aberto (${dataBr(limites.inicio)}).`, status: 400 };
     return { incluidoEm: inicioDoDiaNoErp(dia) };
   };
 
-  const nomeDaLoja = async (codigo: number) => {
-    const client = erpClient();
-    if (!client) return "";
-    try {
-      const rows = await client.query<{ codigoEmpresa: number; nome: string | null }>(LOJAS_SQL);
-      return (rows.find((r) => Number(r.codigoEmpresa) === codigo)?.nome ?? "").trim();
-    } catch {
-      return "";
-    }
-  };
+  const nomeDaLoja = async (codigo: number) => (await lojasDoErp(erpClient())).find((l) => l.codigo === codigo)?.nome ?? "";
 
   const registrar = async (c: AuthContext, action: string, item: ItemPreVencido, anterior: AtributosItemPreVencido["anterior"] = null) => {
     const user = c.get("user");
@@ -121,14 +93,7 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, er
     });
   };
 
-  /** Recusa quem não tem a Permission, não tem Vínculo ou não tem a Loja no Vínculo. */
-  const recusaLoja = async (c: AuthContext, codigoLoja: number) => {
-    if (!pode(c)) return c.json({ error: gerir.deniedMessage }, 403);
-    const lojas = await lojasDoVinculo(vinculos, c.get("user")?.sub);
-    if (!lojas) return c.json({ error: SEM_VINCULO }, 403);
-    if (!lojas.includes(codigoLoja)) return c.json({ error: LOJA_FORA_DO_VINCULO }, 403);
-    return null;
-  };
+  const recusaLoja = recusaDeLoja(permissions, vinculos, gerir);
 
   routes.get("/pre-vencidos/estoque/itens", auth, async (c: AuthContext) => {
     if (!pode(c)) return c.json({ error: gerir.deniedMessage }, 403);
@@ -139,9 +104,9 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, er
     const itens = await store.listar(codigoLoja);
     let restante: Record<string, number>;
     try {
-      restante = await restanteDoEstoque({ erpClient, store, congeladas, correcoes }, codigoLoja, itens);
+      restante = await restanteDoEstoque(baixasDeps, codigoLoja, itens);
     } catch (err) {
-      return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
+      return c.json(erroDoErp(err), 503);
     }
     // Os zerados saem da lista por padrão; `zerados=true` os traz de volta.
     const zerados = c.req.query("zerados") === "true";

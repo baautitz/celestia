@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { horaDoErp } from "./baixas-da-loja.js";
+import { dataBr } from "./datas.js";
 import type { AuditService } from "./vinculo-audit.js";
 
 export const ITEM_PRE_VENCIDO_PLUGIN = "inovafarma";
@@ -21,7 +22,7 @@ const Atributos = z.object({
 export type AtributosItemPreVencido = z.infer<typeof Atributos>;
 
 /** Dia (na hora do ERP) de um instante ISO, `DD/MM/AAAA`. */
-const dataBr = (iso: string) => horaDoErp(iso).slice(0, 10).split("-").reverse().join("/");
+const diaBr = (iso: string) => dataBr(horaDoErp(iso).slice(0, 10));
 const loja = (a: AtributosItemPreVencido) => a.nomeLoja || `Loja ${a.codigoLoja}`;
 const descricao = (a: AtributosItemPreVencido) => `${a.quantidade} un. de "${a.nomeProduto}" (validade ${a.validade}) no Estoque de Pré-vencidos da ${loja(a)}`;
 
@@ -32,7 +33,7 @@ export function declareItemPreVencidoAudit(audit: AuditService): void {
     ...base,
     action: ITEM_PRE_VENCIDO_ACTIONS.editar,
     summary: (a) =>
-      `Alterou o Item de Pré-vencido "${a.nomeProduto}" da ${loja(a)} de ${a.anterior?.quantidade} un. (validade ${a.anterior?.validade}) para ${a.quantidade} un. (validade ${a.validade}).${a.anterior?.incluidoEm ? ` Data de inclusão de ${dataBr(a.anterior.incluidoEm)} para ${dataBr(a.incluidoEm)}.` : ""}`,
+      `Alterou o Item de Pré-vencido "${a.nomeProduto}" da ${loja(a)} de ${a.anterior?.quantidade} un. (validade ${a.anterior?.validade}) para ${a.quantidade} un. (validade ${a.validade}).${a.anterior?.incluidoEm ? ` Data de inclusão de ${diaBr(a.anterior.incluidoEm)} para ${diaBr(a.incluidoEm)}.` : ""}`,
   });
   audit.declareAction({ ...base, action: ITEM_PRE_VENCIDO_ACTIONS.excluir, summary: (a) => `Excluiu ${descricao(a)}.` });
 }

@@ -1,10 +1,7 @@
 import { calcularBaixas, type ResultadoBaixas, type VendaParaBaixa } from "./baixas-pre-vencidos.js";
 import type { BaixasCongeladas } from "./baixas-congeladas-store.js";
 import type { ItemPreVencido } from "./estoque-pre-vencidos-store.js";
-
-interface ErpQuery {
-  query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
-}
+import type { ErpQuery } from "./metas-comum.js";
 
 /** Fuso das datas do ERP: `Venda.DataVenda` é a hora local da Loja, sem fuso. */
 export const FUSO_ERP = "America/Sao_Paulo";

@@ -1,9 +1,9 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { ModuleContext } from "@platform/core/module";
-import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { buscaProdutosSql, MIN_BUSCA_PRODUTO, parametrosBusca } from "./produtos-erp.js";
-import { lojasDoVinculo } from "./estoque-pre-vencidos-routes.js";
+import { ERP_INDISPONIVEL, SEM_CONEXAO, type ErpQuery } from "./metas-comum.js";
+import { inclusaoRetroativa, lojasDoErp, lojasDoVinculo } from "./pre-vencidos-comum.js";
 import type { VinculoStore } from "./vinculo-store.js";
 
 /** Forma do serviço `periods` do Module `closing_period`; o Plugin não importa `@platform/server` (ADR 0002). */
@@ -18,10 +18,6 @@ export interface PeriodsService {
   list(): Promise<PeriodoResumo[]>;
 }
 
-interface ErpQuery {
-  query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
-}
-
 export interface PreVencidosRoutesDeps {
   routes: ModuleContext["routes"];
   permissions: ModuleContext["permissions"];
@@ -33,9 +29,6 @@ export interface PreVencidosRoutesDeps {
 
 type AuthContext = Context<{ Variables: { user?: { sub?: string; permissions?: string[] } } }>;
 
-const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
-const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
-
 export type LinhaBusca = { produtoId: string; nome: string | null; codigoBarra: string | null };
 
 /** O que a tela Pré-vencidos precisa para abrir e a busca de produto do Estoque. */
@@ -44,31 +37,21 @@ export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient
   const baixas = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-baixas:manage");
   const pode = (c: AuthContext, ref: { key: string }) => permissions.has(c.get("user")?.permissions, ref.key);
 
-  const lojasDoErp = async (client: ErpQuery | undefined) => {
-    if (!client) return [];
-    try {
-      const rows = await client.query<{ codigoEmpresa: number; nome: string | null }>(LOJAS_SQL);
-      return rows.map((r) => ({ codigo: Number(r.codigoEmpresa), nome: (r.nome || "").trim() }));
-    } catch {
-      return [];
-    }
-  };
-
-  // O que a tela precisa para abrir: Closing Periods, Lojas e as abas que a Permission libera.
+  // O que a tela precisa para abrir: Closing Periods, as Lojas do Vínculo, as abas que a Permission libera e, para quem
+  // gere as Baixas, até onde a inclusão de um Item pode retroagir (calculado aqui, na hora do ERP).
   routes.get("/pre-vencidos/contexto", auth, async (c: AuthContext) => {
     const podeEstoque = pode(c, estoque);
     const podeBaixas = pode(c, baixas);
     if (!podeEstoque && !podeBaixas) return c.json({ error: estoque.deniedMessage }, 403);
 
     const lojasErp = await lojasDoErp(erpClient());
-    // Estoque e Baixas: só as Lojas do Vínculo.
     const lojas = ((await lojasDoVinculo(vinculos, c.get("user")?.sub)) ?? []).map((codigo) => ({ codigo, nome: lojasErp.find((l) => l.codigo === codigo)?.nome ?? "" }));
     return c.json({
       podeEstoque,
       podeBaixas,
       periodos: (await periods.list()).sort((a, b) => b.startDate.localeCompare(a.startDate)),
-      ...(podeEstoque ? { lojasEstoque: lojas } : {}),
-      ...(podeBaixas ? { lojasBaixas: lojas } : {}),
+      lojas,
+      ...(podeBaixas ? { inclusaoRetroativa: (await inclusaoRetroativa(periods)) ?? undefined } : {}),
     });
   });
 
