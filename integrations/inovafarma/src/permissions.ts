@@ -79,7 +79,7 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
   },
   "metas-geral:view": {
     label: "Metas: Acompanhamento de todas as Lojas",
-    description: "Permite ver o Acompanhamento das Metas de todos os Colaboradores: Realizado, Atingimento e Prêmio.",
+    description: "Permite ver o Acompanhamento das Metas de todos os Colaboradores: Realizado, % Atingido e Prêmio.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para ver o Acompanhamento das Metas de todas as Lojas.",
   },
   "metas-loja:view": {

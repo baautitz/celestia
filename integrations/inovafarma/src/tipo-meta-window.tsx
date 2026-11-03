@@ -548,7 +548,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
 
   const faixasCampo = (
     <Stack gap="field">
-      <Label>Faixas (% de Atingimento e Prêmio)</Label>
+      <Label>Faixas (% Atingido e Prêmio)</Label>
       {faixas.fields.map((f, i) => (
         <Stack key={f.id} gap="tight">
           <Stack direction="row" gap="field" align="end">
@@ -559,7 +559,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
                 <FormItem>
                   <FormControl>
                     <InputGroup>
-                      <InputGroupInput inputMode="decimal" aria-label={`Atingimento da Faixa ${i + 1}`} {...field} />
+                      <InputGroupInput inputMode="decimal" aria-label={`% Atingido da Faixa ${i + 1}`} {...field} />
                       <InputGroupAddon align="inline-end">
                         <InputGroupText>%</InputGroupText>
                       </InputGroupAddon>
@@ -684,9 +684,9 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
                   {v.regraTipo === "fixo" && valorCampo("Prêmio se atingir")}
                   {v.regraTipo === "proporcional" && (
                     <>
-                      {valorCampo("Prêmio a 100% de Atingimento")}
-                      {percentualCampo("gatilho", "Gatilho (% de Atingimento, opcional)", true)}
-                      {percentualCampo("teto", "Teto (% de Atingimento, opcional)", true)}
+                      {valorCampo("Prêmio a 100% atingido")}
+                      {percentualCampo("gatilho", "Gatilho (% Atingido, opcional)", true)}
+                      {percentualCampo("teto", "Teto (% Atingido, opcional)", true)}
                     </>
                   )}
                   {v.regraTipo === "faixas" && faixasCampo}

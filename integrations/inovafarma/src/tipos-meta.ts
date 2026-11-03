@@ -133,7 +133,7 @@ export function problemaNoCampo(t: DadosTipoMeta): ProblemaDoTipo | null {
     const base = t.regra.indicadorBase === t.indicador ? indicador : temLista(t.regra.indicadorBase) ? null : indicadorPorId(t.regra.indicadorBase);
     if (!base?.valorVendido) return problemaEm("indicadorBase", "O Percentual se aplica a um Indicador de valor vendido em R$.");
   }
-  if (t.regra.tipo === "faixas" && new Set(t.regra.faixas.map((f) => f.atingimento)).size !== t.regra.faixas.length) return problemaEm("faixas", "Duas Faixas não podem ter o mesmo Atingimento.");
+  if (t.regra.tipo === "faixas" && new Set(t.regra.faixas.map((f) => f.atingimento)).size !== t.regra.faixas.length) return problemaEm("faixas", "Duas Faixas não podem ter o mesmo % Atingido.");
   if (t.semAlvo) {
     if (t.regra.tipo !== "percentual" || t.regra.soSeAtingir) return problemaEm("regra", "Um Tipo de Meta sem Alvo só paga o Percentual, sem depender de atingir.");
     if (t.regra.indicadorBase !== t.indicador) return problemaEm("indicadorBase", "Um Tipo de Meta sem Alvo paga o Percentual sobre o próprio Indicador.");

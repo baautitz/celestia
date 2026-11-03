@@ -69,14 +69,14 @@ export function PremioParticipanteWindow<M extends MetaDoPremio>({ meta, partici
       <Stack gap="section">
         {(regra.tipo === "fixo" || regra.tipo === "proporcional") && (
           <Stack gap="field">
-            <Label>{regra.tipo === "fixo" ? "Prêmio se atingir" : "Prêmio a 100% de Atingimento"}</Label>
+            <Label>{regra.tipo === "fixo" ? "Prêmio se atingir" : "Prêmio a 100% atingido"}</Label>
             <MoneyInput autoFocus value={regra.valorCentavos / 100} onValueChange={(v) => setRegra({ ...regra, valorCentavos: centavos(v) })} aria-label="Valor do Prêmio" />
           </Stack>
         )}
         {regra.tipo === "faixas" &&
           regra.faixas.map((f, i) => (
             <Stack key={i} gap="field">
-              <Label>{`Faixa ${i + 1}: a partir de ${porcentagem(f.atingimento)} de Atingimento`}</Label>
+              <Label>{`Faixa ${i + 1}: a partir de ${porcentagem(f.atingimento)} atingido`}</Label>
               <MoneyInput
                 value={f.valorCentavos / 100}
                 onValueChange={(v) => setRegra({ ...regra, faixas: regra.faixas.map((x, j) => (j === i ? { ...x, valorCentavos: centavos(v) } : x)) })}

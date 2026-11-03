@@ -284,10 +284,10 @@ describe("Metas: construtor de Tipo de Meta", () => {
     expect(rotulos.map((r) => r.textContent)).toEqual(["Nome", "Indicador", "Sem Alvo (comissão pura)", "Alvo padrão (opcional)", "Exibição para o Colaborador", "Mostrar o Prêmio ao Colaborador"]);
     await escolher(within(modal).getByRole("combobox", { name: "Regra do Prêmio" }), "Faixas");
     fireEvent.click(within(modal).getByRole("button", { name: "Adicionar Faixa" }));
-    fireEvent.change(within(modal).getByLabelText("Atingimento da Faixa 2"), { target: { value: "100" } });
+    fireEvent.change(within(modal).getByLabelText("% Atingido da Faixa 2"), { target: { value: "100" } });
     fireEvent.click(within(modal).getByRole("button", { name: "Salvar" }));
     const erro = await waitFor(() => {
-      const achado = within(modal).getAllByText("Duas Faixas não podem ter o mesmo Atingimento.").find((e) => e.getAttribute("role") === "alert");
+      const achado = within(modal).getAllByText("Duas Faixas não podem ter o mesmo % Atingido.").find((e) => e.getAttribute("role") === "alert");
       expect(achado).toBeTruthy();
       return achado!;
     });
