@@ -17,6 +17,7 @@ Regras de interface do `@platform/ui` e do `@platform/web`. Resumo em [AGENTS.md
   - `Stack iconTone="primary"`: colore em `primary` o ícone filho direto (ex.: ícone ao lado de um título).
   - `Stack surface="banner"`: faixa de título sem borda, com fundo suave.
   - `Stack narrow`: limita a largura a `max-w-sm` para formulários e blocos estreitos.
+  - `Grid columns="split"`: duas colunas a partir de `lg` e uma embaixo da outra abaixo dele (ex.: formulário em duas colunas num diálogo `size: "full"`, que ocupa a tela toda no celular e rola quando passa da altura).
   - `MultiValueButton`: botão de seleção múltipla que mostra um valor por linha, como o seletor de Lojas em célula de tabela.
   - `ComboboxInput inTableCell`: fixa a largura do combobox para edição dentro de uma célula de tabela (no celular, ocupa a largura toda).
   - `CenteredNotice`: aviso centralizado dentro da área autenticada (ex.: acesso negado); `CenteredScreen` é para telas cheias fora dela.

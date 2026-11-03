@@ -9,12 +9,12 @@ import type { WindowController } from "./controller.ts"
 import { WindowContext, WindowFooterContext } from "./use-window.tsx"
 import type { WindowHandle } from "./use-window.tsx"
 
-/** Largura do diálogo por `size`; `medium` é o padrão. */
+/** Largura do diálogo por `size`; `medium` é o padrão. `full` ocupa a tela toda no celular e rola quando passa da altura. */
 const DIALOG_WIDTH: Record<WindowSize, string> = {
   small: "sm:max-w-md",
   medium: "sm:max-w-lg",
   large: "sm:max-w-3xl",
-  full: "sm:max-w-6xl",
+  full: "h-svh max-w-full overflow-y-auto sm:h-auto sm:max-h-[90svh] sm:max-w-6xl",
 }
 
 /** Conteúdo de uma janela: componente sem props (quem abre fecha sobre os dados). */

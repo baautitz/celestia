@@ -112,8 +112,8 @@ function Stack({
 }
 
 interface GridProps extends Omit<React.ComponentProps<"div">, "className" | "style"> {
-  /** `2` = duas colunas fixas; `cards` = 1/2/4 colunas responsivas. */
-  columns: 2 | "cards"
+  /** `2` = duas colunas fixas; `split` = uma coluna abaixo de `lg` e duas a partir dele; `cards` = 1/2/4 colunas responsivas. */
+  columns: 2 | "split" | "cards"
   gap?: Gap
 }
 
@@ -122,7 +122,7 @@ function Grid({ columns, gap = "section", ...props }: GridProps) {
     <div
       className={cn(
         "grid",
-        columns === 2 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
+        columns === 2 ? "grid-cols-2" : columns === "split" ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
         gaps[gap]
       )}
       {...props}
