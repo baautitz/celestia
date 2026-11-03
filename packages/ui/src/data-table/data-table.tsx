@@ -67,6 +67,13 @@ const isNumericColumn = (col: { format?: DataTableFormat }) =>
   isNumericFormat(col.format);
 const isCenteredColumn = (col: { format?: DataTableFormat; centered?: boolean }) =>
   col.centered === true || col.format === "date";
+/**
+ * Números, datas e tags têm largura fixa (ou a do cabeçalho, se maior) e as colunas de texto ficam com o resto.
+ * Assim a largura não depende do conteúdo, e as subtabelas de linhas expandidas ficam alinhadas entre si.
+ */
+const hasFixedWidth = (col: { format?: DataTableFormat; centered?: boolean }) =>
+  isNumericColumn(col) || isCenteredColumn(col);
+const FIXED_COLUMN_WIDTH_CLASS = "w-32";
 /** Colunas que não quebram linha na impressão; as demais quebram para a tabela encolher menos. */
 const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([
   ...NUMERIC_FORMATS,
@@ -812,6 +819,7 @@ export function DataTable<TRow>({
                           col.sortable && "cursor-pointer select-none",
                           isNumericColumn(col) && "text-right",
                           isCenteredColumn(col) && "text-center",
+                          hasFixedWidth(col) && FIXED_COLUMN_WIDTH_CLASS,
                           boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
                           frozenClass(col.key, true),
                           headerEdgeClass(col.key),
