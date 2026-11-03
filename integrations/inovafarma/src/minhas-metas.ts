@@ -1,5 +1,6 @@
 import { diferenca, type ResultadoParticipante } from "./apuracao.js";
 import type { TipoApuracao } from "./apuracao-store.js";
+import type { BaixaPublica } from "./baixas-do-periodo.js";
 import { formatarValor } from "./indicadores.js";
 import { descreverEntrada, indicadorDoTipo, ordenarEntradas, type Exibicao } from "./tipos-meta.js";
 
@@ -21,20 +22,10 @@ export interface MinhaMeta {
 }
 
 /** Uma Baixa de Pré-vencido do Colaborador em Minhas Metas. Nunca o código do produto no ERP. */
-export interface MinhaBaixa {
-  vendaId: number;
-  /** Hora do ERP, `AAAA-MM-DD HH:MM:SS`. */
-  data: string;
-  /** Identificador opaco do produto. */
-  produtoId: string;
-  nomeProduto: string;
-  codigoBarra: string | null;
-  quantidadeVendida: number;
-  /** Quanto da venda foi Pré-vencido. */
-  quantidade: number;
+export type MinhaBaixa = Omit<BaixaPublica, "correcao"> & {
   /** Correção de Baixa feita pelo gestor nesta venda, com o motivo. */
-  correcao?: { quantidade: number; motivo: string };
-}
+  correcao?: Pick<NonNullable<BaixaPublica["correcao"]>, "quantidade" | "motivo">;
+};
 
 /** Corta do resultado do Participante o que o gestor não liberou: o servidor nunca envia o resto. */
 export function minhaMeta(metaId: string, tipo: TipoApuracao, r: ResultadoParticipante): MinhaMeta {

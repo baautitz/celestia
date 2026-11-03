@@ -7,14 +7,14 @@ import type { AvaliacaoStore } from "./avaliacoes-store.js";
 import { desempenhoSql } from "./desempenho-vendas.js";
 import type { IndicadorId } from "./indicadores.js";
 import { listaSql, type LinhaLista } from "./lista-produtos.js";
-import { ator, ERP_INDISPONIVEL, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, vinculoDoUsuario, type AuthContext } from "./metas-comum.js";
+import { ator, ERP_INDISPONIVEL, erroDoErp, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, vinculoDoUsuario, type AuthContext } from "./metas-comum.js";
 import type { MetaStore } from "./metas-store.js";
 import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
 import type { UsersService } from "./colaboradores-routes.js";
 import { minhaMeta, type MinhaBaixa } from "./minhas-metas.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { PeriodoResumo, PeriodsService } from "./pre-vencidos-routes.js";
-import { baixasDoPeriodo } from "./baixas-do-periodo.js";
+import { baixaPublica, baixasDoPeriodo, type BaixasDoPeriodoDeps } from "./baixas-do-periodo.js";
 import type { EstoquePreVencidoStore } from "./estoque-pre-vencidos-store.js";
 import type { BaixasCongeladasStore } from "./baixas-congeladas-store.js";
 import type { CorrecaoBaixaStore } from "./correcoes-baixa-store.js";
@@ -115,6 +115,7 @@ const INDICADORES_DE_VENDAS: Partial<Record<IndicadorId, (r: LinhaDesempenho) =>
 export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): void {
   const { routes, permissions, auth, events, erpClient, tipos, metas, vinculos, avaliacoes, estoque, congeladas, correcoes, apuracoes, periods, audit, users } = deps;
   const montagem = metasDoPeriodo({ erpClient, tipos, metas, audit });
+  const baixasDeps: BaixasDoPeriodoDeps = { erpClient, store: estoque, congeladas, correcoes };
   const geralRef = INOVAFARMA_PERMISSIONS.ref("metas-geral:view");
   const lojaRef = INOVAFARMA_PERMISSIONS.ref("metas-loja:view");
   const individualRef = INOVAFARMA_PERMISSIONS.ref("metas-individual:view");
@@ -164,7 +165,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     }
     if (indicadores.has("pre-vencidos")) {
       // O vendido de Pré-vencido é o que as Baixas do Período creditam ao Colaborador, em todas as Lojas.
-      for (const b of await baixasDoPeriodo({ erpClient, store: estoque, congeladas, correcoes }, periodo)) {
+      for (const b of await baixasDoPeriodo(baixasDeps, periodo)) {
         const d = de(b.venda.codigoColaborador);
         d.indicadores["pre-vencidos"] = (d.indicadores["pre-vencidos"] ?? 0) + b.quantidade;
       }
@@ -317,7 +318,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     try {
       resultado = await apuracaoDe(periodo, ator(c));
     } catch (err: unknown) {
-      return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
+      return c.json(erroDoErp(err), 503);
     }
     // A Loja só escolhe quem aparece: as confirmadas no Vínculo de cada Colaborador.
     const lojas = new Map((await vinculos.list()).filter((v) => !vinculoDesfeito(v)).map((v) => [v.codigoColaborador, v.lojas]));
@@ -336,7 +337,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     try {
       resultado = await apuracaoDe(periodo, ator(c));
     } catch (err: unknown) {
-      return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
+      return c.json(erroDoErp(err), 503);
     }
     const minhas = resultado.apuracao.metas.flatMap(({ metaId, tipo, participantes }) => {
       const meu = participantes.find((p) => p.codigoColaborador === codigo);
@@ -346,21 +347,15 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     let baixas: MinhaBaixa[] = [];
     if (minhas.some((m) => m.indicador === "pre-vencidos")) {
       try {
-        baixas = (await baixasDoPeriodo({ erpClient, store: estoque, congeladas, correcoes }, periodo))
+        baixas = (await baixasDoPeriodo(baixasDeps, periodo))
           .filter((b) => b.venda.codigoColaborador === codigo)
           .sort((a, b) => a.venda.data.localeCompare(b.venda.data) || a.venda.vendaId - b.venda.vendaId)
-          .map(({ venda, quantidade, nomeProduto, codigoBarra, correcao }) => ({
-            vendaId: venda.vendaId,
-            data: venda.data,
-            produtoId: venda.produtoId,
-            nomeProduto,
-            codigoBarra,
-            quantidadeVendida: venda.quantidade,
-            quantidade,
-            ...(correcao ? { correcao: { quantidade: correcao.quantidade, motivo: correcao.motivo } } : {}),
-          }));
+          .map((b) => {
+            const { correcao, ...baixa } = baixaPublica(b);
+            return { ...baixa, ...(correcao ? { correcao: { quantidade: correcao.quantidade, motivo: correcao.motivo } } : {}) };
+          });
       } catch (err: unknown) {
-        return c.json({ error: err instanceof Error && err.message === SEM_CONEXAO ? SEM_CONEXAO : ERP_INDISPONIVEL }, 503);
+        return c.json(erroDoErp(err), 503);
       }
     }
     return c.json({ periodo, congelada: resultado.congelada, metas: minhas.map((m) => m.minha), baixas });

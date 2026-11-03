@@ -184,7 +184,9 @@ describe("Estoque de Pré-vencidos", () => {
   it("o contexto diz que pode gerir o Estoque e traz as Lojas do Vínculo", async () => {
     const { req } = await boot();
     const contexto = await (await req("ana", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
-    expect(contexto).toMatchObject({ podeEstoque: true, lojasEstoque: [{ codigo: 1, nome: "Centro" }] });
+    expect(contexto).toMatchObject({ podeEstoque: true, lojas: [{ codigo: 1, nome: "Centro" }] });
+    // Sem a Permission de Baixas, não há inclusão retroativa.
+    expect(contexto).not.toHaveProperty("inclusaoRetroativa");
   });
 });
 
@@ -244,7 +246,7 @@ describe("Baixas de Pré-vencido", () => {
   it("o contexto diz que pode ver as Baixas e traz as Lojas do Vínculo", async () => {
     const { req, periodoId } = await boot();
     const contexto = await (await req("gil", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
-    expect(contexto).toMatchObject({ podeBaixas: true, podeEstoque: false, lojasBaixas: [{ codigo: 1, nome: "Centro" }] });
+    expect(contexto).toMatchObject({ podeBaixas: true, podeEstoque: false, lojas: [{ codigo: 1, nome: "Centro" }], inclusaoRetroativa: { inicio: dia(-5) } });
     expect(contexto.periodos.map((p: { id: string }) => p.id)).toEqual([periodoId]);
   });
 });
@@ -291,6 +293,14 @@ describe("Congelamento das Baixas no fechamento do Closing Period", () => {
     expect(await baixas(periodoId)).toEqual([]);
   });
 
+  it("o Período fechado sem Baixas gravadas não é recalculado ao vivo", async () => {
+    const { incluir, periodoId, baixas, fechar } = await comDoisPeriodos();
+    expect((await fechar(periodoId)).status).toBe(200);
+    await incluir("ana", { quantidade: 5 });
+    vendas = [venda(1, 1, 2)];
+    expect(await baixas(periodoId)).toEqual([]);
+  });
+
   it("reabrir descarta o congelado e volta a calcular ao vivo", async () => {
     const { incluir, periodoId, seguinteId, baixas, fechar, reabrir } = await comDoisPeriodos();
     await incluir("ana", { quantidade: 5 });
@@ -320,6 +330,16 @@ describe("Inclusão retroativa de Item", () => {
     expect((await incluir("rui", { incluidoEm: dia(-6) })).status).toBe(400);
     expect((await incluir("rui", { incluidoEm: dia(2) })).status).toBe(400);
     expect((await incluir("rui", { incluidoEm: "03/11/2026" })).status).toBe(400);
+  });
+
+  it("retroage até o início do Período aberto mais antigo, mesmo que ele já tenha terminado", async () => {
+    const { incluir, req, periodoId } = await boot();
+    expect((await req("adm", "POST", "/api/closing-periods", { name: "Anterior", startDate: dia(-20), endDate: dia(-6) })).status).toBe(201);
+    expect((await req("adm", "POST", `/api/closing-periods/${periodoId}/close`)).status).toBe(200);
+    expect((await incluir("rui", { incluidoEm: dia(-15) })).status).toBe(201);
+    expect((await incluir("rui", { incluidoEm: dia(-21) })).status).toBe(400);
+    const contexto = await (await req("rui", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
+    expect(contexto.inclusaoRetroativa).toEqual({ inicio: dia(-20), hoje: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
   });
 
   it("sem a Permission de Baixas, a data retroativa é recusada", async () => {
@@ -381,6 +401,18 @@ describe("Correção de Baixa", () => {
     expect(resumo(await baixas())).toEqual([[7, [[1, 0]]], [8, [[2, 2]]]]);
   });
 
+  it("não corrige acima do que havia no Estoque para a venda, para que a Correção seja a Baixa que vale", async () => {
+    const { baixas, corrigir, req } = await comBaixas();
+    // A venda 2 teve 2, mas só 1 restava no Estoque quando ela foi feita.
+    const acima = await corrigir("gil", { vendaId: 2, quantidade: 2 });
+    expect(acima.status).toBe(400);
+    expect(await acima.json()).toMatchObject({ error: expect.stringContaining("(1)") });
+    // Na edição, o teto é o que a venda baixaria sem a própria Correção.
+    const criada = (await (await corrigir("gil", { quantidade: 1 })).json()) as Correcao;
+    expect((await req("gil", "PUT", `/api/m/inovafarma/pre-vencidos/baixas/correcoes/${criada.id}`, { quantidade: 2, motivo: "Eram duas", version: 1 })).status).toBe(200);
+    expect(resumo(await baixas())).toEqual([[7, [[1, 2]]], [8, [[2, 1]]]]);
+  });
+
   it("recusa sem a Permission, fora das Lojas do Vínculo e no Período fechado", async () => {
     const { corrigir, req, periodoId } = await comBaixas();
     expect((await corrigir("ana")).status).toBe(403);
@@ -410,8 +442,8 @@ describe("Correção de Baixa", () => {
     const eventos = (await (await req("auditor", "GET", "/api/audit?plugin=inovafarma")).json()) as { action: string; summary: string }[];
     const resumoDe = (action: string) => eventos.find((e) => e.action === action)?.summary;
     expect(resumoDe("correcao_baixa_create")).toContain("de 2 para 1 un. Motivo: Uma unidade não era Pré-vencido");
-    expect(resumoDe("correcao_baixa_update")).toContain("de 1 para 0 un. Motivo: Nenhuma era");
-    expect(resumoDe("correcao_baixa_delete")).toContain("era 0 un.");
+    expect(resumoDe("correcao_baixa_update")).toContain("de 1 para 0 un. Motivo: Nenhuma era (antes: Uma unidade não era Pré-vencido)");
+    expect(resumoDe("correcao_baixa_delete")).toContain("era 0 un. Motivo: Nenhuma era");
     expect(JSON.stringify(eventos)).not.toContain(String(CODIGO_PRODUTO_SECRETO));
   });
 

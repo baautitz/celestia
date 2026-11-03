@@ -92,7 +92,7 @@ export function CorrecaoBaixaWindow({ codigoLoja, periodoId, venda }: Props) {
                     <Input type="number" inputMode="numeric" min={0} max={venda.quantidadeVendida} step={1} {...field} />
                   </FormControl>
                   <FormDescription>
-                    De 0 a {venda.quantidadeVendida}, o que a venda teve. O que sair volta ao Restante e pode ser baixado pelas vendas seguintes.
+                    De 0 a {venda.quantidadeVendida}, o que a venda teve, sem passar do que havia no Estoque para ela. O que sair volta ao Restante e pode ser baixado pelas vendas seguintes.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
