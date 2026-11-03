@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { Pencil, Undo2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
+import { Button } from "@platform/ui/components/button";
 import { Label } from "@platform/ui/components/label";
 import { Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
@@ -7,6 +9,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
+import { CorrecaoBaixaWindow, type CorrecaoDaBaixa } from "./correcao-baixa-window";
 import type { LojaOpcao } from "./loja-opcao";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
@@ -29,6 +32,8 @@ interface Baixa {
   codigoBarra: string | null;
   quantidadeVendida: number;
   quantidade: number;
+  /** Correção de Baixa da venda: `quantidade` já a reflete. */
+  correcao?: CorrecaoDaBaixa;
 }
 
 interface BaixasDoColaborador {
@@ -51,16 +56,19 @@ const colunasVenda: DataTableColumn<Baixa>[] = [
   { key: "produto", label: "Produto", value: (b) => b.nomeProduto },
   { key: "vendida", label: "Qtde vendida", value: (b) => b.quantidadeVendida, format: "number" },
   { key: "quantidade", label: "Baixa", value: (b) => b.quantidade, format: "number" },
+  { key: "correcao", label: "Correção", value: (b) => (b.correcao ? `${b.correcao.motivo}${b.correcao.autorNome ? ` (${b.correcao.autorNome})` : ""}` : "") },
 ];
 
 /** Aba Baixas: as Baixas de Pré-vencido de uma Loja do Vínculo num Closing Period, por Colaborador e abertas por venda. */
 export function BaixasPreVencidosTab({ lojas, periodos }: { lojas: LojaOpcao[]; periodos: Periodo[] }) {
-  const { feedback } = useUi();
+  const { feedback, windows } = useUi();
   const [loja, setLoja] = useState(lojas.length > 0 ? String(lojas[0]!.codigo) : "");
   // Abre no período aberto de data mais recente; sem nenhum aberto, no mais recente.
   const [periodoId, setPeriodoId] = useState((periodos.find((p) => p.status !== "closed") ?? periodos[0])?.id ?? "");
   const [grupos, setGrupos] = useState<BaixasDoColaborador[]>([]);
   const [carregando, setCarregando] = useState(false);
+  // Muda a cada Correção salva ou desfeita: recarrega as Baixas do servidor.
+  const [recarga, setRecarga] = useState(0);
 
   // Só a resposta da última consulta vale.
   const consulta = useRef(0);
@@ -78,7 +86,7 @@ export function BaixasPreVencidosTab({ lojas, periodos }: { lojas: LojaOpcao[]; 
       .finally(() => {
         if (minha === consulta.current) setCarregando(false);
       });
-  }, [loja, periodoId, feedback]);
+  }, [loja, periodoId, feedback, recarga]);
 
   if (lojas.length === 0) {
     return (
@@ -88,6 +96,51 @@ export function BaixasPreVencidosTab({ lojas, periodos }: { lojas: LojaOpcao[]; 
       </Alert>
     );
   }
+
+  // Só se corrige Baixa no Período aberto.
+  const aberto = periodos.find((p) => p.id === periodoId)?.status !== "closed";
+
+  const corrigir = async (venda: Baixa) => {
+    const resultado = await windows.open<CorrecaoDaBaixa>({
+      surface: "dialog",
+      size: "small",
+      title: venda.correcao ? "Alterar Correção de Baixa" : "Corrigir Baixa",
+      description: `Venda ${venda.vendaId} · ${venda.nomeProduto}`,
+      content: () => <CorrecaoBaixaWindow codigoLoja={Number(loja)} periodoId={periodoId} venda={venda} />,
+    });
+    if (resultado.status === "confirmed") setRecarga((n) => n + 1);
+  };
+
+  const desfazer = async (venda: Baixa) => {
+    if (!venda.correcao) return;
+    const ok = await windows.confirm({
+      title: "Desfazer Correção",
+      description: `Desfazer a Correção da venda ${venda.vendaId}? A Baixa volta a ser calculada pelas vendas.`,
+      confirmLabel: "Desfazer",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await apiFetch(`${BASE}/baixas/correcoes/${venda.correcao.id}?version=${venda.correcao.version}`, { method: "DELETE" });
+      feedback.notify({ type: "success", title: "Correção desfeita." });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao desfazer a Correção."));
+    }
+    setRecarga((n) => n + 1);
+  };
+
+  const acoesDaVenda = (b: Baixa) => (
+    <Stack direction="row" gap="tight">
+      <Button size="icon" variant="ghost" aria-label={`Corrigir a Baixa da venda ${b.vendaId}`} onClick={() => void corrigir(b)}>
+        <Pencil />
+      </Button>
+      {b.correcao && (
+        <Button size="icon" variant="ghost" tone="destructive" aria-label={`Desfazer a Correção da venda ${b.vendaId}`} onClick={() => void desfazer(b)}>
+          <Undo2 />
+        </Button>
+      )}
+    </Stack>
+  );
 
   const colunas: DataTableColumn<BaixasDoColaborador>[] = [
     { key: "colaborador", label: "Colaborador", value: (g) => g.nomeColaborador, searchable: true, sortable: true },
@@ -139,7 +192,9 @@ export function BaixasPreVencidosTab({ lojas, periodos }: { lojas: LojaOpcao[]; 
         description="As vendas da Loja no período que gastaram o Estoque de Pré-vencidos, por Colaborador."
         emptyMessage="Nenhuma Baixa nesta Loja no período."
         search={{ placeholder: "Buscar Colaborador" }}
-        renderExpanded={(g) => <DataTable scroll="page" columns={colunasVenda} rows={g.vendas} getRowId={(b) => `${b.vendaId}|${b.produtoId}`} />}
+        renderExpanded={(g) => (
+          <DataTable scroll="page" columns={colunasVenda} rows={g.vendas} getRowId={(b) => `${b.vendaId}|${b.produtoId}`} rowActions={aberto ? acoesDaVenda : undefined} />
+        )}
       />
     </Stack>
   );
