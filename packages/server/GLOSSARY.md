@@ -171,7 +171,7 @@ Stop a User from signing in while keeping the User. A deactivated User is not re
 _Avoid_: Delete, remove, block
 
 **Certificate Exemption** (pt-BR: **Acesso sem certificado**):
-A flag on a User that lets them sign in without presenting a Device certificate (see the [Certificate Authority glossary](../../services/ca/GLOSSARY.md)). Without it, every User must present the certificate of an active Device.
+A flag on a User that lets them sign in without presenting a Device certificate (see the [Certificate Authority glossary](../../services/ca/GLOSSARY.md)). The certificate is still asked for, only to track the Device: if they present one, the session is tied to it; if not, they sign in without a Device. Without the flag, every User must present the certificate of an active Device.
 _Avoid_: Bypass, whitelist
 
 **Permission**:
