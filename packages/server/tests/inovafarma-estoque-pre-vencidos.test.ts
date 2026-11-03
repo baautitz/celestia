@@ -188,7 +188,9 @@ describe("Baixas de Pré-vencido", () => {
     vendas = [venda(1, -2, 1), venda(2, 2, 3), venda(3, 3, 9, { codigoLoja: 2 })];
     expect((await listar("ana")).map((i) => [i.id, i.restante])).toEqual([[outro.id, 2]]);
     const todos = (await (await req("ana", "GET", "/api/m/inovafarma/pre-vencidos/estoque/itens?codigoLoja=1&zerados=true")).json()) as Item[];
-    expect(todos.map((i) => [i.id, i.restante])).toEqual([[zerado.id, 0], [outro.id, 2]]);
+    // Incluídos no mesmo instante, a ordem entre os dois não é fixa.
+    expect(todos.map((i) => [i.id, i.restante])).toEqual(expect.arrayContaining([[zerado.id, 0], [outro.id, 2]]));
+    expect(todos).toHaveLength(2);
   });
 
   it("lista as Baixas da Loja no Closing Period por Colaborador e por venda, inclusive de quem não tem Vínculo, sem as canceladas", async () => {
