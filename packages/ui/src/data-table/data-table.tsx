@@ -885,7 +885,17 @@ export function DataTable<TRow>({
               {printButton}
               {search && (
                 <InputGroup
-                  className={isMobile ? "flex-1" : (search.className ?? "w-72")}
+                  className={
+                    isMobile ? "flex-1" : (search.className ?? "min-w-72")
+                  }
+                  style={
+                    isMobile || search.className
+                      ? undefined
+                      : {
+                          // Cresce até caber o placeholder inteiro, sem cortar.
+                          width: `calc(${(search.placeholder ?? "Buscar...").length}ch + 3rem)`,
+                        }
+                  }
                 >
                   <InputGroupInput
                     type="search"
