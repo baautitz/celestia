@@ -162,4 +162,19 @@ describe("aba Estoque", () => {
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "POST");
     expect(JSON.parse(envio![1].body)).toEqual({ codigoLoja: 1, produtoId: "guid-1", quantidade: 5, validade: "2027-08", incluidoEm: dia(-5) });
   });
+
+  it("com a Permission de Baixas, ajusta a data de inclusão na edição e só envia a data se ela mudou", async () => {
+    contexto = { ...contextoEstoque, podeBaixas: true, lojasBaixas: [{ codigo: 1, nome: "Centro" }], periodos: [{ id: "p1", name: "Atual", startDate: dia(-5), endDate: dia(10), status: "open" }] };
+    itens = [item({ incluidoEm: new Date().toISOString() })];
+    renderizar();
+    await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
+    fireEvent.click(screen.getByRole("button", { name: "Editar DIPIRONA 500MG" }));
+    const data = (await screen.findByPlaceholderText("dd/mm/aaaa")) as HTMLInputElement;
+    expect(data.value).toBe(dia(0).split("-").reverse().join("/"));
+    fireEvent.change(data, { target: { value: ddmmaaaa(dia(-3)) } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(apiFetch.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true));
+    const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "PUT");
+    expect(JSON.parse(envio![1].body)).toEqual({ quantidade: 3, validade: "2027-06", incluidoEm: dia(-3), version: 1 });
+  });
 });

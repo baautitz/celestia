@@ -62,7 +62,10 @@ interface Props {
   codigoLoja: number;
   /** Presente na edição: só quantidade e validade mudam. */
   item?: ItemPreVencido;
-  /** Só para quem gere as Baixas, na inclusão: a data de inclusão pode retroagir até este dia (`AAAA-MM-DD`). */
+  /**
+   * Só para quem gere as Baixas: a data de inclusão pode retroagir até este dia (`AAAA-MM-DD`). Na edição, só se o Item
+   * foi incluído a partir dele (o incluído antes já entrou num Período fechado).
+   */
   retroagirAte?: string;
 }
 
@@ -70,13 +73,22 @@ interface Props {
 export function ItemPreVencidoWindow({ codigoLoja, item, retroagirAte }: Props) {
   const { resolve } = useWindow<ItemSalvo>();
   const { feedback } = useUi();
+  const diaIncluido = item ? diaLocal(new Date(item.incluidoEm)) : undefined;
+  const comData = retroagirAte !== undefined && (diaIncluido === undefined || diaIncluido >= retroagirAte);
   const form = useForm<Valores>({
     resolver: zodResolver(esquema(retroagirAte)),
-    defaultValues: { produtoId: item?.produtoId ?? "", quantidade: item ? String(item.quantidade) : "", validade: item?.validade ?? "" },
+    defaultValues: {
+      produtoId: item?.produtoId ?? "",
+      quantidade: item ? String(item.quantidade) : "",
+      validade: item?.validade ?? "",
+      incluidoEm: comData && item ? new Date(item.incluidoEm) : undefined,
+    },
   });
 
   const onSubmit = async (valores: Valores) => {
-    const corpo = { quantidade: Number(valores.quantidade), validade: valores.validade };
+    // Só vai a data que mudou: sem ela, a inclusão fica agora (ou como estava, na edição).
+    const dia = comData && valores.incluidoEm ? diaLocal(valores.incluidoEm) : undefined;
+    const corpo = { quantidade: Number(valores.quantidade), validade: valores.validade, ...(dia && dia !== diaIncluido ? { incluidoEm: dia } : {}) };
     try {
       const salvo = item
         ? await apiFetch<ItemSalvo>(`${BASE}/estoque/itens/${item.id}`, {
@@ -87,7 +99,7 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroagirAte }: Props) 
         : await apiFetch<ItemSalvo>(`${BASE}/estoque/itens`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ codigoLoja, produtoId: valores.produtoId, ...corpo, ...(valores.incluidoEm ? { incluidoEm: diaLocal(valores.incluidoEm) } : {}) }),
+            body: JSON.stringify({ codigoLoja, produtoId: valores.produtoId, ...corpo }),
           });
       feedback.notify({ type: "success", title: item ? "Item alterado." : "Item incluído." });
       resolve(salvo);
@@ -144,7 +156,7 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroagirAte }: Props) 
                 </FormItem>
               )}
             />
-            {retroagirAte && (
+            {comData && (
               <FormField
                 control={form.control}
                 name="incluidoEm"
@@ -154,7 +166,9 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroagirAte }: Props) 
                     <FormControl>
                       <DatePicker value={field.value} onChange={field.onChange} />
                     </FormControl>
-                    <FormDescription>Em branco, agora. Pode retroagir até {dataBr(retroagirAte)}, para que as vendas desde então gerem Baixas.</FormDescription>
+                    <FormDescription>
+                      {item ? "" : "Em branco, agora. "}Pode retroagir até {dataBr(retroagirAte)}, para que as vendas desde então gerem Baixas.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -65,7 +65,7 @@ export function EstoquePreVencidosTab({ lojas, retroagirAte }: { lojas: LojaOpca
       size: "small",
       title: item ? "Editar Item" : "Incluir Item",
       description: item ? item.nomeProduto : "Inclua um Pré-vencido que está na prateleira da Loja.",
-      content: () => <ItemPreVencidoWindow codigoLoja={Number(loja)} item={item} retroagirAte={item ? undefined : retroagirAte} />,
+      content: () => <ItemPreVencidoWindow codigoLoja={Number(loja)} item={item} retroagirAte={retroagirAte} />,
     });
     if (resultado.status !== "confirmed") return;
     // O Item salvo já aparece na tabela; a recarga confirma com o servidor.
