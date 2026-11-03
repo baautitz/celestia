@@ -14,6 +14,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
+import { EstoquePreVencidosTab } from "./estoque-pre-vencidos-tab";
 import { LancamentoWindow, type Lancamento, type LojaOpcao } from "./pre-vencido-window";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
@@ -30,12 +31,15 @@ interface Periodo {
 interface Contexto {
   podeLancar: boolean;
   podeConferir: boolean;
+  podeEstoque: boolean;
   vinculado: boolean;
   /** Closing Periods, o de data mais recente primeiro; só os abertos aceitam lançar, editar e excluir. */
   periodos: Periodo[];
   lojas: LojaOpcao[];
   periodosConferencia?: Periodo[];
   lojasConferencia?: LojaOpcao[];
+  /** Lojas do Vínculo, para o Estoque. */
+  lojasEstoque?: LojaOpcao[];
 }
 
 interface DetalheConferencia {
@@ -314,12 +318,12 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
   );
 }
 
-/** Tela Pré-vencidos: o vendedor lança os seus; o gestor confere o declarado com as vendas do ERP. */
+/** Tela Pré-vencidos: o Estoque de cada Loja; o vendedor lança os seus; o gestor confere o declarado com as vendas do ERP. */
 export function PreVencidosPage() {
   const { feedback } = useUi();
   const [contexto, setContexto] = useState<Contexto | null>(null);
-  const [aba, setAba] = useTabParam<"lancamentos" | "conferencia">(
-    contexto ? [contexto.podeLancar && "lancamentos", contexto.podeConferir && "conferencia"] : [],
+  const [aba, setAba] = useTabParam<"estoque" | "lancamentos" | "conferencia">(
+    contexto ? [contexto.podeEstoque && "estoque", contexto.podeLancar && "lancamentos", contexto.podeConferir && "conferencia"] : [],
   );
 
   useEffect(() => {
@@ -333,11 +337,18 @@ export function PreVencidosPage() {
     <Stack gap="section">
       <Tabs value={aba} onValueChange={setAba}>
         <TabsList>
+          {contexto.podeEstoque && <TabsTrigger value="estoque">Estoque</TabsTrigger>}
           {contexto.podeLancar && <TabsTrigger value="lancamentos">Meus Lançamentos</TabsTrigger>}
           {contexto.podeConferir && <TabsTrigger value="conferencia">Conferência</TabsTrigger>}
         </TabsList>
       </Tabs>
-      {aba === "lancamentos" ? <MeusLancamentos contexto={contexto} /> : <Conferencia contexto={contexto} />}
+      {aba === "estoque" ? (
+        <EstoquePreVencidosTab lojas={contexto.lojasEstoque ?? []} />
+      ) : aba === "lancamentos" ? (
+        <MeusLancamentos contexto={contexto} />
+      ) : (
+        <Conferencia contexto={contexto} />
+      )}
     </Stack>
   );
 }

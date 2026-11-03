@@ -795,8 +795,11 @@ export const inovafarmaWebModule = defineWebModule({
       order: 20,
       permission: "inovafarma:pre-vencidos-lancamento:manage",
       component: PreVencidosPage,
-      // Quem só confere (gestor) também abre a tela; ela mostra as abas que a Permission libera.
-      variants: [{ permission: "inovafarma:pre-vencidos-conferencia:view", component: PreVencidosPage }],
+      // Quem só confere (gestor) ou só gere o Estoque também abre a tela; ela mostra as abas que a Permission libera.
+      variants: [
+        { permission: "inovafarma:pre-vencidos-conferencia:view", component: PreVencidosPage },
+        { permission: "inovafarma:pre-vencidos-estoque:manage", component: PreVencidosPage },
+      ],
     },
     {
       id: "inovafarma-avaliacoes",

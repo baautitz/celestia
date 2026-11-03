@@ -1,22 +1,18 @@
-import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@platform/ui/components/button";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@platform/ui/components/combobox";
 import { FieldGroup } from "@platform/ui/components/field";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
 import { Input } from "@platform/ui/components/input";
-import { Label } from "@platform/ui/components/label";
 import { MonthPicker } from "@platform/ui/components/month-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
-import { MIN_BUSCA_PRODUTO } from "./produtos-erp";
+import { ProdutoBusca } from "./produto-busca";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
-const ESPERA_BUSCA_MS = 300;
 
 export interface Lancamento {
   id: string;
@@ -35,14 +31,6 @@ export interface LojaOpcao {
   codigo: number;
   nome: string;
 }
-
-interface ProdutoOpcao {
-  id: string;
-  nome: string;
-  codigoBarra: string | null;
-}
-
-const rotulo = (p: ProdutoOpcao) => (p.codigoBarra ? `${p.nome} (${p.codigoBarra})` : p.nome);
 
 const schema = z.object({
   codigoLoja: z.string().min(1, "Selecione a Loja."),
@@ -63,9 +51,6 @@ interface Props {
 export function LancamentoWindow({ periodoId, lojas, lancamento }: Props) {
   const { resolve } = useWindow<Lancamento>();
   const { feedback } = useUi();
-  const [busca, setBusca] = useState("");
-  const [produtos, setProdutos] = useState<ProdutoOpcao[]>([]);
-  const [escolhido, setEscolhido] = useState<ProdutoOpcao | null>(null);
   const form = useForm<Valores>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -75,42 +60,6 @@ export function LancamentoWindow({ periodoId, lojas, lancamento }: Props) {
       validade: lancamento?.validade ?? "",
     },
   });
-
-  const escolher = (produto: ProdutoOpcao | null) => {
-    setEscolhido(produto);
-    form.setValue("produtoId", produto?.id ?? "", { shouldValidate: form.formState.isSubmitted });
-  };
-
-  // Os resultados aparecem enquanto digita (ou bipa); com um só resultado, o produto já fica escolhido.
-  useEffect(() => {
-    const termo = busca.trim();
-    if (escolhido && busca === rotulo(escolhido)) return;
-    if (termo.length < MIN_BUSCA_PRODUTO) {
-      setProdutos([]);
-      return;
-    }
-    let atual = true;
-    const espera = setTimeout(() => {
-      apiFetch<ProdutoOpcao[]>(`${BASE}/produtos?q=${encodeURIComponent(termo)}`)
-        .then((achados) => {
-          if (!atual) return;
-          setProdutos(achados);
-          if (achados.length === 1) {
-            escolher(achados[0]!);
-            setBusca(rotulo(achados[0]!));
-          } else if (escolhido) escolher(null);
-        })
-        .catch((err: unknown) => {
-          if (atual) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao buscar o produto."));
-        });
-    }, ESPERA_BUSCA_MS);
-    return () => {
-      atual = false;
-      clearTimeout(espera);
-    };
-    // `escolher` e `feedback` não mudam o resultado da busca.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busca]);
 
   const onSubmit = async (valores: Valores) => {
     try {
@@ -169,34 +118,11 @@ export function LancamentoWindow({ periodoId, lojas, lancamento }: Props) {
                   name="produtoId"
                   render={() => (
                     <FormItem>
-                      <Label htmlFor="pre-vencido-busca">Produto (bipe o código de barras ou digite o nome)</Label>
-                      <Combobox
-                        autoHighlight
-                        filter={null}
-                        items={produtos}
-                        value={escolhido}
-                        inputValue={busca}
-                        onInputValueChange={setBusca}
-                        onValueChange={(p: ProdutoOpcao | null) => {
-                          escolher(p);
-                          if (p) setBusca(rotulo(p));
-                        }}
-                        itemToStringLabel={rotulo}
-                        itemToStringValue={(p: ProdutoOpcao) => p.id}
-                        isItemEqualToValue={(a: ProdutoOpcao, b: ProdutoOpcao) => a.id === b.id}
-                      >
-                        <ComboboxInput id="pre-vencido-busca" autoFocus showTrigger={false} placeholder="Código de barras ou nome" />
-                        <ComboboxContent>
-                          <ComboboxEmpty>{busca.trim().length < MIN_BUSCA_PRODUTO ? `Digite ao menos ${MIN_BUSCA_PRODUTO} caracteres.` : "Nenhum produto encontrado."}</ComboboxEmpty>
-                          <ComboboxList>
-                            {(p: ProdutoOpcao) => (
-                              <ComboboxItem key={p.id} value={p}>
-                                {rotulo(p)}
-                              </ComboboxItem>
-                            )}
-                          </ComboboxList>
-                        </ComboboxContent>
-                      </Combobox>
+                      <ProdutoBusca
+                        id="pre-vencido-busca"
+                        url={`${BASE}/produtos`}
+                        onChange={(p) => form.setValue("produtoId", p?.id ?? "", { shouldValidate: form.formState.isSubmitted })}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
