@@ -1,13 +1,13 @@
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
-import { formatarValor, indicadorPorId } from "./indicadores.js";
+import { formatarValor } from "./indicadores.js";
 import { BUSCA_LISTA_SQL, conferirSql, MIN_BUSCA_LISTA, type ResultadoBusca } from "./lista-produtos.js";
 import { ator, ERP_INDISPONIVEL, META_DESATUALIZADA, SEM_CONEXAO, type AuthContext } from "./metas-comum.js";
 import type { MetaStore } from "./metas-store.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
-import { DadosTipoMeta, EXIBICAO_LABEL, EntradaLista, TIPOS_ENTRADA, descreverEntrada, descreverPremio, ordenarEntradas, problemaDoTipo, type TipoEntrada, type TipoMeta } from "./tipos-meta.js";
+import { DadosTipoMeta, EXIBICAO_LABEL, EntradaLista, indicadorDoTipo, TIPOS_ENTRADA, descreverEntrada, descreverPremio, ordenarEntradas, problemaDoTipo, type TipoEntrada, type TipoMeta } from "./tipos-meta.js";
 import type { ErpQueryClient } from "./server.js";
 import { META_TARGET, TIPO_META_TARGET, TIPOS_META_ACTIONS, TIPOS_META_PLUGIN, type ValoresTipo } from "./tipos-meta-audit.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
@@ -45,7 +45,7 @@ const Conferencia = z.object({ entradas: z.array(EntradaLista.pick({ tipo: true,
 const comPremio = (t: TipoMeta) => ({ ...t, premio: descreverPremio(t) });
 
 const valores = (t: TipoMeta): ValoresTipo => {
-  const indicador = indicadorPorId(t.indicador);
+  const indicador = indicadorDoTipo(t);
   return {
     nome: t.nome,
     indicador: indicador.nome,
@@ -53,7 +53,7 @@ const valores = (t: TipoMeta): ValoresTipo => {
     mostrarPremio: t.mostrarPremio,
     premio: descreverPremio(t),
     alvoPadrao: t.alvoPadrao === null ? null : formatarValor(indicador, t.alvoPadrao),
-    lista: t.lista ? `em unidades: ${ordenarEntradas(t.lista.entradas).map(descreverEntrada).join(", ")}` : null,
+    lista: t.lista ? `em ${t.lista.unidade === "reais" ? "R$" : "unidades"}: ${ordenarEntradas(t.lista.entradas).map(descreverEntrada).join(", ")}` : null,
     ativo: t.ativo,
   };
 };
@@ -194,7 +194,7 @@ export function registerTiposMetaRoutes({ routes, permissions, auth, erpClient, 
     );
     if (!atualizadas) return c.json(META_DESATUALIZADA, 409);
 
-    const alvoTexto = formatarValor(indicadorPorId(tipo.indicador), tipo.alvoPadrao);
+    const alvoTexto = formatarValor(indicadorDoTipo(tipo), tipo.alvoPadrao);
     for (const { meta, periodo, codigos } of alvos) {
       await audit.record({
         plugin: TIPOS_META_PLUGIN,

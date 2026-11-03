@@ -1,7 +1,7 @@
 import { diferenca, type ResultadoParticipante } from "./apuracao.js";
 import type { TipoApuracao } from "./apuracao-store.js";
-import { formatarValor, indicadorPorId } from "./indicadores.js";
-import type { Exibicao } from "./tipos-meta.js";
+import { formatarValor } from "./indicadores.js";
+import { indicadorDoTipo, type Exibicao } from "./tipos-meta.js";
 
 /** Uma Meta como o Participante a vê em Minhas Metas: só o que a Exibição e o Tipo de Meta liberam. */
 export interface MinhaMeta {
@@ -23,7 +23,7 @@ export interface MinhaMeta {
 /** Corta do resultado do Participante o que o gestor não liberou: o servidor nunca envia o resto. */
 export function minhaMeta(metaId: string, tipo: TipoApuracao, r: ResultadoParticipante): MinhaMeta {
   const meta: MinhaMeta = { metaId, nome: tipo.nome, exibicao: tipo.exibicao, atingida: r.atingida };
-  const indicador = indicadorPorId(tipo.indicador);
+  const indicador = indicadorDoTipo(tipo);
   // Na Meta de Avaliações o Saldo e o valor inicial são o próprio Prêmio: só aparecem se o Tipo mostra o Prêmio.
   const escondePremio = tipo.indicador === "avaliacoes" && !tipo.mostrarPremio;
   if (tipo.exibicao === "progresso" && !escondePremio) {

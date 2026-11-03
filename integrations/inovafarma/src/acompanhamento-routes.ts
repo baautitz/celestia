@@ -150,7 +150,9 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
       if (!tipo.lista) continue;
       const { sql, params } = listaSql(tipo.lista);
       const porColaborador = new Map<number, number>();
-      for (const r of await client.query<LinhaLista>(sql, { ...datas, ...params })) porColaborador.set(Number(r.codigoColaborador), Number(r.quantidade) || 0);
+      // Em unidades, a quantidade vendida; em R$, o valor líquido em centavos, como os demais Indicadores em R$.
+      const realizado = (r: LinhaLista) => (tipo.lista?.unidade === "reais" ? Math.round((Number(r.valor) || 0) * 100) : Number(r.quantidade) || 0);
+      for (const r of await client.query<LinhaLista>(sql, { ...datas, ...params })) porColaborador.set(Number(r.codigoColaborador), realizado(r));
       listas.set(tipo.id, porColaborador);
     }
     if (indicadores.has("pre-vencidos")) {
@@ -191,7 +193,16 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     const apuradas: MetaApurada[] = doPeriodo
       .map(({ meta, tipo }) => ({
         metaId: meta.id,
-        tipo: { id: tipo.id, nome: tipo.nome, indicador: tipo.indicador, exibicao: tipo.exibicao, mostrarPremio: tipo.mostrarPremio, semAlvo: tipo.semAlvo, premio: descreverPremio(tipo) },
+        tipo: {
+          id: tipo.id,
+          nome: tipo.nome,
+          indicador: tipo.indicador,
+          exibicao: tipo.exibicao,
+          mostrarPremio: tipo.mostrarPremio,
+          semAlvo: tipo.semAlvo,
+          lista: tipo.lista,
+          premio: descreverPremio(tipo),
+        },
         participantes: meta.participantes.map((p) => apurarParticipante(tipo, p, dadosDe(tipo, p.codigoColaborador))),
       }))
       .sort((a, b) => a.tipo.nome.localeCompare(b.tipo.nome));

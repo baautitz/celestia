@@ -1,6 +1,6 @@
-import { atingimento as calcularAtingimento, formatarValor, indicadorPorId, reais, type Indicador, type IndicadorId } from "./indicadores.js";
+import { atingimento as calcularAtingimento, formatarValor, reais, type Indicador, type IndicadorId } from "./indicadores.js";
 import type { ParticipanteMeta } from "./metas-store.js";
-import type { DadosTipoMeta, RegraPremio } from "./tipos-meta.js";
+import { indicadorDoTipo, type DadosTipoMeta, type RegraPremio } from "./tipos-meta.js";
 
 /** O que o Período tem de um Colaborador, somado em todas as Lojas. */
 export interface DadosColaborador {
@@ -28,7 +28,7 @@ export interface ResultadoParticipante {
   aviso?: string;
 }
 
-type TipoApurado = Pick<DadosTipoMeta, "indicador" | "semAlvo" | "regra">;
+type TipoApurado = Pick<DadosTipoMeta, "indicador" | "semAlvo" | "regra"> & { lista?: DadosTipoMeta["lista"] };
 
 const nomeCurto = (indicador: Indicador) => indicador.nome.replace(/ %$/, "");
 const comUnidade = (indicador: Indicador, valor: number) => `${formatarValor(indicador, valor)}${indicador.unidade === "quantidade" ? " un." : ""}`;
@@ -60,7 +60,7 @@ export const regraDoParticipante = (regra: RegraPremio, participante: Pick<Parti
   participante.premio && participante.premio.tipo === regra.tipo ? participante.premio : regra;
 
 export function apurarParticipante(tipo: TipoApurado, participante: ParticipanteMeta, dados: DadosColaborador): ResultadoParticipante {
-  const indicador = indicadorPorId(tipo.indicador);
+  const indicador = indicadorDoTipo(tipo);
   const { codigoColaborador, nome } = participante;
   const alvo = tipo.semAlvo ? null : participante.alvo;
   let realizado: number;

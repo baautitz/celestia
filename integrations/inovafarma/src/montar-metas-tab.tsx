@@ -33,6 +33,7 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { AlvoInput, rotuloAlvo } from "./alvo-input";
 import { DefinirAlvoWindow } from "./alvo-padrao-window";
 import { formatarValor, indicadorPorId, type IndicadorId } from "./indicadores";
+import { indicadorDoTipo } from "./tipos-meta";
 import { regraDoParticipante } from "./apuracao";
 import {
   PremioParticipanteWindow,
@@ -319,7 +320,7 @@ function AcoesDaMeta({
       description: `Meta "${meta.tipo.nome}" · ${periodoNome}`,
       content: () => (
         <DefinirAlvoWindow
-          indicadorId={meta.tipo.indicador}
+          indicador={indicadorDoTipo(meta.tipo)}
           meta={{
             id: meta.periodoId,
             name: periodoNome,
@@ -424,7 +425,7 @@ function MetaDoPeriodo({
     });
     if (r.status === "confirmed") atualizar(r.value);
   };
-  const indicador = indicadorPorId(meta.tipo.indicador);
+  const indicador = indicadorDoTipo(meta.tipo);
   const avaliacoes = meta.tipo.indicador === "avaliacoes";
   const estado = (c: Colaborador) =>
     participacao(meta, edicoes, c.codigoColaborador);
@@ -626,7 +627,7 @@ export function MontarMetas({
 
   const alteracoes: Alteracao[] = (montagem?.metas ?? []).flatMap((meta) =>
     Object.entries(edicoes[meta.id] ?? {}).map(([codigo, edicao]) => {
-      const indicador = indicadorPorId(meta.tipo.indicador);
+      const indicador = indicadorDoTipo(meta.tipo);
       const valor = (e: Edicao, novo: boolean) =>
         !e.participa
           ? "Não participa"

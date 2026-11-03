@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { colaboradorDasMinhasMetas, visualizacoesDasMetas } from "./acompanhamento-routes.js";
 import { LOJAS_SQL } from "./colaboradores-routes.js";
-import { formatarValor, indicadorPorId } from "./indicadores.js";
+import { formatarValor } from "./indicadores.js";
 import { METAS_ACTIONS } from "./metas-audit.js";
 import { ator, ERP_INDISPONIVEL, META_DESATUALIZADA, PERIODO_NAO_ENCONTRADO, type AuthContext } from "./metas-comum.js";
 import type { DadosMeta, Meta, MetaStore } from "./metas-store.js";
@@ -11,7 +11,7 @@ import { alvoInicial, novaMeta, pendentes, usaAlvo, type ColaboradorAtivo } from
 import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
-import { descreverPremio, RegraPremio, type TipoMeta } from "./tipos-meta.js";
+import { descreverPremio, indicadorDoTipo, RegraPremio, type TipoMeta } from "./tipos-meta.js";
 import { regraDoParticipante } from "./apuracao.js";
 import type { ErpQueryClient } from "./server.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
@@ -168,7 +168,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     if (meta.version !== version) return c.json(META_DESATUALIZADA, 409);
     const codigo = Number(c.req.param("codigo"));
     const atual = meta.participantes.find((p) => p.codigoColaborador === codigo);
-    const indicador = indicadorPorId(tipo.indicador);
+    const indicador = indicadorDoTipo(tipo);
     const texto = (n: number | null) => (n === null ? "pendente" : formatarValor(indicador, n));
     const base = { tipo: tipo.nome, periodo: periodo.name, rotulo: rotuloAlvo(tipo) };
 
@@ -217,7 +217,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       tipo: tipo.nome,
       periodo: periodo.name,
       rotulo: rotuloAlvo(tipo),
-      alvo: formatarValor(indicadorPorId(tipo.indicador), parsed.data.alvo),
+      alvo: formatarValor(indicadorDoTipo(tipo), parsed.data.alvo),
       participantes: marcados.map((p) => p.nome),
     });
     return c.json(comTipo(atualizada, tipo));

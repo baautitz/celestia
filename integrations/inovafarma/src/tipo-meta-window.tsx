@@ -19,7 +19,18 @@ import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imper
 import { apiFetch } from "@platform/ui/lib/api";
 import { INDICADORES, formatarValor, indicadorPorId, valorNoAtingimento, type Indicador, type IndicadorId } from "./indicadores";
 import { ListaProdutosCampo } from "./lista-produtos-campo";
-import { EXIBICAO_LABEL, EntradaLista, REGRA_LABEL, descreverPremio, problemaDoTipo, type DadosTipoMeta, type Exibicao, type RegraPremio, type TipoMeta, type TipoRegra } from "./tipos-meta";
+import {
+  EXIBICAO_LABEL,
+  EntradaLista,
+  REGRA_LABEL,
+  UNIDADES_LISTA,
+  UNIDADE_LISTA_LABEL,
+  descreverPremio,
+  ehValorVendido,
+  indicadorDoTipo,
+  problemaDoTipo,
+  type UnidadeLista,
+  type DadosTipoMeta, type Exibicao, type RegraPremio, type TipoMeta, type TipoRegra } from "./tipos-meta";
 
 export const BASE = "/api/m/inovafarma/metas/tipos";
 
@@ -28,13 +39,20 @@ export type TipoMetaComPremio = TipoMeta & { premio: string };
 const json = (method: string, body: unknown) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 /** Indicadores de valor vendido em R$, base do Percentual. */
-const BASES_PERCENTUAL = INDICADORES.filter((i) => i.unidade === "reais" && i.id !== "avaliacoes" && i.id !== "ticket-medio" && i.direcao !== "menor");
+const BASES_PERCENTUAL = INDICADORES.filter(ehValorVendido);
+
+/** O Indicador com a unidade escolhida (a Lista de Produtos mede unidades ou R$). */
+const indicadorDe = (indicador: IndicadorId, unidadeLista: UnidadeLista) => indicadorDoTipo({ indicador, lista: { unidade: unidadeLista } });
+
+/** Bases do Percentual: os Indicadores em R$ e, num Tipo de Lista em R$, a própria Lista. */
+const basesPercentual = (indicador: IndicadorId, unidadeLista: UnidadeLista) =>
+  indicador === "lista-produtos" && unidadeLista === "reais" ? [indicadorDe(indicador, unidadeLista), ...BASES_PERCENTUAL] : BASES_PERCENTUAL;
 
 /** Sem Alvo, o Prêmio é um Percentual do próprio Indicador: só vale para Indicadores que servem de base. */
-const podeSemAlvo = (indicador: IndicadorId) => BASES_PERCENTUAL.some((i) => i.id === indicador);
+const podeSemAlvo = (indicador: IndicadorId, unidadeLista: UnidadeLista) => ehValorVendido(indicadorDe(indicador, unidadeLista));
 
 /** "Calcular sobre" começa no próprio Indicador quando ele é em R$; senão, vazio. */
-const baseInicial = (indicador: IndicadorId): IndicadorId | "" => (podeSemAlvo(indicador) ? indicador : "");
+const baseInicial = (indicador: IndicadorId, unidadeLista: UnidadeLista): IndicadorId | "" => (podeSemAlvo(indicador, unidadeLista) ? indicador : "");
 
 const schema = z.object({
   nome: z.string().trim().min(1, "Informe o nome do Tipo de Meta.").max(80, "O nome deve ter no máximo 80 caracteres."),
@@ -56,6 +74,7 @@ const schema = z.object({
   alvoPadrao: z.union([z.number(), z.string()]),
   /** Entradas da Lista de Produtos (só no Indicador Lista de Produtos). */
   entradas: z.array(EntradaLista),
+  unidadeLista: z.enum(UNIDADES_LISTA),
   ativo: z.boolean(),
 });
 type Valores = z.infer<typeof schema>;
@@ -94,7 +113,7 @@ function regraDe(v: Valores): RegraPremio {
 
 /** Os valores do formulário no formato da API. */
 export function dadosDe(v: Valores): DadosTipoMeta {
-  const emReais = indicadorPorId(v.indicador).unidade === "reais";
+  const emReais = indicadorDe(v.indicador, v.unidadeLista).unidade === "reais";
   const alvo = !temAlvoPadrao(v.semAlvo) ? null : typeof v.alvoPadrao === "number" ? (v.alvoPadrao > 0 ? v.alvoPadrao : null) : numeroOuNull(v.alvoPadrao);
   return {
     nome: v.nome.trim(),
@@ -104,7 +123,7 @@ export function dadosDe(v: Valores): DadosTipoMeta {
     semAlvo: v.semAlvo,
     regra: regraDe(v),
     alvoPadrao: alvo === null ? null : emReais ? centavos(alvo) : alvo,
-    lista: v.indicador === "lista-produtos" && v.entradas.length > 0 ? { entradas: v.entradas, unidade: "unidades" } : null,
+    lista: v.indicador === "lista-produtos" && v.entradas.length > 0 ? { entradas: v.entradas, unidade: v.unidadeLista } : null,
     ativo: v.ativo,
   };
 }
@@ -118,7 +137,8 @@ function problemaDoFormulario(v: Valores, dados: DadosTipoMeta): string | null {
 function iniciais(tipo?: TipoMeta): Valores {
   const r = tipo?.regra;
   const indicador = tipo?.indicador ?? "ticket-medio";
-  const emReais = indicadorPorId(indicador).unidade === "reais";
+  const unidadeLista = tipo?.lista?.unidade ?? "unidades";
+  const emReais = indicadorDe(indicador, unidadeLista).unidade === "reais";
   return {
     nome: tipo?.nome ?? "",
     indicador,
@@ -131,10 +151,11 @@ function iniciais(tipo?: TipoMeta): Valores {
     teto: r?.tipo === "proporcional" && r.teto !== null ? String(r.teto) : "",
     faixas: r?.tipo === "faixas" ? r.faixas.map((f) => ({ atingimento: String(f.atingimento), valor: f.valorCentavos / 100 })) : [{ atingimento: "100", valor: 0 }],
     percentual: r?.tipo === "percentual" ? String(r.percentual) : "",
-    indicadorBase: r?.tipo === "percentual" ? r.indicadorBase : baseInicial(indicador),
+    indicadorBase: r?.tipo === "percentual" ? r.indicadorBase : baseInicial(indicador, unidadeLista),
     soSeAtingir: r?.tipo === "percentual" ? r.soSeAtingir : true,
     alvoPadrao: tipo?.alvoPadrao == null ? "" : emReais ? tipo.alvoPadrao / 100 : String(tipo.alvoPadrao),
     entradas: tipo?.lista?.entradas ?? [],
+    unidadeLista,
     ativo: tipo?.ativo ?? true,
   };
 }
@@ -157,7 +178,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
   const antesDoSemAlvo = useRef<Pick<Valores, "regraTipo" | "exibicao"> | null>(null);
   const faixas = useFieldArray({ control: form.control, name: "faixas" });
   const v = useWatch({ control: form.control }) as Valores;
-  const indicador = indicadorPorId(v.indicador);
+  const indicador = indicadorDe(v.indicador, v.unidadeLista);
   const avaliacoes = v.indicador === "avaliacoes";
   const regras = regrasPermitidas(v.indicador, v.semAlvo);
   const exibicoes = exibicoesPermitidas(v.semAlvo);
@@ -172,7 +193,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
 
   /** Ao trocar o Indicador ou o "sem Alvo", leva a regra e a Exibição para uma opção válida. */
   const ajustar = (indicadorId: IndicadorId, semAlvoPedido: boolean) => {
-    const semAlvo = semAlvoPedido && podeSemAlvo(indicadorId);
+    const semAlvo = semAlvoPedido && podeSemAlvo(indicadorId, form.getValues("unidadeLista"));
     if (semAlvo !== form.getValues("semAlvo")) form.setValue("semAlvo", semAlvo, { shouldDirty: true });
     const permitidas = regrasPermitidas(indicadorId, semAlvo);
     if (!permitidas.includes(form.getValues("regraTipo"))) form.setValue("regraTipo", permitidas[0]!, { shouldDirty: true });
@@ -275,7 +296,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
             onValueChange={(id) => {
               if (!id) return;
               field.onChange(id);
-              form.setValue("indicadorBase", baseInicial(id as IndicadorId), { shouldDirty: true });
+              form.setValue("indicadorBase", baseInicial(id as IndicadorId, form.getValues("unidadeLista")), { shouldDirty: true });
               ajustar(id as IndicadorId, form.getValues("semAlvo"));
             }}
           >
@@ -300,7 +321,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
     />
   );
 
-  const semAlvoCampo = podeSemAlvo(v.indicador) && (
+  const semAlvoCampo = podeSemAlvo(v.indicador, v.unidadeLista) && (
     <FormField
       control={form.control}
       name="semAlvo"
@@ -324,6 +345,46 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
             />
           </FormControl>
           <FormDescription>Paga um percentual do que foi vendido, sem Alvo a atingir.</FormDescription>
+        </FormItem>
+      )}
+    />
+  );
+
+  /** No Tipo de Lista, a base pode ser a própria Lista (em R$). */
+  const nomeBase = (id: IndicadorId) => (id === "lista-produtos" ? "Lista de Produtos deste Tipo de Meta" : indicadorPorId(id)?.nome);
+
+  /** Ao trocar a unidade da Lista, o Alvo padrão recomeça (outra unidade) e o Sem Alvo e a base do Percentual se ajustam. */
+  const trocarUnidade = (unidade: UnidadeLista) => {
+    form.setValue("unidadeLista", unidade, { shouldDirty: true });
+    form.setValue("alvoPadrao", "", { shouldDirty: true });
+    const base = form.getValues("indicadorBase");
+    if (unidade === "reais" && base === "") form.setValue("indicadorBase", "lista-produtos", { shouldDirty: true });
+    if (unidade === "unidades" && base === "lista-produtos") form.setValue("indicadorBase", "", { shouldDirty: true });
+    ajustar(form.getValues("indicador"), form.getValues("semAlvo"));
+  };
+
+  const unidadeCampo = v.indicador === "lista-produtos" && (
+    <FormField
+      control={form.control}
+      name="unidadeLista"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>A Lista mede</FormLabel>
+          <Select value={field.value} onValueChange={(u) => u && trocarUnidade(u as UnidadeLista)}>
+            <FormControl>
+              <SelectTrigger aria-label="A Lista mede">
+                <SelectValue>{(u: UnidadeLista) => UNIDADE_LISTA_LABEL[u]}</SelectValue>
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              {UNIDADES_LISTA.map((u) => (
+                <SelectItem key={u} value={u}>
+                  {UNIDADE_LISTA_LABEL[u]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FormDescription>Soma tudo o que foi vendido da Lista, com as regras da Venda Líquida; cada produto conta uma vez.</FormDescription>
         </FormItem>
       )}
     />
@@ -525,13 +586,13 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
               <Select value={field.value} onValueChange={(id) => id && field.onChange(id)}>
                 <FormControl>
                   <SelectTrigger aria-label="Calcular sobre">
-                    <SelectValue>{(id: IndicadorId | "") => (id ? indicadorPorId(id)?.nome : undefined) ?? "Escolha um Indicador em R$"}</SelectValue>
+                    <SelectValue>{(id: IndicadorId | "") => (id ? nomeBase(id) : undefined) ?? "Escolha um Indicador em R$"}</SelectValue>
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {BASES_PERCENTUAL.map((i) => (
+                  {basesPercentual(v.indicador, v.unidadeLista).map((i) => (
                     <SelectItem key={i.id} value={i.id}>
-                      {i.nome}
+                      {nomeBase(i.id as IndicadorId)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -572,6 +633,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
                   {nomeCampo}
                   {indicadorCampo}
                   {listaCampo}
+                  {unidadeCampo}
                   {semAlvoCampo}
                   {alvoCampo}
                   {exibicaoCampo}

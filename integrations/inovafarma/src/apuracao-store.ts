@@ -1,8 +1,11 @@
 import type { ResultadoParticipante } from "./apuracao.js";
 import type { TipoMeta } from "./tipos-meta.js";
 
-/** O Tipo de Meta como estava na Apuração: alterá-lo depois não muda um Período fechado (ADR 0007). */
-export type TipoApuracao = Pick<TipoMeta, "id" | "nome" | "indicador" | "exibicao" | "mostrarPremio" | "semAlvo"> & { premio: string };
+/**
+ * O Tipo de Meta como estava na Apuração: alterá-lo depois não muda um Período fechado (ADR 0007). A Lista de Produtos
+ * vai junto (unidade e entradas); ausente nas Apurações gravadas antes de a Lista ir para o Tipo de Meta.
+ */
+export type TipoApuracao = Pick<TipoMeta, "id" | "nome" | "indicador" | "exibicao" | "mostrarPremio" | "semAlvo"> & { premio: string; lista?: TipoMeta["lista"] };
 
 export interface MetaApurada {
   metaId: string;
