@@ -40,7 +40,11 @@ function erpFalso() {
       { id: "7", nome: "REVISAR", eliminado: false },
       { id: "143", nome: "EMS ANTIGA", eliminado: true },
     ],
-    Produto: [{ id: DIPIRONA, nome: "DIPIRONA 1G", detalhe: "789" }],
+    Produto: [
+      { id: DIPIRONA, nome: "DIPIRONA 1G", detalhe: "789", ativo: true },
+      { id: "0A14E45F-CEEA-467F-A8F4-5E1D2C3B4A02", nome: "DIPIRONA GOTAS", detalhe: "790", ativo: false },
+      { id: "1B14E45F-CEEA-467F-A8F4-5E1D2C3B4A03", nome: "DIPIRONA XAROPE", detalhe: "791", ativo: true, eliminado: true },
+    ],
   };
   const erp = { fora: false, consultas: [] as string[] };
   const client = {
@@ -256,7 +260,7 @@ describe("Tipo de Meta de Lista de Produtos", () => {
 
   it("busca só no tipo escolhido, sem o Fabricante REVISAR nem cadastros eliminados ou inativos", async () => {
     const { req } = boot();
-    const busca = async (tipo: string, q: string) => (await (await req("gil", "GET", `/metas/lista/busca?tipo=${tipo}&q=${q}`)).json()) as { tipo: string; id: string; nome: string }[];
+    const busca = async (tipo: string, q: string) => (await (await req("gil", "GET", `/tipos-meta/lista/busca?tipo=${tipo}&q=${q}`)).json()) as { tipo: string; id: string; nome: string }[];
     expect((await busca("laboratorio", "EM")).map((r) => r.nome)).toEqual(["EMS MARCAS"]);
     expect((await busca("laboratorio", "REVISAR")).map((r) => r.nome)).toEqual([]);
     expect((await busca("grupo", "VITAMIN")).map((r) => [r.tipo, r.id, r.nome])).toEqual([
@@ -265,8 +269,9 @@ describe("Tipo de Meta de Lista de Produtos", () => {
     ]);
     expect((await busca("secao", "GEN")).map((r) => r.nome)).toEqual(["GENERICOS"]);
     expect((await busca("produto", "DIP")).map((r) => [r.tipo, r.id])).toEqual([["produto", DIPIRONA]]);
-    expect((await req("gil", "GET", "/metas/lista/busca?tipo=marca&q=EMS")).status).toBe(400);
-    expect((await req("ana", "GET", "/metas/lista/busca?tipo=grupo&q=VIT")).status).toBe(403);
+    expect((await req("gil", "GET", "/tipos-meta/lista/busca?q=EMS")).status).toBe(400);
+    expect((await req("gil", "GET", "/tipos-meta/lista/busca?tipo=marca&q=EMS")).status).toBe(400);
+    expect((await req("ana", "GET", "/tipos-meta/lista/busca?tipo=grupo&q=VIT")).status).toBe(403);
   });
 
   it("confere quais entradas não existem mais no ERP", async () => {
@@ -275,9 +280,40 @@ describe("Tipo de Meta de Lista de Produtos", () => {
       { tipo: "grupo", id: "44" },
       { tipo: "laboratorio", id: "999" },
     ];
-    const res = await req("gil", "POST", "/metas/lista/conferir", { entradas });
+    const res = await req("gil", "POST", "/tipos-meta/lista/conferir", { entradas });
     expect(await res.json()).toEqual({ ausentes: [{ tipo: "laboratorio", id: "999" }] });
     erp.fora = true;
-    expect((await req("gil", "POST", "/metas/lista/conferir", { entradas })).status).toBe(503);
+    expect((await req("gil", "POST", "/tipos-meta/lista/conferir", { entradas })).status).toBe(503);
+  });
+
+  it("recusa na conferência o id fora do formato do tipo, sem consultar o ERP", async () => {
+    const { req, erp } = boot();
+    for (const entrada of [
+      { tipo: "produto", id: "44" },
+      { tipo: "grupo", id: DIPIRONA },
+      { tipo: "grupo", id: "0" },
+      { tipo: "laboratorio", id: "9999999999" },
+    ]) {
+      const res = await req("gil", "POST", "/tipos-meta/lista/conferir", { entradas: [entrada] });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe("Uma entrada da Lista tem um identificador inválido.");
+    }
+    expect(erp.consultas).toEqual([]);
+  });
+
+  it("não muda a unidade da Lista quando o Tipo de Meta já tem Metas", async () => {
+    const { req, metas } = boot();
+    const criado = (await (await req("gil", "POST", "/metas/tipos", lista)).json()) as Tipo;
+    const emReais = { ...lista, alvoPadrao: null, lista: { ...lista.lista, unidade: "reais" } };
+    expect(((await (await req("gil", "GET", "/metas/tipos")).json()) as { temMetas: boolean }[])[0]!.temMetas).toBe(false);
+
+    await metas.criar({ periodoId: "marco", tipoId: criado.id, participantes: [], excluidos: [] });
+    expect(((await (await req("gil", "GET", "/metas/tipos")).json()) as { temMetas: boolean }[])[0]!.temMetas).toBe(true);
+    const recusa = await req("gil", "PUT", `/metas/tipos/${criado.id}`, { ...emReais, version: 1 });
+    expect(recusa.status).toBe(400);
+    expect(((await recusa.json()) as { error: string }).error).toMatch(/a unidade não muda/);
+    // A Lista em si ainda pode mudar.
+    const outra = { ...lista, lista: { ...lista.lista, entradas: lista.lista.entradas.slice(1) }, version: 1 };
+    expect((await req("gil", "PUT", `/metas/tipos/${criado.id}`, outra)).status).toBe(200);
   });
 });

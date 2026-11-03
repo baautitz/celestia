@@ -2,12 +2,13 @@ import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { formatarValor } from "./indicadores.js";
-import { BUSCA_LISTA_SQL, conferirSql, MIN_BUSCA_LISTA, type ResultadoBusca } from "./lista-produtos.js";
+import { BUSCA_LISTA_SQL, conferirSql, type ResultadoBusca } from "./lista-produtos.js";
 import { ator, ERP_INDISPONIVEL, META_DESATUALIZADA, SEM_CONEXAO, type AuthContext } from "./metas-comum.js";
 import type { MetaStore } from "./metas-store.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
-import { DadosTipoMeta, EXIBICAO_LABEL, EntradaLista, indicadorDoTipo, TIPOS_ENTRADA, descreverEntrada, descreverPremio, ordenarEntradas, problemaDoTipo, type TipoEntrada, type TipoMeta } from "./tipos-meta.js";
+import { parametrosBusca } from "./produtos-erp.js";
+import { DadosTipoMeta, EXIBICAO_LABEL, EntradaLista, idValido, indicadorDoTipo, MIN_BUSCA_LISTA, TIPOS_ENTRADA, descreverEntrada, descreverPremio, ordenarEntradas, problemaDoTipo, type TipoMeta } from "./tipos-meta.js";
 import type { ErpQueryClient } from "./server.js";
 import { META_TARGET, TIPO_META_TARGET, TIPOS_META_ACTIONS, TIPOS_META_PLUGIN, type ValoresTipo } from "./tipos-meta-audit.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
@@ -31,6 +32,7 @@ const SEM_ALVO_PADRAO = "O Tipo de Meta não tem Alvo padrão para aplicar.";
 const META_NAO_ENCONTRADA = "Meta não encontrada para este Tipo de Meta.";
 const PERIODO_FECHADO = "O Período de Fechamento da Meta está fechado: a Meta não pode ser alterada.";
 const PARTICIPANTE_FORA = "Um dos Colaboradores escolhidos não é Participante da Meta.";
+const UNIDADE_FIXA = "A Lista deste Tipo de Meta já mede os Alvos das Metas cadastradas: a unidade não muda. Cadastre outro Tipo de Meta.";
 const VERSAO_DESATUALIZADA = { error: "O Tipo de Meta foi alterado por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
 
 const Edicao = DadosTipoMeta.extend({ version: z.number().int().min(1) });
@@ -40,9 +42,11 @@ const Aplicacao = z.object({
     .min(1, "Escolha ao menos um Período."),
 });
 
-const Conferencia = z.object({ entradas: z.array(EntradaLista.pick({ tipo: true, id: true })).max(500) });
+const ID_INVALIDO = "Uma entrada da Lista tem um identificador inválido.";
+const Conferencia = z.object({ entradas: z.array(EntradaLista.pick({ tipo: true, id: true }).refine(idValido, ID_INVALIDO)).max(500) });
+const TipoBusca = z.enum(TIPOS_ENTRADA, { errorMap: () => ({ message: "Tipo de entrada da Lista inválido." }) });
 
-const comPremio = (t: TipoMeta) => ({ ...t, premio: descreverPremio(t) });
+const comPremio = (t: TipoMeta, temMetas = false) => ({ ...t, premio: descreverPremio(t), temMetas });
 
 const valores = (t: TipoMeta): ValoresTipo => {
   const indicador = indicadorDoTipo(t);
@@ -83,9 +87,13 @@ export function registerTiposMetaRoutes({ routes, permissions, auth, erpClient, 
     return { dados: parsed.data as z.infer<S> } as const;
   };
 
+  /** Ids dos Tipos de Meta que já têm Meta em algum Período, aberto ou fechado. */
+  const tiposComMetas = async () => new Set((await metas.listar((await periods.list()).map((p) => p.id))).map((m) => m.tipoId));
+
   routes.get("/metas/tipos", auth, async (c: AuthContext) => {
     if (!pode(c)) return c.json({ error: manage.deniedMessage }, 403);
-    return c.json((await store.listar()).map(comPremio));
+    const comMetas = await tiposComMetas();
+    return c.json((await store.listar()).map((t) => comPremio(t, comMetas.has(t.id))));
   });
 
   routes.post("/metas/tipos", auth, async (c: AuthContext) => {
@@ -106,24 +114,28 @@ export function registerTiposMetaRoutes({ routes, permissions, auth, erpClient, 
     if ("recusa" in lido) return lido.recusa;
     const { version, ...dados } = lido.dados;
     if (dados.indicador !== anterior.indicador) return c.json({ error: INDICADOR_FIXO }, 400);
+    // Os Alvos gravados nas Metas estão na unidade da Lista: em outra unidade, seriam lidos errado.
+    if (anterior.lista && dados.lista && anterior.lista.unidade !== dados.lista.unidade && (await tiposComMetas()).has(anterior.id))
+      return c.json({ error: UNIDADE_FIXA }, 400);
     if (await duplicado(dados.nome, anterior.id)) return c.json({ error: NOME_DUPLICADO }, 409);
     const atualizado = await store.atualizar(anterior.id, dados, version);
     if (!atualizado) return c.json(VERSAO_DESATUALIZADA, 409);
     await registrar(c, TIPOS_META_ACTIONS.editar, atualizado, anterior);
-    return c.json(comPremio(atualizado));
+    return c.json(comPremio(atualizado, (await tiposComMetas()).has(atualizado.id)));
   });
 
   // Busca de entradas da Lista de Produtos no ERP, só no tipo escolhido.
-  routes.get("/metas/lista/busca", auth, async (c: AuthContext) => {
+  routes.get("/tipos-meta/lista/busca", auth, async (c: AuthContext) => {
     if (!pode(c)) return c.json({ error: manage.deniedMessage }, 403);
-    const tipo = c.req.query("tipo") as TipoEntrada;
-    if (!TIPOS_ENTRADA.includes(tipo)) return c.json({ error: "Tipo de entrada da Lista inválido." }, 400);
+    const parsedTipo = TipoBusca.safeParse(c.req.query("tipo"));
+    if (!parsedTipo.success) return c.json({ error: parsedTipo.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    const tipo = parsedTipo.data;
     const q = (c.req.query("q") ?? "").trim().slice(0, 100);
     if (q.length < MIN_BUSCA_LISTA[tipo]) return c.json([]);
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
     try {
-      const rows = await client.query<ResultadoBusca>(BUSCA_LISTA_SQL[tipo], { busca: q, buscaLike: `%${q.replace(/[\\%_[]/g, "\\$&")}%` });
+      const rows = await client.query<ResultadoBusca>(BUSCA_LISTA_SQL[tipo], parametrosBusca(q));
       return c.json(rows.map((r) => ({ tipo, id: String(r.id), nome: (r.nome || "").trim(), detalhe: r.detalhe ?? null })));
     } catch {
       return c.json({ error: ERP_INDISPONIVEL }, 503);
@@ -131,7 +143,7 @@ export function registerTiposMetaRoutes({ routes, permissions, auth, erpClient, 
   });
 
   // Quais entradas da Lista ainda existem no ERP: as outras aparecem com o aviso "não encontrado no ERP".
-  routes.post("/metas/lista/conferir", auth, async (c: AuthContext) => {
+  routes.post("/tipos-meta/lista/conferir", auth, async (c: AuthContext) => {
     if (!pode(c)) return c.json({ error: manage.deniedMessage }, 403);
     const parsed = Conferencia.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
