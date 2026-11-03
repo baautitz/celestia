@@ -7,6 +7,9 @@ import type { ErpClient } from "../src/erp/erp-client.js";
 
 const ESTOQUE = "inovafarma:pre-vencidos-estoque:manage";
 const BAIXAS = "inovafarma:pre-vencidos-baixas:manage";
+const BAIXAS_GERAL = "inovafarma:pre-vencidos-baixas-geral:view";
+const BAIXAS_LOJA = "inovafarma:pre-vencidos-baixas-loja:view";
+const BAIXAS_INDIVIDUAL = "inovafarma:pre-vencidos-baixas-individual:view";
 const CODIGO_PRODUTO_SECRETO = 987654;
 const PRODUTO = { produtoId: "6f1c0a52-0000-4000-8000-000000000001", nome: "DIPIRONA 500MG", codigoBarra: "7891234567895" };
 
@@ -70,12 +73,14 @@ async function boot() {
     roles: [
       { id: "adm", name: "Adm", permissions: ["inovafarma:colaboradores:update", "inovafarma:colaboradores:view", "closing_period:period:create", "closing_period:period:close", "closing_period:period:reopen", "closing_period:period:read"] },
       { id: "est", name: "Estoque", permissions: [ESTOQUE] },
-      { id: "ger", name: "Gestor", permissions: [BAIXAS] },
-      { id: "ambos", name: "Gestor do Estoque", permissions: [ESTOQUE, BAIXAS] },
+      { id: "ger", name: "Gestor", permissions: [BAIXAS, BAIXAS_LOJA] },
+      { id: "geral", name: "Diretoria", permissions: [BAIXAS_GERAL] },
+      { id: "corrige", name: "Só corrige", permissions: [BAIXAS] },
+      { id: "ambos", name: "Gestor do Estoque", permissions: [ESTOQUE, BAIXAS, BAIXAS_INDIVIDUAL] },
       { id: "outro", name: "Outro", permissions: ["inovafarma:colaboradores:view"] },
       { id: "audit", name: "Auditoria", permissions: ["system:audit:read"] },
     ],
-    users: [usuario("adm", "adm"), usuario("ana", "est"), usuario("caio", "est"), usuario("zeca", "outro"), usuario("auditor", "audit"), usuario("gil", "ger"), usuario("lia", "ger"), usuario("rui", "ambos")],
+    users: [usuario("adm", "adm"), usuario("ana", "est"), usuario("caio", "est"), usuario("zeca", "outro"), usuario("auditor", "audit"), usuario("gil", "ger"), usuario("lia", "ger"), usuario("rui", "ambos"), usuario("dir", "geral"), usuario("teo", "corrige")],
   });
   vendas = [];
   erpFora = false;
@@ -86,7 +91,7 @@ async function boot() {
     const { accessToken } = (await res.json()) as { accessToken: string };
     return { authorization: `Bearer ${accessToken}`, "content-type": "application/json" };
   };
-  const h = { adm: await login("adm"), ana: await login("ana"), caio: await login("caio"), zeca: await login("zeca"), auditor: await login("auditor"), gil: await login("gil"), lia: await login("lia"), rui: await login("rui") };
+  const h = { adm: await login("adm"), ana: await login("ana"), caio: await login("caio"), zeca: await login("zeca"), auditor: await login("auditor"), gil: await login("gil"), lia: await login("lia"), rui: await login("rui"), dir: await login("dir"), teo: await login("teo") };
   const req = (who: keyof typeof h, method: string, path: string, body?: unknown) =>
     platform.app.request(path, { method, headers: h[who], body: body === undefined ? undefined : JSON.stringify(body) });
   expect((await req("adm", "PUT", "/api/m/inovafarma/colaboradores/7/vinculo", { usuarioId: "ana", lojas: [1], version: 0 })).status).toBe(200);
@@ -248,6 +253,39 @@ describe("Baixas de Pré-vencido", () => {
     const contexto = await (await req("gil", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
     expect(contexto).toMatchObject({ podeBaixas: true, podeEstoque: false, lojas: [{ codigo: 1, nome: "Centro" }], inclusaoRetroativa: { inicio: dia(-5) } });
     expect(contexto.periodos.map((p: { id: string }) => p.id)).toEqual([periodoId]);
+  });
+});
+
+describe("Visualizações das Baixas", () => {
+  async function comVendas() {
+    const ctx = await boot();
+    await ctx.incluir("ana", { quantidade: 10 });
+    vendas = [venda(1, 1, 2), venda(2, 2, 1, { codigoColaborador: 10, nomeColaborador: "RUI LIMA" })];
+    const baixas = async (who: "gil" | "dir" | "rui" | "teo" | "ana", query = "") => {
+      const res = await ctx.req(who, "GET", `/api/m/inovafarma/pre-vencidos/baixas?periodoId=${ctx.periodoId}${query}`);
+      return { status: res.status, grupos: res.status === 200 ? ((await res.json()) as Grupo[]).map((g) => [g.codigoColaborador, g.vendas.map((v) => v.vendaId)]) : null };
+    };
+    return { ...ctx, baixas };
+  }
+
+  it("Geral vê todas as Lojas e Colaboradores sem Vínculo; Loja, as do Vínculo; Individual, só as do Colaborador vinculado", async () => {
+    const { baixas } = await comVendas();
+    expect(await baixas("dir")).toEqual({ status: 200, grupos: [[7, [1]], [10, [2]]] });
+    expect(await baixas("dir", "&codigoLoja=2")).toEqual({ status: 200, grupos: [] });
+    expect(await baixas("gil", "&visualizacao=loja")).toEqual({ status: 200, grupos: [[7, [1]], [10, [2]]] });
+    expect((await baixas("gil", "&visualizacao=loja&codigoLoja=2")).status).toBe(403);
+    expect((await baixas("gil", "&visualizacao=geral")).status).toBe(403);
+    expect(await baixas("rui")).toEqual({ status: 200, grupos: [[10, [2]]] });
+  });
+
+  it("gerir as Baixas sem Visualização abre a aba, mas não lista as Baixas", async () => {
+    const { baixas, req } = await comVendas();
+    expect((await baixas("teo")).status).toBe(403);
+    expect((await baixas("ana")).status).toBe(403);
+    const contexto = await (await req("teo", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
+    expect(contexto).toMatchObject({ podeBaixas: true, podeCorrigir: true, visualizacoes: [] });
+    const geral = await (await req("dir", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
+    expect(geral).toMatchObject({ podeBaixas: true, podeCorrigir: false, visualizacoes: [{ id: "geral", lojas: [{ codigo: 1, nome: "Centro" }, { codigo: 2, nome: "Bairro" }] }] });
   });
 });
 

@@ -3,8 +3,9 @@ import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { buscaProdutosSql, MIN_BUSCA_PRODUTO, parametrosBusca } from "./produtos-erp.js";
 import { ERP_INDISPONIVEL, SEM_CONEXAO, type ErpQuery } from "./metas-comum.js";
-import { inclusaoRetroativa, lojasDoErp, lojasDoVinculo } from "./pre-vencidos-comum.js";
+import { inclusaoRetroativa, lojasDoErp, lojasDoVinculo, visualizacoesDasBaixas } from "./pre-vencidos-comum.js";
 import type { VinculoStore } from "./vinculo-store.js";
+import type { Visualizacao } from "./visualizacoes.js";
 
 /** Forma do serviço `periods` do Module `closing_period`; o Plugin não importa `@platform/server` (ADR 0002). */
 export interface PeriodoResumo {
@@ -37,21 +38,29 @@ export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient
   const baixas = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-baixas:manage");
   const pode = (c: AuthContext, ref: { key: string }) => permissions.has(c.get("user")?.permissions, ref.key);
 
-  // O que a tela precisa para abrir: Closing Periods, as Lojas do Vínculo, as abas que a Permission libera e, para quem
-  // gere as Baixas, até onde a inclusão de um Item pode retroagir (calculado aqui, na hora do ERP).
+  // O que a tela precisa para abrir: Closing Periods, as Lojas do Vínculo, as abas que a Permission libera, as
+  // Visualizações das Baixas com as Lojas de cada uma e, para quem gere as Baixas, até onde a inclusão de um Item pode
+  // retroagir (calculado aqui, na hora do ERP).
   routes.get("/pre-vencidos/contexto", auth, async (c: AuthContext) => {
     const podeEstoque = pode(c, estoque);
-    const podeBaixas = pode(c, baixas);
+    const podeCorrigir = pode(c, baixas);
+    const { disponiveis, lojas: lojasVinculo } = await visualizacoesDasBaixas(c, permissions, vinculos);
+    const podeBaixas = podeCorrigir || disponiveis.length > 0;
     if (!podeEstoque && !podeBaixas) return c.json({ error: estoque.deniedMessage }, 403);
 
     const lojasErp = await lojasDoErp(erpClient());
-    const lojas = ((await lojasDoVinculo(vinculos, c.get("user")?.sub)) ?? []).map((codigo) => ({ codigo, nome: lojasErp.find((l) => l.codigo === codigo)?.nome ?? "" }));
+    const nome = (codigo: number) => ({ codigo, nome: lojasErp.find((l) => l.codigo === codigo)?.nome ?? "" });
+    const lojas = ((await lojasDoVinculo(vinculos, c.get("user")?.sub)) ?? []).map(nome);
+    // Geral: todas as Lojas do ERP; Loja: as do Vínculo; Individual não filtra por Loja.
+    const lojasDe = (v: Visualizacao) => (v === "geral" ? lojasErp : v === "loja" ? lojasVinculo.map(nome) : []);
     return c.json({
       podeEstoque,
       podeBaixas,
+      podeCorrigir,
       periodos: (await periods.list()).sort((a, b) => b.startDate.localeCompare(a.startDate)),
       lojas,
-      ...(podeBaixas ? { inclusaoRetroativa: (await inclusaoRetroativa(periods)) ?? undefined } : {}),
+      visualizacoes: disponiveis.map((id) => ({ id, lojas: lojasDe(id) })),
+      ...(podeCorrigir ? { inclusaoRetroativa: (await inclusaoRetroativa(periods)) ?? undefined } : {}),
     });
   });
 

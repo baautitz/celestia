@@ -2,9 +2,10 @@ import type { Context } from "hono";
 import type { ModuleContext } from "@platform/core/module";
 import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { horaDoErp } from "./baixas-da-loja.js";
-import type { ErpQuery } from "./metas-comum.js";
+import { vinculoDoUsuario, type ErpQuery } from "./metas-comum.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
-import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
+import type { VinculoStore } from "./vinculo-store.js";
+import { VISUALIZACAO_PERMISSION_BAIXAS, visualizacoesDoUsuario, type VisualizacoesDoUsuario } from "./visualizacoes.js";
 
 /** O que as rotas do Estoque e das Baixas de Pré-vencido compartilham: as Lojas do Vínculo e a inclusão retroativa. */
 
@@ -16,8 +17,7 @@ type AuthContext = Context<{ Variables: { user?: { sub?: string; permissions?: s
 /** Lojas do Vínculo (não desfeito) do Usuário; null sem Vínculo. */
 export async function lojasDoVinculo(vinculos: VinculoStore, usuarioId: string | undefined): Promise<number[] | null> {
   if (!usuarioId) return null;
-  const vinculo = (await vinculos.list()).find((v) => v.usuarioId === usuarioId && !vinculoDesfeito(v));
-  return vinculo ? vinculo.lojas : null;
+  return (await vinculoDoUsuario(vinculos, usuarioId))?.lojas ?? null;
 }
 
 /**
@@ -33,6 +33,13 @@ export const recusaDeLoja =
     if (!lojas.includes(codigoLoja)) return c.json({ error: LOJA_FORA_DO_VINCULO }, 403);
     return null;
   };
+
+/** Visualizações das Baixas que o Usuário tem: a Permission de cada uma e, para Loja e Individual, o Vínculo em vigor. */
+export async function visualizacoesDasBaixas(c: AuthContext, permissions: ModuleContext["permissions"], vinculos: VinculoStore): Promise<VisualizacoesDoUsuario> {
+  const usuarioId = c.get("user")?.sub;
+  const vinculo = usuarioId ? await vinculoDoUsuario(vinculos, usuarioId) : null;
+  return visualizacoesDoUsuario(c.get("user")?.permissions, vinculo, (p, k) => permissions.has(p, k), VISUALIZACAO_PERMISSION_BAIXAS);
+}
 
 /** Lojas do ERP com o nome; vazio sem conexão ou com o ERP indisponível. */
 export async function lojasDoErp(client: ErpQuery | undefined): Promise<{ codigo: number; nome: string }[]> {

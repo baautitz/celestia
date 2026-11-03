@@ -4,7 +4,8 @@ import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { baixaPublica, baixasDoPeriodo, tetoDaCorrecao, type BaixaDoPeriodo, type BaixaPublica, type BaixasDoPeriodoDeps } from "./baixas-do-periodo.js";
 import { erroDoErp } from "./metas-comum.js";
-import { recusaDeLoja } from "./pre-vencidos-comum.js";
+import { LOJA_FORA_DO_VINCULO, recusaDeLoja, visualizacoesDasBaixas } from "./pre-vencidos-comum.js";
+import { SEM_VISUALIZACAO, VISUALIZACAO_PERMISSION_BAIXAS, VISUALIZACOES, type Visualizacao } from "./visualizacoes.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
 import { CORRECAO_BAIXA_ACTIONS, CORRECAO_BAIXA_PLUGIN, CORRECAO_BAIXA_TARGET, type AtributosCorrecaoBaixa } from "./correcoes-baixa-audit.js";
 import { CorrecaoDuplicadaError, type CorrecaoBaixa } from "./correcoes-baixa-store.js";
@@ -26,7 +27,8 @@ export interface BaixasDoColaborador {
   codigoColaborador: number;
   nomeColaborador: string;
   quantidade: number;
-  vendas: BaixaPublica[];
+  /** Cada venda com a Loja onde foi feita: a Correção só vale nas Lojas do Vínculo. */
+  vendas: (BaixaPublica & { codigoLoja: number })[];
 }
 
 const SO_PERIODO_ABERTO = "Só se corrige Baixa no Período aberto.";
@@ -51,30 +53,45 @@ export function porColaborador(baixas: readonly BaixaDoPeriodo[]): BaixasDoColab
     const { venda, quantidade } = baixa;
     const grupo = grupos.get(venda.codigoColaborador) ?? { codigoColaborador: venda.codigoColaborador, nomeColaborador: venda.nomeColaborador, quantidade: 0, vendas: [] };
     grupo.quantidade += quantidade;
-    grupo.vendas.push(baixaPublica(baixa));
+    grupo.vendas.push({ ...baixaPublica(baixa), codigoLoja: baixa.codigoLoja });
     grupos.set(venda.codigoColaborador, grupo);
   }
   return [...grupos.values()].sort((a, b) => a.nomeColaborador.localeCompare(b.nomeColaborador, "pt-BR") || a.codigoColaborador - b.codigoColaborador);
 }
 
-/** Aba Baixas: as Baixas de Pré-vencido de uma Loja do Vínculo num Closing Period. */
+/** Aba Baixas: as Baixas de Pré-vencido de um Closing Period por Visualização e as Correções de Baixa nas Lojas do Vínculo. */
 export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, vinculos, periods, audit, ...deps }: BaixasPreVencidosRoutesDeps): void {
   const { correcoes } = deps;
   const gerir = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-baixas:manage");
   const recusaLoja = recusaDeLoja(permissions, vinculos, gerir);
 
+  /**
+   * Baixas do Período na Visualização pedida (a mais ampla, sem ela), com as regras do Desempenho de Vendas: Geral, todas
+   * as Lojas; Loja, as Lojas do Vínculo; Individual, as vendas do Colaborador vinculado em qualquer Loja. `codigoLoja`
+   * opcional filtra uma Loja (não em Individual).
+   */
   routes.get("/pre-vencidos/baixas", auth, async (c: AuthContext) => {
-    if (!permissions.has(c.get("user")?.permissions, gerir.key)) return c.json({ error: gerir.deniedMessage }, 403);
-    const codigoLoja = Number(c.req.query("codigoLoja"));
+    const { disponiveis, lojas: lojasVinculo, codigoColaborador } = await visualizacoesDasBaixas(c, permissions, vinculos);
+    if (disponiveis.length === 0) return c.json({ error: SEM_VISUALIZACAO }, 403);
+    const pedida = c.req.query("visualizacao") ?? disponiveis[0];
+    if (!VISUALIZACOES.includes(pedida as Visualizacao)) return c.json({ error: "Parâmetro 'visualizacao' deve ser geral, loja ou individual." }, 400);
+    const visualizacao = pedida as Visualizacao;
+    if (!disponiveis.includes(visualizacao)) {
+      const item = INOVAFARMA_PERMISSIONS.items.find((i) => i.key === VISUALIZACAO_PERMISSION_BAIXAS[visualizacao]);
+      return c.json({ error: item?.deniedMessage ?? SEM_VISUALIZACAO }, 403);
+    }
     const periodoId = c.req.query("periodoId");
-    if (!Number.isInteger(codigoLoja) || codigoLoja < 1 || !periodoId) return c.json({ error: "Parâmetros 'codigoLoja' e 'periodoId' são obrigatórios." }, 400);
-    const recusa = await recusaLoja(c, codigoLoja);
-    if (recusa) return recusa;
+    const loja = c.req.query("codigoLoja");
+    const codigoLoja = loja === undefined || loja === "" ? null : Number(loja);
+    if (!periodoId || (codigoLoja !== null && (!Number.isInteger(codigoLoja) || codigoLoja < 1))) return c.json({ error: "Parâmetro 'periodoId' é obrigatório e 'codigoLoja', se informado, é o código da Loja." }, 400);
+    if (visualizacao === "loja" && codigoLoja !== null && !lojasVinculo.includes(codigoLoja)) return c.json({ error: LOJA_FORA_DO_VINCULO }, 403);
     const periodo = (await periods.list()).find((p) => p.id === periodoId);
     if (!periodo) return c.json({ error: "Período de Fechamento não encontrado." }, 404);
 
+    const lojas = visualizacao === "individual" ? undefined : codigoLoja !== null ? [codigoLoja] : visualizacao === "loja" ? lojasVinculo : undefined;
     try {
-      return c.json(porColaborador(await baixasDoPeriodo(deps, periodo, [codigoLoja])));
+      const baixas = await baixasDoPeriodo(deps, periodo, lojas);
+      return c.json(porColaborador(visualizacao === "individual" ? baixas.filter((b) => b.venda.codigoColaborador === codigoColaborador) : baixas));
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }

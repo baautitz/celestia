@@ -39,8 +39,23 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
   },
   "pre-vencidos-baixas:manage": {
     label: "Pré-vencidos: Gerir as Baixas",
-    description: "Permite ver a aba Baixas com as Baixas de Pré-vencido das Lojas do Colaborador vinculado ao Usuário, fazer Correções de Baixa e incluir Itens com data de inclusão retroativa.",
+    description: "Permite fazer Correções de Baixa nas Lojas do Colaborador vinculado ao Usuário e incluir Itens com data de inclusão retroativa. Ver as Baixas depende das Visualizações.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para gerir as Baixas de Pré-vencidos.",
+  },
+  "pre-vencidos-baixas-geral:view": {
+    label: "Baixas de Pré-vencido: Visualização Geral",
+    description: "Permite ver as Baixas de Pré-vencido de todas as Lojas e de todos os Colaboradores.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para a Visualização Geral das Baixas de Pré-vencido.",
+  },
+  "pre-vencidos-baixas-loja:view": {
+    label: "Baixas de Pré-vencido: Visualização Loja",
+    description: "Permite ver as Baixas de Pré-vencido das Lojas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para a Visualização Loja das Baixas de Pré-vencido.",
+  },
+  "pre-vencidos-baixas-individual:view": {
+    label: "Baixas de Pré-vencido: Visualização Individual",
+    description: "Permite ver as Baixas de Pré-vencido do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para a Visualização Individual das Baixas de Pré-vencido.",
   },
   "avaliacoes-individual:view": {
     label: "Avaliações: Visualização Individual",
