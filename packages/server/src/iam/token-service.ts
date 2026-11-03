@@ -39,6 +39,8 @@ export class TokenService {
   private secret: string;
   private accessTtl: number;
   private refreshTtl: number;
+  /** Validade do token do Desafio de Certificado: a mesma do desafio na CA. */
+  static readonly LOGIN_CHALLENGE_TTL_SECONDS = 300;
 
   constructor(config?: TokenServiceConfig) {
     this.secret = resolveSecret(config?.jwtSecret);
@@ -89,6 +91,23 @@ export class TokenService {
 
     const token = await sign({ ...payload }, this.secret);
     return { token, payload };
+  }
+
+  /**
+   * Token do Desafio de Certificado: prende o desafio aberto depois da senha ao navegador que a digitou (vai num
+   * cookie HttpOnly). Sem ele, quem visse o `challengeId` na URL da CA terminaria o login no lugar do Usuário.
+   */
+  async generateLoginChallengeToken(userId: string, challengeId: string): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    return sign({ sub: userId, challengeId, type: "login_challenge", iat: now, exp: now + TokenService.LOGIN_CHALLENGE_TTL_SECONDS }, this.secret);
+  }
+
+  async verifyLoginChallengeToken(token: string): Promise<{ userId: string; challengeId: string }> {
+    const claims = await verify(token, this.secret, "HS256");
+    if (typeof claims.sub !== "string" || !claims.sub || claims.type !== "login_challenge" || typeof claims.challengeId !== "string") {
+      throw new Error("Token de desafio inválido.");
+    }
+    return { userId: claims.sub, challengeId: claims.challengeId };
   }
 
   /**

@@ -20,17 +20,21 @@ async function setup(options: { auditLog?: AuditLog } = {}) {
   const ca = await createTestCertificateAuthority();
   const { device } = await ca.issueDevice("Caixa 1");
   const app = createPlatformApp({ userStore, certificateAuthority: ca.client, auditLog: options.auditLog });
-  const post = (path: string, body: object) => app.request(path, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) });
+  const post = (path: string, body: object, headers: Record<string, string> = {}) =>
+    app.request(path, { method: "POST", headers: { ...JSON_HEADERS, ...headers }, body: JSON.stringify(body) });
   const login = (username: string, password = TEST_PASSWORD) => post("/api/auth/login", { username, password });
   const refresh = (token: string) => post("/api/auth/refresh", { refresh_token: token });
   const refreshTokenOf = async (res: Response) => ((await res.json()) as { refresh_token: string }).refresh_token;
-  /** Senha, depois o navegador apresenta `fingerprint` na CA, depois o callback troca o código. */
+  /** O cookie do Desafio de Certificado que o login gravou no navegador, pronto para o header `Cookie`. */
+  const challengeCookieOf = (res: Response) => ({ Cookie: (res.headers.get("set-cookie") ?? "").split(";")[0]! });
+  /** Senha, depois o navegador apresenta `fingerprint` na CA, depois o callback troca o código no mesmo navegador. */
   const loginWithCertificate = async (username: string, fingerprint?: string) => {
-    const first = (await (await login(username)).json()) as { certificateRequired: true; verifyUrl: string };
+    const res = await login(username);
+    const first = (await res.json()) as { certificateRequired: true; verifyUrl: string };
     const { challengeId, code } = await ca.followVerifyUrl(first.verifyUrl, fingerprint);
-    return post("/api/auth/login/certificate", { challengeId, code });
+    return post("/api/auth/login/certificate", { challengeId, code }, challengeCookieOf(res));
   };
-  return { ca, device, comCert, userStore, auditLog: options.auditLog, app, login, refresh, refreshTokenOf, loginWithCertificate, post };
+  return { ca, device, comCert, userStore, auditLog: options.auditLog, app, login, refresh, refreshTokenOf, loginWithCertificate, challengeCookieOf, post };
 }
 
 describe("login por certificado de Dispositivo", () => {
@@ -63,15 +67,26 @@ describe("login por certificado de Dispositivo", () => {
   });
 
   it("o código só vale uma vez e só para o desafio dele", async () => {
-    const { login, post, ca, device } = await setup();
-    const first = (await (await login("com.cert")).json()) as { verifyUrl: string };
-    const second = (await (await login("com.cert")).json()) as { verifyUrl: string };
-    const one = await ca.followVerifyUrl(first.verifyUrl, device.fingerprint);
-    const two = await ca.followVerifyUrl(second.verifyUrl, device.fingerprint);
+    const { login, post, ca, device, challengeCookieOf } = await setup();
+    const firstRes = await login("com.cert");
+    const secondRes = await login("com.cert");
+    const one = await ca.followVerifyUrl(((await firstRes.json()) as { verifyUrl: string }).verifyUrl, device.fingerprint);
+    const two = await ca.followVerifyUrl(((await secondRes.json()) as { verifyUrl: string }).verifyUrl, device.fingerprint);
 
-    expect((await post("/api/auth/login/certificate", { challengeId: two.challengeId, code: one.code })).status).toBe(403);
-    expect((await post("/api/auth/login/certificate", one)).status).toBe(200);
-    expect((await post("/api/auth/login/certificate", one)).status).toBe(403);
+    expect((await post("/api/auth/login/certificate", { challengeId: two.challengeId, code: one.code }, challengeCookieOf(secondRes))).status).toBe(403);
+    expect((await post("/api/auth/login/certificate", one, challengeCookieOf(firstRes))).status).toBe(200);
+    expect((await post("/api/auth/login/certificate", one, challengeCookieOf(firstRes))).status).toBe(403);
+  });
+
+  it("o desafio só vale no navegador que digitou a senha: sem o cookie dele, ou com o de outro desafio, nega", async () => {
+    const { login, post, ca, device, challengeCookieOf } = await setup();
+    const res = await login("sem.cert");
+    const other = await login("sem.cert");
+    const { challengeId, code } = await ca.followVerifyUrl(((await res.json()) as { verifyUrl: string }).verifyUrl, device.fingerprint);
+
+    expect((await post("/api/auth/login/certificate", { challengeId, code })).status).toBe(403);
+    expect((await post("/api/auth/login/certificate", { challengeId, code }, challengeCookieOf(other))).status).toBe(403);
+    expect((await post("/api/auth/login/certificate", { challengeId, code }, { Cookie: "login_challenge=forjado" })).status).toBe(403);
   });
 
   it("não revela a exigência de certificado a quem errou a senha", async () => {
@@ -81,7 +96,35 @@ describe("login por certificado de Dispositivo", () => {
     expect(await res.json()).toEqual({ error: "Credenciais inválidas." });
   });
 
-  it("deixa entrar só com a senha quem tem a opção de acesso sem certificado, mesmo com a CA fora do ar", async () => {
+  it("pede o certificado também a quem tem a opção de acesso sem certificado, para rastrear o Dispositivo", async () => {
+    const { login } = await setup();
+    const res = await login("sem.cert");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ certificateRequired: true, verifyUrl: expect.any(String) });
+  });
+
+  it("quem tem a opção e apresenta o certificado entra pelo Dispositivo", async () => {
+    const { loginWithCertificate, device, refresh, refreshTokenOf } = await setup();
+    const res = await loginWithCertificate("sem.cert", device.fingerprint);
+    expect(res.status).toBe(200);
+    const body = (await res.clone().json()) as { user: { deviceId?: string; deviceName?: string } };
+    expect(body.user).toMatchObject({ deviceId: device.id, deviceName: "Caixa 1" });
+    const renewed = (await (await refresh(await refreshTokenOf(res))).json()) as { user: { deviceId?: string } };
+    expect(renewed.user.deviceId).toBe(device.id);
+  });
+
+  it("quem tem a opção e não apresenta certificado (ou um desconhecido) entra sem Dispositivo", async () => {
+    const { loginWithCertificate } = await setup();
+    for (const fingerprint of [undefined, "b".repeat(64)]) {
+      const res = await loginWithCertificate("sem.cert", fingerprint);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { accessToken: string; user: { deviceId?: string } };
+      expect(body.accessToken).toEqual(expect.any(String));
+      expect(body.user.deviceId).toBeUndefined();
+    }
+  });
+
+  it("deixa entrar só com a senha quem tem a opção, com a CA fora do ar", async () => {
     const { login, ca } = await setup();
     ca.setDown(true);
     const res = await login("sem.cert");
@@ -89,13 +132,23 @@ describe("login por certificado de Dispositivo", () => {
     expect(await res.json()).toMatchObject({ accessToken: expect.any(String) });
   });
 
+  it("quem tem a opção entra sem Dispositivo se a CA cair entre a senha e a volta dela", async () => {
+    const { login, post, ca, challengeCookieOf } = await setup();
+    const res = await login("sem.cert");
+    const { challengeId } = await ca.followVerifyUrl(((await res.json()) as { verifyUrl: string }).verifyUrl);
+    ca.setDown(true);
+    expect((await post("/api/auth/login/certificate", { challengeId }, challengeCookieOf(res))).status).toBe(200);
+  });
+
   it("falha fechado com 503 quando a CA está fora do ar, só para quem exige certificado", async () => {
-    const { login, post, ca } = await setup();
+    const { login, post, ca, challengeCookieOf } = await setup();
+    const first = await login("com.cert");
+    const { challengeId, code } = await ca.followVerifyUrl(((await first.json()) as { verifyUrl: string }).verifyUrl);
     ca.setDown(true);
     const res = await login("com.cert");
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: UNAVAILABLE });
-    expect((await post("/api/auth/login/certificate", { challengeId: "x", code: "y" })).status).toBe(503);
+    expect((await post("/api/auth/login/certificate", { challengeId, code }, challengeCookieOf(first))).status).toBe(503);
   });
 
   it("renova a sessão sem pedir o certificado de novo enquanto o Dispositivo estiver ativo", async () => {
@@ -131,9 +184,26 @@ describe("login por certificado de Dispositivo", () => {
 
   it("não prende a sessão de quem tem a opção a um Dispositivo", async () => {
     const { login, refresh, refreshTokenOf, ca, device } = await setup();
+    ca.setDown(true);
     const token = await refreshTokenOf(await login("sem.cert"));
+    ca.setDown(false);
     await ca.client.revokeDevice(device.id);
     expect((await refresh(token)).status).toBe(200);
+  });
+
+  it("quem tem a opção segue renovando sem o Dispositivo revogado, e com a CA fora do ar", async () => {
+    const { loginWithCertificate, refresh, refreshTokenOf, ca, device } = await setup();
+    const token = await refreshTokenOf(await loginWithCertificate("sem.cert", device.fingerprint));
+
+    ca.setDown(true);
+    const down = await refresh(token);
+    expect(down.status).toBe(200);
+    ca.setDown(false);
+
+    await ca.client.revokeDevice(device.id);
+    const renewed = await refresh(await refreshTokenOf(down));
+    expect(renewed.status).toBe(200);
+    expect(((await renewed.json()) as { user: { deviceId?: string } }).user.deviceId).toBeUndefined();
   });
 });
 
@@ -209,9 +279,9 @@ describe("Audit Log do acesso por certificado", () => {
 
   it("registra o login que entrou por um Dispositivo, e nenhum quando o acesso foi sem certificado", async () => {
     const auditLog = new AuditLog(new MemoryAuditStore());
-    const { comCert: user, device, login, loginWithCertificate } = await setup({ auditLog });
+    const { comCert: user, device, loginWithCertificate } = await setup({ auditLog });
 
-    expect((await login("sem.cert")).status).toBe(200);
+    expect((await loginWithCertificate("sem.cert")).status).toBe(200);
     expect(await auditLog.list({ plugin: "iam" })).toEqual([]);
 
     expect((await loginWithCertificate("com.cert", device.fingerprint)).status).toBe(200);
@@ -247,7 +317,7 @@ describe("Audit Log do acesso por certificado", () => {
 
     it("o login pelo Dispositivo grava o Dispositivo, e quem entra sem certificado fica sem Dispositivo", async () => {
       const auditLog = new AuditLog(new MemoryAuditStore());
-      const { userStore, device, app, login, loginWithCertificate } = await setup({ auditLog });
+      const { userStore, device, app, loginWithCertificate } = await setup({ auditLog });
       await userStore.createRole({ id: "role_p", name: "P", description: "d", permissions: ["closing_period:period:create"] });
       await userStore.createUser({ fullname: "Sem Dispositivo", username: "sem.disp", password: TEST_PASSWORD, roleId: "role_p", allowWithoutCertificate: true });
 
@@ -255,7 +325,7 @@ describe("Audit Log do acesso por certificado", () => {
       const [loginEntry] = await auditLog.list({ plugin: "iam" });
       expect(loginEntry).toMatchObject({ action: "login_with_device", deviceId: device.id, deviceName: "Caixa 1" });
 
-      const sem = (await (await login("sem.disp")).json()) as { accessToken: string };
+      const sem = (await (await loginWithCertificate("sem.disp")).json()) as { accessToken: string };
       expect((await criarPeriodo(app, sem.accessToken)).status).toBe(201);
       const [entrada] = await auditLog.list({ plugin: "closing_period" });
       expect(entrada).toMatchObject({ deviceId: null, deviceName: null });

@@ -10,7 +10,7 @@ import { grantDeniedMessage, missingGrants } from "./can-grant.js";
 import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requirePermission } from "./middleware.js";
 import { hasPermission } from "./has-permission.js";
-import type { TokenService } from "./token-service.js";
+import { TokenService } from "./token-service.js";
 import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
 import { CertificateAuthorityUnavailableError, DeviceNotFoundError, DeviceStillActiveError, type CertificateAuthorityClient } from "./certificate-authority-client.js";
 import type { AuditLog } from "../audit/audit-log.js";
@@ -45,6 +45,11 @@ function getDummyHash(): string {
 /** `Secure` em produção (HTTPS); fora dela o cookie precisa funcionar em http://localhost. */
 const refreshCookie = () =>
   ({ path: "/api/auth", httpOnly: true, sameSite: "Lax", maxAge: 7 * 24 * 3600, secure: process.env.NODE_ENV === "production" }) as const;
+
+/** Cookie do Desafio de Certificado: só vale entre a senha e a volta da CA. */
+const LOGIN_CHALLENGE_COOKIE = "login_challenge";
+const loginChallengeCookie = () =>
+  ({ path: "/api/auth", httpOnly: true, sameSite: "Lax", maxAge: TokenService.LOGIN_CHALLENGE_TTL_SECONDS, secure: process.env.NODE_ENV === "production" }) as const;
 
 const LAST_ADMIN = LAST_ADMIN_MESSAGE;
 const ADMIN_TARGET_ONLY = "Somente administradores podem inativar outro administrador.";
@@ -139,19 +144,20 @@ export function createIamModule({
             return c.json({ error: "Credenciais inválidas." }, 401);
           }
 
-          // Sem a opção de acesso sem certificado, o certificado de um Dispositivo ativo é obrigatório. Só se pede
-          // depois da senha, para não revelar a exigência a quem não a conhece: o navegador vai à CA ler o certificado
-          // e volta pelo callback, que termina o login em /auth/login/certificate.
-          if (!user.allowWithoutCertificate) {
-            try {
-              const { verifyUrl } = await certificateAuthority.createChallenge(user.id);
-              return c.json({ certificateRequired: true, verifyUrl });
-            } catch (err: unknown) {
-              if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
-              throw err;
-            }
+          // Depois da senha, todo login passa pela CA, que lê o certificado do navegador e o devolve pelo callback
+          // (/auth/login/certificate). Sem a opção de acesso sem certificado, o Dispositivo ativo é obrigatório; com
+          // ela, o certificado só serve para rastrear o Dispositivo, e quem não tem um (ou com a CA fora do ar) entra
+          // sem ele. A exigência só aparece depois da senha, para não revelá-la a quem não a conhece.
+          let challenge: { challengeId: string; verifyUrl: string };
+          try {
+            challenge = await certificateAuthority.createChallenge(user.id);
+          } catch (err: unknown) {
+            if (!(err instanceof CertificateAuthorityUnavailableError)) throw err;
+            if (user.allowWithoutCertificate) return completeLogin(c, user);
+            return c.json({ error: err.message }, 503);
           }
-          return completeLogin(c, user);
+          setCookie(c, LOGIN_CHALLENGE_COOKIE, await tokenService.generateLoginChallengeToken(user.id, challenge.challengeId), loginChallengeCookie());
+          return c.json({ certificateRequired: true, verifyUrl: challenge.verifyUrl });
         },
       );
 
@@ -161,21 +167,28 @@ export function createIamModule({
         zValidator("json", z.object({ challengeId: z.string().min(1), code: z.string().optional() })),
         async (c) => {
           const { challengeId, code } = c.req.valid("json");
+          // O desafio só vale no navegador que digitou a senha: o cookie dele tem que apontar para este desafio.
+          const challengeToken = getCookie(c, LOGIN_CHALLENGE_COOKIE);
+          deleteCookie(c, LOGIN_CHALLENGE_COOKIE, { path: "/api/auth" });
+          const bound = challengeToken ? await tokenService.verifyLoginChallengeToken(challengeToken).catch(() => null) : null;
+          if (!bound || bound.challengeId !== challengeId) return c.json({ error: CERTIFICATE_REQUIRED }, 403);
+
           let exchange: Awaited<ReturnType<CertificateAuthorityClient["exchangeChallenge"]>>;
           try {
             exchange = await certificateAuthority.exchangeChallenge({ challengeId, code });
           } catch (err: unknown) {
-            if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
-            throw err;
+            if (!(err instanceof CertificateAuthorityUnavailableError)) throw err;
+            const exempt = await userStore.findById(bound.userId);
+            if (exempt?.allowWithoutCertificate && exempt.status !== "inactive") return completeLogin(c, exempt);
+            return c.json({ error: err.message }, 503);
           }
-          const user = exchange.userId ? await userStore.findById(exchange.userId) : null;
-          if (!exchange.granted || !user || user.status === "inactive") {
-            if (user) {
-              await recordIamAudit({ id: user.id, name: user.fullname }, "deny_login_without_certificate", { type: USER_AUDIT_TARGET, id: user.id }, { username: user.username });
-            }
-            return c.json({ error: CERTIFICATE_REQUIRED }, 403);
-          }
-          return completeLogin(c, user, { id: exchange.deviceId, name: exchange.deviceName });
+          const user = exchange.userId === bound.userId ? await userStore.findById(exchange.userId) : null;
+          if (!user || user.status === "inactive") return c.json({ error: CERTIFICATE_REQUIRED }, 403);
+          if (exchange.granted) return completeLogin(c, user, { id: exchange.deviceId, name: exchange.deviceName });
+          // Quem tem a opção de acesso sem certificado e não apresentou um entra sem Dispositivo.
+          if (user.allowWithoutCertificate) return completeLogin(c, user);
+          await recordIamAudit({ id: user.id, name: user.fullname }, "deny_login_without_certificate", { type: USER_AUDIT_TARGET, id: user.id }, { username: user.username });
+          return c.json({ error: CERTIFICATE_REQUIRED }, 403);
         },
       );
 
@@ -200,12 +213,21 @@ export function createIamModule({
             }
 
             // A sessão continua enquanto o Dispositivo que a abriu seguir ativo; o certificado não é pedido de novo.
-            // Quem exige certificado e tem uma sessão sem Dispositivo não renova (falha fechado).
+            // Quem exige certificado e tem uma sessão sem Dispositivo não renova (falha fechado). Quem tem a opção de
+            // acesso sem certificado não depende do Dispositivo: revogado, a sessão segue sem ele; com a CA fora do
+            // ar, renova sem o nome dele e o tenta de novo na próxima renovação.
             let sessionDevice: { id: string; name: string } | undefined;
-            if (refreshPayload.deviceId) {
-              const device = await certificateAuthority.getDevice(refreshPayload.deviceId);
-              if (!device || device.status !== "active") return c.json({ error: CERTIFICATE_REQUIRED }, 401);
-              sessionDevice = { id: device.id, name: device.name };
+            let sessionDeviceId = refreshPayload.deviceId;
+            if (sessionDeviceId) {
+              let device: Awaited<ReturnType<CertificateAuthorityClient["getDevice"]>> | undefined;
+              try {
+                device = await certificateAuthority.getDevice(sessionDeviceId);
+              } catch (err: unknown) {
+                if (!(err instanceof CertificateAuthorityUnavailableError) || !user.allowWithoutCertificate) throw err;
+              }
+              if (device?.status === "active") sessionDevice = { id: device.id, name: device.name };
+              else if (!user.allowWithoutCertificate) return c.json({ error: CERTIFICATE_REQUIRED }, 401);
+              else if (device !== undefined) sessionDeviceId = undefined;
             } else if (!user.allowWithoutCertificate) {
               return c.json({ error: CERTIFICATE_REQUIRED }, 401);
             }
@@ -216,7 +238,7 @@ export function createIamModule({
               role || undefined,
               sessionDevice,
             );
-            const { token: newRefreshToken } = await tokenService.generateRefreshToken(user, refreshPayload.deviceId);
+            const { token: newRefreshToken } = await tokenService.generateRefreshToken(user, sessionDeviceId);
 
             setCookie(c, "refresh_token", newRefreshToken, refreshCookie());
 

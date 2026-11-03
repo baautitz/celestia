@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { ADMIN_PASSWORD, ADMIN_USERNAME } from "./credentials";
-import { loginAsAdmin, openMenu } from "./helpers";
+import { apiLoginAsAdmin, loginAsAdmin, openMenu } from "./helpers";
 
 test("lista os Períodos de Fechamento", async ({ page, request }) => {
   // Períodos não podem se sobrepor: um dia aleatório distante garante unicidade entre repetições e retentativas.
@@ -8,8 +7,7 @@ test("lista os Períodos de Fechamento", async ({ page, request }) => {
   const iso = day.toISOString().slice(0, 10);
   const br = iso.split("-").reverse().join("/");
   const name = `Fechamento ${iso}-${Math.random().toString(36).slice(2, 8)}`;
-  const login = await request.post("/api/auth/login", { data: { username: ADMIN_USERNAME, password: ADMIN_PASSWORD } });
-  const { accessToken } = (await login.json()) as { accessToken: string };
+  const accessToken = await apiLoginAsAdmin(request);
   const created = await request.post("/api/closing-periods", {
     headers: { Authorization: `Bearer ${accessToken}` },
     data: { name, startDate: iso, endDate: iso },

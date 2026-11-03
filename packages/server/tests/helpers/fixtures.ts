@@ -87,7 +87,17 @@ export async function authHeader(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password: TEST_PASSWORD }),
   });
-  const { access_token } = (await res.json()) as { access_token: string };
+  const body = (await res.json()) as { access_token?: string; verifyUrl?: string };
+  if (body.access_token) return { Authorization: `Bearer ${body.access_token}` };
+  // Com a CA no ar todo login passa pelo Desafio de Certificado: volta dele sem certificado, como quem tem a opção de
+  // acesso sem certificado e não apresentou um.
+  const challengeId = new URL(body.verifyUrl!).searchParams.get("challenge");
+  const done = await app.request("/api/auth/login/certificate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: (res.headers.get("set-cookie") ?? "").split(";")[0]! },
+    body: JSON.stringify({ challengeId }),
+  });
+  const { access_token } = (await done.json()) as { access_token: string };
   return { Authorization: `Bearer ${access_token}` };
 }
 
