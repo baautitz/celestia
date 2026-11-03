@@ -11,7 +11,6 @@ import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
 import { LastAdminError } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
-import { PostgresPreVencidoStore } from "../../../integrations/inovafarma/src/postgres-pre-vencido-store.js";
 import { PostgresEstoquePreVencidoStore } from "../../../integrations/inovafarma/src/postgres-estoque-pre-vencidos-store.js";
 import { PostgresAvaliacaoStore } from "../../../integrations/inovafarma/src/postgres-avaliacao-store.js";
 import { PostgresFuroEstoqueStore } from "../../../integrations/inovafarma/src/postgres-furo-estoque-store.js";
@@ -48,7 +47,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
         // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA) e a que troca Excluir por Inativar Usuários; o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos, a das Avaliações, a do Furo de Estoque e as cinco das Metas (Tipos de Meta, Montar Metas, Apuração, Prêmio do Participante e Lista de Produtos no Tipo de Meta); os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 6 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 11 : 1);
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 6 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 12 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -74,7 +73,6 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "inovafarma", name: "metas_participantes" },
         { schema: "inovafarma", name: "motivos_ajuste" },
         { schema: "inovafarma", name: "pre_vencidos_itens" },
-        { schema: "inovafarma", name: "pre_vencidos_lancamentos" },
         { schema: "inovafarma", name: "tipos_meta" },
         { schema: "inovafarma", name: "vinculos_colaborador" },
       ]);
@@ -126,7 +124,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_lancamentos, inovafarma.pre_vencidos_itens, inovafarma.avaliacoes, inovafarma.justificativas_ajuste CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_itens, inovafarma.avaliacoes, inovafarma.justificativas_ajuste CASCADE`);
     });
 
     describe("Users e Roles", () => {
@@ -257,38 +255,6 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       });
     });
 
-    describe("Lançamentos de Pré-vencidos", () => {
-      const novo = {
-        periodoId: "p1",
-        codigoColaborador: 7,
-        nomeColaborador: "ANA",
-        usuarioId: "ana",
-        codigoLoja: 1,
-        produtoId: "guid-1",
-        codigoProduto: 987654,
-        nomeProduto: "DIPIRONA 500MG",
-        codigoBarra: "7891234567895",
-        quantidade: 3,
-        validade: "2027-06",
-      };
-
-      it("cria, lista pelo período e Colaborador, edita e exclui com a version", async () => {
-        const store = new PostgresPreVencidoStore(db);
-        const criado = await store.criar(novo);
-        await store.criar({ ...novo, codigoColaborador: 8 });
-        expect(criado).toMatchObject({ version: 1, quantidade: 3, codigoProduto: 987654 });
-        expect(await store.listar({ periodoId: "p1", codigoColaborador: 7 })).toHaveLength(1);
-        expect(await store.listar({ periodoId: "p1" })).toHaveLength(2);
-        expect(await store.listar({ periodoId: "outro" })).toHaveLength(0);
-
-        expect(await store.atualizar(criado.id, { quantidade: 9, validade: "2027-08" }, 99)).toBeNull();
-        expect(await store.atualizar(criado.id, { quantidade: 9, validade: "2027-08" }, 1)).toMatchObject({ quantidade: 9, validade: "2027-08", version: 2 });
-        expect(await store.excluir(criado.id, 1)).toBe(false);
-        expect(await store.excluir(criado.id, 2)).toBe(true);
-        expect(await store.get(criado.id)).toBeNull();
-      });
-    });
-
     describe("Estoque de Pré-vencidos", () => {
       const novo = {
         codigoLoja: 1,
@@ -308,6 +274,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         await store.criar({ ...novo, codigoLoja: 2 });
         expect(criado).toMatchObject({ version: 1, quantidade: 3, codigoProduto: 987654, incluidoEm: "2027-04-10T13:00:00.000Z" });
         expect((await store.listar(1)).map((i) => i.id)).toEqual([criado.id, depois.id]);
+        expect(await store.lojas()).toEqual([1, 2]);
 
         expect(await store.atualizar(criado.id, { quantidade: 9, validade: "2027-08" }, 99)).toBeNull();
         expect(await store.atualizar(criado.id, { quantidade: 9, validade: "2027-08" }, 1)).toMatchObject({ quantidade: 9, validade: "2027-08", version: 2 });

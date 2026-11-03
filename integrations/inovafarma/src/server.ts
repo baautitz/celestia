@@ -26,10 +26,7 @@ import { MemoryTipoMetaStore } from "./tipos-meta-store.js";
 import { MemoryMetaStore } from "./metas-store.js";
 import { PostgresTipoMetaStore } from "./postgres-tipos-meta-store.js";
 import { PostgresMetaStore } from "./postgres-meta-store.js";
-import { declarePreVencidoAudit } from "./pre-vencidos-audit.js";
 import { registerPreVencidosRoutes, type PeriodsService } from "./pre-vencidos-routes.js";
-import { MemoryPreVencidoStore } from "./pre-vencidos-store.js";
-import { PostgresPreVencidoStore } from "./postgres-pre-vencido-store.js";
 import { declareItemPreVencidoAudit } from "./estoque-pre-vencidos-audit.js";
 import { registerEstoquePreVencidosRoutes } from "./estoque-pre-vencidos-routes.js";
 import { registerBaixasPreVencidosRoutes } from "./baixas-pre-vencidos-routes.js";
@@ -76,7 +73,6 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
     register({ routes, permissions, services, events }) {
       const audit = services.use<AuditService>("audit", "log");
       declareVinculoAudit(audit);
-      declarePreVencidoAudit(audit);
       declareItemPreVencidoAudit(audit);
       declareAvaliacaoAudit(audit);
       declareFuroEstoqueAudit(audit);
@@ -84,7 +80,6 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declareMetasAudit(audit);
       declareApuracaoAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
-      const preVencidos = db ? new PostgresPreVencidoStore(db) : new MemoryPreVencidoStore();
       const avaliacoes = db ? new PostgresAvaliacaoStore(db) : new MemoryAvaliacaoStore();
       const users = services.use<UsersService>("iam", "users");
       const periods = services.use<PeriodsService>("closing_period", "periods");
@@ -102,10 +97,8 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         permissions,
         auth,
         erpClient: () => erpClients[erpId],
-        store: preVencidos,
         vinculos: store,
         periods,
-        audit,
       });
       const estoquePreVencidos = db ? new PostgresEstoquePreVencidoStore(db) : new MemoryEstoquePreVencidoStore();
       registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: estoquePreVencidos, vinculos: store, audit });
