@@ -186,3 +186,27 @@ export const preVencidosBaixasCongeladas = inovafarmaSchema.table(
   },
   (t) => [primaryKey({ columns: [t.periodoId, t.codigoLoja] }), index("pre_vencidos_baixas_congeladas_loja_idx").on(t.codigoLoja, t.ate)],
 );
+
+/** Correções de Baixa: quanto de uma linha de venda do ERP (venda + produto) foi de fato Pré-vencido. */
+export const preVencidosCorrecoesBaixa = inovafarmaSchema.table(
+  "pre_vencidos_correcoes_baixa",
+  {
+    id: text("id").primaryKey(),
+    /** Referência lógica a `closing_period.periods`: o Período da venda, sem FK entre Modules. */
+    periodoId: text("periodo_id").notNull(),
+    codigoLoja: integer("codigo_loja").notNull(),
+    /** `Venda.CodigoVenda` do ERP. */
+    vendaId: integer("venda_id").notNull(),
+    /** Identificador opaco do produto (`Produto.rowguid`). */
+    produtoId: text("produto_id").notNull(),
+    quantidade: integer("quantidade").notNull(),
+    motivo: text("motivo").notNull(),
+    /** Referência lógica a `iam.users`: quem corrigiu por último. */
+    autorId: text("autor_id").notNull(),
+    autorNome: text("autor_nome").notNull(),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("pre_vencidos_correcoes_baixa_linha_idx").on(t.codigoLoja, t.vendaId, t.produtoId)],
+);

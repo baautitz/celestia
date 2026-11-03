@@ -13,6 +13,8 @@ import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
 import { PostgresEstoquePreVencidoStore } from "../../../integrations/inovafarma/src/postgres-estoque-pre-vencidos-store.js";
 import { PostgresBaixasCongeladasStore } from "../../../integrations/inovafarma/src/postgres-baixas-congeladas-store.js";
+import { PostgresCorrecaoBaixaStore } from "../../../integrations/inovafarma/src/postgres-correcoes-baixa-store.js";
+import { CorrecaoDuplicadaError } from "../../../integrations/inovafarma/src/correcoes-baixa-store.js";
 import { PostgresAvaliacaoStore } from "../../../integrations/inovafarma/src/postgres-avaliacao-store.js";
 import { PostgresFuroEstoqueStore } from "../../../integrations/inovafarma/src/postgres-furo-estoque-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
@@ -47,8 +49,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA) e a que troca Excluir por Inativar Usuários; o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos, a das Avaliações, a do Furo de Estoque, as cinco das Metas (Tipos de Meta, Montar Metas, Apuração, Prêmio do Participante e Lista de Produtos no Tipo de Meta), a dos Itens de Pré-vencido, a que remove os Lançamentos e a das Baixas congeladas; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 6 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 13 : 1);
+        // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA) e a que troca Excluir por Inativar Usuários; o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos, a das Avaliações, a do Furo de Estoque, as cinco das Metas (Tipos de Meta, Montar Metas, Apuração, Prêmio do Participante e Lista de Produtos no Tipo de Meta), a dos Itens de Pré-vencido, a que remove os Lançamentos, a das Baixas congeladas e a das Correções de Baixa; os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 6 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 14 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -74,6 +76,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "inovafarma", name: "metas_participantes" },
         { schema: "inovafarma", name: "motivos_ajuste" },
         { schema: "inovafarma", name: "pre_vencidos_baixas_congeladas" },
+        { schema: "inovafarma", name: "pre_vencidos_correcoes_baixa" },
         { schema: "inovafarma", name: "pre_vencidos_itens" },
         { schema: "inovafarma", name: "tipos_meta" },
         { schema: "inovafarma", name: "vinculos_colaborador" },
@@ -126,7 +129,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_itens, inovafarma.pre_vencidos_baixas_congeladas, inovafarma.avaliacoes, inovafarma.justificativas_ajuste CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_itens, inovafarma.pre_vencidos_baixas_congeladas, inovafarma.pre_vencidos_correcoes_baixa, inovafarma.avaliacoes, inovafarma.justificativas_ajuste CASCADE`);
     });
 
     describe("Users e Roles", () => {
@@ -305,6 +308,21 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         expect((await store.doPeriodo("abril")).map((c) => c.codigoLoja)).toEqual([2]);
         await store.descartar("abril");
         expect(await store.doPeriodo("abril")).toEqual([]);
+      });
+
+      it("cria uma Correção de Baixa por linha de venda, lista pela Loja, edita e exclui com a version", async () => {
+        const store = new PostgresCorrecaoBaixaStore(db);
+        const nova = { periodoId: "p1", codigoLoja: 1, vendaId: 10, produtoId: "guid-1", quantidade: 1, motivo: "Sem desconto", autorId: "gil", autorNome: "Gil" };
+        const criada = await store.criar(nova);
+        await store.criar({ ...nova, codigoLoja: 2 });
+        await expect(store.criar({ ...nova, quantidade: 0 })).rejects.toBeInstanceOf(CorrecaoDuplicadaError);
+        expect(criada).toMatchObject({ ...nova, version: 1 });
+        expect((await store.daLoja(1)).map((c) => c.id)).toEqual([criada.id]);
+        expect(await store.atualizar(criada.id, { quantidade: 0, motivo: "Outro", autorId: "lia", autorNome: "Lia" }, 9)).toBeNull();
+        expect(await store.atualizar(criada.id, { quantidade: 0, motivo: "Outro", autorId: "lia", autorNome: "Lia" }, 1)).toMatchObject({ quantidade: 0, motivo: "Outro", autorNome: "Lia", version: 2 });
+        expect(await store.excluir(criada.id, 1)).toBe(false);
+        expect(await store.excluir(criada.id, 2)).toBe(true);
+        expect(await store.get(criada.id)).toBeNull();
       });
     });
 
