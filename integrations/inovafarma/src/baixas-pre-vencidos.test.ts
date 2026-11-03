@@ -73,4 +73,16 @@ describe("Baixas de Pré-vencido", () => {
     expect(baixas.map((b) => [b.venda.vendaId, b.venda.codigoColaborador])).toEqual([[1, 7]]);
     expect(restante).toEqual({ a: 0, b: 1 });
   });
+
+  it("com estado congelado, parte do Restante congelado e ignora as vendas até o congelamento, mesmo as canceladas depois", () => {
+    const { baixas, restante } = calcularBaixas({
+      itens: [item("maio", 5, "2027-05"), item("junho", 4, "2027-06"), item("novo", 2, "2027-05", "2027-05-02 08:00:00")],
+      vendas: [venda(1, "2027-04-20 10:00:00", 3, { cancelada: true }), venda(2, "2027-05-03 10:00:00", 3)],
+      congelado: { ate: "2027-04-30 23:59:59", restante: { maio: 1, junho: 4 } },
+    });
+    expect(baixas.map((b) => [b.venda.vendaId, b.itens])).toEqual([
+      [2, [{ itemId: "maio", quantidade: 1 }, { itemId: "novo", quantidade: 2 }]],
+    ]);
+    expect(restante).toEqual({ maio: 0, junho: 4, novo: 0 });
+  });
 });
