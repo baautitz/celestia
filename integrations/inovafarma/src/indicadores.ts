@@ -14,37 +14,47 @@ export interface Indicador {
   unidade: Unidade;
   /** Quando menor é melhor e zero é o melhor resultado (ex.: Desconto), não falta de vendas (ex.: CMV). */
   zeroEhResultado?: boolean;
+  /** Valor vendido em R$: pode ser Sem Alvo e base do Percentual. */
+  valorVendido?: boolean;
+  /** Nome da unidade nas quantidades (ex.: "40 incentivos"); sem ele, "un.". */
+  substantivo?: string;
+  /** O Tipo de Meta define o que é medido numa Lista de Produtos própria. */
+  lista?: boolean;
 }
 
-const indicador = <const I extends string>(id: I, nome: string, unidade: Unidade, direcao: Direcao = "maior", zeroEhResultado = false) => ({
+type Extras = Partial<Pick<Indicador, "direcao" | "zeroEhResultado" | "valorVendido" | "substantivo" | "lista">>;
+
+const indicador = <const I extends string>(id: I, nome: string, unidade: Unidade, extras: Extras = {}) => ({
   id,
   nome,
-  direcao,
   unidade,
-  zeroEhResultado,
+  direcao: "maior" as Direcao,
+  ...extras,
 });
+
+const VENDIDO = { valorVendido: true } as const;
 
 /** Indicadores fixos do Plugin: o cliente não cria Indicador, só escolhe um destes no Tipo de Meta. */
 export const INDICADORES = [
-  indicador("venda-liquida", "Venda Líquida", "reais"),
-  indicador("desconto-percent", "Desconto %", "percentual", "menor", true),
-  indicador("desconto-valor", "Desconto em R$", "reais", "menor", true),
-  indicador("cmv", "CMV %", "percentual", "menor"),
+  indicador("venda-liquida", "Venda Líquida", "reais", VENDIDO),
+  indicador("desconto-percent", "Desconto %", "percentual", { direcao: "menor", zeroEhResultado: true }),
+  indicador("desconto-valor", "Desconto em R$", "reais", { direcao: "menor", zeroEhResultado: true }),
+  indicador("cmv", "CMV %", "percentual", { direcao: "menor" }),
   indicador("ticket-medio", "Ticket Médio", "reais"),
   indicador("foco-qtd", "Qtd. Total Foco", "quantidade"),
-  indicador("foco-valor", "Valor Total Foco", "reais"),
-  indicador("vitaminas-qtd", "Qtd. Vitaminas", "quantidade"),
-  indicador("vitaminas-valor", "Valor Vitaminas", "reais"),
-  indicador("genericos-qtd", "Qtd. Genéricos", "quantidade"),
-  indicador("genericos-valor", "Valor Genéricos", "reais"),
-  indicador("similares-qtd", "Qtd. Similares", "quantidade"),
-  indicador("similares-valor", "Valor Similares", "reais"),
-  indicador("incentivos-qtd", "Qtd. Incentivos", "quantidade"),
-  indicador("incentivos-valor", "Valor Incentivos", "reais"),
-  indicador("vendas-cadastro-qtd", "Qtd. de Vendas com Cadastro", "quantidade"),
+  indicador("foco-valor", "Valor Total Foco", "reais", VENDIDO),
+  indicador("vitaminas-qtd", "Qtd. Vitaminas", "quantidade", { substantivo: "vitaminas" }),
+  indicador("vitaminas-valor", "Valor Vitaminas", "reais", VENDIDO),
+  indicador("genericos-qtd", "Qtd. Genéricos", "quantidade", { substantivo: "genéricos" }),
+  indicador("genericos-valor", "Valor Genéricos", "reais", VENDIDO),
+  indicador("similares-qtd", "Qtd. Similares", "quantidade", { substantivo: "similares" }),
+  indicador("similares-valor", "Valor Similares", "reais", VENDIDO),
+  indicador("incentivos-qtd", "Qtd. Incentivos", "quantidade", { substantivo: "incentivos" }),
+  indicador("incentivos-valor", "Valor Incentivos", "reais", VENDIDO),
+  indicador("vendas-cadastro-qtd", "Qtd. de Vendas com Cadastro", "quantidade", { substantivo: "vendas" }),
   indicador("vendas-cadastro-percent", "% de Vendas com Cadastro", "percentual"),
-  indicador("pre-vencidos", "Pré-vencidos vendidos", "quantidade"),
-  indicador("lista-produtos", "Lista de Produtos", "quantidade"),
+  indicador("pre-vencidos", "Pré-vencidos vendidos", "quantidade", { substantivo: "pré-vencidos" }),
+  indicador("lista-produtos", "Lista de Produtos", "quantidade", { lista: true }),
   indicador("avaliacoes", "Avaliações (Saldo)", "reais"),
 ] as const satisfies readonly Indicador[];
 
@@ -87,3 +97,6 @@ export function formatarValor(indicador: Indicador, valor: number): string {
       return numero(valor);
   }
 }
+
+/** Valor na unidade do Indicador, com "un." nas quantidades (ex.: "40 un.", "R$ 50,00"). */
+export const comUnidade = (indicador: Indicador, valor: number) => `${formatarValor(indicador, valor)}${indicador.unidade === "quantidade" ? " un." : ""}`;

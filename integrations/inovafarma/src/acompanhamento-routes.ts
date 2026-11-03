@@ -16,7 +16,7 @@ import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { conferir } from "./pre-vencidos-conferencia.js";
 import { LOTE_PRODUTOS, vendasSql, type LinhaVenda, type PeriodoResumo, type PeriodsService } from "./pre-vencidos-routes.js";
 import type { PreVencidoStore } from "./pre-vencidos-store.js";
-import { descreverPremio, type TipoMeta } from "./tipos-meta.js";
+import { descreverPremio, temLista, type TipoMeta } from "./tipos-meta.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
 import type { ErpQueryClient } from "./server.js";
 import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
@@ -182,13 +182,13 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     // Na Apuração do fechamento o Período ainda está aberto: só os Tipos ativos contam.
     const doPeriodo = metasVisiveis(await metas.listar([periodo.id]), await tipos.listar(), { status: "open" });
     const indicadores = new Set<IndicadorId>(doPeriodo.flatMap(({ tipo }) => (tipo.regra.tipo === "percentual" ? [tipo.indicador, tipo.regra.indicadorBase] : [tipo.indicador])));
-    const tiposLista = doPeriodo.flatMap(({ tipo }) => (tipo.indicador === "lista-produtos" ? [tipo] : []));
+    const tiposLista = doPeriodo.flatMap(({ tipo }) => (temLista(tipo.indicador) ? [tipo] : []));
     const { dados, listas } = await dadosDoPeriodo(periodo, indicadores, tiposLista);
     const vazio: DadosColaborador = { indicadores: {}, descontosCentavos: 0 };
     /** O vendido da Lista entra como o Realizado comum do Indicador Lista de Produtos daquele Tipo de Meta. */
     const dadosDe = (tipo: TipoMeta, codigo: number): DadosColaborador => {
       const d = dados.get(codigo) ?? vazio;
-      return tipo.indicador === "lista-produtos" ? { ...d, indicadores: { ...d.indicadores, "lista-produtos": listas.get(tipo.id)?.get(codigo) ?? 0 } } : d;
+      return temLista(tipo.indicador) ? { ...d, indicadores: { ...d.indicadores, "lista-produtos": listas.get(tipo.id)?.get(codigo) ?? 0 } } : d;
     };
     const apuradas: MetaApurada[] = doPeriodo
       .map(({ meta, tipo }) => ({

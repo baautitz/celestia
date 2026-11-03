@@ -40,6 +40,7 @@ import {
   resumoPremio,
 } from "./premio-participante-window";
 import type { Meta } from "./metas-store";
+import { usaAlvo } from "./montar-metas";
 import type { TipoMetaComPremio } from "./tipo-meta-window";
 
 const BASE = "/api/m/inovafarma/metas";
@@ -114,7 +115,6 @@ const colunasMetas: DataTableColumn<MetaVista>[] = [
   },
 ];
 
-const usaAlvo = (t: TipoMetaComPremio) => !t.semAlvo;
 const periodoInicial = (periodos: PeriodoMetas[]) =>
   (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
 

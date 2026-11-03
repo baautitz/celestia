@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MIN_BUSCA_PRODUTO } from "./produtos-erp.js";
 import { INDICADOR_IDS, formatarValor, indicadorPorId, porcentagem, reais, valorNoAtingimento, type Indicador, type IndicadorId } from "./indicadores.js";
 
 /** Exibição para o Colaborador; o gestor sempre vê tudo. */
@@ -11,9 +12,15 @@ export const TIPOS_ENTRADA = ["produto", "grupo", "secao", "laboratorio"] as con
 export type TipoEntrada = (typeof TIPOS_ENTRADA)[number];
 export const TIPO_ENTRADA_LABEL: Record<TipoEntrada, string> = { produto: "Produto", grupo: "Grupo", secao: "Seção", laboratorio: "Laboratório" };
 
+/** Mínimo de caracteres da busca de cada tipo de entrada no ERP. */
+export const MIN_BUSCA_LISTA: Record<TipoEntrada, number> = { produto: MIN_BUSCA_PRODUTO, grupo: 1, secao: 1, laboratorio: 2 };
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** O id de cada tipo no ERP: `Produto.rowguid` no Produto; o código do Grupo, da Seção ou do Fabricante nos demais. */
-const idValido = (e: Pick<EntradaLista, "tipo" | "id">) => (e.tipo === "produto" ? UUID.test(e.id) : /^\d{1,10}$/.test(e.id));
+/** Maior código de um `int` do SQL Server: o código do Grupo, da Seção e do Fabricante. */
+const MAX_CODIGO = 2_147_483_647;
+/** O id de cada tipo no ERP: `Produto.rowguid` (guid) no Produto; o código (inteiro positivo) do Grupo, da Seção ou do Fabricante nos demais. */
+export const idValido = (e: Pick<EntradaLista, "tipo" | "id">) =>
+  e.tipo === "produto" ? UUID.test(e.id) : /^[1-9]\d{0,9}$/.test(e.id) && Number(e.id) <= MAX_CODIGO;
 
 /** O que a Lista de Produtos mede: unidades vendidas ou valor vendido (R$, valor líquido). */
 export const UNIDADES_LISTA = ["unidades", "reais"] as const;
@@ -96,40 +103,48 @@ export interface TipoMeta extends DadosTipoMeta {
  */
 export function indicadorDoTipo(t: { indicador: IndicadorId; lista?: Pick<ListaTipo, "unidade"> | null }): Indicador {
   const indicador = indicadorPorId(t.indicador);
-  return t.indicador === "lista-produtos" && t.lista?.unidade === "reais" ? { ...indicador, unidade: "reais" } : indicador;
+  return indicador.lista && t.lista?.unidade === "reais" ? { ...indicador, unidade: "reais", valorVendido: true } : indicador;
 }
 
-/** Se o Indicador do Tipo é valor vendido em R$: pode ser Sem Alvo e base do Percentual. */
-export const ehValorVendido = (indicador: Indicador) =>
-  indicador.unidade === "reais" && indicador.id !== "avaliacoes" && indicador.id !== "ticket-medio" && indicador.direcao !== "menor";
+/** Se o Indicador mede uma Lista de Produtos própria do Tipo de Meta. */
+export const temLista = (indicador: IndicadorId) => indicadorPorId(indicador).lista === true;
 
-/** Regras que dependem de mais de um campo; null se o Tipo de Meta é válido. */
-export function problemaDoTipo(t: DadosTipoMeta): string | null {
+/** Campo do formulário a que um problema do Tipo de Meta se refere, para mostrar o erro ao lado dele. */
+export type CampoDoTipo = "semAlvo" | "alvoPadrao" | "lista" | "exibicao" | "regra" | "teto" | "faixas" | "indicadorBase";
+export type ProblemaDoTipo = { campo: CampoDoTipo; mensagem: string };
+
+const problemaEm = (campo: CampoDoTipo, mensagem: string): ProblemaDoTipo => ({ campo, mensagem });
+
+/** Regras que dependem de mais de um campo, com o campo a que cada uma se refere; null se o Tipo de Meta é válido. */
+export function problemaNoCampo(t: DadosTipoMeta): ProblemaDoTipo | null {
   const indicador = indicadorDoTipo(t);
   const avaliacoes = t.indicador === "avaliacoes";
-  if (avaliacoes !== (t.regra.tipo === "saldo")) return "A Meta de Avaliações paga o Saldo, e só ela paga o Saldo.";
-  if (avaliacoes && t.semAlvo) return "A Meta de Avaliações precisa do valor inicial.";
-  if (t.indicador === "lista-produtos" && !t.lista) return "Adicione pelo menos uma entrada à Lista.";
-  if (t.indicador !== "lista-produtos" && t.lista) return "Só o Indicador Lista de Produtos tem Lista.";
-  if (t.lista && !t.lista.entradas.every(idValido)) return "Uma entrada da Lista tem um identificador inválido.";
-  if (t.lista && new Set(t.lista.entradas.map((e) => `${e.tipo}:${e.id}`)).size !== t.lista.entradas.length) return "Uma entrada aparece duas vezes na Lista.";
-  if (t.regra.tipo === "proporcional" && indicador.direcao === "menor") return `O Proporcional não se aplica a ${indicador.nome}, em que menor é melhor.`;
+  if (avaliacoes !== (t.regra.tipo === "saldo")) return problemaEm("regra", "A Meta de Avaliações paga o Saldo, e só ela paga o Saldo.");
+  if (avaliacoes && t.semAlvo) return problemaEm("semAlvo", "A Meta de Avaliações precisa do valor inicial.");
+  if (temLista(t.indicador) && !t.lista) return problemaEm("lista", "Adicione pelo menos uma entrada à Lista.");
+  if (!temLista(t.indicador) && t.lista) return problemaEm("lista", "Só o Indicador Lista de Produtos tem Lista.");
+  if (t.lista && !t.lista.entradas.every(idValido)) return problemaEm("lista", "Uma entrada da Lista tem um identificador inválido.");
+  if (t.lista && new Set(t.lista.entradas.map((e) => `${e.tipo}:${e.id}`)).size !== t.lista.entradas.length) return problemaEm("lista", "Uma entrada aparece duas vezes na Lista.");
+  if (t.regra.tipo === "proporcional" && indicador.direcao === "menor") return problemaEm("regra", `O Proporcional não se aplica a ${indicador.nome}, em que menor é melhor.`);
   if (t.regra.tipo === "proporcional" && t.regra.gatilho !== null && t.regra.teto !== null && t.regra.gatilho >= t.regra.teto)
-    return "O Gatilho deve ser menor que o Teto.";
+    return problemaEm("teto", "O Gatilho deve ser menor que o Teto.");
   if (t.regra.tipo === "percentual") {
     // A Lista de Produtos só é base do Percentual no próprio Tipo de Meta de Lista, e só em R$.
-    const base = t.regra.indicadorBase === t.indicador ? indicador : t.regra.indicadorBase === "lista-produtos" ? null : indicadorPorId(t.regra.indicadorBase);
-    if (!base || !ehValorVendido(base)) return "O Percentual se aplica a um Indicador de valor vendido em R$.";
+    const base = t.regra.indicadorBase === t.indicador ? indicador : temLista(t.regra.indicadorBase) ? null : indicadorPorId(t.regra.indicadorBase);
+    if (!base?.valorVendido) return problemaEm("indicadorBase", "O Percentual se aplica a um Indicador de valor vendido em R$.");
   }
-  if (t.regra.tipo === "faixas" && new Set(t.regra.faixas.map((f) => f.atingimento)).size !== t.regra.faixas.length) return "Duas Faixas não podem ter o mesmo Atingimento.";
+  if (t.regra.tipo === "faixas" && new Set(t.regra.faixas.map((f) => f.atingimento)).size !== t.regra.faixas.length) return problemaEm("faixas", "Duas Faixas não podem ter o mesmo Atingimento.");
   if (t.semAlvo) {
-    if (t.regra.tipo !== "percentual" || t.regra.soSeAtingir) return "Um Tipo de Meta sem Alvo só paga o Percentual, sem depender de atingir.";
-    if (t.regra.indicadorBase !== t.indicador) return "Um Tipo de Meta sem Alvo paga o Percentual sobre o próprio Indicador.";
-    if (t.exibicao !== "progresso") return "Um Tipo de Meta sem Alvo não mostra Atingida / Não atingida: use a Exibição Progresso.";
-    if (t.alvoPadrao !== null) return "Um Tipo de Meta sem Alvo não tem Alvo padrão.";
+    if (t.regra.tipo !== "percentual" || t.regra.soSeAtingir) return problemaEm("regra", "Um Tipo de Meta sem Alvo só paga o Percentual, sem depender de atingir.");
+    if (t.regra.indicadorBase !== t.indicador) return problemaEm("indicadorBase", "Um Tipo de Meta sem Alvo paga o Percentual sobre o próprio Indicador.");
+    if (t.exibicao !== "progresso") return problemaEm("exibicao", "Um Tipo de Meta sem Alvo não mostra Atingida / Não atingida: use a Exibição Progresso.");
+    if (t.alvoPadrao !== null) return problemaEm("alvoPadrao", "Um Tipo de Meta sem Alvo não tem Alvo padrão.");
   }
   return null;
 }
+
+/** Regras que dependem de mais de um campo; null se o Tipo de Meta é válido. */
+export const problemaDoTipo = (t: DadosTipoMeta): string | null => problemaNoCampo(t)?.mensagem ?? null;
 
 /** Ponto da regra: na unidade do Indicador quando há Alvo padrão; senão, em % de Atingimento. */
 const limiar = (indicador: Indicador, alvo: number | null, pct: number) =>
@@ -157,7 +172,7 @@ export function descreverPremio(t: Pick<DadosTipoMeta, "indicador" | "regra" | "
       return partes.join(" · ");
     }
     case "percentual":
-      return `Paga ${porcentagem(r.percentual)} ${r.indicadorBase === "lista-produtos" ? "do valor vendido da Lista de Produtos" : `do ${indicadorPorId(r.indicadorBase).nome}`}${r.soSeAtingir ? ", se atingir o Alvo" : ""}`;
+      return `Paga ${porcentagem(r.percentual)} ${temLista(r.indicadorBase) ? "do valor vendido da Lista de Produtos" : `do ${indicadorPorId(r.indicadorBase).nome}`}${r.soSeAtingir ? ", se atingir o Alvo" : ""}`;
     case "saldo":
       return `Começa com ${alvo === null ? "o valor inicial" : reais(alvo)}, desconta as Avaliações do Período e paga o Saldo`;
   }

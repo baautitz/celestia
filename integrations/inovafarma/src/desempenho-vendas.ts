@@ -68,7 +68,6 @@ export const vendasFromWhere = (filtro: string) => `
  * com parâmetros (`@dataInicio`, `@dataFim` e os do filtro), nunca com entrada do usuário.
  */
 export function desempenhoSql(filtroEmpresa: string) {
-  const reembolsoPbm = REEMBOLSO_PBM;
   const fromWhere = vendasFromWhere(filtroEmpresa);
 
   const sql = `
@@ -76,9 +75,9 @@ export function desempenhoSql(filtroEmpresa: string) {
       vp.CodigoFuncionario AS codigoColaborador,
       c.Nome AS nomeColaborador,
       COUNT(DISTINCT vp.CodigoVenda) AS quantidadeVendas,
-      CAST(SUM(vp.Total + vp.TotalDesconto + ${reembolsoPbm}) AS float) AS totalBruto,
+      CAST(SUM(vp.Total + vp.TotalDesconto + ${REEMBOLSO_PBM}) AS float) AS totalBruto,
       CAST(SUM(vp.TotalDesconto) AS float) AS totalDesconto,
-      CAST(SUM(vp.Total + ${reembolsoPbm}) AS float) AS totalLiquido,
+      CAST(SUM(vp.Total + ${REEMBOLSO_PBM}) AS float) AS totalLiquido,
       CAST(SUM(vp.Quantidade * vp.PrecoCusto) AS float) AS totalCmv,
       COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN vp.CodigoVenda END) AS vendasComCadastro,
       ${Object.values(CATEGORIAS).map(({ coluna, filtro }) => {

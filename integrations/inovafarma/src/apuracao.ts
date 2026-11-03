@@ -1,4 +1,4 @@
-import { atingimento as calcularAtingimento, formatarValor, reais, type Indicador, type IndicadorId } from "./indicadores.js";
+import { atingimento as calcularAtingimento, comUnidade, formatarValor, reais, type Indicador, type IndicadorId } from "./indicadores.js";
 import type { ParticipanteMeta } from "./metas-store.js";
 import { indicadorDoTipo, type DadosTipoMeta, type RegraPremio } from "./tipos-meta.js";
 
@@ -31,7 +31,6 @@ export interface ResultadoParticipante {
 type TipoApurado = Pick<DadosTipoMeta, "indicador" | "semAlvo" | "regra"> & { lista?: DadosTipoMeta["lista"] };
 
 const nomeCurto = (indicador: Indicador) => indicador.nome.replace(/ %$/, "");
-const comUnidade = (indicador: Indicador, valor: number) => `${formatarValor(indicador, valor)}${indicador.unidade === "quantidade" ? " un." : ""}`;
 /** Diferença entre dois valores do Indicador: em pontos percentuais quando o Indicador é %. */
 export const diferenca = (indicador: Indicador, valor: number) =>
   indicador.unidade === "percentual" ? `${formatarValor({ ...indicador, unidade: "quantidade" }, valor)} p.p.` : formatarValor(indicador, valor);
