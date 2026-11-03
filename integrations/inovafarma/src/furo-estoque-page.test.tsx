@@ -77,6 +77,22 @@ describe("Furo de Estoque", () => {
     expect(screen.getByRole("button", { name: "Justificar Ajuste 100" })).toBeTruthy();
   });
 
+  it("a busca encontra o Ajuste pelo produto, por nome ou código de barras", async () => {
+    const item = { produtoId: "p1", nome: "DIPIRONA 500MG", codigoBarra: "7891234567890", quantidade: 1, precoCusto: 9, totalCusto: 9 };
+    ajustes = [{ ...ajuste(100, -9, null), itens: [item] }, ajuste(300, -5, null)];
+    renderizar();
+    expect(await screen.findByRole("button", { name: "Justificar Ajuste 300" }, { timeout: 5000 })).toBeTruthy();
+    const busca = screen.getByPlaceholderText("Buscar Ajuste, Colaborador, Motivo ou produto");
+
+    fireEvent.change(busca, { target: { value: "dipirona" } });
+    expect(await screen.findByRole("button", { name: "Justificar Ajuste 100" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Justificar Ajuste 300" })).toBeNull();
+
+    fireEvent.change(busca, { target: { value: "7891234567890" } });
+    expect(await screen.findByRole("button", { name: "Justificar Ajuste 100" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Justificar Ajuste 300" })).toBeNull();
+  });
+
   it("só mostra a aba Motivos com a Permission geral", async () => {
     contexto = { ...contexto, podeGerenciarMotivos: true };
     renderizar();

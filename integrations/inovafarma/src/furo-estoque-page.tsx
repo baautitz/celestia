@@ -302,7 +302,7 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
                 ? "Nenhum Ajuste justificado neste período."
                 : "Nenhum Ajuste de Estoque neste período."
         }
-        search={{ placeholder: "Buscar Ajuste, Colaborador ou Motivo" }}
+        search={{ placeholder: "Buscar Ajuste, Colaborador, Motivo ou produto", fields: (a) => a.itens.flatMap((i) => [i.nome, i.codigoBarra ?? ""]) }}
         totals={(linhas) => ({ quantidade: linhas.reduce((n, a) => n + a.quantidade, 0), totalCusto: somaCusto(linhas) })}
         renderExpanded={(a) => (
           <Stack gap="field">
