@@ -88,7 +88,8 @@ export function AvaliacaoWindow({ periodoId, lojas, avaliacao }: Props) {
       .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar os Colaboradores.")));
   }, [avaliacao, feedback]);
 
-  const lojasDoEscolhido = lojas.filter((l) => escolhido?.lojas.includes(l.codigo));
+  // Sem Loja confirmada no Vínculo, quem vê todas as Lojas escolhe qualquer uma.
+  const lojasDoEscolhido = escolhido?.lojas.length === 0 ? lojas : lojas.filter((l) => escolhido?.lojas.includes(l.codigo));
 
   const escolher = (colaborador: ColaboradorOpcao | null) => {
     setEscolhido(colaborador);

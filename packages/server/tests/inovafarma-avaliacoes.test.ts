@@ -18,7 +18,7 @@ const COLABORADORES = [
   // Vinculada à Loja 2: o Vínculo vale mais que a Loja do ERP.
   { codigoColaborador: 8, nome: "BIA LIMA", ativo: true, codigoEmpresa: 1 },
   { codigoColaborador: 9, nome: "GIL GERENTE", ativo: true, codigoEmpresa: 1 },
-  // Sem Vínculo: valem a Loja do ERP e o estado no ERP.
+  // Sem Vínculo: a Loja do ERP não vale, só aparecem em Todas as Lojas.
   { codigoColaborador: 10, nome: "CAIO SEM VINCULO", ativo: true, codigoEmpresa: 1 },
   { codigoColaborador: 11, nome: "DORA INATIVA", ativo: false, codigoEmpresa: 1 },
 ];
@@ -97,7 +97,6 @@ describe("Avaliações do Colaborador", () => {
     const colaboradores = await (await req("gil", "GET", "/api/m/inovafarma/avaliacoes/colaboradores")).json();
     expect(colaboradores).toEqual([
       { codigoColaborador: 7, nome: "ANA SOUZA", usuario: "ana", lojas: [1] },
-      { codigoColaborador: 10, nome: "CAIO SEM VINCULO", usuario: null, lojas: [1] },
     ]);
 
     expect((await lancar("rh", { codigoColaborador: 8, codigoLoja: 2 })).status).toBe(201);
@@ -105,11 +104,12 @@ describe("Avaliações do Colaborador", () => {
     expect(await (await req("rh", "GET", `/api/m/inovafarma/avaliacoes?periodoId=${abril.id}`)).json()).toMatchObject([{ nomeColaborador: "BIA LIMA", lancadoPor: "rh" }]);
   });
 
-  it("avalia Colaborador ativo sem Vínculo pela Loja do ERP, mas não o inativo sem Vínculo", async () => {
-    const { lancar } = await boot();
-    expect(await (await lancar("gil", { codigoColaborador: 10 })).json()).toMatchObject({ nomeColaborador: "CAIO SEM VINCULO", codigoLoja: 1 });
-    expect((await lancar("gil", { codigoColaborador: 11 })).status).toBe(403);
-    expect((await lancar("gil", { codigoColaborador: 10, codigoLoja: 2 })).status).toBe(403);
+  it("Colaborador sem Loja confirmada só aparece e é avaliado em Todas as Lojas, na Loja escolhida", async () => {
+    const { req, lancar } = await boot();
+    expect((await lancar("gil", { codigoColaborador: 10 })).status).toBe(403);
+    const todos = (await (await req("rh", "GET", "/api/m/inovafarma/avaliacoes/colaboradores")).json()) as { codigoColaborador: number; lojas: number[] }[];
+    expect(todos).toEqual(expect.arrayContaining([expect.objectContaining({ codigoColaborador: 10, lojas: [] }), expect.objectContaining({ codigoColaborador: 11, lojas: [] })]));
+    expect(await (await lancar("rh", { codigoColaborador: 10, codigoLoja: 2 })).json()).toMatchObject({ nomeColaborador: "CAIO SEM VINCULO", codigoLoja: 2 });
   });
 
   it("edita descrição e valor com controle de version e não altera em período fechado", async () => {

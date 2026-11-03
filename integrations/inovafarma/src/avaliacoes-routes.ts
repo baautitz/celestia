@@ -87,7 +87,7 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
 
   /**
    * Colaboradores que o Usuário pode avaliar, menos ele mesmo: os de uma Loja que ele gerencia.
-   * A Loja vem do Vínculo salvo; sem Vínculo (ou sem Loja nele), da Loja do Colaborador ativo no ERP.
+   * As Lojas são só as confirmadas no Vínculo; quem não tem Loja confirmada só aparece para quem vê todas as Lojas.
    * `null` quando o ERP não responde.
    */
   const elegiveis = async (c: AuthContext, lojas: number[] | undefined): Promise<Elegivel[] | null> => {
@@ -105,12 +105,12 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
       const codigoColaborador = Number(r.codigoColaborador);
       const nome = (r.nome || "").trim();
       const salvo = salvos.get(codigoColaborador);
-      return { codigoColaborador, nome, lojas: salvo ? salvo.lojas : r.ativo ? [Number(r.codigoEmpresa)] : [] };
+      return { codigoColaborador, nome, lojas: salvo ? salvo.lojas : [] };
     });
     const noErp = new Set(doErp.map((e) => e.codigoColaborador));
     const sumidos = [...salvos.values()].filter((v) => !noErp.has(v.codigoColaborador)).map((v) => ({ codigoColaborador: v.codigoColaborador, nome: "", lojas: v.lojas }));
     const proprio = (await vinculoDe(c))?.codigoColaborador;
-    return [...doErp, ...sumidos].filter((e) => e.codigoColaborador !== proprio && e.lojas.some((l) => gerencia(lojas, l)));
+    return [...doErp, ...sumidos].filter((e) => e.codigoColaborador !== proprio && (lojas === undefined || e.lojas.some((l) => gerencia(lojas, l))));
   };
 
   const registrar = (c: AuthContext, action: string, alvo: Avaliacao, periodo: PeriodoResumo | undefined, anterior: AtributosAvaliacao["anterior"] = null) => {
@@ -210,7 +210,8 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     const lista = await elegiveis(c, lojas);
     if (lista === null) return c.json({ error: ERP_INDISPONIVEL }, 503);
     const colaborador = lista.find((v) => v.codigoColaborador === codigoColaborador);
-    if (!colaborador?.lojas.includes(codigoLoja)) return c.json({ error: "O Colaborador não é da Loja informada." }, 403);
+    // Sem Loja confirmada, quem vê todas as Lojas escolhe a Loja da Avaliação.
+    if (!colaborador || (colaborador.lojas.length > 0 && !colaborador.lojas.includes(codigoLoja))) return c.json({ error: "O Colaborador não é da Loja informada." }, 403);
 
     const periodo = (await periods.list()).find((p) => p.id === periodoId);
     if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
