@@ -3,15 +3,15 @@ import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { colaboradorDasMinhasMetas, visualizacoesDasMetas } from "./acompanhamento-routes.js";
 import { LOJAS_SQL } from "./colaboradores-routes.js";
-import { formatarValor, indicadorPorId } from "./indicadores.js";
+import { formatarValor } from "./indicadores.js";
 import { METAS_ACTIONS } from "./metas-audit.js";
-import { ator, ERP_INDISPONIVEL, META_DESATUALIZADA, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, type AuthContext } from "./metas-comum.js";
+import { ator, ERP_INDISPONIVEL, META_DESATUALIZADA, PERIODO_NAO_ENCONTRADO, type AuthContext } from "./metas-comum.js";
 import type { DadosMeta, Meta, MetaStore } from "./metas-store.js";
 import { alvoInicial, novaMeta, pendentes, usaAlvo, type ColaboradorAtivo } from "./montar-metas.js";
 import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
-import { BUSCA_SQL, MIN_BUSCA, type LinhaBusca, type PeriodsService } from "./pre-vencidos-routes.js";
-import { descreverPremio, RegraPremio, type TipoMeta } from "./tipos-meta.js";
+import type { PeriodsService } from "./pre-vencidos-routes.js";
+import { descreverPremio, indicadorDoTipo, RegraPremio, type TipoMeta } from "./tipos-meta.js";
 import { regraDoParticipante } from "./apuracao.js";
 import type { ErpQueryClient } from "./server.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
@@ -38,7 +38,6 @@ const META_REPETIDA = "O Período já tem uma Meta deste Tipo de Meta.";
 const NAO_PARTICIPANTE = "O Colaborador não é Participante da Meta.";
 const NAO_ATIVO = "O Colaborador não está ativo no ERP.";
 const SEM_ALVO = "Esta Meta não tem Alvo por Participante.";
-const SO_LISTA = "Só a Meta de Lista de Produtos tem produtos.";
 
 const Version = z.number().int().min(1);
 const PremioParticipante = z.object({ version: Version, premio: RegraPremio.nullable() });
@@ -46,14 +45,6 @@ const Alvo = z.number({ invalid_type_error: "Informe o Alvo." }).positive("O Alv
 const Nova = z.object({ periodoId: z.string().min(1), tipoId: z.string().min(1) });
 const Participacao = z.object({ version: Version, participa: z.boolean(), alvo: Alvo.nullable().optional() });
 const Definicao = z.object({ version: Version, codigos: z.array(z.number().int()).min(1, "Escolha ao menos um Participante."), alvo: Alvo });
-const Quantidade = z.number().int().min(1, "A quantidade deve ser maior que zero.").max(1_000_000);
-const Lista = z.object({
-  version: Version,
-  produtos: z.array(z.object({ produtoId: z.string().min(1), nome: z.string().trim().min(1), quantidade: Quantidade })).max(500),
-  minimo: z.number().int().min(1, "O mínimo de produtos deve ser maior que zero.").nullable(),
-  ajustes: z.array(z.object({ codigoColaborador: z.number().int(), produtoId: z.string().min(1), quantidade: Quantidade })).max(10_000),
-});
-
 const rotuloAlvo = (tipo: TipoMeta) => (tipo.indicador === "avaliacoes" ? "o valor inicial" : "o Alvo");
 
 export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipos, metas, vinculos, periods, audit }: MetasRoutesDeps): void {
@@ -99,20 +90,6 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       ...(acompanhamento.lojas ? [{ id: "loja" as const, lojas: acompanhamento.lojas.map((codigo) => lojas.find((l) => l.codigo === codigo) ?? { codigo, nome: "" }) }] : []),
     ];
     return c.json({ abas, periodos: abas.montar || abas.acompanhamento || abas.minhas ? await periodosOrdenados() : [], lojas: abas.montar ? lojas : [], visualizacoes });
-  });
-
-  routes.get("/metas/produtos", auth, async (c: AuthContext) => {
-    if (!pode(c)) return c.json({ error: manage.deniedMessage }, 403);
-    const q = (c.req.query("q") ?? "").trim();
-    if (q.length < MIN_BUSCA) return c.json([]);
-    const client = erpClient();
-    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
-    try {
-      const rows = await client.query<LinhaBusca>(BUSCA_SQL, { busca: q, buscaLike: `%${q.replace(/[\\%_[]/g, "\\$&")}%` });
-      return c.json(rows.map((r) => ({ produtoId: r.produtoId, nome: (r.nome || "").trim(), codigoBarra: r.codigoBarra })));
-    } catch {
-      return c.json({ error: ERP_INDISPONIVEL }, 503);
-    }
   });
 
   // Montar Metas de um Período; no primeiro acesso a um Período aberto sem Metas, faz a cópia automática.
@@ -177,7 +154,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
   const aindaAberto = async (meta: Meta) => (await periods.list()).find((p) => p.id === meta.periodoId)?.status === "open";
 
   const gravar = async (meta: Meta, dados: Partial<DadosMeta>, version: number) =>
-    metas.atualizar(meta.id, { participantes: meta.participantes, excluidos: meta.excluidos, lista: meta.lista, ...dados }, version);
+    metas.atualizar(meta.id, { participantes: meta.participantes, excluidos: meta.excluidos, ...dados }, version);
 
   // Marca ou desmarca um Colaborador como Participante, ou altera o Alvo dele.
   routes.put("/metas/:id/participantes/:codigo", auth, async (c: AuthContext) => {
@@ -191,7 +168,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     if (meta.version !== version) return c.json(META_DESATUALIZADA, 409);
     const codigo = Number(c.req.param("codigo"));
     const atual = meta.participantes.find((p) => p.codigoColaborador === codigo);
-    const indicador = indicadorPorId(tipo.indicador);
+    const indicador = indicadorDoTipo(tipo);
     const texto = (n: number | null) => (n === null ? "pendente" : formatarValor(indicador, n));
     const base = { tipo: tipo.nome, periodo: periodo.name, rotulo: rotuloAlvo(tipo) };
 
@@ -202,7 +179,6 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       dados = {
         participantes: meta.participantes.filter((p) => p !== atual),
         excluidos: [...meta.excluidos.filter((e) => e !== codigo), codigo],
-        lista: meta.lista && { ...meta.lista, ajustes: meta.lista.ajustes.filter((a) => a.codigoColaborador !== codigo) },
       };
       atributos = { ...base, colaborador: atual.nome, mudanca: "excluido", alvo: texto(atual.alvo), anterior: null };
     } else if (atual) {
@@ -241,7 +217,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       tipo: tipo.nome,
       periodo: periodo.name,
       rotulo: rotuloAlvo(tipo),
-      alvo: formatarValor(indicadorPorId(tipo.indicador), parsed.data.alvo),
+      alvo: formatarValor(indicadorDoTipo(tipo), parsed.data.alvo),
       participantes: marcados.map((p) => p.nome),
     });
     return c.json(comTipo(atualizada, tipo));
@@ -286,34 +262,5 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     if (!(await metas.excluir(meta.id, version))) return c.json(META_DESATUALIZADA, 409);
     await registrar(c, METAS_ACTIONS.excluir, meta, { tipo: tipo.nome, periodo: periodo.name, participantes: meta.participantes.length });
     return c.body(null, 204);
-  });
-
-  // Lista de Produtos: a quantidade de cada produto, os ajustes por Colaborador e o mínimo de produtos batidos.
-  routes.put("/metas/:id/lista", auth, async (c: AuthContext) => {
-    const alteracao = await alteravel(c);
-    if ("recusa" in alteracao) return alteracao.recusa;
-    const { meta, tipo, periodo } = alteracao;
-    if (tipo.indicador !== "lista-produtos") return c.json({ error: SO_LISTA }, 400);
-    const parsed = Lista.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
-    const { version, produtos, minimo, ajustes } = parsed.data;
-    const ids = new Set(produtos.map((p) => p.produtoId));
-    if (ids.size !== produtos.length) return c.json({ error: "Um produto aparece duas vezes na Lista de Produtos." }, 400);
-    if (minimo !== null && minimo > produtos.length) return c.json({ error: "O mínimo de produtos não pode passar do número de produtos da Lista." }, 400);
-    const participantes = new Set(meta.participantes.map((p) => p.codigoColaborador));
-    if (!ajustes.every((a) => ids.has(a.produtoId) && participantes.has(a.codigoColaborador))) return c.json({ error: "Um ajuste é de um produto ou Colaborador fora da Meta." }, 400);
-    // O ajuste igual à quantidade do produto não é ajuste.
-    const lista = { produtos, minimo, ajustes: ajustes.filter((a) => produtos.find((p) => p.produtoId === a.produtoId)?.quantidade !== a.quantidade) };
-    if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
-    const atualizada = await gravar(meta, { lista }, version);
-    if (!atualizada) return c.json(META_DESATUALIZADA, 409);
-    await registrar(c, METAS_ACTIONS.lista, atualizada, {
-      tipo: tipo.nome,
-      periodo: periodo.name,
-      produtos: produtos.map((p) => `${p.nome} (${p.quantidade})`),
-      minimo: minimo === null ? "todos" : String(minimo),
-      ajustes: lista.ajustes.length,
-    });
-    return c.json(comTipo(atualizada, tipo));
   });
 }

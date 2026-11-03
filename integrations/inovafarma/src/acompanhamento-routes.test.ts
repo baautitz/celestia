@@ -22,6 +22,7 @@ const cmv: DadosTipoMeta = {
   semAlvo: false,
   regra: { tipo: "fixo", valorCentavos: 10000 },
   alvoPadrao: 30,
+  lista: null,
   ativo: true,
 };
 const avaliacoes: DadosTipoMeta = { ...cmv, nome: "Avaliações", indicador: "avaliacoes", regra: { tipo: "saldo" }, alvoPadrao: 20000 };
@@ -50,6 +51,9 @@ async function boot() {
   ]);
   // Unidades vendidas de cada produto da Lista, por Colaborador.
   const produtos: { codigoColaborador: number; produtoId: string; quantidade: number }[] = [];
+  // Total vendido da Lista de Produtos por Colaborador (unidades e valor líquido em R$), e os parâmetros de cada consulta.
+  const listaVendas: { codigoColaborador: number; quantidade: number; valor: number }[] = [];
+  const consultasLista: Record<string, unknown>[] = [];
   const handlers = new Map<string, (p: object) => unknown>();
   const antes = new Map<string, (ctx: { payload: object; cancel(reason: string): void }) => unknown>();
   const registros: { action: string; actor: { id: string; name: string }; attributes: unknown }[] = [];
@@ -71,7 +75,7 @@ async function boot() {
     { codigoColaborador: 2, nome: "BIA", alvo: 30 },
   ];
   const tipoCmv = await tipos.criar(cmv);
-  await metas.criar({ periodoId: "maio", tipoId: tipoCmv.id, participantes, excluidos: [], lista: null });
+  await metas.criar({ periodoId: "maio", tipoId: tipoCmv.id, participantes, excluidos: [] });
   registerAcompanhamentoRoutes({
     routes: app,
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
@@ -83,8 +87,12 @@ async function boot() {
     audit: { declareAction: () => undefined, record: async (r) => registros.push(r) },
     users: { list: async () => [{ id: "gil", fullname: "Gil Gestor", username: "gil", status: "active" }] },
     erpClient: () => ({
-      query: async <T,>(sql: string) => {
+      query: async <T,>(sql: string, params: Record<string, unknown> = {}) => {
         if (erp.falha) throw new Error("ERP fora do ar");
+        if (!sql.includes("totalCmv") && sql.includes(" AS valor")) {
+          consultasLista.push(params);
+          return listaVendas as T[];
+        }
         return (sql.includes("totalCmv")
           ? [...vendas].map(([codigoColaborador, v]) => ({ codigoColaborador, ...v }))
           : sql.includes("produtoId")
@@ -115,7 +123,7 @@ async function boot() {
   /** Fecha o Período sem passar pelo Plugin: como um fechamento anterior à Apuração gravada. */
   const fecharSemPlugin = () => (periodos[0] = { ...periodos[0], status: "closed" });
   const minhas = (who: string, periodoId = "maio") => app.request(`/metas/minhas?periodoId=${periodoId}`, { headers: { "x-user": who } });
-  return { res, ver, vendas, produtos, minhas, evento, fecharSemPlugin, erp, registros, tipos, metas, avaliacoesStore, participantes };
+  return { res, ver, vendas, produtos, listaVendas, consultasLista, minhas, evento, fecharSemPlugin, erp, registros, tipos, metas, avaliacoesStore, participantes };
 }
 
 describe("Acompanhamento das Metas", () => {
@@ -146,7 +154,7 @@ describe("Acompanhamento das Metas", () => {
   it("desconta as Avaliações do Período do valor inicial", async () => {
     const { ver, tipos, metas, avaliacoesStore, participantes } = await boot();
     const tipo = await tipos.criar(avaliacoes);
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: participantes.map((p) => ({ ...p, alvo: 20000 })), excluidos: [], lista: null });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: participantes.map((p) => ({ ...p, alvo: 20000 })), excluidos: [] });
     await avaliacoesStore.criar({ periodoId: "maio", codigoColaborador: 2, nomeColaborador: "BIA", codigoLoja: 20, descricao: "Atraso", valorCentavos: 5000, criadoPor: "x" });
     const { linhas } = await ver("gil");
     expect(linhas.filter((l) => l.tipo.nome === "Avaliações").map((l) => [l.nome, l.premioCentavos])).toEqual([
@@ -208,6 +216,76 @@ describe("Acompanhamento das Metas", () => {
   });
 });
 
+describe("Acompanhamento da Lista de Produtos", () => {
+  const DIPIRONA = "8F14E45F-CEEA-467F-A8F4-5E1D2C3B4A01";
+  const entradas = [
+    { tipo: "laboratorio" as const, id: "414", nome: "EMS" },
+    { tipo: "produto" as const, id: DIPIRONA, nome: "Dipirona 1g" },
+    { tipo: "grupo" as const, id: "44", nome: "Vitaminas" },
+  ];
+  const lista: DadosTipoMeta = { ...cmv, nome: "Mix", indicador: "lista-produtos", alvoPadrao: 10, lista: { unidade: "unidades", entradas } };
+
+  it("em unidades, o Realizado é o vendido da Lista, com Atingimento e Prêmio como num Indicador comum", async () => {
+    const { ver, tipos, metas, listaVendas, consultasLista } = await boot();
+    const tipo = await tipos.criar(lista);
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 10 }, { codigoColaborador: 2, nome: "BIA", alvo: 10 }], excluidos: [] });
+    listaVendas.push({ codigoColaborador: 1, quantidade: 12, valor: 300 }, { codigoColaborador: 2, quantidade: 4, valor: 100 });
+    const linhas = (await ver("gil")).linhas.filter((l) => l.tipo.nome === "Mix");
+    expect(linhas.map((l) => [l.nome, l.atingimento, l.premioCentavos, l.resultado])).toEqual([
+      ["ANA", 120, 10000, "Lista de Produtos 12 de 10 un. · ✓ 2 acima"],
+      ["BIA", 40, 0, "Lista de Produtos 4 de 10 un. · faltam 6"],
+    ]);
+    // Uma consulta por Tipo de Meta, com todas as entradas da Lista.
+    expect(consultasLista).toHaveLength(1);
+    expect(consultasLista[0]).toMatchObject({ produto0: DIPIRONA, grupo0: 44, laboratorio0: 414 });
+  });
+
+  it("em R$, soma o valor vendido; Sem Alvo, paga o Percentual sobre a própria Lista", async () => {
+    const { ver, tipos, metas, listaVendas } = await boot();
+    const tipo = await tipos.criar({
+      ...lista,
+      nome: "Comissão Mix",
+      semAlvo: true,
+      exibicao: "progresso",
+      alvoPadrao: null,
+      lista: { unidade: "reais", entradas },
+      regra: { tipo: "percentual", percentual: 2, indicadorBase: "lista-produtos", soSeAtingir: false },
+    });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: null }], excluidos: [] });
+    listaVendas.push({ codigoColaborador: 1, quantidade: 12, valor: 1500.5 });
+    const [linha] = (await ver("gil")).linhas.filter((l) => l.tipo.nome === "Comissão Mix");
+    expect([linha!.atingimento, linha!.premioCentavos, linha!.resultado]).toEqual([null, 3001, "Lista de Produtos R$ 1.500,50"]);
+  });
+
+  it("em R$ com Alvo, o Atingimento é sobre o valor vendido", async () => {
+    const { ver, tipos, metas, listaVendas } = await boot();
+    const tipo = await tipos.criar({ ...lista, nome: "Mix R$", alvoPadrao: 100000, lista: { unidade: "reais", entradas } });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 100000 }], excluidos: [] });
+    listaVendas.push({ codigoColaborador: 1, quantidade: 3, valor: 1500 });
+    const [linha] = (await ver("gil")).linhas.filter((l) => l.tipo.nome === "Mix R$");
+    expect([linha!.atingimento, linha!.premioCentavos]).toEqual([150, 10000]);
+  });
+
+  it("em Minhas Metas, mostra o Progresso e as entradas da Lista por tipo e depois por nome", async () => {
+    const { minhas, tipos, metas, listaVendas } = await boot();
+    const tipo = await tipos.criar({ ...lista, exibicao: "progresso" });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 10 }], excluidos: [] });
+    listaVendas.push({ codigoColaborador: 1, quantidade: 7, valor: 70 });
+    const metasAna = ((await (await minhas("ana")).json()) as { metas: Record<string, unknown>[] }).metas;
+    expect(metasAna.find((m) => m.nome === "Mix")).toEqual({
+      metaId: expect.any(String),
+      nome: "Mix",
+      exibicao: "progresso",
+      atingida: false,
+      realizado: "7",
+      alvo: "10",
+      falta: "3",
+      lista: ["Produto Dipirona 1g", "Grupo Vitaminas", "Laboratório EMS"],
+      premioCentavos: 0,
+    });
+  });
+});
+
 describe("Minhas Metas", () => {
   const minhasDe = async (res: Response) => ((await res.json()) as { metas: Record<string, unknown>[] }).metas;
 
@@ -221,25 +299,15 @@ describe("Minhas Metas", () => {
   it("no Progresso, mostra Realizado, Alvo e quanto falta, sem o Prêmio que o Tipo esconde", async () => {
     const { minhas, tipos, metas } = await boot();
     const tipo = await tipos.criar({ ...cmv, nome: "Ticket", indicador: "ticket-medio", exibicao: "progresso", mostrarPremio: false, alvoPadrao: 12000 });
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 12000 }], excluidos: [], lista: null });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 12000 }], excluidos: [] });
     const ticket = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Ticket");
     expect(ticket).toEqual({ metaId: expect.any(String), nome: "Ticket", exibicao: "progresso", atingida: false, realizado: "R$ 100,00", alvo: "R$ 120,00", falta: "R$ 20,00" });
-  });
-
-  it("na Contagem, mostra os produtos batidos da Lista", async () => {
-    const { minhas, tipos, metas, produtos } = await boot();
-    const tipo = await tipos.criar({ ...cmv, nome: "Lista", indicador: "lista-produtos", exibicao: "contagem", mostrarPremio: false, alvoPadrao: null });
-    const lista = { produtos: [{ produtoId: "a", nome: "A", quantidade: 2 }, { produtoId: "b", nome: "B", quantidade: 2 }], ajustes: [], minimo: null };
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: null }], excluidos: [], lista });
-    produtos.push({ codigoColaborador: 1, produtoId: "a", quantidade: 3 });
-    const contagem = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Lista");
-    expect(contagem).toEqual({ metaId: expect.any(String), nome: "Lista", exibicao: "contagem", atingida: false, contagem: "1/2 produtos" });
   });
 
   it("mostra o Saldo da Meta de Avaliações como Prêmio quando o Tipo permite", async () => {
     const { minhas, tipos, metas, avaliacoesStore } = await boot();
     const tipo = await tipos.criar({ ...avaliacoes, exibicao: "progresso" });
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [], lista: null });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [] });
     await avaliacoesStore.criar({ periodoId: "maio", codigoColaborador: 1, nomeColaborador: "ANA", codigoLoja: 10, descricao: "Atraso", valorCentavos: 5000, criadoPor: "x" });
     const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
     expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true, realizado: "R$ 150,00", alvo: "R$ 200,00", premioCentavos: 15000 });
@@ -248,7 +316,7 @@ describe("Minhas Metas", () => {
   it("esconde o Saldo da Meta de Avaliações quando o Tipo não mostra o Prêmio", async () => {
     const { minhas, tipos, metas } = await boot();
     const tipo = await tipos.criar({ ...avaliacoes, exibicao: "progresso", mostrarPremio: false });
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [], lista: null });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [] });
     const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
     expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true });
   });

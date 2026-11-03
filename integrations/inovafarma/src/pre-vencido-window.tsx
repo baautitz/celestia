@@ -13,9 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
+import { MIN_BUSCA_PRODUTO } from "./produtos-erp";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
-const MIN_BUSCA = 3;
 const ESPERA_BUSCA_MS = 300;
 
 export interface Lancamento {
@@ -85,7 +85,7 @@ export function LancamentoWindow({ periodoId, lojas, lancamento }: Props) {
   useEffect(() => {
     const termo = busca.trim();
     if (escolhido && busca === rotulo(escolhido)) return;
-    if (termo.length < MIN_BUSCA) {
+    if (termo.length < MIN_BUSCA_PRODUTO) {
       setProdutos([]);
       return;
     }
@@ -191,7 +191,7 @@ export function LancamentoWindow({ periodoId, lojas, lancamento }: Props) {
                       >
                         <ComboboxInput id="pre-vencido-busca" autoFocus showTrigger={false} placeholder="Código de barras ou nome" />
                         <ComboboxContent>
-                          <ComboboxEmpty>{busca.trim().length < MIN_BUSCA ? `Digite ao menos ${MIN_BUSCA} caracteres.` : "Nenhum produto encontrado."}</ComboboxEmpty>
+                          <ComboboxEmpty>{busca.trim().length < MIN_BUSCA_PRODUTO ? `Digite ao menos ${MIN_BUSCA_PRODUTO} caracteres.` : "Nenhum produto encontrado."}</ComboboxEmpty>
                           <ComboboxList>
                             {(p: ProdutoOpcao) => (
                               <ComboboxItem key={p.id} value={p}>

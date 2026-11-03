@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListChecks, Pencil, Plus, Save, Target, Trash2, MoreHorizontal } from "lucide-react";
+import { Pencil, Plus, Save, Target, Trash2, MoreHorizontal } from "lucide-react";
 import {
   Alert,
   AlertDescription,
@@ -33,13 +33,14 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { AlvoInput, rotuloAlvo } from "./alvo-input";
 import { DefinirAlvoWindow } from "./alvo-padrao-window";
 import { formatarValor, indicadorPorId, type IndicadorId } from "./indicadores";
-import { ListaProdutosWindow } from "./lista-produtos-window";
+import { indicadorDoTipo } from "./tipos-meta";
 import { regraDoParticipante } from "./apuracao";
 import {
   PremioParticipanteWindow,
   resumoPremio,
 } from "./premio-participante-window";
 import type { Meta } from "./metas-store";
+import { usaAlvo } from "./montar-metas";
 import type { TipoMetaComPremio } from "./tipo-meta-window";
 
 const BASE = "/api/m/inovafarma/metas";
@@ -114,8 +115,6 @@ const colunasMetas: DataTableColumn<MetaVista>[] = [
   },
 ];
 
-const usaAlvo = (t: TipoMetaComPremio) =>
-  !t.semAlvo && t.indicador !== "lista-produtos";
 const periodoInicial = (periodos: PeriodoMetas[]) =>
   (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
 
@@ -300,7 +299,7 @@ function SalvarAlteracoesWindow({ alteracoes }: { alteracoes: Alteracao[] }) {
 }
 
 /** Uma Meta do Período: os Colaboradores com o checkbox de Participante e o Alvo de cada um. */
-/** Ações de uma Meta na coluna Ações: Definir Alvo (ou valor inicial) e Lista de Produtos. */
+/** Ações de uma Meta na coluna Ações: Definir Alvo (ou valor inicial) e remover. */
 function AcoesDaMeta({
   meta,
   somenteLeitura,
@@ -321,7 +320,7 @@ function AcoesDaMeta({
       description: `Meta "${meta.tipo.nome}" · ${periodoNome}`,
       content: () => (
         <DefinirAlvoWindow
-          indicadorId={meta.tipo.indicador}
+          indicador={indicadorDoTipo(meta.tipo)}
           meta={{
             id: meta.periodoId,
             name: periodoNome,
@@ -330,18 +329,6 @@ function AcoesDaMeta({
             participantes: meta.participantes,
           }}
         />
-      ),
-    });
-    if (r.status === "confirmed") recarregar();
-  };
-
-  const abrirLista = async () => {
-    const r = await windows.open<Meta>({
-      surface: "sheet",
-      title: "Lista de Produtos",
-      description: `Meta "${meta.tipo.nome}" · ${periodoNome}`,
-      content: () => (
-        <ListaProdutosWindow meta={meta} somenteLeitura={somenteLeitura} />
       ),
     });
     if (r.status === "confirmed") recarregar();
@@ -374,12 +361,6 @@ function AcoesDaMeta({
         <Button variant="outline" onClick={() => void definirAlvo()}>
           <Target />
           {avaliacoes ? "Definir valor inicial" : "Definir Alvo"}
-        </Button>
-      )}
-      {meta.tipo.indicador === "lista-produtos" && (
-        <Button variant="outline" onClick={() => void abrirLista()}>
-          <ListChecks />
-          Lista de Produtos
         </Button>
       )}
       {!somenteLeitura && (
@@ -444,7 +425,7 @@ function MetaDoPeriodo({
     });
     if (r.status === "confirmed") atualizar(r.value);
   };
-  const indicador = indicadorPorId(meta.tipo.indicador);
+  const indicador = indicadorDoTipo(meta.tipo);
   const avaliacoes = meta.tipo.indicador === "avaliacoes";
   const estado = (c: Colaborador) =>
     participacao(meta, edicoes, c.codigoColaborador);
@@ -646,7 +627,7 @@ export function MontarMetas({
 
   const alteracoes: Alteracao[] = (montagem?.metas ?? []).flatMap((meta) =>
     Object.entries(edicoes[meta.id] ?? {}).map(([codigo, edicao]) => {
-      const indicador = indicadorPorId(meta.tipo.indicador);
+      const indicador = indicadorDoTipo(meta.tipo);
       const valor = (e: Edicao, novo: boolean) =>
         !e.participa
           ? "Não participa"

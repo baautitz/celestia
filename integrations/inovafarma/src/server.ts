@@ -125,7 +125,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       });
       const tiposMeta = db ? new PostgresTipoMetaStore(db) : new MemoryTipoMetaStore();
       const metas = db ? new PostgresMetaStore(db) : new MemoryMetaStore();
-      registerTiposMetaRoutes({ routes, permissions, auth, store: tiposMeta, metas, periods, audit });
+      registerTiposMetaRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: tiposMeta, metas, periods, audit });
       registerMetasRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], tipos: tiposMeta, metas, vinculos: store, periods, audit });
       registerAcompanhamentoRoutes({
         routes,

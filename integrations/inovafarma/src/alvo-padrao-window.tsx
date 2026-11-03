@@ -9,7 +9,8 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
 import { AlvoInput, rotuloAlvo } from "./alvo-input";
-import { formatarValor, indicadorPorId, type IndicadorId } from "./indicadores";
+import { formatarValor, type Indicador } from "./indicadores";
+import { indicadorDoTipo } from "./tipos-meta";
 import { BASE, type TipoMetaComPremio } from "./tipo-meta-window";
 
 interface Participante {
@@ -27,7 +28,8 @@ export interface PeriodoComMeta {
 }
 
 interface EscolhaProps {
-  indicadorId: IndicadorId;
+  /** O Indicador com a unidade do Tipo de Meta (`indicadorDoTipo`). */
+  indicador: Indicador;
   periodos: PeriodoComMeta[];
   /** O valor a aplicar; sem ele, a janela mostra o campo do valor (Definir Alvo). */
   valorFixo?: number | null;
@@ -40,14 +42,13 @@ interface EscolhaProps {
  * Escolha dos Participantes que recebem o mesmo valor (Alvo ou valor inicial), por Período, com Selecionar todos e Desmarcar todos.
  * Começa com todos marcados; resolve quando aplica. Usada no Alterar o Alvo padrão e no Definir Alvo de uma Meta.
  */
-function EscolhaDeParticipantes({ indicadorId, periodos, valorFixo, aplicar, vazio }: EscolhaProps) {
+function EscolhaDeParticipantes({ indicador, periodos, valorFixo, aplicar, vazio }: EscolhaProps) {
   const { resolve } = useWindow<true>();
   const { feedback } = useUi();
   const [periodoId, setPeriodoId] = useState(periodos[0]?.id ?? "");
   const [marcados, setMarcados] = useState<Record<string, number[]>>(() => Object.fromEntries(periodos.map((p) => [p.id, p.participantes.map((x) => x.codigoColaborador)])));
   const [digitado, setDigitado] = useState<number | null>(null);
   const [enviando, setEnviando] = useState(false);
-  const indicador = indicadorPorId(indicadorId);
   const valor = (n: number | null | undefined) => (n == null ? "pendente" : formatarValor(indicador, n));
   const periodo = periodos.find((p) => p.id === periodoId);
   const doPeriodo = marcados[periodoId] ?? [];
@@ -57,7 +58,7 @@ function EscolhaDeParticipantes({ indicadorId, periodos, valorFixo, aplicar, vaz
   const confirmar = async () => {
     const alvo = comCampo ? digitado : valorFixo;
     if (alvo == null) {
-      feedback.notifyError(new Error(`Informe ${indicadorId === "avaliacoes" ? "o valor inicial" : "o Alvo"}.`));
+      feedback.notifyError(new Error(`Informe ${indicador.id === "avaliacoes" ? "o valor inicial" : "o Alvo"}.`));
       return;
     }
     if (!Object.values(marcados).some((c) => c.length > 0)) {
@@ -91,7 +92,7 @@ function EscolhaDeParticipantes({ indicadorId, periodos, valorFixo, aplicar, vaz
             </Stack>
           ) : (
             <Text variant="small" tone="muted">
-              Novo {indicadorId === "avaliacoes" ? "valor inicial" : "Alvo padrão"}: {valor(valorFixo)}. Escolha a quem aplicar.
+              Novo {indicador.id === "avaliacoes" ? "valor inicial" : "Alvo padrão"}: {valor(valorFixo)}. Escolha a quem aplicar.
             </Text>
           )}
           {periodos.length > 1 && (
@@ -167,7 +168,7 @@ export function AlvoPadraoWindow({ tipo }: { tipo: TipoMetaComPremio }) {
   if (!periodos) return null;
   return (
     <EscolhaDeParticipantes
-      indicadorId={tipo.indicador}
+      indicador={indicadorDoTipo(tipo)}
       periodos={periodos}
       valorFixo={tipo.alvoPadrao}
       vazio={{
@@ -184,12 +185,12 @@ export function AlvoPadraoWindow({ tipo }: { tipo: TipoMetaComPremio }) {
 }
 
 /** Janela "Definir Alvo" (ou "Definir valor inicial") de uma Meta do Período: o mesmo valor para os Participantes marcados. */
-export function DefinirAlvoWindow({ indicadorId, meta }: { indicadorId: IndicadorId; meta: PeriodoComMeta }) {
+export function DefinirAlvoWindow({ indicador, meta }: { indicador: Indicador; meta: PeriodoComMeta }) {
   const { feedback } = useUi();
-  const avaliacoes = indicadorId === "avaliacoes";
+  const avaliacoes = indicador.id === "avaliacoes";
   return (
     <EscolhaDeParticipantes
-      indicadorId={indicadorId}
+      indicador={indicador}
       periodos={[meta]}
       vazio={{ titulo: "Nenhum Participante", texto: "Marque os Colaboradores que participam da Meta antes de definir o valor." }}
       aplicar={async (marcados, alvo) => {

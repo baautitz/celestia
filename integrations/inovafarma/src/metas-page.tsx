@@ -14,7 +14,7 @@ import { AlvoPadraoWindow } from "./alvo-padrao-window";
 import { formatarValor, indicadorPorId } from "./indicadores";
 import { MinhasMetas } from "./minhas-metas-tab";
 import { MontarMetas, type LojaMetas, type PeriodoMetas } from "./montar-metas-tab";
-import { EXIBICAO_LABEL } from "./tipos-meta";
+import { EXIBICAO_LABEL, indicadorDoTipo } from "./tipos-meta";
 import { BASE, TipoMetaWindow, type TipoMetaComPremio, type TipoMetaSalvo } from "./tipo-meta-window";
 
 /** Aba Tipos de Meta: cadastro dos Tipos com a prévia do Prêmio. */
@@ -42,9 +42,10 @@ function TiposDeMeta() {
 
   const abrir = async (tipo?: TipoMetaComPremio) => {
     const resultado = await windows.open<TipoMetaSalvo>({
-      surface: "sheet",
+      surface: "dialog",
+      size: "full",
       title: tipo ? "Alterar Tipo de Meta" : "Novo Tipo de Meta",
-      description: "Indicador, Exibição e regra do Prêmio. Uma alteração afeta só os Períodos abertos.",
+      description: "O que a Meta mede e como paga o Prêmio. Uma alteração afeta só os Períodos abertos.",
       content: () => <TipoMetaWindow tipo={tipo} />,
     });
     void carregar();
@@ -62,11 +63,11 @@ function TiposDeMeta() {
     { key: "nome", label: "Tipo de Meta", value: (t) => t.nome, searchable: true, sortable: true, mobileRole: "primary" },
     { key: "indicador", label: "Indicador", value: (t) => indicadorPorId(t.indicador).nome, searchable: true, sortable: true },
     { key: "exibicao", label: "Exibição", value: (t) => EXIBICAO_LABEL[t.exibicao] },
-    { key: "premio", label: "Prêmio", value: (t) => t.premio, searchable: true },
+    { key: "premio", label: "Prêmio", value: (t) => t.premio, searchable: true, cellClassName: "min-w-64 whitespace-normal" },
     {
       key: "alvoPadrao",
       label: "Alvo padrão",
-      value: (t) => (t.semAlvo ? "Sem Alvo" : t.alvoPadrao === null ? "" : formatarValor(indicadorPorId(t.indicador), t.alvoPadrao)),
+      value: (t) => (t.semAlvo ? "Sem Alvo" : t.alvoPadrao === null ? "" : formatarValor(indicadorDoTipo(t), t.alvoPadrao)),
     },
     {
       key: "ativo",

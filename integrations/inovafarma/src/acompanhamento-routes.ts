@@ -6,6 +6,7 @@ import type { ApuracaoPeriodo, ApuracaoStore, MetaApurada } from "./apuracao-sto
 import type { AvaliacaoStore } from "./avaliacoes-store.js";
 import { desempenhoSql } from "./desempenho-vendas.js";
 import type { IndicadorId } from "./indicadores.js";
+import { listaSql, type LinhaLista } from "./lista-produtos.js";
 import { ator, ERP_INDISPONIVEL, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, vinculoDoUsuario, type AuthContext } from "./metas-comum.js";
 import type { MetaStore } from "./metas-store.js";
 import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
@@ -15,7 +16,7 @@ import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { conferir } from "./pre-vencidos-conferencia.js";
 import { LOTE_PRODUTOS, vendasSql, type LinhaVenda, type PeriodoResumo, type PeriodsService } from "./pre-vencidos-routes.js";
 import type { PreVencidoStore } from "./pre-vencidos-store.js";
-import { descreverPremio } from "./tipos-meta.js";
+import { descreverPremio, temLista, type TipoMeta } from "./tipos-meta.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
 import type { ErpQueryClient } from "./server.js";
 import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
@@ -104,19 +105,6 @@ const INDICADORES_DE_VENDAS: Partial<Record<IndicadorId, (r: LinhaDesempenho) =>
   };
 })();
 
-const listaSql = (produtos: number) => `
-  SELECT vp.CodigoFuncionario AS codigoColaborador, CONVERT(varchar(36), p.rowguid) AS produtoId, CAST(SUM(vp.Quantidade) AS float) AS quantidade
-  FROM Venda v
-  JOIN Venda_Produto vp ON vp.CodigoVenda = v.CodigoVenda
-  JOIN Produto p ON p.CodigoProduto = vp.CodigoProduto
-  WHERE v.Eliminado = 0
-    AND v.CodigoAbertura IS NOT NULL
-    AND v.DataVenda >= @dataInicio
-    AND v.DataVenda <= @dataFim
-    AND CONVERT(varchar(36), p.rowguid) IN (${Array.from({ length: produtos }, (_, i) => `@g${i}`).join(", ")})
-  GROUP BY vp.CodigoFuncionario, p.rowguid
-`;
-
 export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): void {
   const { routes, permissions, auth, events, erpClient, tipos, metas, vinculos, avaliacoes, preVencidos, apuracoes, periods, audit, users } = deps;
   const montagem = metasDoPeriodo({ erpClient, tipos, metas, audit });
@@ -124,17 +112,25 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
   const lojaRef = INOVAFARMA_PERMISSIONS.ref("metas-loja:view");
   const individualRef = INOVAFARMA_PERMISSIONS.ref("metas-individual:view");
 
-  /** O que o ERP e o Plugin têm de cada Colaborador no Período, somado em todas as Lojas. Lança se o ERP falhar. */
-  async function dadosDoPeriodo(periodo: PeriodoResumo, indicadores: Set<IndicadorId>, produtosLista: string[]): Promise<Map<number, DadosColaborador>> {
+  /**
+   * O que o ERP e o Plugin têm de cada Colaborador no Período, somado em todas as Lojas, e o vendido da Lista de cada
+   * Tipo de Meta de Lista (por Tipo, por Colaborador). Lança se o ERP falhar.
+   */
+  async function dadosDoPeriodo(
+    periodo: PeriodoResumo,
+    indicadores: Set<IndicadorId>,
+    tiposLista: TipoMeta[],
+  ): Promise<{ dados: Map<number, DadosColaborador>; listas: Map<string, Map<number, number>> }> {
     const dados = new Map<number, DadosColaborador>();
+    const listas = new Map<string, Map<number, number>>();
     const de = (codigo: number) => {
-      const d = dados.get(codigo) ?? { indicadores: {}, produtos: {}, descontosCentavos: 0 };
+      const d = dados.get(codigo) ?? { indicadores: {}, descontosCentavos: 0 };
       dados.set(codigo, d);
       return d;
     };
     const datas = { dataInicio: `${periodo.startDate} 00:00:00`, dataFim: `${periodo.endDate} 23:59:59` };
     const deVendas = [...indicadores].filter((i) => INDICADORES_DE_VENDAS[i]);
-    const precisaErp = deVendas.length > 0 || produtosLista.length > 0 || indicadores.has("pre-vencidos");
+    const precisaErp = deVendas.length > 0 || tiposLista.length > 0 || indicadores.has("pre-vencidos");
     const conectado = erpClient();
     if (precisaErp && !conectado) throw new Error(SEM_CONEXAO);
     const client = {
@@ -150,13 +146,14 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
         for (const i of deVendas) d.indicadores[i] = INDICADORES_DE_VENDAS[i]?.(r);
       }
     }
-    if (produtosLista.length > 0) {
-      const params: Record<string, unknown> = { ...datas };
-      produtosLista.forEach((id, n) => (params[`g${n}`] = id));
-      for (const r of await client.query<LinhaVenda>(listaSql(produtosLista.length), params)) {
-        const d = de(Number(r.codigoColaborador));
-        d.produtos[r.produtoId] = (d.produtos[r.produtoId] ?? 0) + (Number(r.quantidade) || 0);
-      }
+    for (const tipo of tiposLista) {
+      if (!tipo.lista) continue;
+      const { sql, params } = listaSql(tipo.lista);
+      const porColaborador = new Map<number, number>();
+      // Em unidades, a quantidade vendida; em R$, o valor líquido em centavos, como os demais Indicadores em R$.
+      const realizado = (r: LinhaLista) => (tipo.lista?.unidade === "reais" ? Math.round((Number(r.valor) || 0) * 100) : Number(r.quantidade) || 0);
+      for (const r of await client.query<LinhaLista>(sql, { ...datas, ...params })) porColaborador.set(Number(r.codigoColaborador), realizado(r));
+      listas.set(tipo.id, porColaborador);
     }
     if (indicadores.has("pre-vencidos")) {
       // Só o vendido que a Conferência confirma, limitado ao que foi lançado.
@@ -177,7 +174,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     if (indicadores.has("avaliacoes")) {
       for (const a of await avaliacoes.listar({ periodoId: periodo.id })) de(a.codigoColaborador).descontosCentavos += a.valorCentavos;
     }
-    return dados;
+    return { dados, listas };
   }
 
   /** Apuração ao vivo das Metas do Período, com os Tipos de Meta de agora. Lança se o ERP falhar. */
@@ -185,14 +182,28 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     // Na Apuração do fechamento o Período ainda está aberto: só os Tipos ativos contam.
     const doPeriodo = metasVisiveis(await metas.listar([periodo.id]), await tipos.listar(), { status: "open" });
     const indicadores = new Set<IndicadorId>(doPeriodo.flatMap(({ tipo }) => (tipo.regra.tipo === "percentual" ? [tipo.indicador, tipo.regra.indicadorBase] : [tipo.indicador])));
-    const produtosLista = [...new Set(doPeriodo.flatMap(({ meta }) => meta.lista?.produtos.map((p) => p.produtoId) ?? []))];
-    const dados = await dadosDoPeriodo(periodo, indicadores, produtosLista);
-    const vazio: DadosColaborador = { indicadores: {}, produtos: {}, descontosCentavos: 0 };
+    const tiposLista = doPeriodo.flatMap(({ tipo }) => (temLista(tipo.indicador) ? [tipo] : []));
+    const { dados, listas } = await dadosDoPeriodo(periodo, indicadores, tiposLista);
+    const vazio: DadosColaborador = { indicadores: {}, descontosCentavos: 0 };
+    /** O vendido da Lista entra como o Realizado comum do Indicador Lista de Produtos daquele Tipo de Meta. */
+    const dadosDe = (tipo: TipoMeta, codigo: number): DadosColaborador => {
+      const d = dados.get(codigo) ?? vazio;
+      return temLista(tipo.indicador) ? { ...d, indicadores: { ...d.indicadores, "lista-produtos": listas.get(tipo.id)?.get(codigo) ?? 0 } } : d;
+    };
     const apuradas: MetaApurada[] = doPeriodo
       .map(({ meta, tipo }) => ({
         metaId: meta.id,
-        tipo: { id: tipo.id, nome: tipo.nome, indicador: tipo.indicador, exibicao: tipo.exibicao, mostrarPremio: tipo.mostrarPremio, semAlvo: tipo.semAlvo, premio: descreverPremio(tipo) },
-        participantes: meta.participantes.map((p) => apurarParticipante(tipo, meta.lista, p, dados.get(p.codigoColaborador) ?? vazio)),
+        tipo: {
+          id: tipo.id,
+          nome: tipo.nome,
+          indicador: tipo.indicador,
+          exibicao: tipo.exibicao,
+          mostrarPremio: tipo.mostrarPremio,
+          semAlvo: tipo.semAlvo,
+          lista: tipo.lista,
+          premio: descreverPremio(tipo),
+        },
+        participantes: meta.participantes.map((p) => apurarParticipante(tipo, p, dadosDe(tipo, p.codigoColaborador))),
       }))
       .sort((a, b) => a.tipo.nome.localeCompare(b.tipo.nome));
     return { periodoId: periodo.id, metas: apuradas, apuradoEm: new Date().toISOString() };

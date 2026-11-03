@@ -18,6 +18,8 @@ const Valores = z.object({
   mostrarPremio: z.boolean(),
   premio: z.string(),
   alvoPadrao: z.string().nullable(),
+  /** Lista de Produtos com a unidade e as entradas em texto; ausente nas entradas anteriores à Lista no Tipo de Meta. */
+  lista: z.string().nullable().optional(),
   ativo: z.boolean(),
 });
 const AtributosTipo = Valores.extend({ anterior: Valores.nullable() });
@@ -39,13 +41,14 @@ function mudancas(a: AtributosTipo): string {
   if (antes.mostrarPremio !== a.mostrarPremio) partes.push(a.mostrarPremio ? "passou a mostrar o Prêmio ao Colaborador" : "deixou de mostrar o Prêmio ao Colaborador");
   if (antes.premio !== a.premio) partes.push(`Prêmio de "${antes.premio}" para "${a.premio}"`);
   if (antes.alvoPadrao !== a.alvoPadrao) partes.push(`Alvo padrão de ${antes.alvoPadrao ?? "nenhum"} para ${a.alvoPadrao ?? "nenhum"}`);
+  if ((antes.lista ?? null) !== (a.lista ?? null)) partes.push(`Lista de Produtos para ${a.lista ?? "nenhuma"}`);
   if (antes.ativo !== a.ativo) partes.push(a.ativo ? "reativou" : "desativou");
   return partes.length ? partes.join("; ") : "sem mudanças";
 }
 
 export function declareTiposMetaAudit(audit: AuditService): void {
   const tipo = { plugin: TIPOS_META_PLUGIN, schemaVersion: 1, schema: AtributosTipo };
-  audit.declareAction({ ...tipo, action: TIPOS_META_ACTIONS.criar, summary: (a) => `Cadastrou o Tipo de Meta ${nomeTipo(a)}: ${a.premio}.` });
+  audit.declareAction({ ...tipo, action: TIPOS_META_ACTIONS.criar, summary: (a) => `Cadastrou o Tipo de Meta ${nomeTipo(a)}: ${a.premio}${a.lista ? `; Lista de Produtos ${a.lista}` : ""}.` });
   audit.declareAction({ ...tipo, action: TIPOS_META_ACTIONS.editar, summary: (a) => `Alterou o Tipo de Meta ${nomeTipo(a)}: ${mudancas(a)}.` });
   audit.declareAction({
     plugin: TIPOS_META_PLUGIN,

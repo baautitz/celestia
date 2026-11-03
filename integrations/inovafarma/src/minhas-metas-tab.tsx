@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Label } from "@platform/ui/components/label";
-import { Stack } from "@platform/ui/components/layout";
+import { Stack, Text } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
@@ -18,14 +18,32 @@ interface MinhasMetas {
 /** O resultado na Exibição do Tipo de Meta; o servidor já cortou o que o Colaborador não vê. */
 function resultado(m: MinhaMeta): string {
   if (m.aviso) return m.aviso;
-  if (m.contagem) return m.contagem;
   if (m.realizado === undefined) return "";
   const alvo = m.alvo ? ` de ${m.alvo}` : "";
   return `Realizado ${m.realizado}${alvo}${m.falta ? ` · faltam ${m.falta}` : ""}`;
 }
 
 const colunas: DataTableColumn<MinhaMeta>[] = [
-  { key: "meta", label: "Meta", value: (m) => m.nome, searchable: true, sortable: true, nowrap: true, mobileRole: "primary" },
+  {
+    key: "meta",
+    label: "Meta",
+    value: (m) => m.nome,
+    searchable: true,
+    sortable: true,
+    mobileRole: "primary",
+    // Na Lista de Produtos, o Colaborador vê o que conta.
+    render: (m) =>
+      m.lista ? (
+        <Stack gap="tight">
+          <Text weight="medium">{m.nome}</Text>
+          <Text variant="caption" tone="muted">
+            {m.lista.join(" · ")}
+          </Text>
+        </Stack>
+      ) : (
+        m.nome
+      ),
+  },
   { key: "resultado", label: "Resultado", value: resultado },
   {
     key: "situacao",

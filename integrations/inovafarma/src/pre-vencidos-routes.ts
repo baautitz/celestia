@@ -4,6 +4,7 @@ import type { ModuleContext } from "@platform/core/module";
 import { COLABORADORES_SQL, LOJAS_SQL } from "./colaboradores-routes.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { conferir } from "./pre-vencidos-conferencia.js";
+import { buscaProdutosSql, MIN_BUSCA_PRODUTO, parametrosBusca } from "./produtos-erp.js";
 import { PRE_VENCIDO_ACTIONS, PRE_VENCIDO_PLUGIN, PRE_VENCIDO_TARGET, type AtributosPreVencido } from "./pre-vencidos-audit.js";
 import type { LancamentoPreVencido, PreVencidoStore } from "./pre-vencidos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
@@ -44,8 +45,6 @@ const SEM_VINCULO = "Seu Usuário não está vinculado a um Colaborador. Peça o
 const VERSAO_DESATUALIZADA = { error: "O lançamento foi alterado por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
 const PERIODO_NAO_ENCONTRADO = "Período de Fechamento não encontrado.";
 const PERIODO_FECHADO = "O Período de Fechamento está fechado: não é possível lançar, alterar nem excluir.";
-export const MIN_BUSCA = 3;
-const LIMITE_BUSCA = 30;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const Validade = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe a validade como mês e ano (AAAA-MM).");
@@ -59,18 +58,6 @@ const PRODUTO_SQL = `
          LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra
   FROM Produto p
   WHERE p.Eliminado = 0 AND CONVERT(varchar(36), p.rowguid) = @produtoId
-`;
-
-export const BUSCA_SQL = `
-  SELECT TOP ${LIMITE_BUSCA} CONVERT(varchar(36), p.rowguid) AS produtoId, LTRIM(RTRIM(p.NomeProduto)) AS nome,
-         CASE WHEN p.CodigoBarra = @busca OR EXISTS (SELECT 1 FROM Produto_CodigoBarra b WHERE b.CodigoProduto = p.CodigoProduto AND b.CodigoBarra = @busca)
-              THEN @busca ELSE p.CodigoBarra END AS codigoBarra
-  FROM Produto p
-  WHERE p.Eliminado = 0
-    AND (p.CodigoBarra = @busca
-         OR EXISTS (SELECT 1 FROM Produto_CodigoBarra b WHERE b.CodigoProduto = p.CodigoProduto AND b.CodigoBarra = @busca)
-         OR p.NomeProduto LIKE @buscaLike ESCAPE '\\')
-  ORDER BY p.NomeProduto
 `;
 
 type LinhaProduto = { codigoProduto: number; produtoId: string; nome: string | null; codigoBarra: string | null };
@@ -167,11 +154,11 @@ export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient
   routes.get("/pre-vencidos/produtos", auth, async (c: AuthContext) => {
     if (!pode(c, lancar)) return c.json({ error: lancar.deniedMessage }, 403);
     const q = (c.req.query("q") ?? "").trim();
-    if (q.length < MIN_BUSCA) return c.json([]);
+    if (q.length < MIN_BUSCA_PRODUTO) return c.json([]);
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
     try {
-      const rows = await client.query<LinhaBusca>(BUSCA_SQL, { busca: q, buscaLike: `%${q.replace(/[\\%_[]/g, "\\$&")}%` });
+      const rows = await client.query<LinhaBusca>(buscaProdutosSql({ somenteAtivos: false }), parametrosBusca(q));
       return c.json(rows.map((r) => ({ id: r.produtoId, nome: (r.nome || "").trim(), codigoBarra: r.codigoBarra })));
     } catch {
       return c.json({ error: ERP_INDISPONIVEL }, 503);
