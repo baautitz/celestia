@@ -59,6 +59,44 @@ describe.each([
     expect(screen.queryByText("Detalhe de Alfa")).toBeNull();
   });
 
+  it("buscar com tudo recolhido expande as linhas encontradas e limpar a busca recolhe", async () => {
+    setViewport(width);
+    render(
+      <DataTable
+        columns={[{ ...columns[0]!, searchable: true }]}
+        rows={[...rows, { id: "2", name: "Beta" }]}
+        getRowId={(r) => r.id}
+        search={{}}
+        renderExpanded={(r) => <span>Detalhe de {r.name}</span>}
+      />,
+    );
+    const busca = await screen.findByPlaceholderText("Buscar...");
+    fireEvent.change(busca, { target: { value: "alf" } });
+    expect(await screen.findByText("Detalhe de Alfa")).toBeTruthy();
+    expect(screen.queryByText("Beta")).toBeNull();
+
+    fireEvent.change(busca, { target: { value: "" } });
+    expect(await screen.findByText("Beta")).toBeTruthy();
+    expect(screen.queryByText("Detalhe de Alfa")).toBeNull();
+  });
+
+  it("buscar com uma linha já expandida não expande as outras", async () => {
+    setViewport(width);
+    render(
+      <DataTable
+        columns={[{ ...columns[0]!, searchable: true }]}
+        rows={[...rows, { id: "2", name: "Beta" }]}
+        getRowId={(r) => r.id}
+        search={{}}
+        renderExpanded={(r) => <span>Detalhe de {r.name}</span>}
+      />,
+    );
+    await userEvent.click((await screen.findAllByRole("button", { name: "Expandir linha" }))[0]!);
+    fireEvent.change(screen.getByPlaceholderText("Buscar..."), { target: { value: "a" } });
+    expect(screen.getByText("Detalhe de Alfa")).toBeTruthy();
+    expect(screen.queryByText("Detalhe de Beta")).toBeNull();
+  });
+
   it("é acessível por teclado (Enter e Espaço)", async () => {
     setViewport(width);
     renderTable();

@@ -467,7 +467,9 @@ export function DataTable<TRow>({
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(
     new Set(),
   );
-  const isExpanded = (id: string) => expandedIds.has(id) !== defaultExpanded;
+  // Buscar com tudo recolhido expande as linhas encontradas; limpar a busca recolhe de novo.
+  const [expandedBySearch, setExpandedBySearch] = useState(false);
+  const isExpanded = (id: string) => expandedIds.has(id) !== (defaultExpanded || expandedBySearch);
   const [printing, setPrinting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const nested = useContext(NestedTableContext);
@@ -687,8 +689,8 @@ export function DataTable<TRow>({
   const toggleAll = () =>
     setExpandedIds((prev) => {
       const next = new Set(prev);
-      // Alternada = diferente de `defaultExpanded`.
-      const toggled = !allExpanded !== defaultExpanded;
+      // Alternada = diferente do padrão (`defaultExpanded` ou expandida pela busca).
+      const toggled = !allExpanded !== (defaultExpanded || expandedBySearch);
       for (const row of visible) {
         if (toggled) next.add(getRowId(row));
         else next.delete(getRowId(row));
@@ -948,6 +950,13 @@ export function DataTable<TRow>({
                     placeholder={search.placeholder ?? "Buscar..."}
                     value={query}
                     onChange={(e) => {
+                      const searching = e.target.value.trim() !== "";
+                      if (renderExpanded && !defaultExpanded && searching !== expandedBySearch) {
+                        if (!searching || rows.every((row) => !isExpanded(getRowId(row)))) {
+                          setExpandedBySearch(searching);
+                          setExpandedIds(new Set());
+                        }
+                      }
                       setQuery(e.target.value);
                       setClientPage(1);
                       onSearchChange?.(e.target.value);
