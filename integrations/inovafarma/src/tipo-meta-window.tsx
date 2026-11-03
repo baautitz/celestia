@@ -148,7 +148,7 @@ function iniciais(tipo?: TipoMeta): Valores {
     indicador,
     semAlvo: tipo?.semAlvo ?? false,
     exibicao: tipo?.exibicao ?? "atingida",
-    mostrarPremio: tipo?.mostrarPremio ?? true,
+    mostrarPremio: tipo?.mostrarPremio ?? false,
     regraTipo: r?.tipo ?? "fixo",
     valor: r && (r.tipo === "fixo" || r.tipo === "proporcional") ? r.valorCentavos / 100 : 0,
     gatilho: r?.tipo === "proporcional" && r.gatilho !== null ? String(r.gatilho) : "",
