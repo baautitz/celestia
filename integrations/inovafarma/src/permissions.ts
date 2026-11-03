@@ -47,6 +47,11 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite incluir, editar e excluir Itens de Pré-vencido no Estoque das Lojas do Colaborador vinculado ao Usuário.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para gerir o Estoque de Pré-vencidos.",
   },
+  "pre-vencidos-baixas:manage": {
+    label: "Pré-vencidos: Gerir as Baixas",
+    description: "Permite ver as Baixas de Pré-vencido das Lojas do Colaborador vinculado ao Usuário, por Colaborador e por venda.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir as Baixas de Pré-vencidos.",
+  },
   "avaliacoes-individual:view": {
     label: "Avaliações: Visualização Individual",
     description: "Permite ver as Avaliações recebidas pelo Colaborador vinculado ao Usuário.",

@@ -4,6 +4,7 @@ import type { ModuleContext } from "@platform/core/module";
 import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { PRODUTO_SQL, type LinhaProduto } from "./produtos-erp.js";
+import { baixasDaLoja } from "./baixas-da-loja.js";
 import { ITEM_PRE_VENCIDO_ACTIONS, ITEM_PRE_VENCIDO_PLUGIN, ITEM_PRE_VENCIDO_TARGET, type AtributosItemPreVencido } from "./estoque-pre-vencidos-audit.js";
 import type { EstoquePreVencidoStore, ItemPreVencido } from "./estoque-pre-vencidos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
@@ -25,10 +26,10 @@ export interface EstoquePreVencidosRoutesDeps {
 
 type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
 
-const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
-const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
-const SEM_VINCULO = "Seu Usuário não está vinculado a um Colaborador. Peça o vínculo a quem administra os Colaboradores.";
-const LOJA_FORA_DO_VINCULO = "A Loja informada não está vinculada ao seu Colaborador.";
+export const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
+export const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
+export const SEM_VINCULO = "Seu Usuário não está vinculado a um Colaborador. Peça o vínculo a quem administra os Colaboradores.";
+export const LOJA_FORA_DO_VINCULO = "A Loja informada não está vinculada ao seu Colaborador.";
 const VERSAO_DESATUALIZADA = { error: "O Item foi alterado por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -100,7 +101,18 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, er
     const recusa = await recusaLoja(c, codigoLoja);
     if (recusa) return recusa;
     const itens = await store.listar(codigoLoja);
-    return c.json(itens.map((i) => ({ ...itemPublico(i), restante: i.quantidade })));
+    if (itens.length === 0) return c.json([]);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    let restante: Record<string, number>;
+    try {
+      ({ restante } = await baixasDaLoja(client, codigoLoja, itens));
+    } catch {
+      return c.json({ error: ERP_INDISPONIVEL }, 503);
+    }
+    // Os zerados saem da lista por padrão; `zerados=true` os traz de volta.
+    const zerados = c.req.query("zerados") === "true";
+    return c.json(itens.map((i) => ({ ...itemPublico(i), restante: restante[i.id] ?? i.quantidade })).filter((i) => zerados || i.restante > 0));
   });
 
   routes.post("/pre-vencidos/estoque/itens", auth, async (c: AuthContext) => {
@@ -132,6 +144,7 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, er
       incluidoEm: new Date().toISOString(),
     });
     await registrar(c, ITEM_PRE_VENCIDO_ACTIONS.criar, criado);
+    // Recém-incluído: nenhuma venda o gastou ainda.
     return c.json({ ...itemPublico(criado), restante: criado.quantidade }, 201);
   });
 
@@ -153,7 +166,8 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, er
     const atualizado = await store.atualizar(alvo.item.id, valores, version);
     if (!atualizado) return c.json(VERSAO_DESATUALIZADA, 409);
     await registrar(c, ITEM_PRE_VENCIDO_ACTIONS.editar, atualizado, { quantidade: alvo.item.quantidade, validade: alvo.item.validade });
-    return c.json({ ...itemPublico(atualizado), restante: atualizado.quantidade });
+    // Sem `restante`: depende das vendas do ERP; a tela recarrega a lista.
+    return c.json(itemPublico(atualizado));
   });
 
   routes.delete("/pre-vencidos/estoque/itens/:id", auth, async (c: AuthContext) => {

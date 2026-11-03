@@ -124,6 +124,7 @@
           "inovafarma:pre-vencidos-lancamento:manage",
           "inovafarma:pre-vencidos-conferencia:view",
           "inovafarma:pre-vencidos-estoque:manage",
+          "inovafarma:pre-vencidos-baixas:manage",
           "inovafarma:avaliacoes-individual:view",
           "inovafarma:avaliacoes-loja:manage",
           "inovafarma:avaliacoes-geral:manage",
@@ -322,6 +323,7 @@
         "inovafarma:pre-vencidos-lancamento:manage",
         "inovafarma:pre-vencidos-conferencia:view",
         "inovafarma:pre-vencidos-estoque:manage",
+        "inovafarma:pre-vencidos-baixas:manage",
         "inovafarma:avaliacoes-individual:view",
         "inovafarma:avaliacoes-loja:manage",
         "inovafarma:avaliacoes-geral:manage",
@@ -548,6 +550,13 @@
             "label": "Pré-vencidos: Gerir o Estoque",
             "description": "Permite incluir, editar e excluir Itens de Pré-vencido no Estoque das Lojas do Colaborador vinculado ao Usuário.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir o Estoque de Pré-vencidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pre-vencidos-baixas:manage",
+            "label": "Pré-vencidos: Gerir as Baixas",
+            "description": "Permite ver as Baixas de Pré-vencido das Lojas do Colaborador vinculado ao Usuário, por Colaborador e por venda.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir as Baixas de Pré-vencidos.",
             "module": "inovafarma"
           },
           {
@@ -837,6 +846,13 @@
             "label": "Pré-vencidos: Gerir o Estoque",
             "description": "Permite incluir, editar e excluir Itens de Pré-vencido no Estoque das Lojas do Colaborador vinculado ao Usuário.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir o Estoque de Pré-vencidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pre-vencidos-baixas:manage",
+            "label": "Pré-vencidos: Gerir as Baixas",
+            "description": "Permite ver as Baixas de Pré-vencido das Lojas do Colaborador vinculado ao Usuário, por Colaborador e por venda.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir as Baixas de Pré-vencidos.",
             "module": "inovafarma"
           },
           {

@@ -78,6 +78,7 @@ export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient
   const lancar = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-lancamento:manage");
   const conferirPerm = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-conferencia:view");
   const estoque = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-estoque:manage");
+  const baixas = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-baixas:manage");
   const pode = (c: AuthContext, ref: { key: string }) => permissions.has(c.get("user")?.permissions, ref.key);
 
   const vinculoDe = async (c: AuthContext) => {
@@ -125,11 +126,12 @@ export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient
     const podeLancar = pode(c, lancar);
     const podeConferir = pode(c, conferirPerm);
     const podeEstoque = pode(c, estoque);
-    if (!podeLancar && !podeConferir && !podeEstoque) return c.json({ error: estoque.deniedMessage }, 403);
+    const podeBaixas = pode(c, baixas);
+    if (!podeLancar && !podeConferir && !podeEstoque && !podeBaixas) return c.json({ error: estoque.deniedMessage }, 403);
 
     const todos = (await periods.list()).sort((a, b) => b.startDate.localeCompare(a.startDate));
     const client = erpClient();
-    const vinculo = podeLancar || podeEstoque ? await vinculoDe(c) : null;
+    const vinculo = podeLancar || podeEstoque || podeBaixas ? await vinculoDe(c) : null;
     const lojasErp = await lojasDoErp(client);
     const nomeLoja = (codigo: number) => lojasErp.find((l) => l.codigo === codigo)?.nome ?? "";
 
@@ -137,13 +139,15 @@ export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient
       podeLancar,
       podeConferir,
       podeEstoque,
+      podeBaixas,
       vinculado: vinculo !== null,
       // Todos os períodos: o Colaborador consulta os fechados, mas só lança, edita e exclui nos abertos.
       periodos: todos,
       lojas: (vinculo?.lojas ?? []).map((codigo) => ({ codigo, nome: nomeLoja(codigo) })),
       ...(podeConferir ? { periodosConferencia: todos, lojasConferencia: lojasErp } : {}),
-      // Estoque: só as Lojas do Vínculo.
+      // Estoque e Baixas: só as Lojas do Vínculo.
       ...(podeEstoque ? { lojasEstoque: (vinculo?.lojas ?? []).map((codigo) => ({ codigo, nome: nomeLoja(codigo) })) } : {}),
+      ...(podeBaixas ? { lojasBaixas: (vinculo?.lojas ?? []).map((codigo) => ({ codigo, nome: nomeLoja(codigo) })) } : {}),
     });
   });
 

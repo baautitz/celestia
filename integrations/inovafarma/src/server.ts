@@ -32,6 +32,7 @@ import { MemoryPreVencidoStore } from "./pre-vencidos-store.js";
 import { PostgresPreVencidoStore } from "./postgres-pre-vencido-store.js";
 import { declareItemPreVencidoAudit } from "./estoque-pre-vencidos-audit.js";
 import { registerEstoquePreVencidosRoutes } from "./estoque-pre-vencidos-routes.js";
+import { registerBaixasPreVencidosRoutes } from "./baixas-pre-vencidos-routes.js";
 import { MemoryEstoquePreVencidoStore } from "./estoque-pre-vencidos-store.js";
 import { PostgresEstoquePreVencidoStore } from "./postgres-estoque-pre-vencidos-store.js";
 import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
@@ -106,15 +107,9 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         periods,
         audit,
       });
-      registerEstoquePreVencidosRoutes({
-        routes,
-        permissions,
-        auth,
-        erpClient: () => erpClients[erpId],
-        store: db ? new PostgresEstoquePreVencidoStore(db) : new MemoryEstoquePreVencidoStore(),
-        vinculos: store,
-        audit,
-      });
+      const estoquePreVencidos = db ? new PostgresEstoquePreVencidoStore(db) : new MemoryEstoquePreVencidoStore();
+      registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: estoquePreVencidos, vinculos: store, audit });
+      registerBaixasPreVencidosRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: estoquePreVencidos, vinculos: store, periods });
       registerAvaliacoesRoutes({
         routes,
         permissions,
