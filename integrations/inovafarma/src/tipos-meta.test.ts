@@ -9,6 +9,7 @@ const tipo = (dados: Partial<DadosTipoMeta>): DadosTipoMeta => ({
   semAlvo: false,
   regra: { tipo: "fixo", valorCentavos: 10000 },
   alvoPadrao: null,
+  lista: null,
   ativo: true,
   ...dados,
 });
@@ -67,8 +68,10 @@ describe("regras do Tipo de Meta", () => {
     expect(problemaDoTipo(tipo({ indicador: "foco-qtd", regra: { tipo: "percentual", percentual: 1, indicadorBase: "foco-qtd", soSeAtingir: true } }))).toMatch(/R\$/);
   });
 
-  it("a Contagem é só da Lista de Produtos", () => {
-    expect(problemaDoTipo(tipo({ exibicao: "contagem" }))).toMatch(/Contagem/);
-    expect(problemaDoTipo(tipo({ indicador: "lista-produtos", exibicao: "contagem" }))).toBeNull();
+  it("a Lista é obrigatória no Indicador Lista de Produtos e proibida nos outros", () => {
+    const lista = { entradas: [{ tipo: "produto" as const, id: "P1", nome: "DIPIRONA" }], unidade: "unidades" as const };
+    expect(problemaDoTipo(tipo({ indicador: "lista-produtos" }))).toMatch(/entrada à Lista/);
+    expect(problemaDoTipo(tipo({ lista }))).toMatch(/Só o Indicador Lista de Produtos/);
+    expect(problemaDoTipo(tipo({ indicador: "lista-produtos", lista }))).toBeNull();
   });
 });

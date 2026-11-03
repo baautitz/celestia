@@ -17,6 +17,7 @@ const cmv = {
   semAlvo: false,
   regra: { tipo: "faixas", faixas: [{ atingimento: 100, valorCentavos: 10000 }] },
   alvoPadrao: 30,
+  lista: null,
   ativo: true,
 };
 
@@ -44,6 +45,7 @@ function boot() {
     routes: app,
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
     auth,
+    erpClient: () => undefined,
     store: new MemoryTipoMetaStore(),
     metas,
     periods: { list: async () => periodos },
@@ -95,8 +97,8 @@ describe("Tipos de Meta", () => {
       { codigoColaborador: 1, nome: "ANA", alvo: 28 },
       { codigoColaborador: 2, nome: "BIA", alvo: null },
     ];
-    const abril = (await metas.criar({ periodoId: "abril", tipoId: criado.id, participantes, excluidos: [], lista: null }))!;
-    await metas.criar({ periodoId: "marco", tipoId: criado.id, participantes, excluidos: [], lista: null });
+    const abril = (await metas.criar({ periodoId: "abril", tipoId: criado.id, participantes, excluidos: [] }))!;
+    await metas.criar({ periodoId: "marco", tipoId: criado.id, participantes, excluidos: [] });
 
     const aplicacao = (await (await req("gil", "GET", `/metas/tipos/${criado.id}/aplicacao`)).json()) as { periodos: { id: string; metaId: string; participantes: unknown[] }[] };
     expect(aplicacao.periodos.map((p) => [p.id, p.metaId, p.participantes.length])).toEqual([["abril", abril.id, 2]]);
@@ -116,7 +118,7 @@ describe("Alvo padrão com o Período fechando ao mesmo tempo", () => {
   it("não grava nem registra se o Período fecha durante a aplicação", async () => {
     const { req, metas, log, periodos } = boot();
     const criado = (await (await req("gil", "POST", "/metas/tipos", cmv)).json()) as Tipo;
-    const abril = await metas.criar({ periodoId: "abril", tipoId: criado.id, participantes: [{ codigoColaborador: 2, nome: "BIA", alvo: null }], excluidos: [], lista: null });
+    const abril = await metas.criar({ periodoId: "abril", tipoId: criado.id, participantes: [{ codigoColaborador: 2, nome: "BIA", alvo: null }], excluidos: [] });
     if (!abril) throw new Error("Meta não criada");
     // Outro gestor fecha o Período enquanto a aplicação confere a Meta.
     const ler = metas.meta.bind(metas);
@@ -136,8 +138,8 @@ describe("Alvo em várias Metas de uma vez", () => {
   it("grava todas ou nenhuma: uma Meta alterada por outra pessoa não deixa as outras alteradas", async () => {
     const metas = new MemoryMetaStore();
     const participantes = [{ codigoColaborador: 1, nome: "ANA", alvo: null }];
-    const abril = await metas.criar({ periodoId: "abril", tipoId: "t", participantes, excluidos: [], lista: null });
-    const maio = await metas.criar({ periodoId: "maio", tipoId: "t", participantes, excluidos: [], lista: null });
+    const abril = await metas.criar({ periodoId: "abril", tipoId: "t", participantes, excluidos: [] });
+    const maio = await metas.criar({ periodoId: "maio", tipoId: "t", participantes, excluidos: [] });
     if (!abril || !maio) throw new Error("Metas não criadas");
     const aplicacoes = (versaoMaio: number) => [
       { id: abril.id, codigos: [1], expectedVersion: abril.version },

@@ -3,9 +3,9 @@ export type Direcao = "maior" | "menor";
 
 /**
  * Unidade dos valores do Indicador (Realizado e Alvo): `percentual` em pontos (30 = 30%),
- * `reais` em centavos, `quantidade` em unidades e `produtos` em produtos batidos da Lista de Produtos.
+ * `reais` em centavos e `quantidade` em unidades.
  */
-export type Unidade = "percentual" | "reais" | "quantidade" | "produtos";
+export type Unidade = "percentual" | "reais" | "quantidade";
 
 export interface Indicador {
   id: string;
@@ -44,7 +44,7 @@ export const INDICADORES = [
   indicador("vendas-cadastro-qtd", "Qtd. de Vendas com Cadastro", "quantidade"),
   indicador("vendas-cadastro-percent", "% de Vendas com Cadastro", "percentual"),
   indicador("pre-vencidos", "Pré-vencidos vendidos", "quantidade"),
-  indicador("lista-produtos", "Lista de Produtos", "produtos"),
+  indicador("lista-produtos", "Lista de Produtos", "quantidade"),
   indicador("avaliacoes", "Avaliações (Saldo)", "reais"),
 ] as const satisfies readonly Indicador[];
 
@@ -83,8 +83,6 @@ export function formatarValor(indicador: Indicador, valor: number): string {
       return porcentagem(valor);
     case "reais":
       return reais(Math.round(valor));
-    case "produtos":
-      return `${numero(valor, 0)} produtos`;
     default:
       return numero(valor);
   }

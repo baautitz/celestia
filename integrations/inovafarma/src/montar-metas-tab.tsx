@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListChecks, Pencil, Plus, Save, Target, Trash2, MoreHorizontal } from "lucide-react";
+import { Pencil, Plus, Save, Target, Trash2, MoreHorizontal } from "lucide-react";
 import {
   Alert,
   AlertDescription,
@@ -33,7 +33,6 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { AlvoInput, rotuloAlvo } from "./alvo-input";
 import { DefinirAlvoWindow } from "./alvo-padrao-window";
 import { formatarValor, indicadorPorId, type IndicadorId } from "./indicadores";
-import { ListaProdutosWindow } from "./lista-produtos-window";
 import { regraDoParticipante } from "./apuracao";
 import {
   PremioParticipanteWindow,
@@ -114,8 +113,7 @@ const colunasMetas: DataTableColumn<MetaVista>[] = [
   },
 ];
 
-const usaAlvo = (t: TipoMetaComPremio) =>
-  !t.semAlvo && t.indicador !== "lista-produtos";
+const usaAlvo = (t: TipoMetaComPremio) => !t.semAlvo;
 const periodoInicial = (periodos: PeriodoMetas[]) =>
   (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
 
@@ -300,7 +298,7 @@ function SalvarAlteracoesWindow({ alteracoes }: { alteracoes: Alteracao[] }) {
 }
 
 /** Uma Meta do Período: os Colaboradores com o checkbox de Participante e o Alvo de cada um. */
-/** Ações de uma Meta na coluna Ações: Definir Alvo (ou valor inicial) e Lista de Produtos. */
+/** Ações de uma Meta na coluna Ações: Definir Alvo (ou valor inicial) e remover. */
 function AcoesDaMeta({
   meta,
   somenteLeitura,
@@ -335,18 +333,6 @@ function AcoesDaMeta({
     if (r.status === "confirmed") recarregar();
   };
 
-  const abrirLista = async () => {
-    const r = await windows.open<Meta>({
-      surface: "sheet",
-      title: "Lista de Produtos",
-      description: `Meta "${meta.tipo.nome}" · ${periodoNome}`,
-      content: () => (
-        <ListaProdutosWindow meta={meta} somenteLeitura={somenteLeitura} />
-      ),
-    });
-    if (r.status === "confirmed") recarregar();
-  };
-
   const remover = async () => {
     const ok = await windows.confirm({
       title: "Remover Meta",
@@ -374,12 +360,6 @@ function AcoesDaMeta({
         <Button variant="outline" onClick={() => void definirAlvo()}>
           <Target />
           {avaliacoes ? "Definir valor inicial" : "Definir Alvo"}
-        </Button>
-      )}
-      {meta.tipo.indicador === "lista-produtos" && (
-        <Button variant="outline" onClick={() => void abrirLista()}>
-          <ListChecks />
-          Lista de Produtos
         </Button>
       )}
       {!somenteLeitura && (

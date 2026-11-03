@@ -34,7 +34,7 @@ export class PostgresMetaStore implements MetaStore {
 
   async criar(nova: NovaMeta): Promise<Meta | null> {
     return this.db.transaction(async (tx) => {
-      const [row] = await tx.insert(metas).values({ id: novoIdMeta(), periodoId: nova.periodoId, tipoId: nova.tipoId, excluidos: nova.excluidos, lista: nova.lista }).onConflictDoNothing().returning();
+      const [row] = await tx.insert(metas).values({ id: novoIdMeta(), periodoId: nova.periodoId, tipoId: nova.tipoId, excluidos: nova.excluidos }).onConflictDoNothing().returning();
       if (!row) return null;
       if (nova.participantes.length) await tx.insert(metasParticipantes).values(nova.participantes.map((p) => ({ ...p, premio: p.premio ?? null, metaId: row.id })));
       return meta(row, nova.participantes.map((p) => ({ ...p, premio: p.premio ?? null, metaId: row.id })));
@@ -79,7 +79,7 @@ export class PostgresMetaStore implements MetaStore {
     const atualizada = await this.db.transaction(async (tx) => {
       const [row] = await tx
         .update(metas)
-        .set({ excluidos: dados.excluidos, lista: dados.lista, version: expectedVersion + 1, atualizadoEm: new Date() })
+        .set({ excluidos: dados.excluidos, version: expectedVersion + 1, atualizadoEm: new Date() })
         .where(and(eq(metas.id, id), eq(metas.version, expectedVersion)))
         .returning();
       if (!row) return null;

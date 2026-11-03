@@ -12,23 +12,6 @@ export interface ParticipanteMeta {
   premio?: RegraPremio | null;
 }
 
-/** Produto da Lista de Produtos, com a quantidade igual para todos os Participantes. */
-export interface ProdutoLista {
-  /** `Produto.rowguid` do ERP: o código do produto não sai do servidor. */
-  produtoId: string;
-  nome: string;
-  quantidade: number;
-}
-
-/** Lista de Produtos da Meta: as quantidades, os ajustes por Colaborador e o mínimo de produtos batidos. */
-export interface ListaProdutos {
-  produtos: ProdutoLista[];
-  /** Quantos produtos o Participante precisa bater; null: todos. */
-  minimo: number | null;
-  /** Quantidade de um produto para um Participante, quando difere da quantidade do produto. */
-  ajustes: { codigoColaborador: number; produtoId: string; quantidade: number }[];
-}
-
 /** Um Tipo de Meta aplicado a um Closing Period: no máximo uma Meta por Tipo por Período. */
 export interface Meta {
   id: string;
@@ -37,15 +20,13 @@ export interface Meta {
   participantes: ParticipanteMeta[];
   /** Colaboradores ativos que o gestor desmarcou: não entram de novo na cópia automática. */
   excluidos: number[];
-  /** Só na Meta de um Tipo com o Indicador Lista de Produtos. */
-  lista: ListaProdutos | null;
   version: number;
   criadoEm: string;
   atualizadoEm: string;
 }
 
-export type NovaMeta = Pick<Meta, "periodoId" | "tipoId" | "participantes" | "excluidos" | "lista">;
-export type DadosMeta = Pick<Meta, "participantes" | "excluidos" | "lista">;
+export type NovaMeta = Pick<Meta, "periodoId" | "tipoId" | "participantes" | "excluidos">;
+export type DadosMeta = Pick<Meta, "participantes" | "excluidos">;
 
 export interface AplicacaoAlvo {
   id: string;
@@ -63,7 +44,7 @@ export interface MetaStore {
   definirAlvo(id: string, codigos: number[], alvo: number | null, expectedVersion: number): Promise<Meta | null>;
   /** `definirAlvo` em várias Metas, todas ou nenhuma: null se alguma mudou ou sumiu, e aí nenhuma é gravada. */
   definirAlvos(aplicacoes: AplicacaoAlvo[], alvo: number | null): Promise<Meta[] | null>;
-  /** Grava Participantes, excluídos e Lista de Produtos de uma vez. Compare-and-set pela `version`; null se a Meta mudou ou sumiu. */
+  /** Grava Participantes e excluídos de uma vez. Compare-and-set pela `version`; null se a Meta mudou ou sumiu. */
   atualizar(id: string, dados: DadosMeta, expectedVersion: number): Promise<Meta | null>;
   /** Remove a Meta com os Participantes. Compare-and-set pela `version`; false se a Meta mudou ou sumiu. */
   excluir(id: string, expectedVersion: number): Promise<boolean>;

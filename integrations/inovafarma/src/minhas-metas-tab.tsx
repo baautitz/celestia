@@ -18,7 +18,6 @@ interface MinhasMetas {
 /** O resultado na Exibição do Tipo de Meta; o servidor já cortou o que o Colaborador não vê. */
 function resultado(m: MinhaMeta): string {
   if (m.aviso) return m.aviso;
-  if (m.contagem) return m.contagem;
   if (m.realizado === undefined) return "";
   const alvo = m.alvo ? ` de ${m.alvo}` : "";
   return `Realizado ${m.realizado}${alvo}${m.falta ? ` · faltam ${m.falta}` : ""}`;

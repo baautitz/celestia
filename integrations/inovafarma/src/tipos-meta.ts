@@ -2,9 +2,40 @@ import { z } from "zod";
 import { INDICADOR_IDS, formatarValor, indicadorPorId, porcentagem, reais, valorNoAtingimento, type Indicador, type IndicadorId } from "./indicadores.js";
 
 /** Exibição para o Colaborador; o gestor sempre vê tudo. */
-export const EXIBICOES = ["atingida", "progresso", "contagem"] as const;
+export const EXIBICOES = ["atingida", "progresso"] as const;
 export type Exibicao = (typeof EXIBICOES)[number];
-export const EXIBICAO_LABEL: Record<Exibicao, string> = { atingida: "Atingida / Não atingida", progresso: "Progresso", contagem: "Contagem" };
+export const EXIBICAO_LABEL: Record<Exibicao, string> = { atingida: "Atingida / Não atingida", progresso: "Progresso" };
+
+/** Tipo de uma entrada da Lista de Produtos: o que casa com o produto vendido no ERP. */
+export const TIPOS_ENTRADA = ["produto"] as const;
+export type TipoEntrada = (typeof TIPOS_ENTRADA)[number];
+export const TIPO_ENTRADA_LABEL: Record<TipoEntrada, string> = { produto: "Produto" };
+
+/** O que a Lista de Produtos mede: unidades vendidas. */
+export const UNIDADES_LISTA = ["unidades"] as const;
+export type UnidadeLista = (typeof UNIDADES_LISTA)[number];
+
+/** Entrada da Lista: o id no ERP (`Produto.rowguid`) e o nome gravado, legível se a entrada sair do ERP. */
+export const EntradaLista = z.object({
+  tipo: z.enum(TIPOS_ENTRADA),
+  id: z.string().trim().min(1).max(64),
+  nome: z.string().trim().min(1).max(200),
+});
+export type EntradaLista = z.infer<typeof EntradaLista>;
+
+/** Lista de Produtos do Tipo de Meta: conjunto de entradas; cada produto vendido conta uma vez dentro da Meta. */
+export const ListaTipo = z.object({
+  entradas: z.array(EntradaLista).min(1, "Adicione pelo menos uma entrada à Lista.").max(500, "A Lista deve ter no máximo 500 entradas."),
+  unidade: z.enum(UNIDADES_LISTA),
+});
+export type ListaTipo = z.infer<typeof ListaTipo>;
+
+/** Entradas na ordem da tela: por tipo e depois em ordem alfabética. */
+export const ordenarEntradas = <E extends Pick<EntradaLista, "tipo" | "nome">>(entradas: readonly E[]): E[] =>
+  [...entradas].sort((a, b) => TIPOS_ENTRADA.indexOf(a.tipo) - TIPOS_ENTRADA.indexOf(b.tipo) || a.nome.localeCompare(b.nome, "pt-BR"));
+
+/** Entrada em texto, como o Colaborador e o Audit Log a veem (ex.: "Produto Dipirona 1g"). */
+export const descreverEntrada = (e: Pick<EntradaLista, "tipo" | "nome">) => `${TIPO_ENTRADA_LABEL[e.tipo]} ${e.nome}`;
 
 const Centavos = z.number().int().min(1, "Informe o valor do Prêmio.");
 const Pct = z.number().positive();
@@ -41,6 +72,8 @@ export const DadosTipoMeta = z.object({
   regra: RegraPremio,
   /** Na unidade do Indicador (R$ em centavos). Na Meta de Avaliações, é o valor inicial. */
   alvoPadrao: z.number().positive("O Alvo padrão deve ser maior que zero.").nullable(),
+  /** Só no Indicador Lista de Produtos, e obrigatória nele. */
+  lista: ListaTipo.nullable().default(null),
   ativo: z.boolean(),
 });
 export type DadosTipoMeta = z.infer<typeof DadosTipoMeta>;
@@ -58,8 +91,9 @@ export function problemaDoTipo(t: DadosTipoMeta): string | null {
   const avaliacoes = t.indicador === "avaliacoes";
   if (avaliacoes !== (t.regra.tipo === "saldo")) return "A Meta de Avaliações paga o Saldo, e só ela paga o Saldo.";
   if (avaliacoes && t.semAlvo) return "A Meta de Avaliações precisa do valor inicial.";
-  if (t.exibicao === "contagem" && t.indicador !== "lista-produtos") return "A Contagem só se aplica à Lista de Produtos.";
-  if (t.indicador === "lista-produtos" && t.alvoPadrao !== null) return "A Lista de Produtos não tem Alvo padrão: as quantidades ficam na Meta.";
+  if (t.indicador === "lista-produtos" && !t.lista) return "Adicione pelo menos uma entrada à Lista.";
+  if (t.indicador !== "lista-produtos" && t.lista) return "Só o Indicador Lista de Produtos tem Lista.";
+  if (t.lista && new Set(t.lista.entradas.map((e) => `${e.tipo}:${e.id}`)).size !== t.lista.entradas.length) return "Uma entrada aparece duas vezes na Lista.";
   if (t.regra.tipo === "proporcional" && indicador.direcao === "menor") return `O Proporcional não se aplica a ${indicador.nome}, em que menor é melhor.`;
   if (t.regra.tipo === "proporcional" && t.regra.gatilho !== null && t.regra.teto !== null && t.regra.gatilho >= t.regra.teto)
     return "O Gatilho deve ser menor que o Teto.";

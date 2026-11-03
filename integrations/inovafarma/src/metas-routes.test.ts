@@ -19,10 +19,10 @@ const cmv: DadosTipoMeta = {
   semAlvo: false,
   regra: { tipo: "faixas", faixas: [{ atingimento: 100, valorCentavos: 10000 }] },
   alvoPadrao: 30,
+  lista: null,
   ativo: true,
 };
 const ticket: DadosTipoMeta = { ...cmv, nome: "Ticket", indicador: "ticket-medio", alvoPadrao: null };
-const lista: DadosTipoMeta = { ...cmv, nome: "Lista", indicador: "lista-produtos", exibicao: "contagem", alvoPadrao: null };
 
 interface LinhaErp {
   codigoColaborador: number;
@@ -190,25 +190,6 @@ describe("Montar Metas", () => {
     expect(log.at(-1)).toBe('Definiu o Alvo R$ 50,00 da Meta "Ticket" no período "Abril" para 1 Participante: BIA.');
   });
 
-  it("monta a Lista de Produtos com ajuste por Colaborador e mínimo de produtos", async () => {
-    const { req, json, tipos, log } = await boot();
-    const tipo = await tipos.criar(lista);
-    const meta = await json<Meta>("gil", "POST", "/metas", { periodoId: "abril", tipoId: tipo.id });
-    expect(meta.lista).toEqual({ produtos: [], minimo: null, ajustes: [] });
-    const produtos = [
-      { produtoId: "p1", nome: "DIPIRONA", quantidade: 10 },
-      { produtoId: "p2", nome: "VITAMINA C", quantidade: 5 },
-    ];
-    const ajustes = [
-      { codigoColaborador: 1, produtoId: "p1", quantidade: 4 },
-      { codigoColaborador: 2, produtoId: "p1", quantidade: 10 },
-    ];
-    expect((await req("gil", "PUT", `/metas/${meta.id}/lista`, { version: 1, produtos, minimo: 3, ajustes })).status).toBe(400);
-    const salva = await json<Meta>("gil", "PUT", `/metas/${meta.id}/lista`, { version: 1, produtos, minimo: 1, ajustes });
-    expect(salva.lista).toEqual({ produtos, minimo: 1, ajustes: [ajustes[0]] });
-    expect(log.at(-1)).toBe('Alterou a Lista de Produtos da Meta "Lista" no período "Abril": DIPIRONA (10), VITAMINA C (5); mínimo: 1; 1 ajuste por Colaborador.');
-  });
-
   it("no primeiro acesso, copia as Metas do Período atualizado por último, com os Colaboradores de hoje", async () => {
     const { req, json, tipos, log, erp } = await boot();
     const tipo = await tipos.criar(cmv);
@@ -256,7 +237,7 @@ describe("Montar Metas", () => {
     await json<Meta>("gil", "POST", "/metas", { periodoId: "abril", tipoId: tipo.id });
     const marco = await json<Montagem>("gil", "GET", "/metas?periodoId=marco");
     expect(marco).toMatchObject({ somenteLeitura: true, copiadoDe: null, metas: [] });
-    const fechada = (await metas.criar({ periodoId: "marco", tipoId: tipo.id, participantes: [], excluidos: [], lista: null }))!;
+    const fechada = (await metas.criar({ periodoId: "marco", tipoId: tipo.id, participantes: [], excluidos: [] }))!;
     expect((await req("gil", "PUT", `/metas/${fechada.id}/participantes/1`, { version: 1, participa: true })).status).toBe(409);
     expect((await req("gil", "POST", `/metas/${fechada.id}/definir-alvo`, { version: 1, codigos: [1], alvo: 1 })).status).toBe(409);
   });

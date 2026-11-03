@@ -22,6 +22,7 @@ const cmv: DadosTipoMeta = {
   semAlvo: false,
   regra: { tipo: "fixo", valorCentavos: 10000 },
   alvoPadrao: 30,
+  lista: null,
   ativo: true,
 };
 const avaliacoes: DadosTipoMeta = { ...cmv, nome: "Avaliações", indicador: "avaliacoes", regra: { tipo: "saldo" }, alvoPadrao: 20000 };
@@ -71,7 +72,7 @@ async function boot() {
     { codigoColaborador: 2, nome: "BIA", alvo: 30 },
   ];
   const tipoCmv = await tipos.criar(cmv);
-  await metas.criar({ periodoId: "maio", tipoId: tipoCmv.id, participantes, excluidos: [], lista: null });
+  await metas.criar({ periodoId: "maio", tipoId: tipoCmv.id, participantes, excluidos: [] });
   registerAcompanhamentoRoutes({
     routes: app,
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
@@ -146,7 +147,7 @@ describe("Acompanhamento das Metas", () => {
   it("desconta as Avaliações do Período do valor inicial", async () => {
     const { ver, tipos, metas, avaliacoesStore, participantes } = await boot();
     const tipo = await tipos.criar(avaliacoes);
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: participantes.map((p) => ({ ...p, alvo: 20000 })), excluidos: [], lista: null });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: participantes.map((p) => ({ ...p, alvo: 20000 })), excluidos: [] });
     await avaliacoesStore.criar({ periodoId: "maio", codigoColaborador: 2, nomeColaborador: "BIA", codigoLoja: 20, descricao: "Atraso", valorCentavos: 5000, criadoPor: "x" });
     const { linhas } = await ver("gil");
     expect(linhas.filter((l) => l.tipo.nome === "Avaliações").map((l) => [l.nome, l.premioCentavos])).toEqual([
@@ -221,25 +222,15 @@ describe("Minhas Metas", () => {
   it("no Progresso, mostra Realizado, Alvo e quanto falta, sem o Prêmio que o Tipo esconde", async () => {
     const { minhas, tipos, metas } = await boot();
     const tipo = await tipos.criar({ ...cmv, nome: "Ticket", indicador: "ticket-medio", exibicao: "progresso", mostrarPremio: false, alvoPadrao: 12000 });
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 12000 }], excluidos: [], lista: null });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 12000 }], excluidos: [] });
     const ticket = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Ticket");
     expect(ticket).toEqual({ metaId: expect.any(String), nome: "Ticket", exibicao: "progresso", atingida: false, realizado: "R$ 100,00", alvo: "R$ 120,00", falta: "R$ 20,00" });
-  });
-
-  it("na Contagem, mostra os produtos batidos da Lista", async () => {
-    const { minhas, tipos, metas, produtos } = await boot();
-    const tipo = await tipos.criar({ ...cmv, nome: "Lista", indicador: "lista-produtos", exibicao: "contagem", mostrarPremio: false, alvoPadrao: null });
-    const lista = { produtos: [{ produtoId: "a", nome: "A", quantidade: 2 }, { produtoId: "b", nome: "B", quantidade: 2 }], ajustes: [], minimo: null };
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: null }], excluidos: [], lista });
-    produtos.push({ codigoColaborador: 1, produtoId: "a", quantidade: 3 });
-    const contagem = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Lista");
-    expect(contagem).toEqual({ metaId: expect.any(String), nome: "Lista", exibicao: "contagem", atingida: false, contagem: "1/2 produtos" });
   });
 
   it("mostra o Saldo da Meta de Avaliações como Prêmio quando o Tipo permite", async () => {
     const { minhas, tipos, metas, avaliacoesStore } = await boot();
     const tipo = await tipos.criar({ ...avaliacoes, exibicao: "progresso" });
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [], lista: null });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [] });
     await avaliacoesStore.criar({ periodoId: "maio", codigoColaborador: 1, nomeColaborador: "ANA", codigoLoja: 10, descricao: "Atraso", valorCentavos: 5000, criadoPor: "x" });
     const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
     expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true, realizado: "R$ 150,00", alvo: "R$ 200,00", premioCentavos: 15000 });
@@ -248,7 +239,7 @@ describe("Minhas Metas", () => {
   it("esconde o Saldo da Meta de Avaliações quando o Tipo não mostra o Prêmio", async () => {
     const { minhas, tipos, metas } = await boot();
     const tipo = await tipos.criar({ ...avaliacoes, exibicao: "progresso", mostrarPremio: false });
-    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [], lista: null });
+    await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [] });
     const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
     expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true });
   });

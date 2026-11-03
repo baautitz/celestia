@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { Plus, Trash2 } from "lucide-react";
@@ -18,7 +18,8 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
 import { INDICADORES, formatarValor, indicadorPorId, valorNoAtingimento, type Indicador, type IndicadorId } from "./indicadores";
-import { EXIBICAO_LABEL, REGRA_LABEL, descreverPremio, problemaDoTipo, type DadosTipoMeta, type Exibicao, type RegraPremio, type TipoMeta, type TipoRegra } from "./tipos-meta";
+import { ListaProdutosCampo } from "./lista-produtos-campo";
+import { EXIBICAO_LABEL, EntradaLista, REGRA_LABEL, descreverPremio, problemaDoTipo, type DadosTipoMeta, type Exibicao, type RegraPremio, type TipoMeta, type TipoRegra } from "./tipos-meta";
 
 export const BASE = "/api/m/inovafarma/metas/tipos";
 
@@ -53,6 +54,8 @@ const schema = z.object({
   soSeAtingir: z.boolean(),
   /** R$ em reais quando o Indicador é em R$; senão, o número digitado. */
   alvoPadrao: z.union([z.number(), z.string()]),
+  /** Entradas da Lista de Produtos (só no Indicador Lista de Produtos). */
+  entradas: z.array(EntradaLista),
   ativo: z.boolean(),
 });
 type Valores = z.infer<typeof schema>;
@@ -70,10 +73,9 @@ export function regrasPermitidas(indicador: IndicadorId, semAlvo: boolean): Tipo
   return indicadorPorId(indicador).direcao === "menor" ? regras.filter((r) => r !== "proporcional") : regras;
 }
 
-const exibicoesPermitidas = (indicador: IndicadorId, semAlvo: boolean): Exibicao[] =>
-  semAlvo ? ["progresso"] : indicador === "lista-produtos" ? ["atingida", "progresso", "contagem"] : ["atingida", "progresso"];
+const exibicoesPermitidas = (semAlvo: boolean): Exibicao[] => (semAlvo ? ["progresso"] : ["atingida", "progresso"]);
 
-const temAlvoPadrao = (indicador: IndicadorId, semAlvo: boolean) => !semAlvo && indicador !== "lista-produtos";
+const temAlvoPadrao = (semAlvo: boolean) => !semAlvo;
 
 function regraDe(v: Valores): RegraPremio {
   switch (v.regraTipo) {
@@ -93,7 +95,7 @@ function regraDe(v: Valores): RegraPremio {
 /** Os valores do formulário no formato da API. */
 export function dadosDe(v: Valores): DadosTipoMeta {
   const emReais = indicadorPorId(v.indicador).unidade === "reais";
-  const alvo = !temAlvoPadrao(v.indicador, v.semAlvo) ? null : typeof v.alvoPadrao === "number" ? (v.alvoPadrao > 0 ? v.alvoPadrao : null) : numeroOuNull(v.alvoPadrao);
+  const alvo = !temAlvoPadrao(v.semAlvo) ? null : typeof v.alvoPadrao === "number" ? (v.alvoPadrao > 0 ? v.alvoPadrao : null) : numeroOuNull(v.alvoPadrao);
   return {
     nome: v.nome.trim(),
     indicador: v.indicador,
@@ -102,6 +104,7 @@ export function dadosDe(v: Valores): DadosTipoMeta {
     semAlvo: v.semAlvo,
     regra: regraDe(v),
     alvoPadrao: alvo === null ? null : emReais ? centavos(alvo) : alvo,
+    lista: v.indicador === "lista-produtos" && v.entradas.length > 0 ? { entradas: v.entradas, unidade: "unidades" } : null,
     ativo: v.ativo,
   };
 }
@@ -131,6 +134,7 @@ function iniciais(tipo?: TipoMeta): Valores {
     indicadorBase: r?.tipo === "percentual" ? r.indicadorBase : baseInicial(indicador),
     soSeAtingir: r?.tipo === "percentual" ? r.soSeAtingir : true,
     alvoPadrao: tipo?.alvoPadrao == null ? "" : emReais ? tipo.alvoPadrao / 100 : String(tipo.alvoPadrao),
+    entradas: tipo?.lista?.entradas ?? [],
     ativo: tipo?.ativo ?? true,
   };
 }
@@ -156,7 +160,8 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
   const indicador = indicadorPorId(v.indicador);
   const avaliacoes = v.indicador === "avaliacoes";
   const regras = regrasPermitidas(v.indicador, v.semAlvo);
-  const exibicoes = exibicoesPermitidas(v.indicador, v.semAlvo);
+  const exibicoes = exibicoesPermitidas(v.semAlvo);
+  const [tentouSalvar, setTentouSalvar] = useState(false);
   const dados = dadosDe(v);
   const problema = problemaDoFormulario(v, dados);
 
@@ -171,11 +176,12 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
     if (semAlvo !== form.getValues("semAlvo")) form.setValue("semAlvo", semAlvo, { shouldDirty: true });
     const permitidas = regrasPermitidas(indicadorId, semAlvo);
     if (!permitidas.includes(form.getValues("regraTipo"))) form.setValue("regraTipo", permitidas[0]!, { shouldDirty: true });
-    const exib = exibicoesPermitidas(indicadorId, semAlvo);
+    const exib = exibicoesPermitidas(semAlvo);
     if (!exib.includes(form.getValues("exibicao"))) form.setValue("exibicao", exib[0]!, { shouldDirty: true });
   };
 
   const onSubmit = async (valores: Valores) => {
+    setTentouSalvar(true);
     const corpo = dadosDe(valores);
     const erro = problemaDoFormulario(valores, corpo);
     if (erro) {
@@ -323,7 +329,21 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
     />
   );
 
-  const alvoCampo = temAlvoPadrao(v.indicador, v.semAlvo) && (
+  const listaCampo = v.indicador === "lista-produtos" && (
+    <FormField
+      control={form.control}
+      name="entradas"
+      render={({ field }) => (
+        <ListaProdutosCampo
+          entradas={field.value}
+          onChange={field.onChange}
+          erro={tentouSalvar && field.value.length === 0 ? "Adicione pelo menos uma entrada à Lista." : null}
+        />
+      )}
+    />
+  );
+
+  const alvoCampo = temAlvoPadrao(v.semAlvo) && (
     <FormField
       control={form.control}
       name="alvoPadrao"
@@ -551,6 +571,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
                 <FieldGroup>
                   {nomeCampo}
                   {indicadorCampo}
+                  {listaCampo}
                   {semAlvoCampo}
                   {alvoCampo}
                   {exibicaoCampo}

@@ -8,6 +8,7 @@ export const METAS_ACTIONS = {
   copiar: "meta_copy",
   participante: "meta_participante_update",
   definirAlvo: "meta_alvo_define",
+  /** Só para ler entradas antigas: a Lista de Produtos saiu da Meta e foi para o Tipo de Meta. */
   lista: "meta_lista_update",
   excluir: "meta_delete",
   premio: "meta_premio_update",

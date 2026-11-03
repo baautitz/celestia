@@ -56,10 +56,9 @@ const minhas = {
   metas: [
     { metaId: "met_1", nome: "CMV", exibicao: "atingida", atingida: true, premioCentavos: 10000 },
     { metaId: "met_2", nome: "Ticket", exibicao: "progresso", atingida: false, realizado: "R$ 100,00", alvo: "R$ 120,00", falta: "R$ 20,00" },
-    { metaId: "met_3", nome: "Lista", exibicao: "contagem", atingida: false, contagem: "19/20 produtos" },
   ],
 };
-const metaCmv = { id: "met_1", periodoId: "abril", tipoId: "tme_1", participantes, excluidos: [], lista: null, version: 1, tipo: cmv, pendentes: 1 };
+const metaCmv = { id: "met_1", periodoId: "abril", tipoId: "tme_1", participantes, excluidos: [], version: 1, tipo: cmv, pendentes: 1 };
 const montagem = {
   somenteLeitura: false,
   copiadoDe: null,
@@ -182,7 +181,6 @@ describe("Metas: Minhas Metas", () => {
     renderizar();
     fireEvent.click(await screen.findByRole("tab", { name: "Minhas Metas" }));
     expect((await screen.findAllByText("Realizado R$ 100,00 de R$ 120,00 · faltam R$ 20,00")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("19/20 produtos").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Atingida").length).toBeGreaterThan(0);
     expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/minhas?periodoId=abril");
     expect(screen.queryByRole("button", { name: /Imprimir/ })).toBeNull();

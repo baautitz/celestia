@@ -37,18 +37,17 @@ export const porCategoria = (fn: (categoria: Categoria) => CategoriaTotal): Cate
   totalFoco: fn("totalFoco"),
 });
 
-/**
- * SQL do Desempenho de Vendas por Colaborador e do total de vendas. `filtroEmpresa` é montado pelo servidor
- * com parâmetros (`@dataInicio`, `@dataFim` e os do filtro), nunca com entrada do usuário.
- */
-export function desempenhoSql(filtroEmpresa: string) {
-  // Como no relatório oficial do InovaFarma: vendas sem caixa aberto (CodigoAbertura nulo) ficam fora,
-  // a Taxa de Entrega (Produto_Inventario_Grupo 3) não conta como venda,
-  // e o valor que um PBM com financeiro (ex.: Farmácia Popular) reembolsa à loja entra no bruto e no líquido.
-  // O ERP deixa esse item com Total = 0 e TotalDesconto = 0; o reembolso fica só em Venda_Produto_PBM.
-  const reembolsoPbm = "ISNULL(pbm.DescontoUnitarioPBM * vp.Quantidade, 0)";
+// Como no relatório oficial do InovaFarma: vendas sem caixa aberto (CodigoAbertura nulo) ficam fora,
+// a Taxa de Entrega (Produto_Inventario_Grupo 3) não conta como venda,
+// e o valor que um PBM com financeiro (ex.: Farmácia Popular) reembolsa à loja entra no bruto e no líquido.
+// O ERP deixa esse item com Total = 0 e TotalDesconto = 0; o reembolso fica só em Venda_Produto_PBM.
+export const REEMBOLSO_PBM = "ISNULL(pbm.DescontoUnitarioPBM * vp.Quantidade, 0)";
 
-  const fromWhere = `
+/**
+ * FROM e WHERE das vendas do Período com as regras da Venda Líquida (aliases `v`, `vp`, `p`, `pbm`).
+ * `filtro` é montado pelo servidor com parâmetros, nunca com entrada do usuário.
+ */
+export const vendasFromWhere = (filtro: string) => `
     FROM Venda v
     JOIN Venda_Produto vp ON vp.CodigoVenda = v.CodigoVenda
     JOIN Funcionario f ON f.CodigoFuncionario = vp.CodigoFuncionario
@@ -61,8 +60,16 @@ export function desempenhoSql(filtroEmpresa: string) {
       AND ISNULL(p.CodigoGrupoInventario, 0) <> 3
       AND v.DataVenda >= @dataInicio
       AND v.DataVenda <= @dataFim
-      ${filtroEmpresa}
+      ${filtro}
   `;
+
+/**
+ * SQL do Desempenho de Vendas por Colaborador e do total de vendas. `filtroEmpresa` é montado pelo servidor
+ * com parâmetros (`@dataInicio`, `@dataFim` e os do filtro), nunca com entrada do usuário.
+ */
+export function desempenhoSql(filtroEmpresa: string) {
+  const reembolsoPbm = REEMBOLSO_PBM;
+  const fromWhere = vendasFromWhere(filtroEmpresa);
 
   const sql = `
     SELECT
