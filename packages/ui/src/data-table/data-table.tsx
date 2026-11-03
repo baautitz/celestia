@@ -428,8 +428,8 @@ export function DataTable<TRow>({
   defaultExpanded = false,
   scroll = "table",
   actionsLabel = "Ações",
-  actionsHeadClassName = "text-right w-20",
-  actionsSkeletonClassName = "h-8 w-8 ml-auto",
+  actionsHeadClassName = "text-center w-20",
+  actionsSkeletonClassName = "h-8 w-8 mx-auto",
   search,
   pagination,
   manual = false,
@@ -1031,7 +1031,7 @@ export function DataTable<TRow>({
                           </TableCell>
                         ))}
                         {hasActions && (
-                          <TableCell className="text-right">
+                          <TableCell className="text-center">
                             <Skeleton className={actionsSkeletonClassName} />
                           </TableCell>
                         )}
@@ -1124,7 +1124,7 @@ export function DataTable<TRow>({
                               );
                             })}
                             {hasActions && (
-                              <TableCell className="text-right">
+                              <TableCell className="text-center">
                                 {rowActions?.(row)}
                               </TableCell>
                             )}
