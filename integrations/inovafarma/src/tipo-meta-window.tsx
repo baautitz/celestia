@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRef } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { Plus, Trash2 } from "lucide-react";
@@ -25,7 +26,10 @@ export type TipoMetaComPremio = TipoMeta & { premio: string };
 const json = (method: string, body: unknown) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 /** Indicadores de valor vendido em R$, base do Percentual. */
-const BASES_PERCENTUAL = INDICADORES.filter((i) => i.unidade === "reais" && i.id !== "avaliacoes" && i.id !== "ticket-medio");
+const BASES_PERCENTUAL = INDICADORES.filter((i) => i.unidade === "reais" && i.id !== "avaliacoes" && i.id !== "ticket-medio" && i.direcao !== "menor");
+
+/** Sem Alvo, o Prêmio é um Percentual do próprio Indicador: só vale para Indicadores que servem de base. */
+const podeSemAlvo = (indicador: IndicadorId) => BASES_PERCENTUAL.some((i) => i.id === indicador);
 
 const schema = z.object({
   nome: z.string().trim().min(1, "Informe o nome do Tipo de Meta.").max(80, "O nome deve ter no máximo 80 caracteres."),
@@ -73,7 +77,7 @@ function regraDe(v: Valores): RegraPremio {
     case "faixas":
       return { tipo: "faixas", faixas: v.faixas.map((f) => ({ atingimento: Number(f.atingimento.replace(",", ".")) || 0, valorCentavos: centavos(f.valor) })) };
     case "percentual":
-      return { tipo: "percentual", percentual: numeroOuNull(v.percentual) ?? 0, indicadorBase: v.indicadorBase, soSeAtingir: !v.semAlvo && v.soSeAtingir };
+      return { tipo: "percentual", percentual: numeroOuNull(v.percentual) ?? 0, indicadorBase: v.semAlvo ? v.indicador : v.indicadorBase, soSeAtingir: !v.semAlvo && v.soSeAtingir };
     case "saldo":
       return { tipo: "saldo" };
   }
@@ -128,6 +132,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
   const { resolve } = useWindow<TipoMetaSalvo>();
   const { feedback } = useUi();
   const form = useForm<Valores>({ resolver: zodResolver(schema), defaultValues: iniciais(tipo) });
+  const antesDoSemAlvo = useRef<Pick<Valores, "regraTipo" | "exibicao"> | null>(null);
   const faixas = useFieldArray({ control: form.control, name: "faixas" });
   const v = useWatch({ control: form.control }) as Valores;
   const indicador = indicadorPorId(v.indicador);
@@ -138,12 +143,13 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
   const problema = problemaDoTipo(dados);
 
   /** Ao trocar o Indicador ou o "sem Alvo", leva a regra e a Exibição para uma opção válida. */
-  const ajustar = (indicadorId: IndicadorId, semAlvo: boolean) => {
+  const ajustar = (indicadorId: IndicadorId, semAlvoPedido: boolean) => {
+    const semAlvo = semAlvoPedido && podeSemAlvo(indicadorId);
+    if (semAlvo !== form.getValues("semAlvo")) form.setValue("semAlvo", semAlvo);
     const permitidas = regrasPermitidas(indicadorId, semAlvo);
     if (!permitidas.includes(form.getValues("regraTipo"))) form.setValue("regraTipo", permitidas[0]!);
     const exib = exibicoesPermitidas(indicadorId, semAlvo);
     if (!exib.includes(form.getValues("exibicao"))) form.setValue("exibicao", exib[0]!);
-    if (indicadorId === "avaliacoes" || indicadorId === "lista-produtos") form.setValue("semAlvo", false);
   };
 
   const onSubmit = async (valores: Valores) => {
@@ -249,7 +255,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
                 </FormItem>
               )}
             />
-            {!avaliacoes && v.indicador !== "lista-produtos" && (
+            {podeSemAlvo(v.indicador) && (
               <FormField
                 control={form.control}
                 name="semAlvo"
@@ -260,6 +266,12 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
                       <Switch
                         checked={field.value}
                         onCheckedChange={(semAlvo: boolean) => {
+                          // Ao desligar, volta a Regra e a Exibição que estavam antes de ligar.
+                          if (semAlvo) antesDoSemAlvo.current = { regraTipo: form.getValues("regraTipo"), exibicao: form.getValues("exibicao") };
+                          else if (antesDoSemAlvo.current) {
+                            form.setValue("regraTipo", antesDoSemAlvo.current.regraTipo);
+                            form.setValue("exibicao", antesDoSemAlvo.current.exibicao);
+                          }
                           field.onChange(semAlvo);
                           ajustar(form.getValues("indicador"), semAlvo);
                         }}
@@ -377,29 +389,31 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta }) {
             {v.regraTipo === "percentual" && (
               <>
                 {percentualCampo("percentual", "Percentual (%)")}
-                <FormField
-                  control={form.control}
-                  name="indicadorBase"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Sobre o Indicador</FormLabel>
-                      <Select value={field.value} onValueChange={(id) => id && field.onChange(id)}>
-                        <FormControl>
-                          <SelectTrigger aria-label="Sobre o Indicador">
-                            <SelectValue>{(id: IndicadorId) => indicadorPorId(id)?.nome ?? "Selecione"}</SelectValue>
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {BASES_PERCENTUAL.map((i) => (
-                            <SelectItem key={i.id} value={i.id}>
-                              {i.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
+                {!v.semAlvo && (
+                  <FormField
+                    control={form.control}
+                    name="indicadorBase"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sobre o Indicador</FormLabel>
+                        <Select value={field.value} onValueChange={(id) => id && field.onChange(id)}>
+                          <FormControl>
+                            <SelectTrigger aria-label="Sobre o Indicador">
+                              <SelectValue>{(id: IndicadorId) => indicadorPorId(id)?.nome ?? "Selecione"}</SelectValue>
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {BASES_PERCENTUAL.map((i) => (
+                              <SelectItem key={i.id} value={i.id}>
+                                {i.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
                   )}
                 />
+                )}
                 {!v.semAlvo && (
                   <FormField
                     control={form.control}
