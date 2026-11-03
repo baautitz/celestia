@@ -151,7 +151,7 @@ const textVariants = {
   body: "",
   small: "text-sm",
   caption: "text-xs",
-  tiny: "text-[11px]",
+  tiny: "text-[11px] leading-normal",
   mono: "font-mono text-xs",
   title: "text-2xl font-bold tracking-tight",
   eyebrow: "text-xs font-bold uppercase tracking-wider",
