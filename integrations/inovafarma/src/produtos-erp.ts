@@ -1,4 +1,4 @@
-/** Busca de Produto no ERP, usada no Estoque e no lançamento de Pré-vencidos e na Lista de Produtos do Tipo de Meta. */
+/** Busca de Produto no ERP, usada no Estoque de Pré-vencidos e na Lista de Produtos do Tipo de Meta. */
 
 /** Mínimo de caracteres da busca de Produto: o ERP tem dezenas de milhares de cadastros. */
 export const MIN_BUSCA_PRODUTO = 3;

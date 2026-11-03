@@ -63,7 +63,7 @@ The Itens de Pré-vencido of a Loja, kept by whoever looks after its stock. It i
 _Avoid_: Contagem, Lançamento, Inventário
 
 **Item de Pré-vencido** (en: Near-expiry Item):
-A quantity of one Pré-vencido with a given expiry month in a Loja's Estoque de Pré-vencidos, with the date it was included. Only sales from that date on use it up. The inclusion date may be set back, but never before the start of the open Closing Period. The same product and expiry may be included more than once, each as its own Item.
+A quantity of one Pré-vencido with a given expiry month in a Loja's Estoque de Pré-vencidos, with the date it was included. Only sales from that date on use it up. The inclusion date may be set back, but never before the start of the open Closing Period (the earliest one, even if it has already ended). The same product and expiry may be included more than once, each as its own Item.
 _Avoid_: Lançamento, Registro
 
 **Restante** (en: Remaining):
@@ -75,7 +75,7 @@ The quantity of a sale in the ERP that used up Itens de Pré-vencido of the Loja
 _Avoid_: Venda de Pré-vencido, Lançamento, Ajuste
 
 **Correção de Baixa** (en: Write-off Correction):
-A change by a manager, with a reason, to how much of a sale was really Pré-vencido, from zero up to what that sale had. What is taken off goes back to the Restante and can be used up by later sales. Only in the open Closing Period. The Colaborador sees the correction and its reason.
+A change by a manager, with a reason, to how much of a sale was really Pré-vencido, from zero up to what that sale had and the Estoque had left for it. What is taken off goes back to the Restante and can be used up by later sales. Only in the open Closing Period. The Colaborador sees the correction and its reason.
 _Avoid_: Ajuste, Estorno
 
 **Avaliação do Colaborador** (en: Collaborator Assessment):
