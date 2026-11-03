@@ -62,7 +62,7 @@ function TiposDeMeta() {
     { key: "nome", label: "Tipo de Meta", value: (t) => t.nome, searchable: true, sortable: true, mobileRole: "primary" },
     { key: "indicador", label: "Indicador", value: (t) => indicadorPorId(t.indicador).nome, searchable: true, sortable: true },
     { key: "exibicao", label: "Exibição", value: (t) => EXIBICAO_LABEL[t.exibicao] },
-    { key: "premio", label: "Prêmio", value: (t) => t.premio, searchable: true },
+    { key: "premio", label: "Prêmio", value: (t) => t.premio, searchable: true, cellClassName: "min-w-64 whitespace-normal" },
     {
       key: "alvoPadrao",
       label: "Alvo padrão",
