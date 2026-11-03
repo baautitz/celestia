@@ -17,7 +17,9 @@ const contexto = (extra: Record<string, unknown> = {}) => ({
   podeEstoque: false,
   podeBaixas: true,
   periodos,
+  podeCorrigir: true,
   lojas: [{ codigo: 1, nome: "Centro" }],
+  visualizacoes: [{ id: "loja", lojas: [{ codigo: 1, nome: "Centro" }] }],
   ...extra,
 });
 const grupos = [
@@ -26,8 +28,8 @@ const grupos = [
     nomeColaborador: "ANA SOUZA",
     quantidade: 3,
     vendas: [
-      { vendaId: 501, data: "2027-04-02 10:15:00", produtoId: "guid-1", nomeProduto: "DIPIRONA 500MG", codigoBarra: "789", quantidadeVendida: 2, quantidade: 2 },
-      { vendaId: 502, data: "2027-04-03 11:00:00", produtoId: "guid-1", nomeProduto: "DIPIRONA 500MG", codigoBarra: "789", quantidadeVendida: 4, quantidade: 1 },
+      { codigoLoja: 1, vendaId: 501, data: "2027-04-02 10:15:00", produtoId: "guid-1", nomeProduto: "DIPIRONA 500MG", codigoBarra: "789", quantidadeVendida: 2, quantidade: 2 },
+      { codigoLoja: 1, vendaId: 502, data: "2027-04-03 11:00:00", produtoId: "guid-1", nomeProduto: "DIPIRONA 500MG", codigoBarra: "789", quantidadeVendida: 4, quantidade: 1 },
     ],
   },
 ];
@@ -60,7 +62,7 @@ describe("aba Baixas", () => {
     renderizar();
     expect(await screen.findByRole("tab", { name: "Baixas" })).toBeTruthy();
     expect(screen.queryByRole("tab", { name: "Estoque" })).toBeNull();
-    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/baixas?codigoLoja=1&periodoId=p-abril")));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/baixas?visualizacao=loja&periodoId=p-abril")));
     expect(await screen.findByRole("cell", { name: "ANA SOUZA" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Expandir linha" }));
     expect(await screen.findByRole("cell", { name: "501" })).toBeTruthy();
@@ -71,7 +73,7 @@ describe("aba Baixas", () => {
   it("sem Baixas no período, avisa", async () => {
     apiFetch.mockImplementation(async (url: string) => (url.endsWith("/contexto") ? contexto() : []));
     renderizar();
-    expect(await screen.findByText("Nenhuma Baixa nesta Loja no período.")).toBeTruthy();
+    expect(await screen.findByText("Nenhuma Baixa no período.")).toBeTruthy();
   });
 
   it("corrige a Baixa de uma venda em janela, com quantidade de zero até o vendido e motivo obrigatório", async () => {
@@ -111,6 +113,28 @@ describe("aba Baixas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Desfazer a Correção da venda 501" }));
     fireEvent.click(await screen.findByRole("button", { name: "Desfazer" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/baixas/correcoes/cbx_1?version=2"), { method: "DELETE" }));
+  });
+
+  it("abre na Visualização mais ampla, com Todas as Filiais, e só corrige vendas das Lojas do Vínculo", async () => {
+    const ctx = contexto({ visualizacoes: [{ id: "geral", lojas: [{ codigo: 1, nome: "Centro" }, { codigo: 2, nome: "Bairro" }] }, { id: "loja", lojas: [{ codigo: 1, nome: "Centro" }] }] });
+    const deOutraLoja = [{ ...grupos[0]!, vendas: [{ ...grupos[0]!.vendas[0]!, codigoLoja: 2 }, grupos[0]!.vendas[1]!] }];
+    apiFetch.mockImplementation(async (url: string) => (url.endsWith("/contexto") ? ctx : deOutraLoja));
+    renderizar();
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/baixas?visualizacao=geral&periodoId=p-abril")));
+    expect(screen.getByRole("combobox", { name: "Visualização" }).textContent).toContain("Geral");
+    expect(screen.getByRole("combobox", { name: "Loja" }).textContent).toContain("Todas as Filiais");
+    await screen.findByRole("cell", { name: "ANA SOUZA" });
+    fireEvent.click(screen.getByRole("button", { name: "Expandir linha" }));
+    await screen.findByRole("cell", { name: "501" });
+    expect(screen.queryByRole("button", { name: "Corrigir a Baixa da venda 501" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Corrigir a Baixa da venda 502" })).toBeTruthy();
+  });
+
+  it("sem Visualização, avisa em vez de listar", async () => {
+    apiFetch.mockImplementation(async (url: string) => (url.endsWith("/contexto") ? contexto({ visualizacoes: [] }) : grupos));
+    renderizar();
+    expect(await screen.findByText("Sem Visualização")).toBeTruthy();
+    expect(apiFetch.mock.calls.some(([url]) => String(url).includes("/pre-vencidos/baixas?"))).toBe(false);
   });
 
   it("no Período fechado, não corrige", async () => {

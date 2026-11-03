@@ -4,7 +4,7 @@ import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
 import { useTabParam } from "@platform/ui/hooks/use-tab-param";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import { BaixasPreVencidosTab } from "./baixas-pre-vencidos-tab";
+import { BaixasPreVencidosTab, type VisualizacaoDasBaixas } from "./baixas-pre-vencidos-tab";
 import { EstoquePreVencidosTab } from "./estoque-pre-vencidos-tab";
 import type { LojaOpcao } from "./loja-opcao";
 import type { InclusaoRetroativa } from "./item-pre-vencido-window";
@@ -21,11 +21,16 @@ interface Periodo {
 
 interface Contexto {
   podeEstoque: boolean;
+  /** A aba Baixas: com alguma Visualização das Baixas ou com a Permission de gerir as Baixas. */
   podeBaixas: boolean;
+  /** Gere as Baixas: corrige Baixa nas Lojas do Vínculo e inclui Item com data retroativa. */
+  podeCorrigir: boolean;
   /** Closing Periods, o de data mais recente primeiro. */
   periodos: Periodo[];
-  /** Lojas do Vínculo, do Estoque e das Baixas. */
+  /** Lojas do Vínculo: as do Estoque e as das Correções de Baixa. */
   lojas: LojaOpcao[];
+  /** Visualizações das Baixas, da mais ampla para a mais restrita. */
+  visualizacoes: VisualizacaoDasBaixas[];
   /** Só para quem gere as Baixas: os limites da data de inclusão retroativa, calculados pelo servidor. */
   inclusaoRetroativa?: InclusaoRetroativa;
 }
@@ -54,7 +59,7 @@ export function PreVencidosPage() {
       {aba === "estoque" ? (
         <EstoquePreVencidosTab lojas={contexto.lojas} retroativa={contexto.inclusaoRetroativa} />
       ) : (
-        <BaixasPreVencidosTab lojas={contexto.lojas} periodos={contexto.periodos} />
+        <BaixasPreVencidosTab visualizacoes={contexto.visualizacoes} periodos={contexto.periodos} lojasDaCorrecao={contexto.podeCorrigir ? contexto.lojas.map((l) => l.codigo) : []} />
       )}
     </Stack>
   );

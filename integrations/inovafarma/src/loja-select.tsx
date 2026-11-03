@@ -6,16 +6,23 @@ import type { LojaOpcao } from "./loja-opcao";
 
 const nomeDaLoja = (l: LojaOpcao) => l.nome || `Loja ${l.codigo}`;
 
-/** Escolha da Loja (pelo código, como texto) entre as Lojas do Vínculo. */
-export function LojaSelect({ lojas, value, onChange }: { lojas: LojaOpcao[]; value: string; onChange: (codigo: string) => void }) {
+/** Valor da opção que junta todas as Lojas da lista. */
+export const TODAS_AS_LOJAS = "all";
+
+/**
+ * Escolha da Loja (pelo código, como texto) entre as Lojas da lista. Com `todas`, a primeira opção (valor
+ * `TODAS_AS_LOJAS`) junta todas, com esse rótulo.
+ */
+export function LojaSelect({ lojas, value, onChange, todas }: { lojas: LojaOpcao[]; value: string; onChange: (codigo: string) => void; todas?: string }) {
   return (
     <Stack gap="field">
       <Label>Loja</Label>
       <Select value={value} onValueChange={(v) => v && onChange(v)}>
         <SelectTrigger aria-label="Loja">
-          <SelectValue>{(v: string) => lojas.find((l) => String(l.codigo) === v)?.nome || `Loja ${v}`}</SelectValue>
+          <SelectValue>{(v: string) => (v === TODAS_AS_LOJAS && todas ? todas : lojas.find((l) => String(l.codigo) === v)?.nome || `Loja ${v}`)}</SelectValue>
         </SelectTrigger>
         <SelectContent>
+          {todas && <SelectItem value={TODAS_AS_LOJAS}>{todas}</SelectItem>}
           {lojas.map((l) => (
             <SelectItem key={l.codigo} value={String(l.codigo)}>
               {nomeDaLoja(l)}
