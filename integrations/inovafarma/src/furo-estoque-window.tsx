@@ -5,6 +5,7 @@ import { Button } from "@platform/ui/components/button";
 import { FieldGroup } from "@platform/ui/components/field";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
 import { Input } from "@platform/ui/components/input";
+import { Stack, Text } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Switch } from "@platform/ui/components/switch";
 import { Textarea } from "@platform/ui/components/textarea";
@@ -190,6 +191,32 @@ export function MotivoWindow({ motivo }: { motivo?: Motivo }) {
         <Button type="submit" form="motivo-form" disabled={form.formState.isSubmitting}>
           {motivo ? "Salvar" : "Cadastrar"}
         </Button>
+      </WindowActions>
+    </>
+  );
+}
+
+/** Janela só de leitura com a Justificativa de um Ajuste de Estoque. */
+export function VerJustificativaWindow({ justificativa }: { justificativa: Justificativa }) {
+  const campos = [
+    ["Motivo", justificativa.motivo],
+    ["Observação", justificativa.observacao || "Sem observação"],
+    ["Justificado por", justificativa.justificadoPor || "—"],
+  ] as const;
+  return (
+    <>
+      <Stack gap="section">
+        {campos.map(([rotulo, valor]) => (
+          <Stack key={rotulo} gap="tight">
+            <Text variant="caption" tone="muted">
+              {rotulo}
+            </Text>
+            <Text>{valor}</Text>
+          </Stack>
+        ))}
+      </Stack>
+      <WindowActions>
+        <WindowCancelButton>Fechar</WindowCancelButton>
       </WindowActions>
     </>
   );

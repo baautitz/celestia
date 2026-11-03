@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDownToLine, CheckCircle2, MessageSquarePlus, Pencil, Plus, Trash2, MoreHorizontal } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, CheckCircle2, Eye, MessageSquarePlus, Pencil, Plus, Trash2, MoreHorizontal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
@@ -14,7 +14,7 @@ import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatCurrency, formatDate, formatNumber } from "@platform/ui/lib/format";
-import { BASE, JustificativaWindow, MotivoWindow, type Justificativa, type Motivo } from "./furo-estoque-window";
+import { BASE, JustificativaWindow, MotivoWindow, VerJustificativaWindow, type Justificativa, type Motivo } from "./furo-estoque-window";
 
 const TODAS = "todas";
 
@@ -147,6 +147,17 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
     if (resultado.status === "confirmed") void carregar();
   };
 
+  const verJustificativa = async (ajuste: Ajuste) => {
+    if (!ajuste.justificativa) return;
+    await windows.open({
+      surface: "dialog",
+      size: "small",
+      title: "Justificativa",
+      description: `Ajuste ${ajuste.codigoMovimento} · ${nomeLoja(ajuste.codigoLoja)} · ${formatCurrency(ajuste.totalCusto)}`,
+      content: () => <VerJustificativaWindow justificativa={ajuste.justificativa!} />,
+    });
+  };
+
   const excluir = async (ajuste: Ajuste) => {
     const j = ajuste.justificativa;
     if (!j) return;
@@ -183,6 +194,7 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
     },
     {
       key: "justificativa",
+      centered: true,
       label: "Justificativa",
       value: (a) => a.justificativa?.motivo ?? "",
       searchable: true,
@@ -190,11 +202,11 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
       mobileRole: "primary",
       render: (a) =>
         a.justificativa ? (
-          <Stack direction="row" gap="tight" align="center" wrap>
+          <Stack direction="row" gap="tight" align="center" justify="center">
             <Badge variant="success">{a.justificativa.motivo}</Badge>
-            <Text variant="caption" tone="muted">
-              {[a.justificativa.observacao, a.justificativa.justificadoPor && `por ${a.justificativa.justificadoPor}`].filter(Boolean).join(" · ")}
-            </Text>
+            <Button size="icon" variant="ghost" aria-label={`Ver Justificativa do Ajuste ${a.codigoMovimento}`} onClick={() => void verJustificativa(a)}>
+              <Eye />
+            </Button>
           </Stack>
         ) : (
           <Badge variant="warning">Não justificado</Badge>

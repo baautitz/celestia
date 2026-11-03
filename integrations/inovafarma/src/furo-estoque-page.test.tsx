@@ -77,6 +77,17 @@ describe("Furo de Estoque", () => {
     expect(screen.getByRole("button", { name: "Justificar Ajuste 100" })).toBeTruthy();
   });
 
+  it("o Ajuste justificado mostra um olho que abre a Justificativa", async () => {
+    ajustes = [ajuste(200, -9, { ...justificado, observacao: "Quebrou na prateleira" })];
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Justificados" }, { timeout: 5000 }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ver Justificativa do Ajuste 200" }));
+    const janela = await screen.findByRole("dialog");
+    expect(within(janela).getByText("Vencido")).toBeTruthy();
+    expect(within(janela).getByText("Quebrou na prateleira")).toBeTruthy();
+    expect(within(janela).getByText("gil")).toBeTruthy();
+  });
+
   it("a busca encontra o Ajuste pelo produto, por nome ou código de barras", async () => {
     const item = { produtoId: "p1", nome: "DIPIRONA 500MG", codigoBarra: "7891234567890", quantidade: 1, precoCusto: 9, totalCusto: 9 };
     ajustes = [{ ...ajuste(100, -9, null), itens: [item] }, ajuste(300, -5, null)];
