@@ -28,6 +28,9 @@ export interface ItemPreVencido {
   version: number;
 }
 
+/** O que a gravação devolve: a edição vem sem o Restante, que depende das vendas do ERP. */
+export type ItemSalvo = Omit<ItemPreVencido, "restante"> & { restante?: number };
+
 const schema = z.object({
   produtoId: z.string().min(1, "Busque e selecione o produto."),
   quantidade: z.string().regex(/^[1-9]\d{0,6}$/, "Informe uma quantidade inteira maior que zero."),
@@ -43,7 +46,7 @@ interface Props {
 
 /** Janela de Item de Pré-vencido (incluir ou editar) no Estoque de uma Loja; resolve com o Item salvo. */
 export function ItemPreVencidoWindow({ codigoLoja, item }: Props) {
-  const { resolve } = useWindow<ItemPreVencido>();
+  const { resolve } = useWindow<ItemSalvo>();
   const { feedback } = useUi();
   const form = useForm<Valores>({
     resolver: zodResolver(schema),
@@ -54,12 +57,12 @@ export function ItemPreVencidoWindow({ codigoLoja, item }: Props) {
     const corpo = { quantidade: Number(valores.quantidade), validade: valores.validade };
     try {
       const salvo = item
-        ? await apiFetch<ItemPreVencido>(`${BASE}/estoque/itens/${item.id}`, {
+        ? await apiFetch<ItemSalvo>(`${BASE}/estoque/itens/${item.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ...corpo, version: item.version }),
           })
-        : await apiFetch<ItemPreVencido>(`${BASE}/estoque/itens`, {
+        : await apiFetch<ItemSalvo>(`${BASE}/estoque/itens`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ codigoLoja, produtoId: valores.produtoId, ...corpo }),

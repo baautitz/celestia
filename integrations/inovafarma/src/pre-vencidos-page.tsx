@@ -14,6 +14,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
+import { BaixasPreVencidosTab } from "./baixas-pre-vencidos-tab";
 import { EstoquePreVencidosTab } from "./estoque-pre-vencidos-tab";
 import { LancamentoWindow, type Lancamento, type LojaOpcao } from "./pre-vencido-window";
 
@@ -32,6 +33,7 @@ interface Contexto {
   podeLancar: boolean;
   podeConferir: boolean;
   podeEstoque: boolean;
+  podeBaixas: boolean;
   vinculado: boolean;
   /** Closing Periods, o de data mais recente primeiro; só os abertos aceitam lançar, editar e excluir. */
   periodos: Periodo[];
@@ -40,6 +42,8 @@ interface Contexto {
   lojasConferencia?: LojaOpcao[];
   /** Lojas do Vínculo, para o Estoque. */
   lojasEstoque?: LojaOpcao[];
+  /** Lojas do Vínculo, para as Baixas. */
+  lojasBaixas?: LojaOpcao[];
 }
 
 interface DetalheConferencia {
@@ -318,12 +322,12 @@ function Conferencia({ contexto }: { contexto: Contexto }) {
   );
 }
 
-/** Tela Pré-vencidos: o Estoque de cada Loja; o vendedor lança os seus; o gestor confere o declarado com as vendas do ERP. */
+/** Tela Pré-vencidos: o Estoque de cada Loja e as Baixas que as vendas fazem nele; o vendedor lança os seus; o gestor confere o declarado com as vendas do ERP. */
 export function PreVencidosPage() {
   const { feedback } = useUi();
   const [contexto, setContexto] = useState<Contexto | null>(null);
-  const [aba, setAba] = useTabParam<"estoque" | "lancamentos" | "conferencia">(
-    contexto ? [contexto.podeEstoque && "estoque", contexto.podeLancar && "lancamentos", contexto.podeConferir && "conferencia"] : [],
+  const [aba, setAba] = useTabParam<"estoque" | "baixas" | "lancamentos" | "conferencia">(
+    contexto ? [contexto.podeEstoque && "estoque", contexto.podeBaixas && "baixas", contexto.podeLancar && "lancamentos", contexto.podeConferir && "conferencia"] : [],
   );
 
   useEffect(() => {
@@ -338,12 +342,15 @@ export function PreVencidosPage() {
       <Tabs value={aba} onValueChange={setAba}>
         <TabsList>
           {contexto.podeEstoque && <TabsTrigger value="estoque">Estoque</TabsTrigger>}
+          {contexto.podeBaixas && <TabsTrigger value="baixas">Baixas</TabsTrigger>}
           {contexto.podeLancar && <TabsTrigger value="lancamentos">Meus Lançamentos</TabsTrigger>}
           {contexto.podeConferir && <TabsTrigger value="conferencia">Conferência</TabsTrigger>}
         </TabsList>
       </Tabs>
       {aba === "estoque" ? (
         <EstoquePreVencidosTab lojas={contexto.lojasEstoque ?? []} />
+      ) : aba === "baixas" ? (
+        <BaixasPreVencidosTab lojas={contexto.lojasBaixas ?? []} periodos={contexto.periodos} />
       ) : aba === "lancamentos" ? (
         <MeusLancamentos contexto={contexto} />
       ) : (

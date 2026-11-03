@@ -26,6 +26,11 @@ describe("menu dos módulos registrados", () => {
     expect(menu.find((s) => s.label === "Lançamentos")?.entries.map((e) => e.label)).toEqual(["Pré-vencidos"]);
   });
 
+  it("quem só gere as Baixas de Pré-vencidos vê a entrada Pré-vencidos", () => {
+    const menu = menuSections((permission) => permission === "inovafarma:pre-vencidos-baixas:manage");
+    expect(menu.find((s) => s.label === "Lançamentos")?.entries.map((e) => e.label)).toEqual(["Pré-vencidos"]);
+  });
+
   it("quem só confere Pré-vencidos vê só essa entrada, na Seção Lançamentos", () => {
     const menu = menuSections((permission) => permission === "inovafarma:pre-vencidos-conferencia:view");
     expect(menu.map((s) => s.label)).toEqual(["Lançamentos"]);

@@ -5,13 +5,14 @@ import { Button } from "@platform/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
 import { Show, Stack } from "@platform/ui/components/layout";
+import { Switch } from "@platform/ui/components/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { HeaderActions } from "@platform/ui/context/header-actions";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
-import { ItemPreVencidoWindow, type ItemPreVencido } from "./item-pre-vencido-window";
+import { ItemPreVencidoWindow, type ItemPreVencido, type ItemSalvo } from "./item-pre-vencido-window";
 import type { LojaOpcao } from "./pre-vencido-window";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
@@ -22,6 +23,7 @@ const validadeLabel = (validade: string) => validade.split("-").reverse().join("
 export function EstoquePreVencidosTab({ lojas }: { lojas: LojaOpcao[] }) {
   const { feedback, windows } = useUi();
   const [loja, setLoja] = useState(lojas.length > 0 ? String(lojas[0]!.codigo) : "");
+  const [zerados, setZerados] = useState(false);
   const [itens, setItens] = useState<ItemPreVencido[]>([]);
   const [carregando, setCarregando] = useState(false);
 
@@ -32,14 +34,14 @@ export function EstoquePreVencidosTab({ lojas }: { lojas: LojaOpcao[] }) {
     const minha = ++consulta.current;
     setCarregando(true);
     try {
-      const recebidos = await apiFetch<ItemPreVencido[]>(`${BASE}/estoque/itens?codigoLoja=${encodeURIComponent(loja)}`);
+      const recebidos = await apiFetch<ItemPreVencido[]>(`${BASE}/estoque/itens?codigoLoja=${encodeURIComponent(loja)}${zerados ? "&zerados=true" : ""}`);
       if (minha === consulta.current) setItens(recebidos);
     } catch (err: unknown) {
       if (minha === consulta.current) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar o Estoque de Pré-vencidos."));
     } finally {
       if (minha === consulta.current) setCarregando(false);
     }
-  }, [loja, feedback]);
+  }, [loja, zerados, feedback]);
 
   useEffect(() => {
     void carregar();
@@ -55,7 +57,7 @@ export function EstoquePreVencidosTab({ lojas }: { lojas: LojaOpcao[] }) {
   }
 
   const abrir = async (item?: ItemPreVencido) => {
-    const resultado = await windows.open<ItemPreVencido>({
+    const resultado = await windows.open<ItemSalvo>({
       surface: "dialog",
       size: "small",
       title: item ? "Editar Item" : "Incluir Item",
@@ -66,7 +68,10 @@ export function EstoquePreVencidosTab({ lojas }: { lojas: LojaOpcao[] }) {
     // O Item salvo já aparece na tabela; a recarga confirma com o servidor.
     const salvo = resultado.value;
     if (String(salvo.codigoLoja) === loja) {
-      setItens((atuais) => (atuais.some((i) => i.id === salvo.id) ? atuais.map((i) => (i.id === salvo.id ? salvo : i)) : [...atuais, salvo]));
+      // A edição volta sem o Restante, que depende das vendas: fica o anterior até a recarga.
+      setItens((atuais) =>
+        atuais.some((i) => i.id === salvo.id) ? atuais.map((i) => (i.id === salvo.id ? { ...i, ...salvo } : i)) : [...atuais, { ...salvo, restante: salvo.restante ?? salvo.quantidade }],
+      );
     }
     void carregar();
   };
@@ -93,6 +98,7 @@ export function EstoquePreVencidosTab({ lojas }: { lojas: LojaOpcao[] }) {
     { key: "codigoBarra", label: "Código de barras", value: (i) => i.codigoBarra ?? "", searchable: true },
     { key: "validade", centered: true, label: "Validade", value: (i) => i.validade, render: (i) => validadeLabel(i.validade), sortable: true },
     { key: "quantidade", label: "Quantidade", value: (i) => i.quantidade, format: "number", sortable: true },
+    { key: "restante", label: "Restante", value: (i) => i.restante, format: "number", sortable: true },
     { key: "incluidoEm", centered: true, label: "Incluído em", value: (i) => i.incluidoEm, render: (i) => formatDate(i.incluidoEm), sortable: true },
   ];
 
@@ -133,6 +139,10 @@ export function EstoquePreVencidosTab({ lojas }: { lojas: LojaOpcao[] }) {
             ))}
           </SelectContent>
         </Select>
+      </Stack>
+      <Stack direction="row" align="center" gap="field">
+        <Switch id="estoque-zerados" checked={zerados} onCheckedChange={(on: boolean) => setZerados(on)} aria-label="Mostrar Itens zerados" />
+        <Label htmlFor="estoque-zerados">Mostrar Itens zerados</Label>
       </Stack>
       <DataTable
         scroll="page"

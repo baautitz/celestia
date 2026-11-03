@@ -78,6 +78,14 @@ describe("aba Estoque", () => {
     expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/estoque/itens?codigoLoja=1"));
   });
 
+  it("mostra o Restante e traz os Itens zerados só pelo filtro", async () => {
+    renderizar();
+    await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
+    expect(screen.getByRole("columnheader", { name: /Restante/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("switch", { name: "Mostrar Itens zerados" }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/estoque/itens?codigoLoja=1&zerados=true")));
+  });
+
   it("inclui um Item em janela, enviando o identificador opaco do produto, e a lista volta do servidor", async () => {
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
