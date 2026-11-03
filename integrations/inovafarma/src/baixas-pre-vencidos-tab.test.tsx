@@ -70,6 +70,27 @@ describe("aba Baixas", () => {
     expect(screen.getAllByRole("cell", { name: "DIPIRONA 500MG" })).toHaveLength(2);
   });
 
+  it("filtra as Baixas pelo produto buscado por nome ou código de barras, refazendo o total do Colaborador", async () => {
+    const dois = [
+      grupos[0],
+      {
+        codigoColaborador: 8,
+        nomeColaborador: "BRUNO LIMA",
+        quantidade: 5,
+        vendas: [{ codigoLoja: 1, vendaId: 601, data: "2027-04-04 09:00:00", produtoId: "guid-2", nomeProduto: "AMOXICILINA 500MG", codigoBarra: "456", quantidadeVendida: 5, quantidade: 5 }],
+      },
+    ];
+    apiFetch.mockImplementation(async (url: string) => (url.endsWith("/contexto") ? contexto() : dois));
+    renderizar();
+    expect(await screen.findByRole("cell", { name: "BRUNO LIMA" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Produto"), { target: { value: "dipirona" } });
+    expect(screen.queryByRole("cell", { name: "BRUNO LIMA" })).toBeNull();
+    expect(screen.getByRole("cell", { name: "ANA SOUZA" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Produto"), { target: { value: "456" } });
+    expect(screen.queryByRole("cell", { name: "ANA SOUZA" })).toBeNull();
+    expect(screen.getByRole("cell", { name: "BRUNO LIMA" })).toBeTruthy();
+  });
+
   it("sem Baixas no período, avisa", async () => {
     apiFetch.mockImplementation(async (url: string) => (url.endsWith("/contexto") ? contexto() : []));
     renderizar();
