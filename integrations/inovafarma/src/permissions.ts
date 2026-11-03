@@ -42,6 +42,11 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
   },
+  "pre-vencidos-estoque:manage": {
+    label: "Pré-vencidos: Gerir o Estoque",
+    description: "Permite incluir, editar e excluir Itens de Pré-vencido no Estoque das Lojas do Colaborador vinculado ao Usuário.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir o Estoque de Pré-vencidos.",
+  },
   "avaliacoes-individual:view": {
     label: "Avaliações: Visualização Individual",
     description: "Permite ver as Avaliações recebidas pelo Colaborador vinculado ao Usuário.",

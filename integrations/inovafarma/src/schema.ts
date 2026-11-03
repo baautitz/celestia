@@ -44,6 +44,31 @@ export const preVencidosLancamentos = inovafarmaSchema.table(
   (t) => [index("pre_vencidos_lancamentos_periodo_idx").on(t.periodoId, t.codigoColaborador)],
 );
 
+/** Itens de Pré-vencido do Estoque de cada Loja: contínuo, sem Closing Period. */
+export const preVencidosItens = inovafarmaSchema.table(
+  "pre_vencidos_itens",
+  {
+    id: text("id").primaryKey(),
+    /** Código da Loja no ERP, sem FK. */
+    codigoLoja: integer("codigo_loja").notNull(),
+    /** Identificador opaco do produto (`Produto.rowguid`): é o que a API expõe. */
+    produtoId: text("produto_id").notNull(),
+    /** Código do produto no ERP: o ERP bloqueia a exibição dele, então fica só no servidor. */
+    codigoProduto: integer("codigo_produto").notNull(),
+    nomeProduto: text("nome_produto").notNull(),
+    codigoBarra: text("codigo_barra"),
+    /** Mês e ano da validade, `AAAA-MM`. */
+    validade: text("validade").notNull(),
+    quantidade: integer("quantidade").notNull(),
+    /** Só as vendas a partir da data de inclusão gastam o Item. */
+    incluidoEm: timestamp("incluido_em").notNull(),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [index("pre_vencidos_itens_loja_idx").on(t.codigoLoja, t.incluidoEm)],
+);
+
 export const avaliacoes = inovafarmaSchema.table(
   "avaliacoes",
   {

@@ -123,6 +123,7 @@
           "inovafarma:colaboradores:update",
           "inovafarma:pre-vencidos-lancamento:manage",
           "inovafarma:pre-vencidos-conferencia:view",
+          "inovafarma:pre-vencidos-estoque:manage",
           "inovafarma:avaliacoes-individual:view",
           "inovafarma:avaliacoes-loja:manage",
           "inovafarma:avaliacoes-geral:manage",
@@ -320,6 +321,7 @@
         "inovafarma:colaboradores:update",
         "inovafarma:pre-vencidos-lancamento:manage",
         "inovafarma:pre-vencidos-conferencia:view",
+        "inovafarma:pre-vencidos-estoque:manage",
         "inovafarma:avaliacoes-individual:view",
         "inovafarma:avaliacoes-loja:manage",
         "inovafarma:avaliacoes-geral:manage",
@@ -539,6 +541,13 @@
             "label": "Conferir Pré-vencidos",
             "description": "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pre-vencidos-estoque:manage",
+            "label": "Pré-vencidos: Gerir o Estoque",
+            "description": "Permite incluir, editar e excluir Itens de Pré-vencido no Estoque das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir o Estoque de Pré-vencidos.",
             "module": "inovafarma"
           },
           {
@@ -821,6 +830,13 @@
             "label": "Conferir Pré-vencidos",
             "description": "Permite ver a Conferência dos Lançamentos de Pré-vencidos de todos os Colaboradores com as vendas do ERP.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para conferir os Pré-vencidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pre-vencidos-estoque:manage",
+            "label": "Pré-vencidos: Gerir o Estoque",
+            "description": "Permite incluir, editar e excluir Itens de Pré-vencido no Estoque das Lojas do Colaborador vinculado ao Usuário.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir o Estoque de Pré-vencidos.",
             "module": "inovafarma"
           },
           {

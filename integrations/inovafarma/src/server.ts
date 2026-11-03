@@ -30,6 +30,10 @@ import { declarePreVencidoAudit } from "./pre-vencidos-audit.js";
 import { registerPreVencidosRoutes, type PeriodsService } from "./pre-vencidos-routes.js";
 import { MemoryPreVencidoStore } from "./pre-vencidos-store.js";
 import { PostgresPreVencidoStore } from "./postgres-pre-vencido-store.js";
+import { declareItemPreVencidoAudit } from "./estoque-pre-vencidos-audit.js";
+import { registerEstoquePreVencidosRoutes } from "./estoque-pre-vencidos-routes.js";
+import { MemoryEstoquePreVencidoStore } from "./estoque-pre-vencidos-store.js";
+import { PostgresEstoquePreVencidoStore } from "./postgres-estoque-pre-vencidos-store.js";
 import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
 import { MemoryVinculoStore } from "./vinculo-store.js";
 import { CATEGORIAS, desempenhoSql, porCategoria, type CategoriaColuna, type CategoriaTotais } from "./desempenho-vendas.js";
@@ -72,6 +76,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       const audit = services.use<AuditService>("audit", "log");
       declareVinculoAudit(audit);
       declarePreVencidoAudit(audit);
+      declareItemPreVencidoAudit(audit);
       declareAvaliacaoAudit(audit);
       declareFuroEstoqueAudit(audit);
       declareTiposMetaAudit(audit);
@@ -99,6 +104,15 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         store: preVencidos,
         vinculos: store,
         periods,
+        audit,
+      });
+      registerEstoquePreVencidosRoutes({
+        routes,
+        permissions,
+        auth,
+        erpClient: () => erpClients[erpId],
+        store: db ? new PostgresEstoquePreVencidoStore(db) : new MemoryEstoquePreVencidoStore(),
+        vinculos: store,
         audit,
       });
       registerAvaliacoesRoutes({

@@ -1,4 +1,4 @@
-/** Busca de Produto no ERP, usada no lançamento de Pré-vencidos e na Lista de Produtos do Tipo de Meta. */
+/** Busca de Produto no ERP, usada no Estoque e no lançamento de Pré-vencidos e na Lista de Produtos do Tipo de Meta. */
 
 /** Mínimo de caracteres da busca de Produto: o ERP tem dezenas de milhares de cadastros. */
 export const MIN_BUSCA_PRODUTO = 3;
@@ -25,3 +25,14 @@ export const buscaProdutosSql = ({ somenteAtivos }: { somenteAtivos: boolean }) 
          OR p.NomeProduto LIKE @buscaLike ESCAPE '\\')
   ORDER BY p.NomeProduto
 `;
+
+// O código do produto no ERP é bloqueado para o usuário: a API só fala em `produtoId` (Produto.rowguid).
+/** Um Produto pelo identificador opaco (`@produtoId`), com o código do ERP, que fica só no servidor. */
+export const PRODUTO_SQL = `
+  SELECT p.CodigoProduto AS codigoProduto, CONVERT(varchar(36), p.rowguid) AS produtoId,
+         LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra
+  FROM Produto p
+  WHERE p.Eliminado = 0 AND CONVERT(varchar(36), p.rowguid) = @produtoId
+`;
+
+export type LinhaProduto = { codigoProduto: number; produtoId: string; nome: string | null; codigoBarra: string | null };

@@ -4,7 +4,7 @@ import type { ModuleContext } from "@platform/core/module";
 import { COLABORADORES_SQL, LOJAS_SQL } from "./colaboradores-routes.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { conferir } from "./pre-vencidos-conferencia.js";
-import { buscaProdutosSql, MIN_BUSCA_PRODUTO, parametrosBusca } from "./produtos-erp.js";
+import { buscaProdutosSql, MIN_BUSCA_PRODUTO, parametrosBusca, PRODUTO_SQL, type LinhaProduto } from "./produtos-erp.js";
 import { PRE_VENCIDO_ACTIONS, PRE_VENCIDO_PLUGIN, PRE_VENCIDO_TARGET, type AtributosPreVencido } from "./pre-vencidos-audit.js";
 import type { LancamentoPreVencido, PreVencidoStore } from "./pre-vencidos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
@@ -52,15 +52,6 @@ const Quantidade = z.number().int().min(1).max(1_000_000);
 const Novo = z.object({ periodoId: z.string().min(1), codigoLoja: z.number().int().min(1), produtoId: z.string().regex(UUID), quantidade: Quantidade, validade: Validade });
 const Edicao = z.object({ quantidade: Quantidade, validade: Validade, version: z.number().int().min(1) });
 
-// O código do produto no ERP é bloqueado para o usuário: a API só fala em `produtoId` (Produto.rowguid).
-const PRODUTO_SQL = `
-  SELECT p.CodigoProduto AS codigoProduto, CONVERT(varchar(36), p.rowguid) AS produtoId,
-         LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra
-  FROM Produto p
-  WHERE p.Eliminado = 0 AND CONVERT(varchar(36), p.rowguid) = @produtoId
-`;
-
-type LinhaProduto = { codigoProduto: number; produtoId: string; nome: string | null; codigoBarra: string | null };
 export type LinhaBusca = { produtoId: string; nome: string | null; codigoBarra: string | null };
 export type LinhaVenda = { codigoColaborador: number; produtoId: string; quantidade: number | null };
 
@@ -86,6 +77,7 @@ const publico = ({ codigoProduto: _codigoProduto, ...resto }: LancamentoPreVenci
 export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient, store, vinculos, periods, audit }: PreVencidosRoutesDeps): void {
   const lancar = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-lancamento:manage");
   const conferirPerm = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-conferencia:view");
+  const estoque = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-estoque:manage");
   const pode = (c: AuthContext, ref: { key: string }) => permissions.has(c.get("user")?.permissions, ref.key);
 
   const vinculoDe = async (c: AuthContext) => {
@@ -132,27 +124,31 @@ export function registerPreVencidosRoutes({ routes, permissions, auth, erpClient
   routes.get("/pre-vencidos/contexto", auth, async (c: AuthContext) => {
     const podeLancar = pode(c, lancar);
     const podeConferir = pode(c, conferirPerm);
-    if (!podeLancar && !podeConferir) return c.json({ error: lancar.deniedMessage }, 403);
+    const podeEstoque = pode(c, estoque);
+    if (!podeLancar && !podeConferir && !podeEstoque) return c.json({ error: estoque.deniedMessage }, 403);
 
     const todos = (await periods.list()).sort((a, b) => b.startDate.localeCompare(a.startDate));
     const client = erpClient();
-    const vinculo = podeLancar ? await vinculoDe(c) : null;
-    const lojasErp = podeLancar || podeConferir ? await lojasDoErp(client) : [];
+    const vinculo = podeLancar || podeEstoque ? await vinculoDe(c) : null;
+    const lojasErp = await lojasDoErp(client);
     const nomeLoja = (codigo: number) => lojasErp.find((l) => l.codigo === codigo)?.nome ?? "";
 
     return c.json({
       podeLancar,
       podeConferir,
+      podeEstoque,
       vinculado: vinculo !== null,
       // Todos os períodos: o Colaborador consulta os fechados, mas só lança, edita e exclui nos abertos.
       periodos: todos,
       lojas: (vinculo?.lojas ?? []).map((codigo) => ({ codigo, nome: nomeLoja(codigo) })),
       ...(podeConferir ? { periodosConferencia: todos, lojasConferencia: lojasErp } : {}),
+      // Estoque: só as Lojas do Vínculo.
+      ...(podeEstoque ? { lojasEstoque: (vinculo?.lojas ?? []).map((codigo) => ({ codigo, nome: nomeLoja(codigo) })) } : {}),
     });
   });
 
   routes.get("/pre-vencidos/produtos", auth, async (c: AuthContext) => {
-    if (!pode(c, lancar)) return c.json({ error: lancar.deniedMessage }, 403);
+    if (!pode(c, lancar) && !pode(c, estoque)) return c.json({ error: estoque.deniedMessage }, 403);
     const q = (c.req.query("q") ?? "").trim();
     if (q.length < MIN_BUSCA_PRODUTO) return c.json([]);
     const client = erpClient();
