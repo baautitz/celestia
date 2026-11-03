@@ -7,11 +7,12 @@ import { useAuth } from "@/context/AuthContext";
 import type { Role, PermissionCatalog, PermissionItem } from "@platform/shared";
 import { Card, CardHeader, CardTitle, CardContent } from "@platform/ui/components/card";
 import { Button } from "@platform/ui/components/button";
-import { PageHeader, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
+import { Grid, PageHeader, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { Input } from "@platform/ui/components/input";
 import { Textarea } from "@platform/ui/components/textarea";
 import { Badge } from "@platform/ui/components/badge";
 import { Switch } from "@platform/ui/components/switch";
+import { Label } from "@platform/ui/components/label";
 import { FieldGroup } from "@platform/ui/components/field";
 import {
   Form,
@@ -49,12 +50,12 @@ const roleSchema = z.object({
 });
 type RoleFormValues = z.infer<typeof roleSchema>;
 
-interface RoleSheetProps {
+interface RoleWindowProps {
   role: Role | null;
   catalog: PermissionCatalog | null;
 }
 
-const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
+const RoleWindowContent: React.FC<RoleWindowProps> = ({ role, catalog }) => {
   const { resolve, setTitle } = useWindow<true>();
   const { feedback } = useUi();
   const isEditMode = role !== null;
@@ -112,6 +113,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
         >
 <Stack gap="section">
           <FieldGroup>
+            <Grid columns="split" gap="group">
             <FormField
               control={form.control}
               name="name"
@@ -138,6 +140,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                 </FormItem>
               )}
             />
+            </Grid>
             <FormField
               control={form.control}
               name="description"
@@ -173,7 +176,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Stack gap="group">
+                  <Grid columns="masonry" gap="section">
                   {catalog &&
                     Object.entries(catalog.system).map(([moduleName, perms]) => (
                       <Stack key={moduleName} gap="field">
@@ -182,7 +185,8 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                         </Stack>
                         <Stack divided>
                           {perms.map((p: PermissionItem) => (
-                            <Stack key={p.key} direction="row" align="center" justify="between" gap="section" padding="compact">
+                            <Label key={p.key} htmlFor={`perm-${p.key}`}>
+                            <Stack grow direction="row" align="center" justify="between" gap="section" padding="compact">
                               <Stack grow>
                                 <Text variant="mono" weight="medium" breakAll>
                                   {p.key}
@@ -194,6 +198,7 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                                 )}
                               </Stack>
                               <Switch
+                                id={`perm-${p.key}`}
                                 checked={field.value.includes("*") || field.value.includes(p.key)}
                                 onCheckedChange={(checked: boolean) =>
                                   field.onChange(
@@ -204,11 +209,12 @@ const RoleSheetContent: React.FC<RoleSheetProps> = ({ role, catalog }) => {
                                 }
                               />
                             </Stack>
+                            </Label>
                           ))}
                         </Stack>
                       </Stack>
                     ))}
-                  </Stack>
+                  </Grid>
                 </CardContent>
               </Card>
             )}
@@ -256,17 +262,18 @@ export const IAMRolesPage: React.FC = () => {
     fetchDataRef.current();
   }, [fetchDataRef]);
 
-  const openSheet = async (role: Role | null) => {
+  const openRoleWindow = async (role: Role | null) => {
     const result = await ui.windows.open<true>({
-      surface: "sheet",
+      surface: "dialog",
+      size: "full",
       title: role ? `Editar Grupo: ${role.name}` : "Novo Grupo de Acesso",
       description: "Configure os dados básicos do grupo e selecione as permissões atribuídas.",
-      content: () => <RoleSheetContent role={role} catalog={catalog} />,
+      content: () => <RoleWindowContent role={role} catalog={catalog} />,
     });
     if (result.status === "confirmed") fetchData();
   };
-  const openCreateSheet = () => openSheet(null);
-  const openEditSheet = (r: Role) => openSheet(r);
+  const openCreateWindow = () => openRoleWindow(null);
+  const openEditWindow = (r: Role) => openRoleWindow(r);
 
   const columns: DataTableColumn<Role>[] = [
     {
@@ -316,7 +323,7 @@ export const IAMRolesPage: React.FC = () => {
 
         {hasPermission("system:roles:create") && (
           <Show on="lgUp">
-            <Button onClick={openCreateSheet}>
+            <Button onClick={openCreateWindow}>
             <PlusCircle />
             Novo Grupo
             </Button>
@@ -330,7 +337,7 @@ export const IAMRolesPage: React.FC = () => {
               <MoreHorizontal />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={openCreateSheet}>
+              <DropdownMenuItem onClick={openCreateWindow}>
                 <PlusCircle />
                 Novo Grupo
               </DropdownMenuItem>
@@ -354,7 +361,7 @@ export const IAMRolesPage: React.FC = () => {
         emptyMessage="Nenhum grupo de acesso cadastrado."
         rowActions={(r) =>
           hasPermission("system:roles:update") ? (
-            <Button variant="ghost" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditSheet(r)}>
+            <Button variant="ghost" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditWindow(r)}>
               <Edit2 />
             </Button>
           ) : null
