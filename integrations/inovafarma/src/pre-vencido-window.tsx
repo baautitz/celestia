@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@platform/ui/components/button";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@platform/ui/components/combobox";
-import { Field, FieldGroup } from "@platform/ui/components/field";
+import { FieldGroup } from "@platform/ui/components/field";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
 import { Input } from "@platform/ui/components/input";
 import { Label } from "@platform/ui/components/label";
@@ -137,12 +137,8 @@ export function LancamentoWindow({ periodoId, lojas, lancamento }: Props) {
       <Form {...form}>
         <form id="lancamento-pre-vencido-form" noValidate onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup>
-            {lancamento ? (
-              <Field>
-                <Label htmlFor="pre-vencido-produto-atual">Produto</Label>
-                <Input id="pre-vencido-produto-atual" readOnly value={lancamento.nomeProduto} />
-              </Field>
-            ) : (
+            {/* Na edição o produto não muda; o nome já aparece na descrição da janela. */}
+            {!lancamento && (
               <>
                 <FormField
                   control={form.control}
