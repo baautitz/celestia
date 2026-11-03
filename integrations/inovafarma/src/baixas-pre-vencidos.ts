@@ -39,15 +39,17 @@ export interface EstadoCongelado {
   restante: Record<string, number>;
 }
 
-/**
- * Entrada do motor. Pensada para crescer sem quebrar quem já chama: as Correções de Baixa (quantidade fixada de uma
- * linha de venda, identificada por `chaveDaLinha`) entram aqui como um campo novo.
- */
+/** Entrada do motor. */
 export interface EntradaBaixas<V extends VendaParaBaixa = VendaParaBaixa> {
   itens: readonly ItemParaBaixa[];
   vendas: readonly V[];
   /** Estado do último Closing Period fechado; sem ele, o motor parte das quantidades incluídas. */
   congelado?: EstadoCongelado | null;
+  /**
+   * Correções de Baixa: a quantidade de Pré-vencido fixada para uma linha de venda, pela `chaveDaLinha`. A linha baixa
+   * no máximo isso (e o que a venda teve e o disponível); o que deixa de baixar fica para as vendas seguintes.
+   */
+  correcoes?: Readonly<Record<string, number>>;
 }
 
 export interface BaixaDeVenda<V extends VendaParaBaixa = VendaParaBaixa> {
@@ -56,10 +58,12 @@ export interface BaixaDeVenda<V extends VendaParaBaixa = VendaParaBaixa> {
   quantidade: number;
   /** De quais Itens saiu, na ordem em que foram gastos. */
   itens: { itemId: string; quantidade: number }[];
+  /** A linha tem Correção de Baixa: aparece mesmo que a Correção a tenha zerado. */
+  corrigida: boolean;
 }
 
 export interface ResultadoBaixas<V extends VendaParaBaixa = VendaParaBaixa> {
-  /** Só as vendas que baixaram algo, na ordem da data. */
+  /** Só as vendas que baixaram algo ou têm Correção, na ordem da data. */
   baixas: BaixaDeVenda<V>[];
   /** Restante de cada Item, pelo id. */
   restante: Record<string, number>;
@@ -71,7 +75,7 @@ export const chaveDaLinha = (venda: Pick<VendaParaBaixa, "vendaId" | "produtoId"
 /** Ordem em que a prateleira entrega: validade mais próxima, depois o Item incluído antes. */
 const ordemDeSaida = (a: ItemParaBaixa, b: ItemParaBaixa) => a.validade.localeCompare(b.validade) || a.incluidoEm.localeCompare(b.incluidoEm) || a.id.localeCompare(b.id);
 
-export function calcularBaixas<V extends VendaParaBaixa>({ itens, vendas, congelado }: EntradaBaixas<V>): ResultadoBaixas<V> {
+export function calcularBaixas<V extends VendaParaBaixa>({ itens, vendas, congelado, correcoes = {} }: EntradaBaixas<V>): ResultadoBaixas<V> {
   const restante: Record<string, number> = Object.fromEntries(itens.map((i) => [i.id, congelado?.restante[i.id] ?? i.quantidade]));
   const porProduto = new Map<string, ItemParaBaixa[]>();
   for (const item of [...itens].sort(ordemDeSaida)) {
@@ -82,7 +86,9 @@ export function calcularBaixas<V extends VendaParaBaixa>({ itens, vendas, congel
   const emOrdem = [...vendas].sort((a, b) => a.data.localeCompare(b.data) || a.vendaId - b.vendaId);
   for (const venda of emOrdem) {
     if (venda.cancelada || venda.quantidade <= 0 || (congelado && venda.data <= congelado.ate)) continue;
-    let falta = venda.quantidade;
+    const corrigida = correcoes[chaveDaLinha(venda)];
+    const pedida = corrigida === undefined ? venda.quantidade : Math.max(0, Math.min(corrigida, venda.quantidade));
+    let falta = pedida;
     const gastos: { itemId: string; quantidade: number }[] = [];
     for (const item of porProduto.get(venda.produtoId) ?? []) {
       if (falta <= 0) break;
@@ -92,7 +98,7 @@ export function calcularBaixas<V extends VendaParaBaixa>({ itens, vendas, congel
       falta -= gasto;
       gastos.push({ itemId: item.id, quantidade: gasto });
     }
-    if (gastos.length > 0) baixas.push({ venda, quantidade: venda.quantidade - falta, itens: gastos });
+    if (gastos.length > 0 || corrigida !== undefined) baixas.push({ venda, quantidade: pedida - falta, itens: gastos, corrigida: corrigida !== undefined });
   }
   return { baixas, restante };
 }

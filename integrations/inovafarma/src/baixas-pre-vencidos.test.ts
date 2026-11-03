@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcularBaixas, type ItemParaBaixa, type VendaParaBaixa } from "./baixas-pre-vencidos.js";
+import { calcularBaixas, chaveDaLinha, type ItemParaBaixa, type VendaParaBaixa } from "./baixas-pre-vencidos.js";
 
 const item = (id: string, quantidade: number, validade: string, incluidoEm = "2027-04-01 08:00:00", produtoId = "dipirona"): ItemParaBaixa => ({ id, produtoId, validade, quantidade, incluidoEm });
 const venda = (vendaId: number, data: string, quantidade: number, extra: Partial<VendaParaBaixa> = {}): VendaParaBaixa => ({
@@ -18,7 +18,7 @@ describe("Baixas de Pré-vencido", () => {
       itens: [item("junho", 3, "2027-06"), item("maio", 2, "2027-05")],
       vendas: [venda(1, "2027-04-02 10:00:00", 4)],
     });
-    expect(baixas).toEqual([{ venda: venda(1, "2027-04-02 10:00:00", 4), quantidade: 4, itens: [{ itemId: "maio", quantidade: 2 }, { itemId: "junho", quantidade: 2 }] }]);
+    expect(baixas).toEqual([{ venda: venda(1, "2027-04-02 10:00:00", 4), quantidade: 4, itens: [{ itemId: "maio", quantidade: 2 }, { itemId: "junho", quantidade: 2 }], corrigida: false }]);
     expect(restante).toEqual({ maio: 0, junho: 1 });
   });
 
@@ -84,5 +84,31 @@ describe("Baixas de Pré-vencido", () => {
       [2, [{ itemId: "maio", quantidade: 1 }, { itemId: "novo", quantidade: 2 }]],
     ]);
     expect(restante).toEqual({ maio: 0, junho: 4, novo: 0 });
+  });
+
+  it("a Correção de Baixa fixa quanto a venda baixa, e o que sai volta ao Restante e é gasto pelas vendas seguintes", () => {
+    const { baixas, restante } = calcularBaixas({
+      itens: [item("a", 3, "2027-06")],
+      vendas: [venda(1, "2027-04-02 10:00:00", 3), venda(2, "2027-04-03 10:00:00", 2, { codigoColaborador: 8 }), venda(3, "2027-04-04 10:00:00", 1)],
+      correcoes: { [chaveDaLinha({ vendaId: 1, produtoId: "dipirona" })]: 1 },
+    });
+    expect(baixas.map((b) => [b.venda.vendaId, b.quantidade, b.corrigida])).toEqual([
+      [1, 1, true],
+      [2, 2, false],
+    ]);
+    expect(restante).toEqual({ a: 0 });
+  });
+
+  it("a Correção que zera a venda a mantém na lista, e a Correção fica limitada ao que a venda teve e ao disponível", () => {
+    const { baixas, restante } = calcularBaixas({
+      itens: [item("a", 2, "2027-06")],
+      vendas: [venda(1, "2027-04-02 10:00:00", 1), venda(2, "2027-04-03 10:00:00", 5)],
+      correcoes: { [chaveDaLinha({ vendaId: 1, produtoId: "dipirona" })]: 0, [chaveDaLinha({ vendaId: 2, produtoId: "dipirona" })]: 9 },
+    });
+    expect(baixas.map((b) => [b.venda.vendaId, b.quantidade, b.corrigida])).toEqual([
+      [1, 0, true],
+      [2, 2, true],
+    ]);
+    expect(restante).toEqual({ a: 0 });
   });
 });
