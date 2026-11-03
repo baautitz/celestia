@@ -19,8 +19,11 @@ const BASE = "/api/m/inovafarma/pre-vencidos";
 
 const validadeLabel = (validade: string) => validade.split("-").reverse().join("/");
 
-/** Aba Estoque: os Itens de Pré-vencido de uma Loja do Vínculo, com inclusão, edição e exclusão em janela. */
-export function EstoquePreVencidosTab({ lojas }: { lojas: LojaOpcao[] }) {
+/**
+ * Aba Estoque: os Itens de Pré-vencido de uma Loja do Vínculo, com inclusão, edição e exclusão em janela.
+ * `retroagirAte` (`AAAA-MM-DD`), só para quem gere as Baixas: a inclusão pode ter data retroativa até esse dia.
+ */
+export function EstoquePreVencidosTab({ lojas, retroagirAte }: { lojas: LojaOpcao[]; retroagirAte?: string }) {
   const { feedback, windows } = useUi();
   const [loja, setLoja] = useState(lojas.length > 0 ? String(lojas[0]!.codigo) : "");
   const [zerados, setZerados] = useState(false);
@@ -62,7 +65,7 @@ export function EstoquePreVencidosTab({ lojas }: { lojas: LojaOpcao[] }) {
       size: "small",
       title: item ? "Editar Item" : "Incluir Item",
       description: item ? item.nomeProduto : "Inclua um Pré-vencido que está na prateleira da Loja.",
-      content: () => <ItemPreVencidoWindow codigoLoja={Number(loja)} item={item} />,
+      content: () => <ItemPreVencidoWindow codigoLoja={Number(loja)} item={item} retroagirAte={item ? undefined : retroagirAte} />,
     });
     if (resultado.status !== "confirmed") return;
     // O Item salvo já aparece na tabela; a recarga confirma com o servidor.

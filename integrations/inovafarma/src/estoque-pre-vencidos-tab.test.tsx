@@ -23,11 +23,21 @@ const item = (extra: Record<string, unknown> = {}) => ({
   version: 1,
   ...extra,
 });
-const contexto = { podeLancar: false, podeConferir: false, podeEstoque: true, vinculado: true, periodos: [], lojas: [], lojasEstoque: [{ codigo: 1, nome: "Centro" }] };
+let contexto: Record<string, unknown> = {};
+const contextoEstoque = { podeLancar: false, podeConferir: false, podeEstoque: true, vinculado: true, periodos: [], lojas: [], lojasEstoque: [{ codigo: 1, nome: "Centro" }] };
 let itens: Record<string, unknown>[] = [];
+
+/** Dia local a `dias` de hoje, `AAAA-MM-DD`. */
+const dia = (dias: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + dias);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const ddmmaaaa = (iso: string) => iso.split("-").reverse().join("");
 
 beforeEach(() => {
   itens = [item()];
+  contexto = contextoEstoque;
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => ({
@@ -112,5 +122,38 @@ describe("aba Estoque", () => {
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "PUT");
     expect(envio![0]).toContain("/pre-vencidos/estoque/itens/ipv_1");
     expect(JSON.parse(envio![1].body)).toEqual({ quantidade: 7, validade: "2027-06", version: 1 });
+  });
+
+  it("sem a Permission de Baixas, a janela de inclusão não tem data de inclusão", async () => {
+    renderizar();
+    await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
+    fireEvent.click(screen.getByRole("button", { name: "Incluir Item" }));
+    await screen.findByLabelText("Quantidade");
+    expect(screen.queryByText("Data de inclusão")).toBeNull();
+  });
+
+  it("com a Permission de Baixas, inclui com data de inclusão retroativa até o início do Closing Period aberto", async () => {
+    contexto = { ...contextoEstoque, podeBaixas: true, lojasBaixas: [{ codigo: 1, nome: "Centro" }], periodos: [{ id: "p1", name: "Atual", startDate: dia(-5), endDate: dia(10), status: "open" }] };
+    renderizar();
+    await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
+    fireEvent.click(screen.getByRole("button", { name: "Incluir Item" }));
+    const campo = (await screen.findByLabelText("Produto (bipe o código de barras ou digite o nome)")) as HTMLInputElement;
+    fireEvent.change(campo, { target: { value: "7891234567895" } });
+    await waitFor(() => expect(campo.value).toContain("DIPIRONA 500MG"));
+    fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("mm/aaaa"), { target: { value: "082027" } });
+    expect(screen.getByText("Data de inclusão")).toBeTruthy();
+    const data = screen.getByPlaceholderText("dd/mm/aaaa");
+
+    fireEvent.change(data, { target: { value: ddmmaaaa(dia(-6)) } });
+    fireEvent.click(screen.getByRole("button", { name: "Incluir" }));
+    expect(await screen.findByText(/não pode ser antes do início do Período aberto/)).toBeTruthy();
+    expect(apiFetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+
+    fireEvent.change(data, { target: { value: ddmmaaaa(dia(-5)) } });
+    fireEvent.click(screen.getByRole("button", { name: "Incluir" }));
+    await waitFor(() => expect(apiFetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
+    const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(envio![1].body)).toEqual({ codigoLoja: 1, produtoId: "guid-1", quantidade: 5, validade: "2027-08", incluidoEm: dia(-5) });
   });
 });

@@ -16,6 +16,7 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { formatDate } from "@platform/ui/lib/format";
 import { BaixasPreVencidosTab } from "./baixas-pre-vencidos-tab";
 import { EstoquePreVencidosTab } from "./estoque-pre-vencidos-tab";
+import { inicioDoPeriodoAbertoHoje } from "./item-pre-vencido-window";
 import { LancamentoWindow, type Lancamento, type LojaOpcao } from "./pre-vencido-window";
 
 const BASE = "/api/m/inovafarma/pre-vencidos";
@@ -348,7 +349,7 @@ export function PreVencidosPage() {
         </TabsList>
       </Tabs>
       {aba === "estoque" ? (
-        <EstoquePreVencidosTab lojas={contexto.lojasEstoque ?? []} />
+        <EstoquePreVencidosTab lojas={contexto.lojasEstoque ?? []} retroagirAte={contexto.podeBaixas ? inicioDoPeriodoAbertoHoje(contexto.periodos) : undefined} />
       ) : aba === "baixas" ? (
         <BaixasPreVencidosTab lojas={contexto.lojasBaixas ?? []} periodos={contexto.periodos} />
       ) : aba === "lancamentos" ? (

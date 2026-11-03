@@ -2,8 +2,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@platform/ui/components/button";
+import { DatePicker } from "@platform/ui/components/date-picker";
 import { FieldGroup } from "@platform/ui/components/field";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
 import { Input } from "@platform/ui/components/input";
 import { MonthPicker } from "@platform/ui/components/month-picker";
 import { useUi } from "@platform/ui/imperative/provider";
@@ -31,25 +32,46 @@ export interface ItemPreVencido {
 /** O que a gravação devolve: a edição vem sem o Restante, que depende das vendas do ERP. */
 export type ItemSalvo = Omit<ItemPreVencido, "restante"> & { restante?: number };
 
-const schema = z.object({
-  produtoId: z.string().min(1, "Busque e selecione o produto."),
-  quantidade: z.string().regex(/^[1-9]\d{0,6}$/, "Informe uma quantidade inteira maior que zero."),
-  validade: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe a validade (mês e ano)."),
-});
-type Valores = z.infer<typeof schema>;
+/** Dia local `AAAA-MM-DD` de uma data. */
+const diaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const dataBr = (dia: string) => dia.split("-").reverse().join("/");
+
+/** Início do Closing Period aberto de hoje: até onde a inclusão de um Item pode retroagir. */
+export const inicioDoPeriodoAbertoHoje = (periodos: readonly { startDate: string; endDate: string; status?: "open" | "closed" }[]) => {
+  const hoje = diaLocal(new Date());
+  return periodos.find((p) => p.status !== "closed" && p.startDate <= hoje && hoje <= p.endDate)?.startDate;
+};
+
+const esquema = (retroagirAte: string | undefined) =>
+  z
+    .object({
+      produtoId: z.string().min(1, "Busque e selecione o produto."),
+      quantidade: z.string().regex(/^[1-9]\d{0,6}$/, "Informe uma quantidade inteira maior que zero."),
+      validade: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe a validade (mês e ano)."),
+      incluidoEm: z.date().optional(),
+    })
+    .superRefine(({ incluidoEm }, ctx) => {
+      if (!incluidoEm || !retroagirAte) return;
+      const dia = diaLocal(incluidoEm);
+      if (dia > diaLocal(new Date())) ctx.addIssue({ code: "custom", path: ["incluidoEm"], message: "A data de inclusão não pode ser no futuro." });
+      else if (dia < retroagirAte) ctx.addIssue({ code: "custom", path: ["incluidoEm"], message: `A data de inclusão não pode ser antes do início do Período aberto (${dataBr(retroagirAte)}).` });
+    });
+type Valores = z.infer<ReturnType<typeof esquema>>;
 
 interface Props {
   codigoLoja: number;
   /** Presente na edição: só quantidade e validade mudam. */
   item?: ItemPreVencido;
+  /** Só para quem gere as Baixas, na inclusão: a data de inclusão pode retroagir até este dia (`AAAA-MM-DD`). */
+  retroagirAte?: string;
 }
 
 /** Janela de Item de Pré-vencido (incluir ou editar) no Estoque de uma Loja; resolve com o Item salvo. */
-export function ItemPreVencidoWindow({ codigoLoja, item }: Props) {
+export function ItemPreVencidoWindow({ codigoLoja, item, retroagirAte }: Props) {
   const { resolve } = useWindow<ItemSalvo>();
   const { feedback } = useUi();
   const form = useForm<Valores>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(esquema(retroagirAte)),
     defaultValues: { produtoId: item?.produtoId ?? "", quantidade: item ? String(item.quantidade) : "", validade: item?.validade ?? "" },
   });
 
@@ -65,7 +87,7 @@ export function ItemPreVencidoWindow({ codigoLoja, item }: Props) {
         : await apiFetch<ItemSalvo>(`${BASE}/estoque/itens`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ codigoLoja, produtoId: valores.produtoId, ...corpo }),
+            body: JSON.stringify({ codigoLoja, produtoId: valores.produtoId, ...corpo, ...(valores.incluidoEm ? { incluidoEm: diaLocal(valores.incluidoEm) } : {}) }),
           });
       feedback.notify({ type: "success", title: item ? "Item alterado." : "Item incluído." });
       resolve(salvo);
@@ -122,6 +144,22 @@ export function ItemPreVencidoWindow({ codigoLoja, item }: Props) {
                 </FormItem>
               )}
             />
+            {retroagirAte && (
+              <FormField
+                control={form.control}
+                name="incluidoEm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de inclusão</FormLabel>
+                    <FormControl>
+                      <DatePicker value={field.value} onChange={field.onChange} />
+                    </FormControl>
+                    <FormDescription>Em branco, agora. Pode retroagir até {dataBr(retroagirAte)}, para que as vendas desde então gerem Baixas.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </FieldGroup>
         </form>
       </Form>
