@@ -327,4 +327,18 @@ describe("Inclusão retroativa de Item", () => {
     expect((await incluir("ana", { incluidoEm: dia(-1) })).status).toBe(403);
     expect(await listar("ana")).toEqual([]);
   });
+
+  it("com a Permission de Baixas, ajusta a data de inclusão de um Item na edição, com as mesmas regras e no Audit Log", async () => {
+    const { incluir, listar, req } = await boot();
+    const criado = (await (await incluir("rui", { quantidade: 5 })).json()) as Item;
+    const editar = (who: "rui" | "ana", body: Record<string, unknown>) => req(who, "PUT", `/api/m/inovafarma/pre-vencidos/estoque/itens/${criado.id}`, { quantidade: 5, validade: "2027-06", ...body });
+    expect((await editar("ana", { incluidoEm: dia(-2), version: 1 })).status).toBe(403);
+    expect((await editar("rui", { incluidoEm: dia(-6), version: 1 })).status).toBe(400);
+    expect((await editar("rui", { incluidoEm: dia(2), version: 1 })).status).toBe(400);
+    expect((await editar("rui", { incluidoEm: dia(-5), version: 1 })).status).toBe(200);
+    vendas = [venda(1, -4, 2)];
+    expect((await listar("rui")).map((i) => i.restante)).toEqual([3]);
+    const eventos = (await (await req("auditor", "GET", "/api/audit?plugin=inovafarma")).json()) as { action: string; summary: string }[];
+    expect(eventos.find((e) => e.action === "item_pre_vencido_update")?.summary).toContain("Data de inclusão de");
+  });
 });

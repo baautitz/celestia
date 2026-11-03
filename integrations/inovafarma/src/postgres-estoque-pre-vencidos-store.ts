@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { preVencidosItens } from "./schema.js";
-import { novoIdItem, type EstoquePreVencidoStore, type ItemPreVencido, type NovoItemPreVencido } from "./estoque-pre-vencidos-store.js";
+import { novoIdItem, type EdicaoItemPreVencido, type EstoquePreVencidoStore, type ItemPreVencido, type NovoItemPreVencido } from "./estoque-pre-vencidos-store.js";
 
 type Row = typeof preVencidosItens.$inferSelect;
 
@@ -38,11 +38,11 @@ export class PostgresEstoquePreVencidoStore implements EstoquePreVencidoStore {
     return row ? toRecord(row) : null;
   }
 
-  async atualizar(id: string, valores: { quantidade: number; validade: string }, expectedVersion: number): Promise<ItemPreVencido | null> {
+  async atualizar(id: string, valores: EdicaoItemPreVencido, expectedVersion: number): Promise<ItemPreVencido | null> {
     const t = preVencidosItens;
     const [row] = await this.db
       .update(t)
-      .set({ ...valores, version: expectedVersion + 1, atualizadoEm: new Date() })
+      .set({ ...valores, incluidoEm: valores.incluidoEm === undefined ? undefined : new Date(valores.incluidoEm), version: expectedVersion + 1, atualizadoEm: new Date() })
       .where(and(eq(t.id, id), eq(t.version, expectedVersion)))
       .returning();
     return row ? toRecord(row) : null;

@@ -19,6 +19,13 @@ export interface ItemPreVencido {
   atualizadoEm: string;
 }
 
+/** O que a edição muda; `incluidoEm` (ISO) só quando a data de inclusão é ajustada. */
+export interface EdicaoItemPreVencido {
+  quantidade: number;
+  validade: string;
+  incluidoEm?: string;
+}
+
 export type NovoItemPreVencido = Omit<ItemPreVencido, "id" | "version" | "criadoEm" | "atualizadoEm">;
 
 export interface EstoquePreVencidoStore {
@@ -29,7 +36,7 @@ export interface EstoquePreVencidoStore {
   lojas(): Promise<number[]>;
   get(id: string): Promise<ItemPreVencido | null>;
   /** Compare-and-set pela `version`; devolve null se o Item mudou ou sumiu. */
-  atualizar(id: string, valores: { quantidade: number; validade: string }, expectedVersion: number): Promise<ItemPreVencido | null>;
+  atualizar(id: string, valores: EdicaoItemPreVencido, expectedVersion: number): Promise<ItemPreVencido | null>;
   /** Compare-and-set pela `version`; false se o Item mudou ou sumiu. */
   excluir(id: string, expectedVersion: number): Promise<boolean>;
 }
@@ -61,7 +68,7 @@ export class MemoryEstoquePreVencidoStore implements EstoquePreVencidoStore {
     return this.itens.get(id) ?? null;
   }
 
-  async atualizar(id: string, valores: { quantidade: number; validade: string }, expectedVersion: number): Promise<ItemPreVencido | null> {
+  async atualizar(id: string, valores: EdicaoItemPreVencido, expectedVersion: number): Promise<ItemPreVencido | null> {
     const atual = this.itens.get(id);
     if (!atual || atual.version !== expectedVersion) return null;
     const atualizado = { ...atual, ...valores, version: atual.version + 1, atualizadoEm: new Date().toISOString() };
