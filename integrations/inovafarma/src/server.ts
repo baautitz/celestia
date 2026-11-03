@@ -115,7 +115,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       // `baixasPreVencidos.baixasDoPeriodo` é a fonte das Baixas de um Período (gravadas se fechado, ao vivo se aberto).
       const baixasPreVencidos = criarBaixasPreVencidos({ erpClient: () => erpClients[erpId], estoque: estoquePreVencidos, congeladas: baixasCongeladas });
       registerCongelamentoBaixas({ events, periods, baixas: baixasPreVencidos, congeladas: baixasCongeladas });
-      registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: estoquePreVencidos, baixas: baixasPreVencidos, vinculos: store, audit });
+      registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: estoquePreVencidos, baixas: baixasPreVencidos, vinculos: store, periods, audit });
       registerBaixasPreVencidosRoutes({ routes, permissions, auth, baixas: baixasPreVencidos, vinculos: store, periods });
       registerAvaliacoesRoutes({
         routes,

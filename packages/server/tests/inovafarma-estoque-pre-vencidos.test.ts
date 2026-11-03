@@ -18,6 +18,7 @@ const COLABORADORES = [
   { codigoColaborador: 7, nome: "ANA SOUZA", ativo: true },
   { codigoColaborador: 8, nome: "GIL COSTA", ativo: true },
   { codigoColaborador: 9, nome: "LIA MELO", ativo: true },
+  { codigoColaborador: 10, nome: "RUI LIMA", ativo: true },
 ];
 
 /** Linhas de venda do ERP, com a Loja e o código do produto que o ERP filtra. */
@@ -70,10 +71,11 @@ async function boot() {
       { id: "adm", name: "Adm", permissions: ["inovafarma:colaboradores:update", "inovafarma:colaboradores:view", "closing_period:period:create", "closing_period:period:close", "closing_period:period:reopen", "closing_period:period:read"] },
       { id: "est", name: "Estoque", permissions: [ESTOQUE] },
       { id: "ger", name: "Gestor", permissions: [BAIXAS] },
+      { id: "ambos", name: "Gestor do Estoque", permissions: [ESTOQUE, BAIXAS] },
       { id: "outro", name: "Outro", permissions: ["inovafarma:colaboradores:view"] },
       { id: "audit", name: "Auditoria", permissions: ["system:audit:read"] },
     ],
-    users: [usuario("adm", "adm"), usuario("ana", "est"), usuario("caio", "est"), usuario("zeca", "outro"), usuario("auditor", "audit"), usuario("gil", "ger"), usuario("lia", "ger")],
+    users: [usuario("adm", "adm"), usuario("ana", "est"), usuario("caio", "est"), usuario("zeca", "outro"), usuario("auditor", "audit"), usuario("gil", "ger"), usuario("lia", "ger"), usuario("rui", "ambos")],
   });
   vendas = [];
   erpFora = false;
@@ -84,12 +86,13 @@ async function boot() {
     const { accessToken } = (await res.json()) as { accessToken: string };
     return { authorization: `Bearer ${accessToken}`, "content-type": "application/json" };
   };
-  const h = { adm: await login("adm"), ana: await login("ana"), caio: await login("caio"), zeca: await login("zeca"), auditor: await login("auditor"), gil: await login("gil"), lia: await login("lia") };
+  const h = { adm: await login("adm"), ana: await login("ana"), caio: await login("caio"), zeca: await login("zeca"), auditor: await login("auditor"), gil: await login("gil"), lia: await login("lia"), rui: await login("rui") };
   const req = (who: keyof typeof h, method: string, path: string, body?: unknown) =>
     platform.app.request(path, { method, headers: h[who], body: body === undefined ? undefined : JSON.stringify(body) });
   expect((await req("adm", "PUT", "/api/m/inovafarma/colaboradores/7/vinculo", { usuarioId: "ana", lojas: [1], version: 0 })).status).toBe(200);
   expect((await req("adm", "PUT", "/api/m/inovafarma/colaboradores/8/vinculo", { usuarioId: "gil", lojas: [1], version: 0 })).status).toBe(200);
   expect((await req("adm", "PUT", "/api/m/inovafarma/colaboradores/9/vinculo", { usuarioId: "lia", lojas: [2], version: 0 })).status).toBe(200);
+  expect((await req("adm", "PUT", "/api/m/inovafarma/colaboradores/10/vinculo", { usuarioId: "rui", lojas: [1], version: 0 })).status).toBe(200);
   const periodo = await req("adm", "POST", "/api/closing-periods", { name: "Atual", startDate: dia(-5), endDate: dia(10) });
   expect(periodo.status).toBe(201);
   const { id: periodoId } = (await periodo.json()) as { id: string };
@@ -291,5 +294,30 @@ describe("Congelamento das Baixas no fechamento do Closing Period", () => {
     expect((await reabrir(periodoId)).status).toBe(200);
     expect(await baixas(periodoId)).toEqual([]);
     expect(await baixas(seguinteId)).toEqual([[7, 4, [[3, 4]]]]);
+  });
+});
+
+describe("Inclusão retroativa de Item", () => {
+  it("com a Permission de Baixas, inclui com data de inclusão retroativa e as vendas a partir dela geram Baixas", async () => {
+    const { incluir, listar, req, periodoId } = await boot();
+    const res = await incluir("rui", { quantidade: 5, incluidoEm: dia(-5) });
+    expect(res.status).toBe(201);
+    vendas = [venda(1, -6, 1), venda(2, -3, 2)];
+    expect((await listar("rui")).map((i) => i.restante)).toEqual([3]);
+    const grupos = (await (await req("gil", "GET", `/api/m/inovafarma/pre-vencidos/baixas?codigoLoja=1&periodoId=${periodoId}`)).json()) as Grupo[];
+    expect(grupos.map((g) => g.vendas.map((v) => [v.vendaId, v.quantidade]))).toEqual([[[2, 2]]]);
+  });
+
+  it("não retroage antes do início do Closing Period aberto nem para o futuro", async () => {
+    const { incluir } = await boot();
+    expect((await incluir("rui", { incluidoEm: dia(-6) })).status).toBe(400);
+    expect((await incluir("rui", { incluidoEm: dia(2) })).status).toBe(400);
+    expect((await incluir("rui", { incluidoEm: "03/11/2026" })).status).toBe(400);
+  });
+
+  it("sem a Permission de Baixas, a data retroativa é recusada", async () => {
+    const { incluir, listar } = await boot();
+    expect((await incluir("ana", { incluidoEm: dia(-1) })).status).toBe(403);
+    expect(await listar("ana")).toEqual([]);
   });
 });

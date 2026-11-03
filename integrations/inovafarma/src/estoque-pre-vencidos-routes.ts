@@ -4,7 +4,8 @@ import type { ModuleContext } from "@platform/core/module";
 import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { PRODUTO_SQL, type LinhaProduto } from "./produtos-erp.js";
-import { BaixasSemErpError, type BaixasPreVencidos } from "./baixas-do-periodo.js";
+import { horaDoErp, inicioDoDiaNoErp } from "./baixas-da-loja.js";
+import { BaixasSemErpError, type BaixasPreVencidos, type PeriodoDasBaixas } from "./baixas-do-periodo.js";
 import { ITEM_PRE_VENCIDO_ACTIONS, ITEM_PRE_VENCIDO_PLUGIN, ITEM_PRE_VENCIDO_TARGET, type AtributosItemPreVencido } from "./estoque-pre-vencidos-audit.js";
 import type { EstoquePreVencidoStore, ItemPreVencido } from "./estoque-pre-vencidos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
@@ -22,6 +23,8 @@ export interface EstoquePreVencidosRoutesDeps {
   store: EstoquePreVencidoStore;
   baixas: BaixasPreVencidos;
   vinculos: VinculoStore;
+  /** Serviço `periods` do Module `closing_period`: a inclusão retroativa vai até o início do Período aberto. */
+  periods: { list(): Promise<PeriodoDasBaixas[]> };
   audit: AuditService;
 }
 
@@ -36,7 +39,14 @@ const VERSAO_DESATUALIZADA = { error: "O Item foi alterado por outra pessoa. A l
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const Validade = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe a validade como mês e ano (AAAA-MM).");
 const Quantidade = z.number({ invalid_type_error: "Informe a quantidade." }).int("Informe uma quantidade inteira.").min(1, "Informe uma quantidade maior que zero.").max(1_000_000);
-const Novo = z.object({ codigoLoja: z.number().int().min(1), produtoId: z.string().regex(UUID, "Produto inválido."), quantidade: Quantidade, validade: Validade });
+const Novo = z.object({
+  codigoLoja: z.number().int().min(1),
+  produtoId: z.string().regex(UUID, "Produto inválido."),
+  quantidade: Quantidade,
+  validade: Validade,
+  /** Data de inclusão retroativa (`AAAA-MM-DD`, na hora do ERP); sem ela, agora. */
+  incluidoEm: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de inclusão (AAAA-MM-DD).").optional(),
+});
 const Edicao = z.object({ quantidade: Quantidade, validade: Validade, version: z.number().int().min(1) });
 
 /** O que a API devolve: nunca o código do produto no ERP. */
@@ -50,9 +60,25 @@ export async function lojasDoVinculo(vinculos: VinculoStore, usuarioId: string |
 }
 
 /** Rotas do Estoque de Pré-vencidos: incluir, listar, editar e excluir Itens nas Lojas do Vínculo. */
-export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient, store, baixas, vinculos, audit }: EstoquePreVencidosRoutesDeps): void {
+export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, erpClient, store, baixas, vinculos, periods, audit }: EstoquePreVencidosRoutesDeps): void {
   const gerir = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-estoque:manage");
   const pode = (c: AuthContext) => permissions.has(c.get("user")?.permissions, gerir.key);
+  const gerirBaixas = INOVAFARMA_PERMISSIONS.ref("pre-vencidos-baixas:manage");
+
+  /**
+   * Instante de inclusão de um Item novo: agora, ou o início do dia retroativo pedido, que só quem gere as Baixas
+   * informa e que vai até o início do Closing Period aberto de hoje, nunca antes nem para o futuro.
+   */
+  const inclusao = async (c: AuthContext, dia: string | undefined): Promise<{ incluidoEm: string } | { erro: string; status: 400 | 403 }> => {
+    if (dia === undefined) return { incluidoEm: new Date().toISOString() };
+    if (!permissions.has(c.get("user")?.permissions, gerirBaixas.key)) return { erro: gerirBaixas.deniedMessage ?? "Acesso negado.", status: 403 };
+    const hoje = horaDoErp(new Date().toISOString()).slice(0, 10);
+    if (dia > hoje) return { erro: "A data de inclusão não pode ser no futuro.", status: 400 };
+    const aberto = (await periods.list()).find((p) => p.status === "open" && p.startDate <= hoje && hoje <= p.endDate);
+    if (!aberto) return { erro: "Não há Período aberto hoje: a data de inclusão não pode retroagir.", status: 400 };
+    if (dia < aberto.startDate) return { erro: `A data de inclusão não pode ser antes do início do Período aberto (${aberto.startDate.split("-").reverse().join("/")}).`, status: 400 };
+    return { incluidoEm: inicioDoDiaNoErp(dia) };
+  };
 
   const nomeDaLoja = async (codigo: number) => {
     const client = erpClient();
@@ -121,6 +147,8 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, er
     const { codigoLoja, produtoId, quantidade, validade } = parsed.data;
     const recusa = await recusaLoja(c, codigoLoja);
     if (recusa) return recusa;
+    const quando = await inclusao(c, parsed.data.incluidoEm);
+    if ("erro" in quando) return c.json({ error: quando.erro }, quando.status);
 
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
@@ -140,10 +168,10 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, er
       codigoBarra: produto.codigoBarra,
       validade,
       quantidade,
-      incluidoEm: new Date().toISOString(),
+      incluidoEm: quando.incluidoEm,
     });
     await registrar(c, ITEM_PRE_VENCIDO_ACTIONS.criar, criado);
-    // Recém-incluído: nenhuma venda o gastou ainda.
+    // Recém-incluído: nenhuma venda o gastou ainda, salvo na inclusão retroativa, que a recarga da lista mostra.
     return c.json({ ...itemPublico(criado), restante: criado.quantidade }, 201);
   });
 

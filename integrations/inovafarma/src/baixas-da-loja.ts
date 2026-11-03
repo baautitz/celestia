@@ -19,6 +19,14 @@ export function horaDoErp(iso: string): string {
   return `${partes.year}-${partes.month}-${partes.day} ${partes.hour}:${partes.minute}:${partes.second}`;
 }
 
+/** O instante (ISO) em que começa o dia `AAAA-MM-DD` na hora do ERP. */
+export function inicioDoDiaNoErp(dia: string): string {
+  const comoUtc = Date.parse(`${dia}T00:00:00Z`);
+  // Quanto a hora do ERP está à frente (ou atrás) do UTC naquele dia.
+  const deslocamento = Date.parse(`${horaDoErp(new Date(comoUtc).toISOString()).replace(" ", "T")}Z`) - comoUtc;
+  return new Date(comoUtc - deslocamento).toISOString();
+}
+
 /** Linha de venda do ERP com o nome de quem vendeu, para a aba Baixas. */
 export interface VendaDaLoja extends VendaParaBaixa {
   codigoLoja: number;
