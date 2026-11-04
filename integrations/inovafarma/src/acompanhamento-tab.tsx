@@ -75,9 +75,17 @@ function CelulaProjecao({ linha, periodo }: { linha: LinhaAcompanhamento; period
   const indicador = indicadorDoTipo(linha.tipo);
   const p = projetar(indicador, linha.realizado, linha.alvo, periodo, hojeLocal());
   if (!p) return null;
+  const tone = p.atinge === null ? "default" : p.atinge ? "success" : "destructive";
+  // Período encerrado: a projeção é o resultado final, sem dica.
+  if (!p.dica)
+    return (
+      <Text variant="small" tone={tone}>
+        {formatarValor(indicador, p.valor)}
+      </Text>
+    );
   return (
     <Tooltip>
-      <TooltipTrigger render={<Text variant="small" tone={p.atinge === null ? "default" : p.atinge ? "success" : "destructive"} />}>
+      <TooltipTrigger render={<Text variant="small" tone={tone} />}>
         {formatarValor(indicador, p.valor)}
       </TooltipTrigger>
       <TooltipContent>{p.dica}</TooltipContent>

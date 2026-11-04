@@ -21,7 +21,7 @@ describe("Projeção", () => {
   });
 
   it("Período fechado: a projeção é o resultado final; Avaliações não projetam", () => {
-    expect(projetar(indicadorPorId("venda-liquida"), 100_000, 50_000, { ...periodo, status: "closed" }, "2026-11-05")).toMatchObject({ valor: 100_000, atinge: true });
+    expect(projetar(indicadorPorId("venda-liquida"), 100_000, 50_000, { ...periodo, status: "closed" }, "2026-11-05")).toEqual({ valor: 100_000, atinge: true, dica: null });
     expect(projetar(indicadorPorId("avaliacoes"), 100, 200, periodo, "2026-10-10")).toBeNull();
   });
 });

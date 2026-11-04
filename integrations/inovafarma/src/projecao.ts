@@ -12,8 +12,8 @@ export interface Projecao {
   valor: number;
   /** Se a projeção atinge o Alvo; null sem Alvo. */
   atinge: boolean | null;
-  /** O que fazer para atingir (ou manter) o Alvo, em palavras. */
-  dica: string;
+  /** O que fazer para atingir (ou manter) o Alvo, em palavras; null com o Período encerrado, sem dica. */
+  dica: string | null;
 }
 
 const DIA_MS = 86_400_000;
@@ -37,7 +37,7 @@ export function projetar(indicador: Indicador, realizado: number, alvo: number |
   if (decorridos <= 0 || total <= 0) return null;
   const v = (n: number) => formatarValor(indicador, n);
   const atinge = (x: number) => (alvo === null ? null : indicador.direcao === "maior" ? x >= alvo : x <= alvo);
-  if (periodo.status === "closed" || decorridos >= total) return { valor: realizado, atinge: atinge(realizado), dica: "Período encerrado: este é o resultado final." };
+  if (periodo.status === "closed" || decorridos >= total) return { valor: realizado, atinge: atinge(realizado), dica: null };
 
   const restantes = total - decorridos;
   const acumula = indicador.unidade !== "percentual" && indicador.id !== "ticket-medio";
