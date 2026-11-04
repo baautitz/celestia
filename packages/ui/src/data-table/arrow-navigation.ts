@@ -15,7 +15,10 @@ const rowsOf = (cell: HTMLTableCellElement): HTMLTableRowElement[] => {
 
 const focus = (el: HTMLElement | undefined): boolean => {
   if (!el) return false;
-  el.focus();
+  // A célula vai para o meio da tela (vertical e horizontal): nunca fica atrás do cabeçalho ou da coluna fixos.
+  el.focus({ preventScroll: true });
+  const cell = el.closest("td");
+  if (cell && typeof cell.scrollIntoView === "function") cell.scrollIntoView({ block: "center", inline: "center" });
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.select();
   return true;
 };

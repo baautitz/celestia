@@ -839,6 +839,8 @@ describe("DataTable arrowNavigation", () => {
     a1.focus();
     fireEvent.keyDown(a1, { key: "ArrowDown" });
     expect(document.activeElement).toBe(screen.getByLabelText("A Bia"));
+    // A linha do campo com foco fica destacada, como se tivesse sido clicada.
+    expect(screen.getByLabelText("A Bia").closest("tr")?.getAttribute("data-state")).toBe("selected");
     fireEvent.keyDown(document.activeElement!, { key: "ArrowUp" });
     expect(document.activeElement).toBe(a1);
     // ← e → sempre trocam de célula, mesmo com o cursor no meio do texto.

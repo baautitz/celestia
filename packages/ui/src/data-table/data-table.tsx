@@ -1051,7 +1051,18 @@ export function DataTable<TRow>({
           </div>
         ) : (
           <>
-            <div className={bordered ? "border border-border" : undefined} onKeyDown={arrowNavigation ? handleArrowNavigation : undefined} onFocus={arrowNavigation ? handleArrowNavigationFocus : undefined}>
+            <div className={bordered ? "border border-border" : undefined} data-arrow-root={arrowNavigation ? "" : undefined}
+              onKeyDown={arrowNavigation ? handleArrowNavigation : undefined}
+              onFocus={
+                arrowNavigation
+                  ? (e) => {
+                      handleArrowNavigationFocus(e);
+                      // Campo da linha com foco: a linha fica destacada como se tivesse sido clicada (não a de uma tabela aninhada).
+                      const tr = (e.target as Element).closest("tr[data-row-id]");
+                      if (tr && tr.closest("[data-arrow-root]") === e.currentTarget) setSelectedId(tr.getAttribute("data-row-id"));
+                    }
+                  : undefined
+              }>
               {wide && (
                 <div
                   ref={stickyHeadRef}
@@ -1138,6 +1149,7 @@ export function DataTable<TRow>({
                           render={() => (
                         <React.Fragment>
                           <TableRow
+                            data-row-id={id}
                             data-state={selected ? "selected" : undefined}
                             aria-selected={selected}
                             onClick={(e) => {
