@@ -101,14 +101,16 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
       }
     }
     const salvos = new Map((await vinculos.list()).filter((v) => v.lojas.length > 0).map((v) => [v.codigoColaborador, v]));
-    const doErp = erp.map((r) => {
+    // Só os ativos no ERP recebem Avaliação.
+    const doErp = erp.filter((r) => Boolean(r.ativo)).map((r) => {
       const codigoColaborador = Number(r.codigoColaborador);
       const nome = (r.nome || "").trim();
       const salvo = salvos.get(codigoColaborador);
       return { codigoColaborador, nome, lojas: salvo ? salvo.lojas : [] };
     });
-    const noErp = new Set(doErp.map((e) => e.codigoColaborador));
-    const sumidos = [...salvos.values()].filter((v) => !noErp.has(v.codigoColaborador)).map((v) => ({ codigoColaborador: v.codigoColaborador, nome: "", lojas: v.lojas }));
+    const noErp = new Set(erp.map((r) => Number(r.codigoColaborador)));
+    // Quem tem Vínculo mas não está no ERP só entra sem ERP configurado: com ERP, não está ativo.
+    const sumidos = client ? [] : [...salvos.values()].filter((v) => !noErp.has(v.codigoColaborador)).map((v) => ({ codigoColaborador: v.codigoColaborador, nome: "", lojas: v.lojas }));
     const proprio = (await vinculoDe(c))?.codigoColaborador;
     return [...doErp, ...sumidos].filter((e) => e.codigoColaborador !== proprio && (lojas === undefined || e.lojas.some((l) => gerencia(lojas, l))));
   };

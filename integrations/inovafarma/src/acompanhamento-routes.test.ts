@@ -64,7 +64,7 @@ async function boot() {
   const handlers = new Map<string, (p: object) => unknown>();
   const antes = new Map<string, (ctx: { payload: object; cancel(reason: string): void }) => unknown>();
   const registros: { action: string; actor: { id: string; name: string }; attributes: unknown }[] = [];
-  const erp = { falha: false };
+  const erp = { falha: false, inativos: new Set<number>() };
   const auth: MiddlewareHandler = async (c, next) => {
     const sub = c.req.header("x-user") ?? "";
     const permissions = { gil: [GERAL], lia: [LOJA], ana: [MINHAS], zoe: [MINHAS], mon: [MONTAR] }[sub] ?? [];
@@ -96,6 +96,8 @@ async function boot() {
     erpClient: () => ({
       query: async <T,>(sql: string, params: Record<string, unknown> = {}) => {
         if (erp.falha) throw new Error("ERP fora do ar");
+        // Colaboradores do ERP: ativos, menos os que o teste desligou.
+        if (sql.includes("f.Ativo")) return [1, 2, 9].map((codigoColaborador) => ({ codigoColaborador, nome: `Colaborador ${codigoColaborador}`, ativo: !erp.inativos.has(codigoColaborador), codigoEmpresa: 10 })) as T[];
         if (sql.includes("@codigoLoja")) return vendasDaLoja.filter((v) => v.codigoLoja === params.codigoLoja && v.data >= String(params.dataInicio)) as T[];
         if (!sql.includes("totalCmv") && sql.includes(" AS valor")) {
           consultasLista.push(params);
@@ -149,6 +151,14 @@ describe("Acompanhamento das Metas", () => {
       { codigoColaborador: 1, nome: "ANA", premioCentavos: 10000 },
       { codigoColaborador: 2, nome: "BIA", premioCentavos: 0 },
     ]);
+  });
+
+  it("tira da Apuração quem ficou inativo no ERP", async () => {
+    const { ver, erp } = await boot();
+    erp.inativos.add(2);
+    const { linhas, totais } = await ver("gil");
+    expect(linhas.map((l) => l.nome)).toEqual(["ANA"]);
+    expect(totais.map((t) => t.codigoColaborador)).toEqual([1]);
   });
 
   it("não paga o CMV a quem não vendeu no Período, sem linha no ERP ou com líquido zero", async () => {

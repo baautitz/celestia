@@ -110,9 +110,10 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     const todosTipos = await tipos.listar();
     const doPeriodo = metasVisiveis(await metas.listar([periodo.id]), todosTipos, periodo);
     const lojas = await lojasConfirmadas();
-    // Os Participantes que saíram do ERP depois de entrar na Meta continuam na lista.
+    // Num Período aberto, só os ativos; o fechado mostra os Participantes como ficaram, inclusive os que saíram do ERP.
     const pessoas = new Map<number, ColaboradorAtivo & { ativo: boolean }>(ativos.map((a) => [a.codigoColaborador, { ...a, ativo: true }]));
-    for (const { meta: m } of doPeriodo) for (const p of m.participantes) if (!pessoas.has(p.codigoColaborador)) pessoas.set(p.codigoColaborador, { codigoColaborador: p.codigoColaborador, nome: p.nome, ativo: false });
+    if (periodo.status !== "open")
+      for (const { meta: m } of doPeriodo) for (const p of m.participantes) if (!pessoas.has(p.codigoColaborador)) pessoas.set(p.codigoColaborador, { codigoColaborador: p.codigoColaborador, nome: p.nome, ativo: false });
 
     return c.json({
       periodo,

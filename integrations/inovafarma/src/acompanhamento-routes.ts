@@ -184,6 +184,9 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     const indicadores = new Set<IndicadorId>(doPeriodo.flatMap(({ tipo }) => (tipo.regra.tipo === "percentual" ? [tipo.indicador, tipo.regra.indicadorBase] : [tipo.indicador])));
     const tiposLista = doPeriodo.flatMap(({ tipo }) => (temLista(tipo.indicador) ? [tipo] : []));
     const { dados, listas } = await dadosDoPeriodo(periodo, indicadores, tiposLista);
+    // Quem ficou inativo no ERP sai da Apuração (e do fechamento); sem ERP configurado, não há como saber, então fica.
+    const ativos = await montagem.ativosDoErp();
+    const ativo = ativos ? new Set(ativos.map((a) => a.codigoColaborador)) : null;
     const vazio: DadosColaborador = { indicadores: {}, descontosCentavos: 0 };
     /** O vendido da Lista entra como o Realizado comum do Indicador Lista de Produtos daquele Tipo de Meta. */
     const dadosDe = (tipo: TipoMeta, codigo: number): DadosColaborador => {
@@ -203,7 +206,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
           lista: tipo.lista,
           premio: descreverPremio(tipo),
         },
-        participantes: meta.participantes.map((p) => apurarParticipante(tipo, p, dadosDe(tipo, p.codigoColaborador))),
+        participantes: meta.participantes.filter((p) => !ativo || ativo.has(p.codigoColaborador)).map((p) => apurarParticipante(tipo, p, dadosDe(tipo, p.codigoColaborador))),
       }))
       .sort((a, b) => a.tipo.nome.localeCompare(b.tipo.nome));
     return { periodoId: periodo.id, metas: apuradas, apuradoEm: new Date().toISOString() };
