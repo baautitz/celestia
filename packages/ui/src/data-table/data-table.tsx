@@ -101,6 +101,8 @@ function HeaderLabel({ col }: { col: { label: string; tooltip?: string } }) {
 export interface DataTableColumn<TRow> {
   key: string;
   label: string;
+  /** O que sai na impressão no lugar do `render` (ex.: o valor de um campo editável, em texto). */
+  printValue?: (row: TRow) => React.ReactNode;
   /** Linha vertical antes da coluna, como entre grupos (ex.: separar uma Meta da outra). */
   divider?: boolean;
   /** Explicação exibida em tooltip ao passar o mouse sobre o cabeçalho. */
@@ -1304,7 +1306,7 @@ export function DataTable<TRow>({
           rows={printRows}
           totals={totalsValues}
           getRowId={getRowId}
-          cellContent={cellContent}
+          cellContent={(col, row) => (col.printValue ? col.printValue(row) : cellContent(col, row))}
           striped={striped}
           bordered={bordered}
           lastFrozenKey={lastFrozenKey}
