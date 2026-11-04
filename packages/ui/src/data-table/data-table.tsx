@@ -1486,6 +1486,8 @@ function PrintTable<TRow>({
   [data-slot="data-table-print"] td, [data-slot="data-table-print"] td * { color: #000 !important; }
   /* Linhas visíveis no papel: o tom da tela some na impressão. */
   [data-slot="data-table-print"] tr { border-color: #9ca3af !important; }
+  /* A borda da linha vai na célula: com um tbody por linha, a do tr some no papel em alguns navegadores. */
+  [data-slot="data-table-print"] tbody td { border-bottom: 1px solid #6b7280 !important; }
   [data-slot="data-table-print"] input { border-color: #9ca3af !important; background: transparent !important; }
 }`;
 
