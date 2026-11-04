@@ -37,6 +37,7 @@ import { indicadorDoTipo } from "./tipos-meta";
 import { regraDoParticipante } from "./apuracao";
 import {
   PremioParticipanteWindow,
+  maximoPremio,
   resumoPremio,
 } from "./premio-participante-window";
 import type { Meta } from "./metas-store";
@@ -947,9 +948,9 @@ function TabelaMontarMetas({
           const imprimePremio = temPremio && e.participa && (!soPremioVisivel || meta.tipo.mostrarPremio);
           const atualLinha = [
             { label: avaliacoes ? "Valor inicial" : "Nova meta", value: campo(nova) },
-            ...(imprimePremio ? [{ label: "Prêmio", value: campo(resumoPremio(regra)) }] : []),
+            ...(imprimePremio ? [{ label: "Prêmio", value: campo(maximoPremio(regra)) }] : []),
           ];
-          return <PairGrid pairs={2} rows={[anteriorLinha, atualLinha]} valueWidths={["7rem", "18rem"]} />;
+          return <PairGrid pairs={2} rows={[anteriorLinha, atualLinha]} valueWidths={["7rem", "8rem"]} />;
         },
         cellClassName: "min-w-md",
       });

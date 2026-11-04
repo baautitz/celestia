@@ -30,6 +30,24 @@ export function resumoPremio(regra: RegraPremio): string {
   }
 }
 
+/** O máximo que o Prêmio paga, para a impressão resumida; o Proporcional sem teto e o Percentual não têm máximo. */
+export function maximoPremio(regra: RegraPremio): string {
+  switch (regra.tipo) {
+    case "fixo":
+      return reais(regra.valorCentavos);
+    case "proporcional":
+      return regra.teto === null ? `${reais(regra.valorCentavos)} a 100%` : reais(Math.round((regra.valorCentavos * Math.max(regra.teto, 100)) / 100));
+    case "faixas":
+      return reais(Math.max(...regra.faixas.map((f) => f.valorCentavos)));
+    case "faixasPercentuais":
+      return reais(Math.round((regra.valorCentavos * Math.max(...regra.faixas.map((f) => f.percentual))) / 100));
+    case "percentual":
+      return porcentagem(regra.percentual);
+    case "saldo":
+      return "Saldo";
+  }
+}
+
 interface MetaDoPremio {
   id: string;
   version: number;
