@@ -9,7 +9,7 @@ import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
-import { Show, Stack, Text } from "@platform/ui/components/layout";
+import { PairGrid, Show, Stack, Text } from "@platform/ui/components/layout";
 import {
   Select,
   SelectContent,
@@ -817,93 +817,79 @@ function TabelaMontarMetas({
       const indicador = indicadorDoTipo(meta.tipo);
       const avaliacoes = meta.tipo.indicador === "avaliacoes";
       const antes = (l: LinhaTabela) => doAnterior.get(meta.tipoId)?.get(l.colaborador.codigoColaborador);
-      const group = meta.tipo.nome;
       // R$ chegam em centavos; o DataTable formata em reais.
       const formato = indicador.unidade === "reais" ? "currency" : indicador.unidade === "percentual" ? "percent" : "number";
       const emExibicao = (v: number) => (indicador.unidade === "reais" ? v / 100 : v);
       const temPremio = meta.tipo.regra.tipo !== "saldo";
-      // Em cima o Período anterior (cinza), embaixo o que se edita agora: Meta anterior/Nova meta e Atingido/Prêmio.
+      // Uma célula por Meta: em cima o Período anterior, embaixo o que se edita; rótulo, valor, rótulo, valor.
       cols.push({
-        key: `${meta.id}:meta`,
-        group,
-        label: !usaAlvo(meta.tipo) ? "Participa" : avaliacoes ? "Valor inicial" : "Meta",
+        key: meta.id,
+        label: meta.tipo.nome,
         value: (l) => textoParticipacao(meta, l.estados[meta.id]!),
         render: (l) => {
-          const a = antes(l)?.alvo;
-          return (
-            <Stack gap="tight">
-              {usaAlvo(meta.tipo) && (
-                <>
-                  <Text variant="caption" tone="muted">
-                    {avaliacoes ? "Valor inicial anterior" : "Meta anterior"}
-                  </Text>
-                  <Text variant="small">{a === null || a === undefined ? "–" : formatarValor(indicador, a)}</Text>
-                  <Text variant="caption" tone="muted">
-                    {avaliacoes ? "Novo valor inicial" : "Nova meta"}
-                  </Text>
-                </>
-              )}
-              <CelulaParticipacao
-                meta={meta}
-                colaborador={l.colaborador}
-                estado={l.estados[meta.id]!}
-                editar={(e) => editar(meta, l.colaborador.codigoColaborador, e)}
-                somenteLeitura={somenteLeitura}
-              />
-            </Stack>
-          );
-        },
-        cellClassName: usaAlvo(meta.tipo) ? "min-w-44 align-top" : "align-top",
-      });
-      cols.push({
-        key: `${meta.id}:premio`,
-        group,
-        label: temPremio ? "Atingido e Prêmio" : avaliacoes ? "Saldo anterior" : "Atingido",
-        value: (l) => (temPremio ? resumoPremio(regraAtual(meta, l.colaborador.codigoColaborador)) : (antes(l)?.realizado ?? null)),
-        render: (l) => {
           const a = antes(l);
+          const estadoMeta = l.estados[meta.id]!;
           const atingido = !a ? (
-            <Text variant="small">–</Text>
+            "–"
           ) : (
             <Text variant="small" tone={a.atingida === true ? "success" : "default"}>
               {formatarValor(indicador, a.realizado)}
             </Text>
           );
-          return (
-            <Stack gap="tight">
-              <Text variant="caption" tone="muted">
-                {avaliacoes ? "Saldo anterior" : "Atingido"}
-              </Text>
-              {/* Como no Desempenho de Vendas: o tooltip compara o Atingido com a Meta anterior, em %. */}
-              {a && a.alvo !== null ? (
-                <TrendTooltip
-                  trend={{ current: emExibicao(a.realizado), previous: emExibicao(a.alvo), label: "Meta anterior", format: formato, favorable: indicador.direcao === "menor" ? "down" : "up" }}
-                >
-                  {atingido}
-                </TrendTooltip>
-              ) : (
-                atingido
-              )}
-              {temPremio && l.estados[meta.id]!.participa && (
-                <Text variant="caption" tone="muted">
-                  Prêmio
-                </Text>
-              )}
-              {temPremio && (
-                <CelulaPremio
+          const anteriorLinha = [
+            ...(usaAlvo(meta.tipo)
+              ? [{ label: avaliacoes ? "Valor inicial anterior" : "Meta anterior", value: a?.alvo === null || a?.alvo === undefined ? "–" : formatarValor(indicador, a.alvo) }]
+              : []),
+            {
+              label: avaliacoes ? "Saldo anterior" : "Atingido",
+              // Como no Desempenho de Vendas: o tooltip compara o Atingido com a Meta anterior, em %.
+              value:
+                a && a.alvo !== null ? (
+                  <TrendTooltip
+                    trend={{ current: emExibicao(a.realizado), previous: emExibicao(a.alvo), label: "Meta anterior", format: formato, favorable: indicador.direcao === "menor" ? "down" : "up" }}
+                  >
+                    {atingido}
+                  </TrendTooltip>
+                ) : (
+                  atingido
+                ),
+            },
+          ];
+          const atualLinha = [
+            {
+              label: !usaAlvo(meta.tipo) ? "Participa" : avaliacoes ? "Novo valor inicial" : "Nova meta",
+              value: (
+                <CelulaParticipacao
                   meta={meta}
                   colaborador={l.colaborador}
-                  participa={l.estados[meta.id]!.participa}
-                  pendente={l.premios[meta.id]}
+                  estado={estadoMeta}
+                  editar={(e) => editar(meta, l.colaborador.codigoColaborador, e)}
                   somenteLeitura={somenteLeitura}
-                  editar={editarPremio}
-                  alterar={(m, c) => void alterarPremio(m, c)}
                 />
-              )}
-            </Stack>
-          );
+              ),
+            },
+            ...(temPremio && estadoMeta.participa
+              ? [
+                  {
+                    label: "Prêmio",
+                    value: (
+                      <CelulaPremio
+                        meta={meta}
+                        colaborador={l.colaborador}
+                        participa
+                        pendente={l.premios[meta.id]}
+                        somenteLeitura={somenteLeitura}
+                        editar={editarPremio}
+                        alterar={(m, c) => void alterarPremio(m, c)}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ];
+          return <PairGrid pairs={2} rows={[anteriorLinha, atualLinha]} />;
         },
-        cellClassName: "min-w-44 whitespace-normal align-top",
+        cellClassName: "min-w-md",
       });
     }
     return cols;

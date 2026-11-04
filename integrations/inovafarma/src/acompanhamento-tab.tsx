@@ -6,7 +6,7 @@ import {
 } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Label } from "@platform/ui/components/label";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import {
   Select,
   SelectContent,
@@ -25,11 +25,12 @@ import type { ResultadoParticipante } from "./apuracao";
 import type { TipoApuracao } from "./apuracao-store";
 import type { LojaMetas, PeriodoMetas } from "./montar-metas-tab";
 import { OlhoAvaliacoes } from "./avaliacoes-do-colaborador";
-import { formatarValor } from "./indicadores";
+import { formatarValor, reais, type Indicador } from "./indicadores";
+import { TrendTooltip } from "@platform/ui/components/trend";
 import { useVisaoMetas, VisaoSelect } from "./metas-visualizacao";
 import { indicadorDoTipo } from "./tipos-meta";
 import { hojeLocal, projetar, type PeriodoDaProjecao } from "./projecao";
-import { Stack, Text } from "@platform/ui/components/layout";
+import { PairGrid, Stack, Text } from "@platform/ui/components/layout";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@platform/ui/components/tooltip";
 
 const TODAS = "todas";
@@ -43,6 +44,8 @@ export interface VisualizacaoMetas {
 interface LinhaAcompanhamento extends ResultadoParticipante {
   metaId: string;
   tipo: TipoApuracao;
+  /** O mesmo Participante na mesma Meta do Período anterior. */
+  anterior?: { alvo: number | null; realizado: number; atingimento: number | null; atingida: boolean | null; premioCentavos: number };
 }
 
 interface Acompanhamento {
@@ -222,54 +225,88 @@ const colunasMeta: DataTableColumn<LinhaMeta>[] = [
   { key: "premio", label: "Total de Prêmios", value: (m) => m.premioCentavos / 100, format: "currency", sortable: true },
 ];
 
-/** Visualização Tabela: uma linha por Colaborador; cada Meta mostra Alvo, Realizado e % Atingido. */
+/** Valor com o tooltip de comparação do Desempenho de Vendas (em %, ou p.p. nos Indicadores em %). */
+function ComTendencia({ indicador, atual, anterior, rotulo, children }: { indicador: Indicador; atual: number; anterior: number | null | undefined; rotulo: string; children: ReactElement }) {
+  if (anterior === null || anterior === undefined) return children;
+  const formato = indicador.unidade === "reais" ? "currency" : indicador.unidade === "percentual" ? "percent" : "number";
+  const exibir = (v: number) => (indicador.unidade === "reais" ? v / 100 : v);
+  return (
+    <TrendTooltip trend={{ current: exibir(atual), previous: exibir(anterior), label: rotulo, format: formato, favorable: indicador.direcao === "menor" ? "down" : "up" }}>
+      {children}
+    </TrendTooltip>
+  );
+}
+
+/**
+ * Visualização Tabela: uma linha por Colaborador e uma célula por Meta, com rótulo e valor: em cima o Período anterior
+ * (Meta anterior, Atingido, Prêmio), embaixo o atual (Meta, Realizado, Projeção, Prêmio).
+ */
 function colunasTabela(metas: LinhaMeta[], olho: Olho | null, periodo: PeriodoDaProjecao | null): DataTableColumn<LinhaColaborador>[] {
   const colunas: DataTableColumn<LinhaColaborador>[] = [
     { key: "colaborador", label: "Colaborador", value: (c) => c.nome, searchable: true, sortable: true, mobileRole: "primary", nowrap: true },
   ];
+  const vazio = { label: "", value: null };
   for (const meta of metas) {
     const indicador = indicadorDoTipo(meta.tipo);
     const linha = (c: LinhaColaborador) => c.metas.find((l) => l.metaId === meta.metaId);
-    const group = meta.tipo.nome;
     const avaliacoes = meta.tipo.indicador === "avaliacoes";
-    if (!meta.tipo.semAlvo)
-      colunas.push({
-        key: `${meta.metaId}:alvo`,
-        group,
-        label: avaliacoes ? "Valor inicial" : "Alvo",
-        value: (c) => {
-          const l = linha(c);
-          return l && l.alvo !== null ? formatarValor(indicador, l.alvo) : "";
-        },
-        nowrap: true,
-      });
+    const v = (n: number | null | undefined) => (n === null || n === undefined ? "–" : formatarValor(indicador, n));
     colunas.push({
-      key: `${meta.metaId}:realizado`,
-      group,
-      label: avaliacoes ? "Saldo" : "Realizado",
-      value: (c) => {
-        const l = linha(c);
-        return l ? formatarValor(indicador, l.realizado) : "";
-      },
+      key: meta.metaId,
+      label: meta.tipo.nome,
+      value: (c) => (linha(c)?.premioCentavos ?? 0) / 100,
+      format: "currency",
+      sortable: true,
       render: (c) => {
         const l = linha(c);
-        return l ? comOlho(olho, l, formatarValor(indicador, l.realizado)) : null;
+        if (!l) return null;
+        const a = l.anterior;
+        const realizado = (
+          <Text variant="small" tone={l.atingida === null ? "default" : l.atingida ? "success" : "destructive"}>
+            {formatarValor(indicador, l.realizado)}
+          </Text>
+        );
+        const atingidoAntes = <Text variant="small" tone={a?.atingida === true ? "success" : "default"}>{a ? formatarValor(indicador, a.realizado) : "–"}</Text>;
+        return (
+          <PairGrid
+            pairs={4}
+            rows={[
+              [
+                { label: avaliacoes ? "Valor inicial anterior" : "Meta anterior", value: v(a?.alvo) },
+                {
+                  label: avaliacoes ? "Saldo anterior" : "Atingido",
+                  value: a ? (
+                    <ComTendencia indicador={indicador} atual={a.realizado} anterior={a.alvo} rotulo="Meta anterior">
+                      {atingidoAntes}
+                    </ComTendencia>
+                  ) : (
+                    "–"
+                  ),
+                },
+                vazio,
+                { label: "Prêmio anterior", value: a ? reais(a.premioCentavos) : "–" },
+              ],
+              [
+                { label: avaliacoes ? "Valor inicial" : "Meta", value: meta.tipo.semAlvo ? "Sem Alvo" : v(l.alvo) },
+                {
+                  label: avaliacoes ? "Saldo" : "Realizado",
+                  value: comOlho(
+                    olho,
+                    l,
+                    <ComTendencia indicador={indicador} atual={l.realizado} anterior={l.alvo} rotulo="Meta">
+                      {realizado}
+                    </ComTendencia>,
+                  ),
+                },
+                avaliacoes ? vazio : { label: "Projeção", value: <CelulaProjecao linha={l} periodo={periodo} /> },
+                { label: "Prêmio", value: <Text variant="small" weight="medium">{reais(l.premioCentavos)}</Text> },
+              ],
+            ]}
+          />
+        );
       },
-      nowrap: true,
+      cellClassName: "min-w-xl",
     });
-    if (!meta.tipo.semAlvo)
-      colunas.push({
-        key: `${meta.metaId}:atingimento`,
-        group,
-        label: "% Atingido",
-        value: (c) => {
-          const a = linha(c)?.atingimento;
-          return a === null || a === undefined || !Number.isFinite(a) ? null : a;
-        },
-        format: "percent",
-        sortable: true,
-      });
-    if (meta.tipo.indicador !== "avaliacoes") colunas.push(colunaProjecao<LinhaColaborador>(`${meta.metaId}:projecao`, linha, periodo, group));
   }
   colunas.push({ key: "premio", label: "Total de Prêmios", value: (c) => c.premioCentavos / 100, format: "currency", sortable: true });
   return colunas;
