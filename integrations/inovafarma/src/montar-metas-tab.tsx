@@ -46,6 +46,7 @@ import { Input } from "@platform/ui/components/input";
 import { MoneyInput } from "@platform/ui/components/money-input";
 import type { TipoMetaComPremio } from "./tipo-meta-window";
 import { useVisaoMetas, VisaoSelect } from "./metas-visualizacao";
+import { TrendTooltip } from "@platform/ui/components/trend";
 
 const BASE = "/api/m/inovafarma/metas";
 const TODAS = "todas";
@@ -820,75 +821,78 @@ function TabelaMontarMetas({
       // R$ chegam em centavos; o DataTable formata em reais.
       const formato = indicador.unidade === "reais" ? "currency" : indicador.unidade === "percentual" ? "percent" : "number";
       const emExibicao = (v: number) => (indicador.unidade === "reais" ? v / 100 : v);
-      if (usaAlvo(meta.tipo)) {
-        cols.push(
-          {
-            key: `${meta.id}:anterior`,
-            group,
-            label: avaliacoes ? "Valor inicial anterior" : "Meta anterior",
-            value: (l) => antes(l)?.alvo ?? null,
-            render: (l) => {
-              const a = antes(l)?.alvo;
-              return a === null || a === undefined ? null : formatarValor(indicador, a);
-            },
-            nowrap: true,
-          },
-          {
-            key: `${meta.id}:atingido`,
-            group,
-            label: avaliacoes ? "Saldo anterior" : "Atingido",
-            // Como no Desempenho de Vendas: o tooltip compara o Atingido com a Meta anterior, em %.
-            value: (l) => {
-              const a = antes(l);
-              return a ? emExibicao(a.realizado) : null;
-            },
-            format: formato,
-            compare: (l) => {
-              const a = antes(l);
-              return a && a.alvo !== null ? { previous: emExibicao(a.alvo), label: "Meta anterior", favorable: indicador.direcao === "menor" ? "down" : "up" } : undefined;
-            },
-            nowrap: true,
-          },
-        );
-      }
+      const temPremio = meta.tipo.regra.tipo !== "saldo";
+      // Em cima o Período anterior (cinza), embaixo o que se edita agora: Meta anterior/Nova meta e Atingido/Prêmio.
       cols.push({
-        key: `${meta.id}:nova`,
+        key: `${meta.id}:meta`,
         group,
-        label: !usaAlvo(meta.tipo) ? "Participa" : avaliacoes ? "Novo valor inicial" : "Nova meta",
+        label: !usaAlvo(meta.tipo) ? "Participa" : avaliacoes ? "Valor inicial anterior / novo" : "Meta anterior / Nova meta",
         value: (l) => textoParticipacao(meta, l.estados[meta.id]!),
-        render: (l) => (
-          <CelulaParticipacao
-            meta={meta}
-            colaborador={l.colaborador}
-            estado={l.estados[meta.id]!}
-            editar={(e) => editar(meta, l.colaborador.codigoColaborador, e)}
-            somenteLeitura={somenteLeitura}
-          />
-        ),
+        render: (l) => {
+          const a = antes(l)?.alvo;
+          return (
+            <Stack gap="tight">
+              {usaAlvo(meta.tipo) && (
+                <Text variant="caption" tone="muted">
+                  {a === null || a === undefined ? "–" : formatarValor(indicador, a)}
+                </Text>
+              )}
+              <CelulaParticipacao
+                meta={meta}
+                colaborador={l.colaborador}
+                estado={l.estados[meta.id]!}
+                editar={(e) => editar(meta, l.colaborador.codigoColaborador, e)}
+                somenteLeitura={somenteLeitura}
+              />
+            </Stack>
+          );
+        },
         cellClassName: usaAlvo(meta.tipo) ? "min-w-44" : undefined,
       });
-      if (meta.tipo.regra.tipo !== "saldo")
-        cols.push({
-          key: `${meta.id}:premio`,
-          group,
-          label: "Prêmio",
-          value: (l) => {
-            const p = meta.participantes.find((x) => x.codigoColaborador === l.colaborador.codigoColaborador);
-            return p ? resumoPremio(regraDoParticipante(meta.tipo.regra, p)) : "";
-          },
-          render: (l) => (
-            <CelulaPremio
-              meta={meta}
-              colaborador={l.colaborador}
-              participa={l.estados[meta.id]!.participa}
-              pendente={l.premios[meta.id]}
-              somenteLeitura={somenteLeitura}
-              editar={editarPremio}
-              alterar={(m, c) => void alterarPremio(m, c)}
-            />
-          ),
-          cellClassName: "min-w-44 whitespace-normal",
-        });
+      cols.push({
+        key: `${meta.id}:premio`,
+        group,
+        label: temPremio ? (avaliacoes ? "Saldo anterior / Prêmio" : "Atingido / Prêmio") : avaliacoes ? "Saldo anterior" : "Atingido",
+        value: (l) => (temPremio ? resumoPremio(regraAtual(meta, l.colaborador.codigoColaborador)) : (antes(l)?.realizado ?? null)),
+        render: (l) => {
+          const a = antes(l);
+          const atingido = !a ? (
+            <Text variant="caption" tone="muted">
+              –
+            </Text>
+          ) : (
+            <Text variant="caption" tone={a.atingida === true ? "success" : "muted"}>
+              {formatarValor(indicador, a.realizado)}
+            </Text>
+          );
+          return (
+            <Stack gap="tight">
+              {/* Como no Desempenho de Vendas: o tooltip compara o Atingido com a Meta anterior, em %. */}
+              {a && a.alvo !== null ? (
+                <TrendTooltip
+                  trend={{ current: emExibicao(a.realizado), previous: emExibicao(a.alvo), label: "Meta anterior", format: formato, favorable: indicador.direcao === "menor" ? "down" : "up" }}
+                >
+                  {atingido}
+                </TrendTooltip>
+              ) : (
+                atingido
+              )}
+              {temPremio && (
+                <CelulaPremio
+                  meta={meta}
+                  colaborador={l.colaborador}
+                  participa={l.estados[meta.id]!.participa}
+                  pendente={l.premios[meta.id]}
+                  somenteLeitura={somenteLeitura}
+                  editar={editarPremio}
+                  alterar={(m, c) => void alterarPremio(m, c)}
+                />
+              )}
+            </Stack>
+          );
+        },
+        cellClassName: "min-w-44 whitespace-normal",
+      });
     }
     return cols;
   }, [metas, anterior, somenteLeitura, editar, alterarPremio, editarPremio]);
