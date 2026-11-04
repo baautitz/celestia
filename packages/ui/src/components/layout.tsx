@@ -142,6 +142,30 @@ function Grid({ columns, gap = "section", ...props }: GridProps) {
   )
 }
 
+/**
+ * Pares rótulo/valor em linhas, com os rótulos e os valores alinhados em colunas (ex.: numa célula de tabela,
+ * "Meta anterior 50 · Atingido 45" em cima e "Nova meta [ ] · Prêmio [ ]" embaixo). Cada par é um `label` e um `value`.
+ */
+function PairGrid({ pairs, rows }: { pairs: number; rows: { label: React.ReactNode; value: React.ReactNode }[][] }) {
+  return (
+    <div className="grid items-center gap-x-2 gap-y-1" style={{ gridTemplateColumns: `repeat(${pairs}, max-content minmax(0, 1fr))` }}>
+      {rows.flatMap((row, i) =>
+        Array.from({ length: pairs }, (_, j) => {
+          const pair = row[j];
+          return [
+            <span key={`${i}-${j}-l`} className="text-xs text-muted-foreground whitespace-nowrap">
+              {pair?.label}
+            </span>,
+            <div key={`${i}-${j}-v`} className="min-w-0">
+              {pair?.value}
+            </div>,
+          ];
+        }).flat(),
+      )}
+    </div>
+  )
+}
+
 /** Exibe o conteúdo apenas a partir de `lg` (`lgUp`) ou apenas abaixo dele (`belowLg`), sem afetar o layout do pai. */
 function Show({ on, ...props }: Omit<React.ComponentProps<"div">, "className" | "style"> & { on: keyof typeof visibility }) {
   return <div className={visibility[on]} {...props} />
@@ -365,4 +389,4 @@ function PageHeader({ title, description }: { title: string; description?: React
   )
 }
 
-export { Stack, Grid, Show, Text, Spin, IconBadge, KpiCard, BrandMark, AppHeader, AppMain, CenteredScreen, CenteredNotice, LoadingScreen, PageHeader }
+export { Stack, Grid, PairGrid, Show, Text, Spin, IconBadge, KpiCard, BrandMark, AppHeader, AppMain, CenteredScreen, CenteredNotice, LoadingScreen, PageHeader }
