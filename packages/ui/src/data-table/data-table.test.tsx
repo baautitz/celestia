@@ -807,3 +807,71 @@ describe("tabela aninhada no celular", () => {
     expect(tabela.className).toContain("overflow-visible");
   });
 });
+
+describe("DataTable arrowNavigation", () => {
+  afterEach(cleanup);
+  type Linha = { id: string; nome: string };
+  const linhas: Linha[] = [
+    { id: "1", nome: "Ana" },
+    { id: "2", nome: "Bia" },
+  ];
+  const colunasEditaveis = [
+    { key: "nome", label: "Nome", value: (r: Linha) => r.nome },
+    { key: "a", label: "A", render: (r: Linha) => <input aria-label={`A ${r.nome}`} defaultValue="12" /> },
+    {
+      key: "b",
+      label: "B",
+      // Como um Switch do base-ui: a chave e o checkbox escondido ficam fora da navegação.
+      render: (r: Linha) => (
+        <>
+          <button type="button" role="switch" aria-checked="false" aria-label={`Chave ${r.nome}`} />
+          <input type="checkbox" aria-hidden="true" tabIndex={-1} />
+          <input aria-label={`B ${r.nome}`} defaultValue="" />
+        </>
+      ),
+    },
+  ];
+
+  it("move o foco entre os campos das células com as setas e o Enter, como numa planilha", () => {
+    setViewport(1280);
+    render(<DataTable columns={colunasEditaveis} rows={linhas} getRowId={(r) => r.id} arrowNavigation />);
+    const a1 = screen.getByLabelText("A Ana") as HTMLInputElement;
+    a1.focus();
+    fireEvent.keyDown(a1, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(screen.getByLabelText("A Bia"));
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(a1);
+    // ← e → sempre trocam de célula, mesmo com o cursor no meio do texto.
+    a1.setSelectionRange(1, 1);
+    fireEvent.keyDown(a1, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByLabelText("B Ana"));
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(a1);
+    // Ao ganhar o foco, o valor fica todo selecionado: digitar substitui.
+    expect([a1.selectionStart, a1.selectionEnd]).toEqual([0, 2]);
+    fireEvent.keyDown(a1, { key: "ArrowRight" });
+    fireEvent.keyDown(document.activeElement!, { key: "Enter" });
+    expect(document.activeElement).toBe(screen.getByLabelText("B Bia"));
+  });
+});
+
+describe("DataTable desempenho", () => {
+  afterEach(cleanup);
+  it("com coluna fixa, uma lista nova com as mesmas linhas não redesenha as que não mudaram", () => {
+    setViewport(1280);
+    let renders = 0;
+    type L = { id: string; nome: string };
+    const cols = [
+      { key: "nome", label: "Nome", value: (r: L) => r.nome },
+      { key: "x", label: "X", render: (r: L) => (renders++, r.nome) },
+    ];
+    const ana = { id: "1", nome: "Ana" };
+    const bia = { id: "2", nome: "Bia" };
+    const id = (r: L) => r.id;
+    const { rerender } = render(<DataTable columns={cols} rows={[ana, bia]} getRowId={id} frozenUntil="nome" />);
+    const antes = renders;
+    rerender(<DataTable columns={cols} rows={[ana, { ...bia, nome: "Bianca" }]} getRowId={id} frozenUntil="nome" />);
+    // Só a linha alterada redesenha.
+    expect(renders - antes).toBe(1);
+  });
+});

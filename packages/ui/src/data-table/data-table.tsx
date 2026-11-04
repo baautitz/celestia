@@ -1,3 +1,4 @@
+import { handleArrowNavigation, handleArrowNavigationFocus } from "./arrow-navigation";
 import React, {
   createContext,
   useCallback,
@@ -208,6 +209,8 @@ export interface DataTableProps<TRow> {
   striped?: boolean;
   /** `key` da última coluna presa à esquerda na rolagem horizontal; ela e as anteriores ficam fixas. Não afeta a impressão. */
   frozenUntil?: string;
+  /** Setas movem o foco entre os campos de valor das células, como numa planilha (↑/↓ e Enter trocam de linha); chaves e botões ficam fora. */
+  arrowNavigation?: boolean;
   /**
    * Totalizador: valores por `key` de coluna, calculados por quem usa a tabela e formatados pelo `format` da coluna.
    * A função recebe as linhas da busca atual, de todas as páginas; o objeto serve ao modo `manual` e a tabelas sem busca.
@@ -455,6 +458,7 @@ export function DataTable<TRow>({
   print,
   striped = false,
   frozenUntil,
+  arrowNavigation = false,
   totals,
   totalsCompare,
 }: DataTableProps<TRow>) {
@@ -562,7 +566,10 @@ export function DataTable<TRow>({
         next.set(key, left);
         left += headRefs.current.get(key)?.offsetWidth ?? 0;
       }
-      setFrozenLeft(next);
+      // Mesmas posições: mantém o Map, senão toda linha (que depende dele) redesenha a cada mudança de `rows`.
+      setFrozenLeft((prev) =>
+        prev.size === next.size && [...next].every(([k, v]) => prev.get(k) === v) ? prev : next,
+      );
     };
     measure();
     if (!frozenSignature || typeof ResizeObserver === "undefined") return;
@@ -1044,7 +1051,7 @@ export function DataTable<TRow>({
           </div>
         ) : (
           <>
-            <div className={bordered ? "border border-border" : undefined}>
+            <div className={bordered ? "border border-border" : undefined} onKeyDown={arrowNavigation ? handleArrowNavigation : undefined} onFocus={arrowNavigation ? handleArrowNavigationFocus : undefined}>
               {wide && (
                 <div
                   ref={stickyHeadRef}
