@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgSchema, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 /** Schema Postgres do Module `iam`. */
 export const iamSchema = pgSchema("iam");
@@ -26,3 +26,17 @@ export const users = iamSchema.table("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at"),
 });
+
+/** Preferência do Usuário (p.ex. a visualização escolhida numa tela): `value` é opaco para o iam. */
+export const userPreferences = iamSchema.table(
+  "user_preferences",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    value: jsonb("value").$type<unknown>().notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.key] })],
+);

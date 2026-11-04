@@ -45,10 +45,23 @@ export interface UserStore {
 
   /** Remove das roles as chaves ausentes de `validKeys` (preserva "*"); devolve quantas foram removidas. */
   syncOrphanPermissions(validKeys: ReadonlySet<string>): Promise<number>;
+
+  /** Preferência do Usuário pela chave; `undefined` quando nunca foi salva. */
+  getPreference(userId: string, key: string): Promise<unknown>;
+  setPreference(userId: string, key: string, value: unknown): Promise<void>;
 }
 
 export class MemoryUserStore implements UserStore {
   private users = new Map<string, User>();
+  private preferences = new Map<string, unknown>();
+
+  async getPreference(userId: string, key: string): Promise<unknown> {
+    return this.preferences.get(`${userId}\u0000${key}`);
+  }
+
+  async setPreference(userId: string, key: string, value: unknown): Promise<void> {
+    this.preferences.set(`${userId}\u0000${key}`, value);
+  }
   private roles = new Map<string, Role>();
 
   constructor(initialData?: { users?: User[]; roles?: Role[] }) {

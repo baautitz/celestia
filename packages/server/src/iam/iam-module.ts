@@ -275,6 +275,25 @@ export function createIamModule({
 
       routes.get("/auth/me", auth, async (c) => c.json(c.get("user")));
 
+      // Preferências do próprio Usuário (p.ex. a visualização de uma tela): o valor é opaco para o iam.
+      const PREFERENCE_KEY = /^[a-z0-9][a-z0-9:._-]{0,99}$/;
+      const MAX_PREFERENCE_BYTES = 4096;
+      routes.get("/iam/preferences/:key", auth, async (c) => {
+        const key = c.req.param("key");
+        if (!PREFERENCE_KEY.test(key)) return c.json({ error: "Chave de preferência inválida." }, 400);
+        const value = await userStore.getPreference(getAuthenticatedUser(c).sub, key);
+        return c.json({ key, value: value ?? null });
+      });
+      routes.put("/iam/preferences/:key", auth, async (c) => {
+        const key = c.req.param("key");
+        if (!PREFERENCE_KEY.test(key)) return c.json({ error: "Chave de preferência inválida." }, 400);
+        const body = await c.req.json<{ value?: unknown }>().catch(() => null);
+        if (!body || body.value === undefined) return c.json({ error: "Informe o 'value' da preferência." }, 400);
+        if (JSON.stringify(body.value).length > MAX_PREFERENCE_BYTES) return c.json({ error: "Preferência grande demais." }, 400);
+        await userStore.setPreference(getAuthenticatedUser(c).sub, key, body.value);
+        return c.json({ key, value: body.value });
+      });
+
       // A tela mostra o que a senha já cumpre; a validação continua no servidor.
       routes.get("/iam/password-policy", auth, (c) =>
         c.json({ rules: PASSWORD_RULES.map(({ label, pattern }) => ({ label, pattern: pattern.source })) }),

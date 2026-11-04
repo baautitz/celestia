@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, count, eq, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CreateUserInput, Role, UpdateUserInput, User } from "@platform/shared";
-import { roles, users } from "./schema.js";
+import { roles, userPreferences, users } from "./schema.js";
 import { PasswordService } from "./password-service.js";
 import { pruneOrphans } from "@platform/core/permissions";
 import { LastAdminError, type UserStore } from "./user-store.js";
@@ -38,6 +38,22 @@ function toRole(row: RoleRow): Role {
 
 export class PostgresUserStore implements UserStore {
   constructor(private db: NodePgDatabase) {}
+
+  async getPreference(userId: string, key: string): Promise<unknown> {
+    const [row] = await this.db
+      .select({ value: userPreferences.value })
+      .from(userPreferences)
+      .where(and(eq(userPreferences.userId, userId), eq(userPreferences.key, key)))
+      .limit(1);
+    return row?.value;
+  }
+
+  async setPreference(userId: string, key: string, value: unknown): Promise<void> {
+    await this.db
+      .insert(userPreferences)
+      .values({ userId, key, value })
+      .onConflictDoUpdate({ target: [userPreferences.userId, userPreferences.key], set: { value, updatedAt: new Date() } });
+  }
 
   async findByUsername(username: string): Promise<User | null> {
     const [row] = await this.db
