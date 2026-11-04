@@ -1527,7 +1527,7 @@ function PrintTable<TRow>({
               <TableHead
                 key={col.key}
                 className={cn(
-                  "h-8",
+                  "h-8 text-xs font-semibold",
                   wrapsInPrint(col) && "whitespace-normal",
                   isNumericColumn(col) && "text-right",
                   isCenteredColumn(col) && "text-center",
