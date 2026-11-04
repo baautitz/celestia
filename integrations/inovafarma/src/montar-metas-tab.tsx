@@ -777,11 +777,14 @@ function TabelaMontarMetas({
   atualizar,
   premio,
   editarPremio,
+  impressao,
 }: VisaoProps & {
   anterior: Anterior | null;
   atualizar: (meta: MetaVista) => void;
   premio: (meta: MetaVista, codigo: number) => number | undefined;
   editarPremio: (meta: MetaVista, codigo: number, valor: number | null) => void;
+  /** Subtítulo e nome do arquivo da impressão (Período, Loja e se há alterações não salvas). */
+  impressao: { description: string; fileName: string };
 }) {
   const alterarPremio = useAlterarPremio(atualizar);
 
@@ -891,6 +894,28 @@ function TabelaMontarMetas({
           ];
           return <PairGrid pairs={2} rows={[anteriorLinha, atualLinha]} valueWidths={["13rem", "11rem"]} />;
         },
+        // No papel, o que está na tela (inclusive o ainda não salvo) em texto, sem os campos.
+        printValue: (l) => {
+          const a = antes(l);
+          const e = l.estados[meta.id]!;
+          const codigo = l.colaborador.codigoColaborador;
+          const nova = !e.participa ? "Não participa" : !usaAlvo(meta.tipo) ? "Participa" : e.alvo === null ? "Pendente" : formatarValor(indicador, e.alvo);
+          const pendente = l.premios[meta.id];
+          const regra = pendente === undefined ? regraAtual(meta, codigo) : comValorDoPremio(regraAtual(meta, codigo), pendente);
+          const anteriorTexto = [
+            ...(usaAlvo(meta.tipo) ? [`${avaliacoes ? "Valor inicial anterior" : "Meta anterior"} ${a?.alvo === null || a?.alvo === undefined ? "–" : formatarValor(indicador, a.alvo)}`] : []),
+            `${avaliacoes ? "Saldo anterior" : "Atingido"} ${a ? formatarValor(indicador, a.realizado) : "–"}`,
+          ].join(" · ");
+          const atualTexto = [`${avaliacoes ? "Valor inicial" : "Nova meta"} ${nova}`, ...(temPremio && e.participa ? [`Prêmio ${resumoPremio(regra)}`] : [])].join(" · ");
+          return (
+            <Stack>
+              <Text variant="caption" tone="muted">
+                {anteriorTexto}
+              </Text>
+              <Text variant="caption">{atualTexto}</Text>
+            </Stack>
+          );
+        },
         cellClassName: "min-w-md",
       });
     }
@@ -915,6 +940,7 @@ function TabelaMontarMetas({
       frozenUntil="nome"
       arrowNavigation
       striped
+      print={{ orientation: "landscape", description: impressao.description, fileName: impressao.fileName }}
     />
   );
 }
@@ -1176,6 +1202,11 @@ export function MontarMetas({
 
   // Participações primeiro: um Colaborador que entra agora já existe quando o Prêmio dele é gravado.
   const alteracoes = [...alteracoesParticipacao, ...alteracoesPremio];
+  const lojaNome = loja === TODAS ? "Todas as Lojas" : lojas.find((l) => String(l.codigo) === loja)?.nome || `Loja ${loja}`;
+  const impressao = {
+    description: `${periodo?.name ?? ""} · ${lojaNome}${anterior?.periodo ? ` · Anterior: ${anterior.periodo.name}` : ""}${alteracoes.length ? ` · Com ${alteracoes.length} alteraç${alteracoes.length === 1 ? "ão" : "ões"} ainda não salva${alteracoes.length === 1 ? "" : "s"}` : ""}`,
+    fileName: `Metas - ${periodo?.name ?? ""} - ${lojaNome}`,
+  };
 
   const salvarAlteracoes = async () => {
     const r = await windows.open<true>({
@@ -1339,7 +1370,7 @@ export function MontarMetas({
           </AlertDescription>
         </Alert>
       )}
-      {visao === "table" && <TabelaMontarMetas {...visaoProps} anterior={anterior} atualizar={atualizar} premio={premioDe} editarPremio={editarPremio} />}
+      {visao === "table" && <TabelaMontarMetas {...visaoProps} anterior={anterior} atualizar={atualizar} premio={premioDe} editarPremio={editarPremio} impressao={impressao} />}
       {visao === "by-colaborador" && <PorColaboradorMontarMetas {...visaoProps} atualizar={atualizar} premio={premioDe} editarPremio={editarPremio} />}
       {visao === "by-meta" && <DataTable
         scroll="page"

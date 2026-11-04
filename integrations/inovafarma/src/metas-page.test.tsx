@@ -313,6 +313,8 @@ describe("Metas: Montar Metas na Tabela", () => {
     fireEvent.change(screen.getByRole("textbox", { name: /de BIA na Meta CMV/ }), { target: { value: "25" } });
     expect(bia.getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("button", { name: "Salvar alterações (1)" })).toBeTruthy();
+    // A Tabela tem impressão.
+    expect(screen.getByRole("button", { name: /Imprimir/ })).toBeTruthy();
     // Faixas em R$ têm vários valores: o Prêmio fica com o lápis.
     expect(screen.getByRole("button", { name: "Alterar o Prêmio de ANA na Meta CMV" })).toBeTruthy();
   });
