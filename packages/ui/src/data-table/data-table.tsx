@@ -101,6 +101,8 @@ function HeaderLabel({ col }: { col: { label: string; tooltip?: string } }) {
 export interface DataTableColumn<TRow> {
   key: string;
   label: string;
+  /** Linha vertical antes da coluna, como entre grupos (ex.: separar uma Meta da outra). */
+  divider?: boolean;
   /** Explicação exibida em tooltip ao passar o mouse sobre o cabeçalho. */
   tooltip?: string;
   /** Rótulo do campo no MobileCard; padrão: `label`, prefixado pelo `group`. */
@@ -346,12 +348,12 @@ function GroupHeaderRow({
 
 /** Colunas que começam ou encerram um grupo ganham uma divisória à esquerda, do cabeçalho ao corpo. */
 function groupBoundaryKeys(
-  columns: { key: string; group?: string }[],
+  columns: { key: string; group?: string; divider?: boolean }[],
 ): ReadonlySet<string> {
   const keys = new Set<string>();
   columns.forEach((col, i) => {
     const prev = columns[i - 1];
-    if (prev && prev.group !== col.group && (prev.group || col.group))
+    if (prev && (col.divider || (prev.group !== col.group && (prev.group || col.group))))
       keys.add(col.key);
   });
   return keys;
