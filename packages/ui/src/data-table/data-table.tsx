@@ -166,6 +166,10 @@ export interface DataTablePrintOptions<TRow = unknown> {
    * Use `<PrintDetailTable>` para uma subtabela compacta.
    */
   details?: (row: TRow) => React.ReactNode;
+  /** Antes de imprimir (ex.: um modal de opções); `false` cancela a impressão. */
+  prepare?: () => Promise<boolean>;
+  /** Colunas do papel; padrão: as da tela. Lidas depois do `prepare`, que pode mudá-las. */
+  columns?: DataTableColumn<TRow>[];
 }
 
 export interface DataTableProps<TRow> {
@@ -824,7 +828,10 @@ export function DataTable<TRow>({
       variant="outline"
       size="default"
       disabled={loading || count === 0 || serverPaged}
-      onClick={() => setPrinting(true)}
+      onClick={async () => {
+        if (print.prepare && !(await print.prepare())) return;
+        setPrinting(true);
+      }}
     >
       <Printer className="size-4 mr-1" />
       Imprimir
@@ -1302,7 +1309,7 @@ export function DataTable<TRow>({
       </CardContent>
       {print && printing && (
         <PrintTable
-          columns={columns}
+          columns={print.columns ?? columns}
           rows={printRows}
           totals={totalsValues}
           getRowId={getRowId}
