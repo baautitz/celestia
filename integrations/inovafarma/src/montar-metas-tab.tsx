@@ -949,7 +949,7 @@ function TabelaMontarMetas({
             { label: avaliacoes ? "Valor inicial" : "Nova meta", value: campo(nova) },
             ...(imprimePremio ? [{ label: "Prêmio", value: campo(resumoPremio(regra)) }] : []),
           ];
-          return <PairGrid pairs={2} rows={[anteriorLinha, atualLinha]} valueWidths={["7rem", "13rem"]} />;
+          return <PairGrid pairs={2} rows={[anteriorLinha, atualLinha]} valueWidths={["7rem", "18rem"]} />;
         },
         cellClassName: "min-w-md",
       });
