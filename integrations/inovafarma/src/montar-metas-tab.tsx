@@ -676,6 +676,26 @@ interface VisaoProps {
   loading: boolean;
 }
 
+/** Opções da impressão do Montar Metas: por padrão, só as Metas cujo Prêmio o Colaborador vê. */
+function ImprimirMetasWindow() {
+  const { resolve } = useWindow<boolean>();
+  const [soVisivel, setSoVisivel] = useState(true);
+  return (
+    <>
+      <Stack direction="row" gap="field" align="center">
+        <Switch checked={soVisivel} onCheckedChange={(on: boolean) => setSoVisivel(on)} aria-label="Imprimir só as Metas com Prêmio visível ao Colaborador" />
+        <Text variant="small">Imprimir só as Metas com Prêmio visível ao Colaborador</Text>
+      </Stack>
+      <WindowActions>
+        <WindowCancelButton />
+        <Button type="button" onClick={() => resolve(soVisivel)}>
+          Imprimir
+        </Button>
+      </WindowActions>
+    </>
+  );
+}
+
 /** Abre a janela do Prêmio do Participante (Faixas em R$, que não cabem numa célula) e atualiza a Meta gravada. */
 function useAlterarPremio(atualizar: (meta: MetaVista) => void) {
   const { windows } = useUi();
@@ -787,6 +807,19 @@ function TabelaMontarMetas({
   impressao: { description: string; fileName: string };
 }) {
   const alterarPremio = useAlterarPremio(atualizar);
+  const { windows } = useUi();
+  const [soPremioVisivel, setSoPremioVisivel] = useState(true);
+  const prepararImpressao = async () => {
+    const r = await windows.open<boolean>({
+      surface: "dialog",
+      title: "Imprimir Metas",
+      description: "O Prêmio visível é o que o Tipo de Meta mostra ao Colaborador em Minhas Metas.",
+      content: () => <ImprimirMetasWindow />,
+    });
+    if (r.status !== "confirmed") return false;
+    setSoPremioVisivel(r.value);
+    return true;
+  };
 
   // Reaproveita a linha anterior quando nenhuma participação dela mudou: o DataTable não a redesenha.
   const cache = useRef(new Map<number, LinhaTabela>());
@@ -940,7 +973,13 @@ function TabelaMontarMetas({
       frozenUntil="nome"
       arrowNavigation
       striped
-      print={{ orientation: "landscape", description: impressao.description, fileName: impressao.fileName }}
+      print={{
+        orientation: "landscape",
+        description: soPremioVisivel ? `${impressao.description} · Só Metas com Prêmio visível ao Colaborador` : impressao.description,
+        fileName: impressao.fileName,
+        prepare: prepararImpressao,
+        columns: soPremioVisivel ? colunas.filter((c) => metas.find((m) => m.id === c.key)?.tipo.mostrarPremio !== false) : colunas,
+      }}
     />
   );
 }

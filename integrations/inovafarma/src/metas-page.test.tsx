@@ -313,8 +313,11 @@ describe("Metas: Montar Metas na Tabela", () => {
     fireEvent.change(screen.getByRole("textbox", { name: /de BIA na Meta CMV/ }), { target: { value: "25" } });
     expect(bia.getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("button", { name: "Salvar alterações (1)" })).toBeTruthy();
-    // A Tabela tem impressão.
-    expect(screen.getByRole("button", { name: /Imprimir/ })).toBeTruthy();
+    // A Tabela tem impressão, com a opção de só as Metas com Prêmio visível, marcada por padrão.
+    fireEvent.click(screen.getByRole("button", { name: /Imprimir/ }));
+    const soVisivel = await screen.findByRole("switch", { name: "Imprimir só as Metas com Prêmio visível ao Colaborador" });
+    expect(soVisivel.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     // Faixas em R$ têm vários valores: o Prêmio fica com o lápis.
     expect(screen.getByRole("button", { name: "Alterar o Prêmio de ANA na Meta CMV" })).toBeTruthy();
   });
