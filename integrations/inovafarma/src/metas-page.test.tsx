@@ -22,6 +22,8 @@ const cmv = {
   version: 1,
   premio: "CMV % até 30% paga R$ 100,00",
 };
+const preferencias: Record<string, string | null> = {};
+const PREFERENCIAS_AGRUPADAS = { "inovafarma:montar-metas:view": "by-meta", "inovafarma:acompanhamento:view": "by-colaborador", "inovafarma:minhas-metas:view": "list" };
 const participantes = [
   { codigoColaborador: 1, nome: "ANA", alvo: 30 },
   { codigoColaborador: 2, nome: "BIA", alvo: null },
@@ -81,7 +83,10 @@ beforeEach(() => {
     }),
   });
   apiFetch.mockReset();
+  Object.assign(preferencias, PREFERENCIAS_AGRUPADAS);
   apiFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+    // Visualização salva de cada aba: os testes agrupados usam a de antes da Tabela.
+    if (url.startsWith("/api/iam/preferences/")) return { value: init?.method === "PUT" ? null : (preferencias[decodeURIComponent(url.split("/").pop()!)] ?? null) };
     if (init?.method === "PUT") return { ...cmv, ...JSON.parse(String(init.body)), version: 2, premio: "CMV % até 28% paga R$ 100,00" };
     if (init?.method === "POST") return { metas: [] };
     if (url.endsWith("/metas/contexto")) return contexto;
@@ -294,6 +299,40 @@ describe("Metas: construtor de Tipo de Meta", () => {
     });
     // Logo abaixo das Faixas, antes do botão de adicionar outra.
     expect(erro.nextElementSibling?.textContent).toContain("Adicionar Faixa");
+  });
+});
+
+describe("Metas: Montar Metas na Tabela", () => {
+  it("é a visualização padrão e digitar a Nova meta já liga o Participa", async () => {
+    preferencias["inovafarma:montar-metas:view"] = null;
+    renderizar();
+    fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
+    const bia = await screen.findByRole("switch", { name: "BIA participa da Meta CMV" });
+    fireEvent.click(bia);
+    expect(bia.getAttribute("aria-checked")).toBe("false");
+    fireEvent.change(screen.getByRole("textbox", { name: /de BIA na Meta CMV/ }), { target: { value: "25" } });
+    expect(bia.getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("button", { name: "Salvar alterações (1)" })).toBeTruthy();
+    // Faixas em R$ têm vários valores: o Prêmio fica com o lápis.
+    expect(screen.getByRole("button", { name: "Alterar o Prêmio de ANA na Meta CMV" })).toBeTruthy();
+  });
+
+  it("edita o Prêmio Fixo na própria célula e grava no Salvar alterações", async () => {
+    preferencias["inovafarma:montar-metas:view"] = null;
+    const padrao = apiFetch.getMockImplementation()!;
+    const fixo = { ...metaCmv, tipo: { ...cmv, regra: { tipo: "fixo", valorCentavos: 10000 } } };
+    apiFetch.mockImplementation(async (url: string, init?: RequestInit) =>
+      url.includes("/metas?periodoId=") ? { ...montagem, metas: [fixo] } : url.endsWith("/premio") ? fixo : padrao(url, init),
+    );
+    renderizar();
+    fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
+    const premio = await screen.findByRole("textbox", { name: "Prêmio de ANA na Meta CMV" });
+    fireEvent.change(premio, { target: { value: "R$ 150,00" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Salvar alterações (1)" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/met_1/participantes/1/premio", expect.anything()));
+    const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/participantes/1/premio"))!;
+    expect(JSON.parse(String(init.body))).toEqual({ version: 1, premio: { tipo: "fixo", valorCentavos: 15000 } });
   });
 });
 

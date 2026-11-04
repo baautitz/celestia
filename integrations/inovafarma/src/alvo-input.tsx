@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@platform/ui/components/input";
 import { MoneyInput } from "@platform/ui/components/money-input";
 import type { Indicador } from "./indicadores";
@@ -27,6 +27,10 @@ export function AlvoInput({
   autoFocus?: boolean;
 }) {
   const [texto, setTexto] = useState(valor === null ? "" : String(valor).replace(".", ","));
+  // O valor mudou por fora (p.ex. desligar o Participa desfaz a edição): o texto acompanha, sem atrapalhar a digitação.
+  useEffect(() => {
+    setTexto((t) => (numero(t) === valor ? t : valor === null ? "" : String(valor).replace(".", ",")));
+  }, [valor]);
   if (indicador.unidade === "reais")
     return (
       <MoneyInput autoFocus={autoFocus} value={valor === null ? null : valor / 100} onValueChange={(v) => onChange(v > 0 ? Math.round(v * 100) : null)} aria-label={label} />

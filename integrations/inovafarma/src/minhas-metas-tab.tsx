@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Label } from "@platform/ui/components/label";
@@ -10,9 +10,12 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { dataHora } from "./datas";
 import type { MinhaBaixa, MinhaMeta } from "./minhas-metas";
 import type { PeriodoMetas } from "./montar-metas-tab";
+import { OlhoAvaliacoes } from "./avaliacoes-do-colaborador";
+import { useVisaoMetas, VisaoSelect } from "./metas-visualizacao";
 
 interface MinhasMetas {
   congelada: boolean;
+  periodoAnterior?: { id: string; name: string } | null;
   metas: MinhaMeta[];
   /** Baixas de Pré-vencido do Colaborador no Período: só quem tem Meta de Pré-vencidos. */
   baixas: MinhaBaixa[];
@@ -57,6 +60,36 @@ const colunas: DataTableColumn<MinhaMeta>[] = [
   { key: "premio", label: "Prêmio", value: (m) => (m.premioCentavos === undefined ? null : m.premioCentavos / 100), format: "currency" },
 ];
 
+/** Visualização Tabela: a Meta anterior e o Atingido nela ao lado da Meta atual. */
+const colunasTabela = (olho: (m: MinhaMeta) => React.ReactNode): DataTableColumn<MinhaMeta>[] => [
+  colunas[0]!,
+  { key: "anterior", group: "Período anterior", label: "Meta anterior", value: (m) => m.anterior?.alvo ?? "", nowrap: true },
+  {
+    key: "atingidoAnterior",
+    group: "Período anterior",
+    label: "Atingido",
+    value: (m) => m.anterior?.realizado ?? "",
+    render: (m) => (m.anterior?.realizado ? `${m.anterior.realizado}${m.anterior.atingida === true ? " ✓" : ""}` : null),
+    nowrap: true,
+  },
+  { key: "alvo", group: "Período atual", label: "Meta atual", value: (m) => m.alvo ?? "", nowrap: true },
+  {
+    key: "realizado",
+    group: "Período atual",
+    label: "Realizado",
+    value: (m) => m.realizado ?? "",
+    render: (m) => (
+      <Stack direction="row" gap="tight" align="center">
+        {m.realizado ?? ""}
+        {olho(m)}
+      </Stack>
+    ),
+    nowrap: true,
+  },
+  colunas[2]!,
+  colunas[3]!,
+];
+
 const colunasBaixa: DataTableColumn<MinhaBaixa>[] = [
   { key: "venda", label: "Venda", value: (b) => String(b.vendaId), mobileRole: "primary" },
   { key: "data", centered: true, label: "Data", value: (b) => b.data, render: (b) => dataHora(b.data) },
@@ -69,8 +102,9 @@ const colunasBaixa: DataTableColumn<MinhaBaixa>[] = [
 const periodoInicial = (periodos: PeriodoMetas[]) => (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
 
 /** Aba Minhas Metas: as Metas do Colaborador vinculado ao Usuário, na Exibição de cada Tipo de Meta. Sem impressão. */
-export function MinhasMetas({ periodos }: { periodos: PeriodoMetas[] }) {
+export function MinhasMetas({ periodos, lerAvaliacoes = false }: { periodos: PeriodoMetas[]; lerAvaliacoes?: boolean }) {
   const { feedback } = useUi();
+  const { visao, salvar: salvarVisao, disponiveis } = useVisaoMetas("minhas-metas", ["table", "list"], "list");
   const [periodoId, setPeriodoId] = useState(() => periodoInicial(periodos));
   const [dados, setDados] = useState<MinhasMetas | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -104,8 +138,21 @@ export function MinhasMetas({ periodos }: { periodos: PeriodoMetas[] }) {
       </Alert>
     );
 
+  // Na Meta de Avaliações, o olho abre as Avaliações recebidas (só com a Permission de vê-las).
+  const olho = (m: MinhaMeta) =>
+    lerAvaliacoes && m.indicador === "avaliacoes" ? <OlhoAvaliacoes periodoId={periodoId} codigoColaborador={0} nome="você" acesso="minhas" /> : null;
+  const colunasLista: DataTableColumn<MinhaMeta>[] = colunas.map((c) =>
+    c.key === "resultado" ? { ...c, render: (m: MinhaMeta) => (
+      <Stack direction="row" gap="tight" align="center">
+        {resultado(m)}
+        {olho(m)}
+      </Stack>
+    ) } : c,
+  );
   return (
     <Stack gap="section">
+      <Stack direction="row" align="end" gap="section" wrap>
+      <VisaoSelect visao={visao} disponiveis={disponiveis} onChange={salvarVisao} />
       <Stack gap="field">
         <Label>Período de Fechamento</Label>
         <Select value={periodoId} onValueChange={(v) => v && setPeriodoId(v)}>
@@ -122,14 +169,15 @@ export function MinhasMetas({ periodos }: { periodos: PeriodoMetas[] }) {
           </SelectContent>
         </Select>
       </Stack>
+      </Stack>
       <DataTable
         scroll="page"
-        columns={colunas}
+        columns={visao === "table" ? colunasTabela(olho) : colunasLista}
         rows={dados?.metas ?? []}
         getRowId={(m) => m.metaId}
         loading={carregando}
         title="Minhas Metas"
-        description={dados?.congelada ? "Período fechado: resultado gravado no fechamento." : "O resultado acompanha as vendas do ERP até o fechamento do Período."}
+        description={`${dados?.congelada ? "Período fechado: resultado gravado no fechamento." : "O resultado acompanha as vendas do ERP até o fechamento do Período."}${visao === "table" && dados?.periodoAnterior ? ` Período anterior: ${dados.periodoAnterior.name}.` : ""}`}
         emptyMessage="Você não participa de nenhuma Meta neste Período."
         striped
       />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pencil, Plus, Save, Target, Trash2, MoreHorizontal } from "lucide-react";
 import {
   Alert,
@@ -41,7 +41,11 @@ import {
 } from "./premio-participante-window";
 import type { Meta } from "./metas-store";
 import { usaAlvo } from "./montar-metas";
+import type { RegraPremio } from "./tipos-meta";
+import { Input } from "@platform/ui/components/input";
+import { MoneyInput } from "@platform/ui/components/money-input";
 import type { TipoMetaComPremio } from "./tipo-meta-window";
+import { useVisaoMetas, VisaoSelect } from "./metas-visualizacao";
 
 const BASE = "/api/m/inovafarma/metas";
 const TODAS = "todas";
@@ -224,7 +228,10 @@ interface Alteracao {
   meta: MetaVista;
   codigoColaborador: number;
   nome: string;
-  edicao: Edicao;
+  /** Participação editada; ausente numa alteração só do Prêmio. */
+  edicao?: Edicao;
+  /** Prêmio editado na célula: a regra própria, ou null para voltar ao Prêmio do Tipo de Meta. */
+  premio?: RegraPremio | null;
   antes: string;
   depois: string;
 }
@@ -240,6 +247,15 @@ function SalvarAlteracoesWindow({ alteracoes }: { alteracoes: Alteracao[] }) {
     try {
       for (const a of alteracoes) {
         const version = versoes.get(a.meta.id) ?? a.meta.version;
+        if (!a.edicao) {
+          const salva = await apiFetch<MetaVista>(`${BASE}/${a.meta.id}/participantes/${a.codigoColaborador}/premio`, {
+            method: "PUT",
+            headers: JSON_HEADERS,
+            body: JSON.stringify({ version, premio: a.premio ?? null }),
+          });
+          versoes.set(a.meta.id, salva.version);
+          continue;
+        }
         const corpo = {
           version,
           participa: a.edicao.participa,
@@ -546,6 +562,413 @@ function MetaDoPeriodo({
   );
 }
 
+/** A mesma Meta (Tipo de Meta) no Período anterior: Alvo e Realizado de cada Participante. */
+interface ResultadoAnterior {
+  codigoColaborador: number;
+  alvo: number | null;
+  realizado: number;
+  atingimento: number | null;
+  atingida: boolean | null;
+}
+interface Anterior {
+  periodo: { id: string; name: string } | null;
+  metas: { tipoId: string; participantes: ResultadoAnterior[] }[];
+}
+
+/** O valor do Prêmio editável na célula: o R$ (ou o % do Percentual do valor vendido). As Faixas em R$ só pelo lápis. */
+const valorDoPremio = (r: RegraPremio): number | null =>
+  r.tipo === "fixo" || r.tipo === "proporcional" || r.tipo === "faixasPercentuais" ? r.valorCentavos : r.tipo === "percentual" ? r.percentual : null;
+const comValorDoPremio = (r: RegraPremio, v: number): RegraPremio =>
+  r.tipo === "percentual" ? { ...r, percentual: v } : r.tipo === "fixo" || r.tipo === "proporcional" || r.tipo === "faixasPercentuais" ? { ...r, valorCentavos: v } : r;
+/** A regra que o Participante tem hoje: a própria ou a do Tipo de Meta. */
+const regraAtual = (meta: MetaVista, codigo: number): RegraPremio => {
+  const p = meta.participantes.find((x) => x.codigoColaborador === codigo);
+  return p ? regraDoParticipante(meta.tipo.regra, p) : meta.tipo.regra;
+};
+/** O Prêmio que a regra fica com o valor da célula: null quando volta a ser o do Tipo de Meta. */
+const premioCom = (meta: MetaVista, codigo: number, v: number): RegraPremio | null => {
+  const nova = comValorDoPremio(regraAtual(meta, codigo), v);
+  return JSON.stringify(nova) === JSON.stringify(meta.tipo.regra) ? null : nova;
+};
+
+/** Campo do Prêmio na célula: R$ em centavos ou %. */
+function PremioInput({ percentual, valor, onChange, label, disabled }: { percentual: boolean; valor: number; onChange: (v: number | null) => void; label: string; disabled: boolean }) {
+  const [texto, setTexto] = useState(String(valor).replace(".", ","));
+  useEffect(() => {
+    setTexto((t) => (Number(t.replace(",", ".")) === valor ? t : String(valor).replace(".", ",")));
+  }, [valor]);
+  if (!percentual)
+    return <MoneyInput value={valor / 100} disabled={disabled} onValueChange={(v) => onChange(v >= 0 ? Math.round(v * 100) : null)} aria-label={label} />;
+  return (
+    <Input
+      inputMode="decimal"
+      value={texto}
+      disabled={disabled}
+      aria-label={label}
+      onChange={(e) => {
+        setTexto(e.target.value);
+        const n = Number(e.target.value.trim().replace(",", "."));
+        onChange(e.target.value.trim() && Number.isFinite(n) && n >= 0 && n <= 100 ? n : null);
+      }}
+    />
+  );
+}
+
+/** Participa e Alvo de um Colaborador numa Meta, editáveis na célula: digitar o Alvo já liga o Participa. */
+function CelulaParticipacao({
+  meta,
+  colaborador,
+  estado,
+  editar,
+  somenteLeitura,
+}: {
+  meta: MetaVista;
+  colaborador: Colaborador;
+  estado: Edicao;
+  editar: (edicao: Edicao) => void;
+  somenteLeitura: boolean;
+}) {
+  const indicador = indicadorDoTipo(meta.tipo);
+  const comAlvo = usaAlvo(meta.tipo);
+  const salvo = participacao(meta, undefined, colaborador.codigoColaborador);
+  if (somenteLeitura)
+    return !estado.participa ? (
+      <Text variant="small" tone="muted">
+        Não participa
+      </Text>
+    ) : !comAlvo ? (
+      "Participa"
+    ) : estado.alvo === null ? (
+      <Badge variant="warning">Pendente</Badge>
+    ) : (
+      formatarValor(indicador, estado.alvo)
+    );
+  return (
+    <Stack direction="row" gap="tight" align="center">
+      <Switch
+        checked={estado.participa}
+        onCheckedChange={(on: boolean) => editar(on ? { participa: true, alvo: estado.alvo ?? salvo.alvo } : { participa: false, alvo: salvo.alvo })}
+        aria-label={`${colaborador.nome} participa da Meta ${meta.tipo.nome}`}
+      />
+      {comAlvo && (
+        <AlvoInput
+          indicador={indicador}
+          valor={estado.participa ? estado.alvo : null}
+          onChange={(alvo) => editar({ participa: alvo !== null || estado.participa, alvo })}
+          label={`${rotuloAlvo(indicador)} de ${colaborador.nome} na Meta ${meta.tipo.nome}`}
+        />
+      )}
+    </Stack>
+  );
+}
+
+/** Texto da participação para busca, ordenação e impressão. */
+const textoParticipacao = (meta: MetaVista, e: Edicao) =>
+  !e.participa ? "" : !usaAlvo(meta.tipo) ? "Participa" : e.alvo === null ? "Pendente" : formatarValor(indicadorDoTipo(meta.tipo), e.alvo);
+
+interface VisaoProps {
+  metas: MetaVista[];
+  colaboradores: Colaborador[];
+  somenteLeitura: boolean;
+  estado: (meta: MetaVista, codigo: number) => Edicao;
+  editar: (meta: MetaVista, codigo: number, edicao: Edicao) => void;
+  loading: boolean;
+}
+
+/** Uma linha da Tabela: o Colaborador e a participação dele em cada Meta. Mantém a identidade enquanto nada muda nela. */
+interface LinhaTabela {
+  colaborador: Colaborador;
+  estados: Record<string, Edicao>;
+  /** Valor do Prêmio editado e ainda não salvo, por Meta. */
+  premios: Record<string, number | undefined>;
+}
+const idDaLinha = (l: LinhaTabela) => String(l.colaborador.codigoColaborador);
+const mesmaEdicao = (a: Edicao | undefined, b: Edicao) => a !== undefined && a.participa === b.participa && a.alvo === b.alvo;
+
+/** Prêmio do Participante na própria célula: o valor editável (Faixas em R$ pelo lápis) e o selo do Prêmio próprio. */
+function CelulaPremio({
+  meta,
+  colaborador,
+  participa,
+  pendente,
+  somenteLeitura,
+  editar,
+  alterar,
+}: {
+  meta: MetaVista;
+  colaborador: Colaborador;
+  participa: boolean;
+  /** Valor editado e ainda não salvo. */
+  pendente: number | undefined;
+  somenteLeitura: boolean;
+  editar: (meta: MetaVista, codigo: number, valor: number | null) => void;
+  alterar: (meta: MetaVista, c: Colaborador) => void;
+}) {
+  const p = meta.participantes.find((x) => x.codigoColaborador === colaborador.codigoColaborador);
+  const regra = regraAtual(meta, colaborador.codigoColaborador);
+  const proprio = Boolean(p?.premio && p.premio.tipo === meta.tipo.regra.tipo);
+  const valor = valorDoPremio(regra);
+  if (!participa) return null;
+  if (somenteLeitura || valor === null)
+    return (
+      <Stack direction="row" gap="tight" align="center">
+        <Text variant="small">{resumoPremio(regra)}</Text>
+        {proprio && <Badge variant="secondary">Próprio</Badge>}
+        {!somenteLeitura && p && (
+          <Button size="icon" variant="ghost" aria-label={`Alterar o Prêmio de ${colaborador.nome} na Meta ${meta.tipo.nome}`} onClick={() => alterar(meta, colaborador)}>
+            <Pencil />
+          </Button>
+        )}
+      </Stack>
+    );
+  return (
+    <Stack direction="row" gap="tight" align="center">
+      <PremioInput
+        percentual={regra.tipo === "percentual"}
+        valor={pendente ?? valor}
+        disabled={false}
+        onChange={(v) => editar(meta, colaborador.codigoColaborador, v)}
+        label={`Prêmio de ${colaborador.nome} na Meta ${meta.tipo.nome}`}
+      />
+      {(proprio || pendente !== undefined) && <Badge variant="secondary">Próprio</Badge>}
+    </Stack>
+  );
+}
+
+/**
+ * Visualização Tabela: uma linha por Colaborador; cada Meta mostra a Meta anterior, o Atingido, a Nova meta e o Prêmio.
+ * Setas navegam pelas Novas metas. Colunas e linhas são estáveis: digitar redesenha só a linha editada.
+ */
+function TabelaMontarMetas({
+  metas,
+  colaboradores,
+  somenteLeitura,
+  estado,
+  editar,
+  loading,
+  anterior,
+  atualizar,
+  premio,
+  editarPremio,
+}: VisaoProps & {
+  anterior: Anterior | null;
+  atualizar: (meta: MetaVista) => void;
+  premio: (meta: MetaVista, codigo: number) => number | undefined;
+  editarPremio: (meta: MetaVista, codigo: number, valor: number | null) => void;
+}) {
+  const { windows } = useUi();
+  const alterarPremio = useCallback(
+    async (meta: MetaVista, c: Colaborador) => {
+      const participante = meta.participantes.find((p) => p.codigoColaborador === c.codigoColaborador);
+      if (!participante) return;
+      const r = await windows.open<MetaVista>({
+        surface: "dialog",
+        title: "Prêmio do Participante",
+        description: `${c.nome} · Meta "${meta.tipo.nome}". Começa com o Prêmio do Tipo de Meta.`,
+        content: () => <PremioParticipanteWindow meta={meta} participante={participante} />,
+      });
+      if (r.status === "confirmed") atualizar(r.value);
+    },
+    [windows, atualizar],
+  );
+
+  // Reaproveita a linha anterior quando nenhuma participação dela mudou: o DataTable não a redesenha.
+  const cache = useRef(new Map<number, LinhaTabela>());
+  const linhas = colaboradores.map((c) => {
+    const antiga = cache.current.get(c.codigoColaborador);
+    const estados: Record<string, Edicao> = {};
+    const premios: Record<string, number | undefined> = {};
+    let igual = antiga !== undefined && antiga.colaborador === c;
+    for (const m of metas) {
+      premios[m.id] = premio(m, c.codigoColaborador);
+      if (antiga?.premios[m.id] !== premios[m.id]) igual = false;
+      const e = estado(m, c.codigoColaborador);
+      if (igual && mesmaEdicao(antiga!.estados[m.id], e)) estados[m.id] = antiga!.estados[m.id]!;
+      else {
+        estados[m.id] = e;
+        igual = false;
+      }
+    }
+    if (igual && antiga && Object.keys(antiga.estados).length === metas.length) return antiga;
+    const nova = { colaborador: c, estados, premios };
+    cache.current.set(c.codigoColaborador, nova);
+    return nova;
+  });
+
+  const colunas = useMemo(() => {
+    const doAnterior = new Map((anterior?.metas ?? []).map((m) => [m.tipoId, new Map(m.participantes.map((p) => [p.codigoColaborador, p]))]));
+    const cols: DataTableColumn<LinhaTabela>[] = [
+      { key: "nome", label: "Colaborador", value: (l) => l.colaborador.nome, searchable: true, sortable: true, mobileRole: "primary", nowrap: true },
+    ];
+    for (const meta of metas) {
+      const indicador = indicadorDoTipo(meta.tipo);
+      const avaliacoes = meta.tipo.indicador === "avaliacoes";
+      const antes = (l: LinhaTabela) => doAnterior.get(meta.tipoId)?.get(l.colaborador.codigoColaborador);
+      const group = meta.tipo.nome;
+      if (usaAlvo(meta.tipo)) {
+        cols.push(
+          {
+            key: `${meta.id}:anterior`,
+            group,
+            label: avaliacoes ? "Valor inicial anterior" : "Meta anterior",
+            value: (l) => antes(l)?.alvo ?? null,
+            render: (l) => {
+              const a = antes(l)?.alvo;
+              return a === null || a === undefined ? null : formatarValor(indicador, a);
+            },
+            nowrap: true,
+          },
+          {
+            key: `${meta.id}:atingido`,
+            group,
+            label: avaliacoes ? "Saldo anterior" : "Atingido",
+            value: (l) => antes(l)?.realizado ?? null,
+            render: (l) => {
+              const a = antes(l);
+              if (!a) return null;
+              const pct = a.atingimento === null ? "" : `${a.atingimento.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+              return (
+                <Stack direction="row" gap="tight" align="center">
+                  {formatarValor(indicador, a.realizado)}
+                  {pct && (
+                    <Text variant="caption" tone={a.atingida === true ? "success" : "muted"}>
+                      {pct}
+                    </Text>
+                  )}
+                </Stack>
+              );
+            },
+            nowrap: true,
+          },
+        );
+      }
+      cols.push({
+        key: `${meta.id}:nova`,
+        group,
+        label: !usaAlvo(meta.tipo) ? "Participa" : avaliacoes ? "Novo valor inicial" : "Nova meta",
+        value: (l) => textoParticipacao(meta, l.estados[meta.id]!),
+        render: (l) => (
+          <CelulaParticipacao
+            meta={meta}
+            colaborador={l.colaborador}
+            estado={l.estados[meta.id]!}
+            editar={(e) => editar(meta, l.colaborador.codigoColaborador, e)}
+            somenteLeitura={somenteLeitura}
+          />
+        ),
+        cellClassName: usaAlvo(meta.tipo) ? "min-w-44" : undefined,
+      });
+      if (meta.tipo.regra.tipo !== "saldo")
+        cols.push({
+          key: `${meta.id}:premio`,
+          group,
+          label: "Prêmio",
+          value: (l) => {
+            const p = meta.participantes.find((x) => x.codigoColaborador === l.colaborador.codigoColaborador);
+            return p ? resumoPremio(regraDoParticipante(meta.tipo.regra, p)) : "";
+          },
+          render: (l) => (
+            <CelulaPremio
+              meta={meta}
+              colaborador={l.colaborador}
+              participa={l.estados[meta.id]!.participa}
+              pendente={l.premios[meta.id]}
+              somenteLeitura={somenteLeitura}
+              editar={editarPremio}
+              alterar={(m, c) => void alterarPremio(m, c)}
+            />
+          ),
+          cellClassName: "min-w-44 whitespace-normal",
+        });
+    }
+    return cols;
+  }, [metas, anterior, somenteLeitura, editar, alterarPremio, editarPremio]);
+
+  return (
+    <DataTable
+      scroll="page"
+      columns={colunas}
+      rows={linhas}
+      getRowId={idDaLinha}
+      loading={loading}
+      title="Metas do Período"
+      description={
+        anterior?.periodo
+          ? `Meta anterior e Atingido: ${anterior.periodo.name}. Use as setas para navegar e digite a Nova meta; digitar já liga o Participa.`
+          : "Use as setas para navegar e digite a Nova meta; digitar já liga o Participa."
+      }
+      emptyMessage={metas.length === 0 ? "Nenhuma Meta. Use Adicionar Meta para escolher os Tipos de Meta deste Período." : "Nenhum Colaborador nesta Loja."}
+      search={{ placeholder: "Buscar Colaborador" }}
+      frozenUntil="nome"
+      arrowNavigation
+      striped
+    />
+  );
+}
+
+/** Visualização Por Colaborador: uma linha por Colaborador; expande para as Metas dele, com Participa e Alvo. */
+function PorColaboradorMontarMetas({ metas, colaboradores, somenteLeitura, estado, editar, loading }: VisaoProps) {
+  const colunas: DataTableColumn<Colaborador>[] = [
+    { key: "nome", label: "Colaborador", value: (c) => c.nome, searchable: true, sortable: true, mobileRole: "primary" },
+    {
+      key: "metas",
+      label: "Participa de",
+      value: (c) => metas.filter((m) => estado(m, c.codigoColaborador).participa).length,
+      format: "number",
+      sortable: true,
+    },
+    {
+      key: "pendentes",
+      centered: true,
+      label: "Pendentes",
+      value: (c) => metas.filter((m) => usaAlvo(m.tipo) && estado(m, c.codigoColaborador).participa && estado(m, c.codigoColaborador).alvo === null).length,
+      render: (c) => {
+        const n = metas.filter((m) => usaAlvo(m.tipo) && estado(m, c.codigoColaborador).participa && estado(m, c.codigoColaborador).alvo === null).length;
+        return n ? <Badge variant="warning">{n}</Badge> : null;
+      },
+    },
+  ];
+  return (
+    <DataTable
+      scroll="page"
+      columns={colunas}
+      rows={colaboradores}
+      getRowId={(c) => String(c.codigoColaborador)}
+      loading={loading}
+      title="Colaboradores"
+      emptyMessage="Nenhum Colaborador nesta Loja."
+      search={{ placeholder: "Buscar Colaborador" }}
+      renderExpanded={(c) => (
+        <DataTable
+          scroll="page"
+          columns={[
+            { key: "meta", label: "Meta", value: (m: MetaVista) => m.tipo.nome, sortable: true, mobileRole: "primary" },
+            { key: "indicador", label: "Indicador", value: (m: MetaVista) => indicadorPorId(m.tipo.indicador).nome },
+            {
+              key: "participacao",
+              label: "Participa · Alvo",
+              value: (m: MetaVista) => textoParticipacao(m, estado(m, c.codigoColaborador)),
+              render: (m: MetaVista) => (
+                <CelulaParticipacao
+                  meta={m}
+                  colaborador={c}
+                  estado={estado(m, c.codigoColaborador)}
+                  editar={(e) => editar(m, c.codigoColaborador, e)}
+                  somenteLeitura={somenteLeitura}
+                />
+              ),
+            },
+          ]}
+          rows={metas}
+          getRowId={(m) => m.id}
+          emptyMessage="Nenhuma Meta neste Período."
+          arrowNavigation
+        />
+      )}
+    />
+  );
+}
+
 /** Aba Montar Metas: as Metas de cada Período, com Participantes, Alvos e Lista de Produtos. */
 export function MontarMetas({
   periodos,
@@ -558,7 +981,15 @@ export function MontarMetas({
   const [periodoId, setPeriodoId] = useState(() => periodoInicial(periodos));
   const [loja, setLoja] = useState(TODAS);
   const [montagem, setMontagem] = useState<Montagem | null>(null);
+  const { visao, salvar: salvarVisao, disponiveis } = useVisaoMetas("montar-metas", ["table", "by-meta", "by-colaborador"], "by-meta");
+  const [anterior, setAnterior] = useState<Anterior | null>(null);
   const [edicoes, setEdicoes] = useState<Edicoes>({});
+  /** Valor do Prêmio editado na Tabela, por Meta e por Colaborador. */
+  const [premios, setPremios] = useState<Record<string, Record<number, number>>>({});
+  const descartar = () => {
+    setEdicoes({});
+    setPremios({});
+  };
   const consulta = useRef(0);
   const periodo = periodos.find((p) => p.id === periodoId);
 
@@ -572,6 +1003,7 @@ export function MontarMetas({
       if (minha !== consulta.current) return;
       setMontagem(m);
       setEdicoes({});
+      setPremios({});
       if (m.copiadoDe)
         feedback.notify({
           type: "success",
@@ -589,6 +1021,19 @@ export function MontarMetas({
     void carregar();
   }, [carregar]);
 
+  // Só a Tabela mostra o Período anterior; ele apura no ERP, então vem à parte e não segura a montagem.
+  useEffect(() => {
+    if (!periodoId || visao !== "table") return;
+    let vivo = true;
+    setAnterior(null);
+    apiFetch<Anterior>(`${BASE}/anterior?periodoId=${encodeURIComponent(periodoId)}`)
+      .then((a) => vivo && setAnterior(a))
+      .catch(() => vivo && setAnterior({ periodo: null, metas: [] }));
+    return () => {
+      vivo = false;
+    };
+  }, [periodoId, visao]);
+
   const adicionar = async () => {
     if (!montagem) return;
     const r = await windows.open<true>({
@@ -605,14 +1050,14 @@ export function MontarMetas({
     if (r.status === "confirmed") void carregar();
   };
 
-  const atualizar = (meta: MetaVista) =>
+  const atualizar = useCallback((meta: MetaVista) =>
     setMontagem(
       (m) =>
         m && { ...m, metas: m.metas.map((x) => (x.id === meta.id ? meta : x)) },
-    );
+    ), []);
 
   /** Guarda a edição; voltar ao que está salvo desfaz a pendência. */
-  const editar = (meta: MetaVista, codigo: number, edicao: Edicao) =>
+  const editar = useCallback((meta: MetaVista, codigo: number, edicao: Edicao) =>
     setEdicoes((atual) => {
       const daMeta = { ...(atual[meta.id] ?? {}) };
       const original = participacao(meta, undefined, codigo);
@@ -623,9 +1068,33 @@ export function MontarMetas({
         delete daMeta[codigo];
       else daMeta[codigo] = edicao;
       return { ...atual, [meta.id]: daMeta };
-    });
+    }), []);
 
-  const alteracoes: Alteracao[] = (montagem?.metas ?? []).flatMap((meta) =>
+  /** Guarda o valor do Prêmio; voltar ao que está salvo desfaz a pendência. */
+  const editarPremio = useCallback((meta: MetaVista, codigo: number, valor: number | null) =>
+    setPremios((atual) => {
+      const daMeta = { ...(atual[meta.id] ?? {}) };
+      if (valor === null || valor === valorDoPremio(regraAtual(meta, codigo))) delete daMeta[codigo];
+      else daMeta[codigo] = valor;
+      return { ...atual, [meta.id]: daMeta };
+    }), []);
+
+  const nomeDe = (codigo: number) => montagem?.colaboradores.find((c) => c.codigoColaborador === codigo)?.nome ?? `Colaborador ${codigo}`;
+  const alteracoesPremio: Alteracao[] = (montagem?.metas ?? []).flatMap((meta) =>
+    Object.entries(premios[meta.id] ?? {}).map(([codigo, valor]) => {
+      const premio = premioCom(meta, Number(codigo), valor);
+      return {
+        meta,
+        codigoColaborador: Number(codigo),
+        nome: nomeDe(Number(codigo)),
+        premio,
+        antes: `Prêmio ${resumoPremio(regraAtual(meta, Number(codigo)))}`,
+        depois: `Prêmio ${resumoPremio(premio ?? meta.tipo.regra)}`,
+      };
+    }),
+  );
+
+  const alteracoesParticipacao: Alteracao[] = (montagem?.metas ?? []).flatMap((meta) =>
     Object.entries(edicoes[meta.id] ?? {}).map(([codigo, edicao]) => {
       const indicador = indicadorDoTipo(meta.tipo);
       const valor = (e: Edicao, novo: boolean) =>
@@ -653,6 +1122,9 @@ export function MontarMetas({
     }),
   );
 
+  // Participações primeiro: um Colaborador que entra agora já existe quando o Prêmio dele é gravado.
+  const alteracoes = [...alteracoesParticipacao, ...alteracoesPremio];
+
   const salvarAlteracoes = async () => {
     const r = await windows.open<true>({
       surface: "dialog",
@@ -677,6 +1149,20 @@ export function MontarMetas({
   const colaboradores = (montagem?.colaboradores ?? []).filter(
     (c) => loja === TODAS || c.lojas.includes(Number(loja)),
   );
+  const metasDoPeriodo = montagem?.metas ?? [];
+  const estadoDe = (meta: MetaVista, codigo: number) => participacao(meta, edicoes[meta.id], codigo);
+  const premioDe = (meta: MetaVista, codigo: number): number | undefined => premios[meta.id]?.[codigo];
+  // Nas visualizações por Colaborador, os inativos só aparecem enquanto participam de alguma Meta.
+  const participantesSalvos = new Set(metasDoPeriodo.flatMap((m) => m.participantes.map((p) => p.codigoColaborador)));
+  const linhasColaborador = colaboradores.filter((c) => c.ativo || participantesSalvos.has(c.codigoColaborador));
+  const visaoProps: VisaoProps = {
+    metas: metasDoPeriodo,
+    colaboradores: linhasColaborador,
+    somenteLeitura: montagem?.somenteLeitura ?? true,
+    estado: estadoDe,
+    editar,
+    loading: !montagem,
+  };
   return (
     <Stack gap="section">
       <HeaderActions>
@@ -684,7 +1170,7 @@ export function MontarMetas({
           <Button
             variant="outline"
             disabled={alteracoes.length === 0}
-            onClick={() => setEdicoes({})}
+            onClick={descartar}
           >
             Descartar
           </Button>
@@ -714,7 +1200,7 @@ export function MontarMetas({
               <MoreHorizontal />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={alteracoes.length === 0} onClick={() => setEdicoes({})}>
+              <DropdownMenuItem disabled={alteracoes.length === 0} onClick={descartar}>
                 Descartar
               </DropdownMenuItem>
               <DropdownMenuItem disabled={alteracoes.length === 0} onClick={() => void salvarAlteracoes()}>
@@ -730,6 +1216,7 @@ export function MontarMetas({
         </Show>
       </HeaderActions>
       <Stack direction="row" align="end" gap="section" wrap>
+        <VisaoSelect visao={visao} disponiveis={disponiveis} onChange={salvarVisao} />
         <Stack gap="field">
           <Label>Período de Fechamento</Label>
           <Select value={periodoId} onValueChange={(v) => v && setPeriodoId(v)}>
@@ -782,7 +1269,9 @@ export function MontarMetas({
           </AlertDescription>
         </Alert>
       )}
-      <DataTable
+      {visao === "table" && <TabelaMontarMetas {...visaoProps} anterior={anterior} atualizar={atualizar} premio={premioDe} editarPremio={editarPremio} />}
+      {visao === "by-colaborador" && <PorColaboradorMontarMetas {...visaoProps} />}
+      {visao === "by-meta" && <DataTable
         scroll="page"
         columns={colunasMetas}
         rows={montagem?.metas ?? []}
@@ -817,7 +1306,7 @@ export function MontarMetas({
             />
           )
         }
-      />
+      />}
     </Stack>
   );
 }

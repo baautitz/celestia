@@ -127,6 +127,7 @@ interface Contexto {
   periodos: PeriodoMetas[];
   lojas: LojaMetas[];
   visualizacoes: VisualizacaoMetas[];
+  avaliacoes?: { gerenciar: boolean; minhas: boolean };
 }
 type Aba = keyof Contexto["abas"];
 
@@ -157,8 +158,8 @@ export function MetasPage() {
       </Tabs>
       {aba === "tipos" && <TiposDeMeta />}
       {aba === "montar" && <MontarMetas periodos={contexto.periodos} lojas={contexto.lojas} />}
-      {aba === "acompanhamento" && <AcompanhamentoMetas periodos={contexto.periodos} visualizacoes={contexto.visualizacoes} />}
-      {aba === "minhas" && <MinhasMetas periodos={contexto.periodos} />}
+      {aba === "acompanhamento" && <AcompanhamentoMetas periodos={contexto.periodos} visualizacoes={contexto.visualizacoes} lerAvaliacoes={contexto.avaliacoes?.gerenciar ?? false} />}
+      {aba === "minhas" && <MinhasMetas periodos={contexto.periodos} lerAvaliacoes={contexto.avaliacoes?.minhas ?? false} />}
     </Stack>
   );
 }
