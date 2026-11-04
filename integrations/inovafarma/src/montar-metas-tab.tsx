@@ -993,7 +993,7 @@ function TabelaMontarMetas({
       striped
       print={{
         orientation: "landscape",
-        description: soPremioVisivel ? `${impressao.description} · Prêmio só das Metas que o mostram ao Colaborador` : impressao.description,
+        description: impressao.description,
         fileName: impressao.fileName,
         prepare: prepararImpressao,
       }}
