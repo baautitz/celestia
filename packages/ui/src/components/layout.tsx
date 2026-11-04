@@ -148,15 +148,16 @@ function Grid({ columns, gap = "section", ...props }: GridProps) {
  */
 function PairGrid({ pairs, rows }: { pairs: number; rows: { label: React.ReactNode; value: React.ReactNode }[][] }) {
   return (
-    <div className="grid items-center gap-x-2 gap-y-1" style={{ gridTemplateColumns: `repeat(${pairs}, max-content minmax(0, 1fr))` }}>
+    // Rótulo e valor na largura do conteúdo: um campo (ex.: MoneyInput) nunca é espremido; a célula cresce.
+    <div className="grid w-max items-center gap-x-2 gap-y-1" style={{ gridTemplateColumns: `repeat(${pairs}, max-content max-content)` }}>
       {rows.flatMap((row, i) =>
         Array.from({ length: pairs }, (_, j) => {
           const pair = row[j];
           return [
-            <span key={`${i}-${j}-l`} className="text-xs text-muted-foreground whitespace-nowrap">
+            <span key={`${i}-${j}-l`} className={cn("text-xs text-muted-foreground whitespace-nowrap", j > 0 && "pl-4")}>
               {pair?.label}
             </span>,
-            <div key={`${i}-${j}-v`} className="min-w-0">
+            <div key={`${i}-${j}-v`} className="whitespace-nowrap">
               {pair?.value}
             </div>,
           ];
