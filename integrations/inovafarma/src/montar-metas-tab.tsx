@@ -855,7 +855,7 @@ function TabelaMontarMetas({
         value: (l) => l.colaborador.nome,
         // No papel, maior e abreviado pela regra do passaporte para não alargar a coluna.
         printValue: (l) => (
-          <Text variant="small" weight="semibold">
+          <Text weight="semibold">
             {abbreviateName(l.colaborador.nome, 24)}
           </Text>
         ),
