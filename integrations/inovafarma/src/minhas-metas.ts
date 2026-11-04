@@ -19,6 +19,10 @@ export interface MinhaMeta {
   lista?: string[];
   /** Só se o Tipo mostra o Prêmio; na Exibição Atingida / Não atingida, só com a Meta atingida. */
   premioCentavos?: number;
+  /** Indicador do Tipo de Meta: na Meta de Avaliações, a tela oferece o atalho para ler as Avaliações. */
+  indicador?: string;
+  /** A mesma Meta (Tipo de Meta) no Período anterior, cortada pela mesma Exibição. */
+  anterior?: Pick<MinhaMeta, "alvo" | "realizado" | "atingida">;
 }
 
 /** Uma Baixa de Pré-vencido do Colaborador em Minhas Metas. Nunca o código do produto no ERP. */

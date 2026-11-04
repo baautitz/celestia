@@ -119,6 +119,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
   const geralRef = INOVAFARMA_PERMISSIONS.ref("metas-geral:view");
   const lojaRef = INOVAFARMA_PERMISSIONS.ref("metas-loja:view");
   const individualRef = INOVAFARMA_PERMISSIONS.ref("metas-individual:view");
+  const manageRef = INOVAFARMA_PERMISSIONS.ref("metas:manage");
 
   /**
    * O que o ERP e o Plugin têm de cada Colaborador no Período, somado em todas as Lojas, e o vendido da Lista de cada
@@ -298,6 +299,45 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     return { apuracao, congelada: true };
   }
 
+  /** O Período imediatamente anterior pela data: o que termina por último antes do início deste. */
+  const periodoAnterior = async (periodo: PeriodoResumo) =>
+    (await periods.list())
+      .filter((p) => p.endDate < periodo.startDate)
+      .sort((a, b) => b.endDate.localeCompare(a.endDate))[0];
+
+  /** Apuração do Período anterior, por Tipo de Meta; sem Período anterior ou com o ERP fora, vazia. */
+  async function apuracaoAnterior(periodo: PeriodoResumo, quem: { id: string; name: string }) {
+    const anterior = await periodoAnterior(periodo);
+    if (!anterior) return { periodo: null, metas: [] as MetaApurada[] };
+    try {
+      return { periodo: { id: anterior.id, name: anterior.name }, metas: (await apuracaoDe(anterior, quem)).apuracao.metas };
+    } catch {
+      return { periodo: { id: anterior.id, name: anterior.name }, metas: [] as MetaApurada[] };
+    }
+  }
+
+  // Montar Metas (Tabela): o Alvo e o Realizado de cada Participante no Período anterior, na mesma Meta (Tipo de Meta).
+  routes.get("/metas/anterior", auth, async (c: AuthContext) => {
+    if (!permissions.has(c.get("user")?.permissions, manageRef.key)) return c.json({ error: manageRef.deniedMessage }, 403);
+    const periodo = (await periods.list()).find((p) => p.id === c.req.query("periodoId"));
+    if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
+    const anterior = await apuracaoAnterior(periodo, ator(c));
+    return c.json({
+      periodo: anterior.periodo,
+      metas: anterior.metas.map(({ tipo, participantes }) => ({
+        tipoId: tipo.id,
+        participantes: participantes.map(({ codigoColaborador, alvo, realizado, atingimento, atingida, resultado }) => ({
+          codigoColaborador,
+          alvo,
+          realizado,
+          atingimento: atingimento !== null && Number.isFinite(atingimento) ? atingimento : null,
+          atingida,
+          resultado,
+        })),
+      })),
+    });
+  });
+
   routes.get("/metas/acompanhamento", auth, async (c: AuthContext) => {
     const acesso = await visualizacoesDasMetas(c.get("user"), permissions.has, vinculos);
     if (!acesso.geral && !acesso.lojas) return c.json({ error: geralRef.deniedMessage }, 403);
@@ -339,9 +379,16 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }
+    // O Período anterior, na mesma Meta (Tipo de Meta), cortado pela mesma Exibição.
+    const anterior = await apuracaoAnterior(periodo, ator(c));
     const minhas = resultado.apuracao.metas.flatMap(({ metaId, tipo, participantes }) => {
       const meu = participantes.find((p) => p.codigoColaborador === codigo);
-      return meu ? [{ minha: minhaMeta(metaId, tipo, meu), indicador: tipo.indicador }] : [];
+      if (!meu) return [];
+      const antes = anterior.metas.find((m) => m.tipo.id === tipo.id);
+      const meuAntes = antes?.participantes.find((p) => p.codigoColaborador === codigo);
+      const cortado = meuAntes && antes ? minhaMeta(antes.metaId, tipo, meuAntes) : undefined;
+      const minha = { ...minhaMeta(metaId, tipo, meu), indicador: tipo.indicador, ...(cortado ? { anterior: { alvo: cortado.alvo, realizado: cortado.realizado, atingida: cortado.atingida } } : {}) };
+      return [{ minha, indicador: tipo.indicador }];
     });
     // Quem tem Meta de Pré-vencidos vê as Baixas que formam o Realizado: venda, produto e quantidade.
     let baixas: MinhaBaixa[] = [];
@@ -358,6 +405,6 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
         return c.json(erroDoErp(err), 503);
       }
     }
-    return c.json({ periodo, congelada: resultado.congelada, metas: minhas.map((m) => m.minha), baixas });
+    return c.json({ periodo, congelada: resultado.congelada, periodoAnterior: anterior.periodo, metas: minhas.map((m) => m.minha), baixas });
   });
 }

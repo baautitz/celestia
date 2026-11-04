@@ -89,7 +89,12 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       ...(acompanhamento.geral ? [{ id: "geral" as const, lojas }] : []),
       ...(acompanhamento.lojas ? [{ id: "loja" as const, lojas: acompanhamento.lojas.map((codigo) => lojas.find((l) => l.codigo === codigo) ?? { codigo, nome: "" }) }] : []),
     ];
-    return c.json({ abas, periodos: abas.montar || abas.acompanhamento || abas.minhas ? await periodosOrdenados() : [], lojas: abas.montar ? lojas : [], visualizacoes });
+    // O olho das Metas de Avaliações é só um atalho: aparece para quem já pode ler as Avaliações.
+    const avaliacoes = {
+      gerenciar: pode(c, INOVAFARMA_PERMISSIONS.ref("avaliacoes-loja:manage")) || pode(c, INOVAFARMA_PERMISSIONS.ref("avaliacoes-geral:manage")),
+      minhas: pode(c, INOVAFARMA_PERMISSIONS.ref("avaliacoes-individual:view")),
+    };
+    return c.json({ abas, periodos: abas.montar || abas.acompanhamento || abas.minhas ? await periodosOrdenados() : [], lojas: abas.montar ? lojas : [], visualizacoes, avaliacoes });
   });
 
   // Montar Metas de um Período; no primeiro acesso a um Período aberto sem Metas, faz a cópia automática.

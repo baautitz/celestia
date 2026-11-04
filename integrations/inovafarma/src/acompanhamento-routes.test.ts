@@ -15,6 +15,7 @@ import { MemoryVinculoStore } from "./vinculo-store";
 const GERAL = "inovafarma:metas-geral:view";
 const LOJA = "inovafarma:metas-loja:view";
 const MINHAS = "inovafarma:metas-individual:view";
+const MONTAR = "inovafarma:metas:manage";
 
 const cmv: DadosTipoMeta = {
   nome: "CMV",
@@ -66,7 +67,7 @@ async function boot() {
   const erp = { falha: false };
   const auth: MiddlewareHandler = async (c, next) => {
     const sub = c.req.header("x-user") ?? "";
-    const permissions = { gil: [GERAL], lia: [LOJA], ana: [MINHAS], zoe: [MINHAS] }[sub] ?? [];
+    const permissions = { gil: [GERAL], lia: [LOJA], ana: [MINHAS], zoe: [MINHAS], mon: [MONTAR] }[sub] ?? [];
     c.set("user" as never, { sub, fullname: sub, permissions } as never);
     await next();
   };
@@ -132,7 +133,7 @@ async function boot() {
   /** Fecha o Período sem passar pelo Plugin: como um fechamento anterior à Apuração gravada. */
   const fecharSemPlugin = () => (periodos[0] = { ...periodos[0], status: "closed" });
   const minhas = (who: string, periodoId = "maio") => app.request(`/metas/minhas?periodoId=${periodoId}`, { headers: { "x-user": who } });
-  return { res, ver, vendas, produtos, vendasDaLoja, estoque, correcoes, listaVendas, consultasLista, minhas, evento, fecharSemPlugin, erp, registros, tipos, metas, avaliacoesStore, participantes };
+  return { periodos, app, res, ver, vendas, produtos, vendasDaLoja, estoque, correcoes, listaVendas, consultasLista, minhas, evento, fecharSemPlugin, erp, registros, tipos, metas, avaliacoesStore, participantes };
 }
 
 describe("Acompanhamento das Metas", () => {
@@ -225,6 +226,30 @@ describe("Acompanhamento das Metas", () => {
   });
 });
 
+describe("Período anterior", () => {
+  it("traz o Alvo e o Realizado do Período imediatamente anterior pela data, na mesma Meta", async () => {
+    const { periodos, app, metas, tipos, minhas } = await boot();
+    periodos.push({ id: "abril", name: "Abril", startDate: "2027-04-01", endDate: "2027-04-30", status: "open" });
+    periodos.push({ id: "junho", name: "Junho", startDate: "2027-06-01", endDate: "2027-06-30", status: "open" });
+    const [tipo] = await tipos.listar();
+    await metas.criar({ periodoId: "junho", tipoId: tipo!.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 28 }], excluidos: [] });
+    const r = await app.request("/metas/anterior?periodoId=junho", { headers: { "x-user": "mon" } });
+    expect(r.status).toBe(200);
+    const anterior = (await r.json()) as { periodo: { name: string }; metas: { tipoId: string; participantes: { codigoColaborador: number; alvo: number; realizado: number }[] }[] };
+    expect(anterior.periodo.name).toBe("Maio");
+    expect(anterior.metas[0]!.tipoId).toBe(tipo!.id);
+    expect(anterior.metas[0]!.participantes.map((p) => [p.codigoColaborador, p.alvo, p.realizado])).toEqual([
+      [1, 30, 25],
+      [2, 30, 40],
+    ]);
+    expect((await app.request("/metas/anterior?periodoId=junho", { headers: { "x-user": "gil" } })).status).toBe(403);
+    // Minhas Metas também traz a mesma Meta no Período anterior, cortada pela Exibição.
+    const minha = (await (await minhas("ana", "junho")).json()) as { periodoAnterior: { name: string }; metas: { anterior?: unknown }[] };
+    expect(minha.periodoAnterior.name).toBe("Maio");
+    expect(minha.metas[0]!.anterior).toBeDefined();
+  });
+});
+
 describe("Acompanhamento da Lista de Produtos", () => {
   const DIPIRONA = "8F14E45F-CEEA-467F-A8F4-5E1D2C3B4A01";
   const entradas = [
@@ -284,6 +309,7 @@ describe("Acompanhamento da Lista de Produtos", () => {
     expect(metasAna.find((m) => m.nome === "Mix")).toEqual({
       metaId: expect.any(String),
       nome: "Mix",
+      indicador: "lista-produtos",
       exibicao: "progresso",
       atingida: false,
       realizado: "7",
@@ -374,9 +400,9 @@ describe("Minhas Metas", () => {
 
   it("na Exibição Atingida / Não atingida, mostra só a situação e o Prêmio só se atingida", async () => {
     const { minhas, vendas } = await boot();
-    expect(await minhasDe(await minhas("ana"))).toEqual([{ metaId: expect.any(String), nome: "CMV", exibicao: "atingida", atingida: true, premioCentavos: 10000 }]);
+    expect(await minhasDe(await minhas("ana"))).toEqual([{ metaId: expect.any(String), nome: "CMV", indicador: "cmv", exibicao: "atingida", atingida: true, premioCentavos: 10000 }]);
     vendas.set(1, { totalLiquido: 1000, totalCmv: 500, quantidadeVendas: 10 });
-    expect(await minhasDe(await minhas("ana"))).toEqual([{ metaId: expect.any(String), nome: "CMV", exibicao: "atingida", atingida: false }]);
+    expect(await minhasDe(await minhas("ana"))).toEqual([{ metaId: expect.any(String), nome: "CMV", indicador: "cmv", exibicao: "atingida", atingida: false }]);
   });
 
   it("no Progresso, mostra Realizado, Alvo e quanto falta, sem o Prêmio que o Tipo esconde", async () => {
@@ -384,7 +410,7 @@ describe("Minhas Metas", () => {
     const tipo = await tipos.criar({ ...cmv, nome: "Ticket", indicador: "ticket-medio", exibicao: "progresso", mostrarPremio: false, alvoPadrao: 12000 });
     await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 12000 }], excluidos: [] });
     const ticket = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Ticket");
-    expect(ticket).toEqual({ metaId: expect.any(String), nome: "Ticket", exibicao: "progresso", atingida: false, realizado: "R$ 100,00", alvo: "R$ 120,00", falta: "R$ 20,00" });
+    expect(ticket).toEqual({ metaId: expect.any(String), nome: "Ticket", indicador: "ticket-medio", exibicao: "progresso", atingida: false, realizado: "R$ 100,00", alvo: "R$ 120,00", falta: "R$ 20,00" });
   });
 
   it("mostra o Saldo da Meta de Avaliações como Prêmio quando o Tipo permite", async () => {
@@ -393,7 +419,7 @@ describe("Minhas Metas", () => {
     await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [] });
     await avaliacoesStore.criar({ periodoId: "maio", codigoColaborador: 1, nomeColaborador: "ANA", codigoLoja: 10, descricao: "Atraso", valorCentavos: 5000, criadoPor: "x" });
     const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
-    expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true, realizado: "R$ 150,00", alvo: "R$ 200,00", premioCentavos: 15000 });
+    expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", indicador: "avaliacoes", exibicao: "progresso", atingida: true, realizado: "R$ 150,00", alvo: "R$ 200,00", premioCentavos: 15000 });
   });
 
   it("esconde o Saldo da Meta de Avaliações quando o Tipo não mostra o Prêmio", async () => {
@@ -401,7 +427,7 @@ describe("Minhas Metas", () => {
     const tipo = await tipos.criar({ ...avaliacoes, exibicao: "progresso", mostrarPremio: false });
     await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 20000 }], excluidos: [] });
     const saldo = (await minhasDe(await minhas("ana"))).find((m) => m.nome === "Avaliações");
-    expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", exibicao: "progresso", atingida: true });
+    expect(saldo).toEqual({ metaId: expect.any(String), nome: "Avaliações", indicador: "avaliacoes", exibicao: "progresso", atingida: true });
   });
 
   it("só libera ao Usuário com a Permission e um Colaborador vinculado, e só as Metas de que ele é Participante", async () => {

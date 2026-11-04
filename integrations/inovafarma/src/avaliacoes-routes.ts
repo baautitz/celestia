@@ -191,10 +191,14 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     if (loja !== undefined && loja !== "" && !Number.isInteger(Number(loja))) return c.json({ error: "O filtro 'codigoLoja' deve ser um número inteiro." }, 400);
     const lojas = await lojasGerenciadas(c);
     const filtro = loja === undefined || loja === "" ? lojas : gerencia(lojas, Number(loja)) ? [Number(loja)] : [];
+    // Só as de um Colaborador: o atalho (olho) das Metas de Avaliações.
+    const colaborador = c.req.query("codigoColaborador");
+    if (colaborador !== undefined && colaborador !== "" && !Number.isInteger(Number(colaborador))) return c.json({ error: "O filtro 'codigoColaborador' deve ser um número inteiro." }, 400);
+    const codigoColaborador = colaborador === undefined || colaborador === "" ? undefined : Number(colaborador);
     // Quem lançou só aparece para quem gerencia; o Colaborador avaliado não vê.
     const usuarios = await users.list();
     return c.json(
-      (await store.listar({ periodoId, lojas: filtro })).map((a) => ({ ...publico(a), lancadoPor: usuarios.find((u) => u.id === a.criadoPor)?.fullname ?? "" })),
+      (await store.listar({ periodoId, lojas: filtro, codigoColaborador })).map((a) => ({ ...publico(a), lancadoPor: usuarios.find((u) => u.id === a.criadoPor)?.fullname ?? "" })),
     );
   });
 
