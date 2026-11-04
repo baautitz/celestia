@@ -146,10 +146,20 @@ function Grid({ columns, gap = "section", ...props }: GridProps) {
  * Pares rótulo/valor em linhas, com os rótulos e os valores alinhados em colunas (ex.: numa célula de tabela,
  * "Meta anterior 50 · Atingido 45" em cima e "Nova meta [ ] · Prêmio [ ]" embaixo). Cada par é um `label` e um `value`.
  */
-function PairGrid({ pairs, rows }: { pairs: number; rows: { label: React.ReactNode; value: React.ReactNode }[][] }) {
+function PairGrid({
+  pairs,
+  rows,
+  valueWidths = [],
+}: {
+  pairs: number
+  rows: { label: React.ReactNode; value: React.ReactNode }[][]
+  /** Largura fixa de cada coluna de valor (padrão `7rem`): a mesma em todas as linhas da tabela, que ficam alinhadas. */
+  valueWidths?: string[]
+}) {
+  const template = Array.from({ length: pairs }, (_, j) => `max-content ${valueWidths[j] ?? "7rem"}`).join(" ")
   return (
-    // Rótulo e valor na largura do conteúdo: um campo (ex.: MoneyInput) nunca é espremido; a célula cresce.
-    <div className="grid w-max items-center gap-x-2 gap-y-1" style={{ gridTemplateColumns: `repeat(${pairs}, max-content max-content)` }}>
+    // Rótulos na largura do texto (iguais em todas as linhas) e valores em largura fixa: a grade não entorta entre linhas.
+    <div className="mx-auto grid w-max items-center gap-x-2 gap-y-1 text-left" style={{ gridTemplateColumns: template }}>
       {rows.flatMap((row, i) =>
         Array.from({ length: pairs }, (_, j) => {
           const pair = row[j];
