@@ -362,10 +362,22 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     }
     // A Loja só escolhe quem aparece: as confirmadas no Vínculo de cada Colaborador.
     const lojas = new Map((await vinculos.list()).filter((v) => !vinculoDesfeito(v)).map((v) => [v.codigoColaborador, v.lojas]));
+    // O mesmo Participante na mesma Meta (Tipo de Meta) do Período anterior, para comparar na Tabela.
+    const anterior = await apuracaoAnterior(periodo, ator(c));
+    const antes = new Map(anterior.metas.map((m) => [m.tipo.id, new Map(m.participantes.map((p) => [p.codigoColaborador, p]))]));
+    const resumoAnterior = (tipoId: string, codigo: number) => {
+      const p = antes.get(tipoId)?.get(codigo);
+      return p ? { alvo: p.alvo, realizado: p.realizado, atingimento: p.atingimento !== null && Number.isFinite(p.atingimento) ? p.atingimento : null, atingida: p.atingida, premioCentavos: p.premioCentavos } : undefined;
+    };
     const linhas = resultado.apuracao.metas
-      .flatMap(({ metaId, tipo, participantes }) => participantes.map((p) => ({ metaId, tipo, ...p, lojas: lojas.get(p.codigoColaborador) ?? [] })))
+      .flatMap(({ metaId, tipo, participantes }) =>
+        participantes.map((p) => {
+          const a = resumoAnterior(tipo.id, p.codigoColaborador);
+          return { metaId, tipo, ...p, lojas: lojas.get(p.codigoColaborador) ?? [], ...(a ? { anterior: a } : {}) };
+        }),
+      )
       .filter((l) => filtro === null || l.lojas.some((codigo) => filtro.includes(codigo)));
-    return c.json({ periodo, congelada: resultado.congelada, apuradoEm: resultado.apuracao.apuradoEm, linhas, totais: totaisPorColaborador(linhas) });
+    return c.json({ periodo, congelada: resultado.congelada, apuradoEm: resultado.apuracao.apuradoEm, periodoAnterior: anterior.periodo, linhas, totais: totaisPorColaborador(linhas) });
   })
   // Minhas Metas: só as Participações do Colaborador vinculado, cortadas pela Exibição no servidor.
   routes.get("/metas/minhas", auth, async (c: AuthContext) => {

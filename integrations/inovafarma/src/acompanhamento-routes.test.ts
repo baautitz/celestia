@@ -243,6 +243,9 @@ describe("Período anterior", () => {
       [2, 30, 40],
     ]);
     expect((await app.request("/metas/anterior?periodoId=junho", { headers: { "x-user": "gil" } })).status).toBe(403);
+    // O Acompanhamento traz o Período anterior em cada linha.
+    const acompanhamento = (await (await app.request("/metas/acompanhamento?periodoId=junho", { headers: { "x-user": "gil" } })).json()) as { linhas: { anterior?: { alvo: number; realizado: number } }[] };
+    expect(acompanhamento.linhas[0]!.anterior).toMatchObject({ alvo: 30, realizado: 25 });
     // Minhas Metas também traz a mesma Meta no Período anterior, cortada pela Exibição.
     const minha = (await (await minhas("ana", "junho")).json()) as { periodoAnterior: { name: string }; metas: { anterior?: unknown }[] };
     expect(minha.periodoAnterior.name).toBe("Maio");
