@@ -825,6 +825,7 @@ function TabelaMontarMetas({
       cols.push({
         key: meta.id,
         label: meta.tipo.nome,
+        divider: true,
         value: (l) => textoParticipacao(meta, l.estados[meta.id]!),
         render: (l) => {
           const a = antes(l);

@@ -254,6 +254,7 @@ function colunasTabela(metas: LinhaMeta[], olho: Olho | null, periodo: PeriodoDa
     colunas.push({
       key: meta.metaId,
       label: meta.tipo.nome,
+      divider: true,
       value: (c) => (linha(c)?.premioCentavos ?? 0) / 100,
       format: "currency",
       sortable: true,
@@ -308,7 +309,7 @@ function colunasTabela(metas: LinhaMeta[], olho: Olho | null, periodo: PeriodoDa
       cellClassName: "min-w-xl",
     });
   }
-  colunas.push({ key: "premio", label: "Total de Prêmios", value: (c) => c.premioCentavos / 100, format: "currency", sortable: true });
+  colunas.push({ key: "premio", label: "Total de Prêmios", value: (c) => c.premioCentavos / 100, format: "currency", sortable: true, divider: true });
   return colunas;
 }
 

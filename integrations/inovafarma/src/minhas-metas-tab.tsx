@@ -67,6 +67,7 @@ const colunasTabela = (olho: (m: MinhaMeta) => React.ReactNode): DataTableColumn
   {
     key: "valores",
     label: "Metas",
+    divider: true,
     value: (m) => m.realizado ?? "",
     render: (m) => (
       <PairGrid
@@ -98,7 +99,7 @@ const colunasTabela = (olho: (m: MinhaMeta) => React.ReactNode): DataTableColumn
     ),
     cellClassName: "min-w-md",
   },
-  colunas[2]!,
+  { ...colunas[2]!, divider: true },
 ];
 
 const colunasBaixa: DataTableColumn<MinhaBaixa>[] = [
