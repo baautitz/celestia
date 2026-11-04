@@ -383,6 +383,9 @@ export function ColaboradoresPage() {
         key: "lojas",
         mobileWide: true,
         label: "Lojas",
+        // O botão das Lojas aceita quebrar o texto, mas na linha não encolhe: sem isso a coluna fica estreita e o
+        // selo Sugestão invade o Status. Na largura do conteúdo, a tabela alarga e rola na horizontal.
+        cellClassName: "*:w-max",
         render: (r) => {
           const valores = valoresDe(r).lojas;
           const sugeridas = r.sugestao?.lojas ?? [];
