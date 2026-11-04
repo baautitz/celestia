@@ -185,6 +185,7 @@ function Show({ on, ...props }: Omit<React.ComponentProps<"div">, "className" | 
 const textVariants = {
   body: "",
   small: "text-sm",
+  large: "text-lg leading-snug",
   caption: "text-xs",
   tiny: "text-[11px] leading-normal",
   mono: "font-mono text-xs",

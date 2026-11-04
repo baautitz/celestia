@@ -287,6 +287,15 @@ describe("impressão", () => {
       .slice(1)
       .map((r) => within(r).getAllByRole("cell")[0]!.textContent);
 
+  it("imprime a coluna com o printValue", async () => {
+    setViewport(1280);
+    stubPrint();
+    const columns = saleColumns.map((c, i) => (i === 0 ? { ...c, printValue: (r: (typeof sales)[number]) => `impresso ${r.seller}` } : c));
+    render(<DataTable columns={columns} rows={sales} getRowId={(r) => r.id} title="Vendas" print={{}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+    expect(printedSellers()[0]).toMatch(/^impresso /);
+  });
+
   it("imprime todas as linhas da busca e ordenação atuais, ignorando a paginação", async () => {
     setViewport(1280);
     stubPrint();
