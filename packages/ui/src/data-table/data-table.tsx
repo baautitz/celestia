@@ -86,23 +86,12 @@ const NOWRAP_PRINT_FORMATS: ReadonlySet<DataTableFormat | undefined> = new Set([
 const wrapsInPrint = (col: { format?: DataTableFormat; nowrap?: boolean }) =>
   !col.nowrap && !NOWRAP_PRINT_FORMATS.has(col.format);
 
-/** Rótulo do cabeçalho; com `labelBelow`, em duas linhas (ex.: o Período anterior em cima, o atual embaixo). */
-function labelContent(col: { label: string; labelBelow?: string }): React.ReactNode {
-  if (!col.labelBelow) return col.label;
-  return (
-    <span className="inline-flex flex-col">
-      <span className="text-muted-foreground font-normal">{col.label}</span>
-      <span>{col.labelBelow}</span>
-    </span>
-  );
-}
-
-function HeaderLabel({ col }: { col: { label: string; labelBelow?: string; tooltip?: string } }) {
-  if (!col.tooltip) return <span>{labelContent(col)}</span>;
+function HeaderLabel({ col }: { col: { label: string; tooltip?: string } }) {
+  if (!col.tooltip) return <span>{col.label}</span>;
   return (
     <Tooltip>
       <TooltipTrigger
-        render={<span className="cursor-help">{labelContent(col)}</span>}
+        render={<span className="cursor-help">{col.label}</span>}
       />
       <TooltipContent>{col.tooltip}</TooltipContent>
     </Tooltip>
@@ -112,8 +101,6 @@ function HeaderLabel({ col }: { col: { label: string; labelBelow?: string; toolt
 export interface DataTableColumn<TRow> {
   key: string;
   label: string;
-  /** Segunda linha do cabeçalho, abaixo do `label` (que fica em cinza): para células de duas linhas. */
-  labelBelow?: string;
   /** Explicação exibida em tooltip ao passar o mouse sobre o cabeçalho. */
   tooltip?: string;
   /** Rótulo do campo no MobileCard; padrão: `label`, prefixado pelo `group`. */
@@ -272,12 +259,12 @@ const PRINT_LINE_COLOR = "border-border";
 
 function mobileLabel(col: {
   label: string;
-  labelBelow?: string;
   mobileLabel?: string;
   group?: string;
 }): string {
-  const label = col.labelBelow ? `${col.label} / ${col.labelBelow}` : col.label;
-  return col.mobileLabel ?? (col.group ? `${col.group} · ${label}` : label);
+  return (
+    col.mobileLabel ?? (col.group ? `${col.group} · ${col.label}` : col.label)
+  );
 }
 
 /** Linha de cabeçalho com os grupos de colunas; não renderiza nada quando nenhuma coluna tem `group`. */
@@ -1343,7 +1330,7 @@ export function PrintDetailTable<TRow>({
                 isCenteredColumn(col) && "text-center",
               )}
             >
-              {col.labelBelow ? `${col.label} / ${col.labelBelow}` : col.label}
+              {col.label}
             </th>
           ))}
         </tr>
@@ -1520,7 +1507,7 @@ function PrintTable<TRow>({
                   frozenEdge(col.key),
                 )}
               >
-                {col.labelBelow ? `${col.label} / ${col.labelBelow}` : col.label}
+                {col.label}
               </TableHead>
             ))}
           </TableRow>
