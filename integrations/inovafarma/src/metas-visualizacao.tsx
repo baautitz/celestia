@@ -1,10 +1,11 @@
-import { Label } from "@platform/ui/components/label";
-import { Stack } from "@platform/ui/components/layout";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
+import { List, Table2, Target, Users } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@platform/ui/components/toggle-group";
 import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import { usePreference } from "@platform/ui/hooks/use-preference";
 
 export type VisaoMetas = "table" | "by-meta" | "by-colaborador" | "list";
+
+const ICONE: Record<VisaoMetas, typeof Table2> = { table: Table2, "by-meta": Target, "by-colaborador": Users, list: List };
 
 const ROTULO: Record<VisaoMetas, string> = {
   table: "Tabela",
@@ -26,22 +27,28 @@ export function useVisaoMetas(aba: string, opcoes: readonly VisaoMetas[], semTab
   return { visao, salvar, disponiveis };
 }
 
+/** Seletor da visualização em abas com ícone, ao lado dos filtros. */
 export function VisaoSelect({ visao, disponiveis, onChange }: { visao: VisaoMetas; disponiveis: readonly VisaoMetas[]; onChange: (v: VisaoMetas) => void }) {
   return (
-    <Stack gap="field">
-      <Label>Exibir</Label>
-      <Select value={visao} onValueChange={(v) => v && disponiveis.includes(v as VisaoMetas) && onChange(v as VisaoMetas)}>
-        <SelectTrigger aria-label="Exibir">
-          <SelectValue>{(v: VisaoMetas) => ROTULO[v]}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {disponiveis.map((v) => (
-            <SelectItem key={v} value={v}>
-              {ROTULO[v]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </Stack>
+    <ToggleGroup
+      variant="outline"
+      spacing={0}
+      aria-label="Visualização das Metas"
+      value={[visao]}
+      onValueChange={(v: string[]) => {
+        const escolhida = v[0] as VisaoMetas | undefined;
+        if (escolhida && disponiveis.includes(escolhida)) onChange(escolhida);
+      }}
+    >
+      {disponiveis.map((v) => {
+        const Icone = ICONE[v];
+        return (
+          <ToggleGroupItem key={v} value={v} aria-label={ROTULO[v]}>
+            <Icone />
+            {ROTULO[v]}
+          </ToggleGroupItem>
+        );
+      })}
+    </ToggleGroup>
   );
 }

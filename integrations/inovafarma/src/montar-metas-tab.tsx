@@ -805,6 +805,9 @@ function TabelaMontarMetas({
       const avaliacoes = meta.tipo.indicador === "avaliacoes";
       const antes = (l: LinhaTabela) => doAnterior.get(meta.tipoId)?.get(l.colaborador.codigoColaborador);
       const group = meta.tipo.nome;
+      // R$ chegam em centavos; o DataTable formata em reais.
+      const formato = indicador.unidade === "reais" ? "currency" : indicador.unidade === "percentual" ? "percent" : "number";
+      const emExibicao = (v: number) => (indicador.unidade === "reais" ? v / 100 : v);
       if (usaAlvo(meta.tipo)) {
         cols.push(
           {
@@ -822,21 +825,15 @@ function TabelaMontarMetas({
             key: `${meta.id}:atingido`,
             group,
             label: avaliacoes ? "Saldo anterior" : "Atingido",
-            value: (l) => antes(l)?.realizado ?? null,
-            render: (l) => {
+            // Como no Desempenho de Vendas: o tooltip compara o Atingido com a Meta anterior, em %.
+            value: (l) => {
               const a = antes(l);
-              if (!a) return null;
-              const pct = a.atingimento === null ? "" : `${a.atingimento.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
-              return (
-                <Stack direction="row" gap="tight" align="center">
-                  {formatarValor(indicador, a.realizado)}
-                  {pct && (
-                    <Text variant="caption" tone={a.atingida === true ? "success" : "muted"}>
-                      {pct}
-                    </Text>
-                  )}
-                </Stack>
-              );
+              return a ? emExibicao(a.realizado) : null;
+            },
+            format: formato,
+            compare: (l) => {
+              const a = antes(l);
+              return a && a.alvo !== null ? { previous: emExibicao(a.alvo), label: "Meta anterior", favorable: indicador.direcao === "menor" ? "down" : "up" } : undefined;
             },
             nowrap: true,
           },
