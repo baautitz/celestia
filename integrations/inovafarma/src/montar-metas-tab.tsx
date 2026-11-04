@@ -826,17 +826,22 @@ function TabelaMontarMetas({
       cols.push({
         key: `${meta.id}:meta`,
         group,
-        label: !usaAlvo(meta.tipo) ? "Participa" : avaliacoes ? "Valor inicial anterior" : "Meta anterior",
-        labelBelow: !usaAlvo(meta.tipo) ? undefined : avaliacoes ? "Novo valor inicial" : "Nova meta",
+        label: !usaAlvo(meta.tipo) ? "Participa" : avaliacoes ? "Valor inicial" : "Meta",
         value: (l) => textoParticipacao(meta, l.estados[meta.id]!),
         render: (l) => {
           const a = antes(l)?.alvo;
           return (
             <Stack gap="tight">
               {usaAlvo(meta.tipo) && (
-                <Text variant="caption" tone="muted">
-                  {a === null || a === undefined ? "–" : formatarValor(indicador, a)}
-                </Text>
+                <>
+                  <Text variant="caption" tone="muted">
+                    {avaliacoes ? "Valor inicial anterior" : "Meta anterior"}
+                  </Text>
+                  <Text variant="small">{a === null || a === undefined ? "–" : formatarValor(indicador, a)}</Text>
+                  <Text variant="caption" tone="muted">
+                    {avaliacoes ? "Novo valor inicial" : "Nova meta"}
+                  </Text>
+                </>
               )}
               <CelulaParticipacao
                 meta={meta}
@@ -853,22 +858,22 @@ function TabelaMontarMetas({
       cols.push({
         key: `${meta.id}:premio`,
         group,
-        label: avaliacoes ? "Saldo anterior" : "Atingido",
-        labelBelow: temPremio ? "Prêmio" : undefined,
+        label: temPremio ? "Atingido e Prêmio" : avaliacoes ? "Saldo anterior" : "Atingido",
         value: (l) => (temPremio ? resumoPremio(regraAtual(meta, l.colaborador.codigoColaborador)) : (antes(l)?.realizado ?? null)),
         render: (l) => {
           const a = antes(l);
           const atingido = !a ? (
-            <Text variant="caption" tone="muted">
-              –
-            </Text>
+            <Text variant="small">–</Text>
           ) : (
-            <Text variant="caption" tone={a.atingida === true ? "success" : "muted"}>
+            <Text variant="small" tone={a.atingida === true ? "success" : "default"}>
               {formatarValor(indicador, a.realizado)}
             </Text>
           );
           return (
             <Stack gap="tight">
+              <Text variant="caption" tone="muted">
+                {avaliacoes ? "Saldo anterior" : "Atingido"}
+              </Text>
               {/* Como no Desempenho de Vendas: o tooltip compara o Atingido com a Meta anterior, em %. */}
               {a && a.alvo !== null ? (
                 <TrendTooltip
@@ -878,6 +883,11 @@ function TabelaMontarMetas({
                 </TrendTooltip>
               ) : (
                 atingido
+              )}
+              {temPremio && l.estados[meta.id]!.participa && (
+                <Text variant="caption" tone="muted">
+                  Prêmio
+                </Text>
               )}
               {temPremio && (
                 <CelulaPremio
