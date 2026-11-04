@@ -935,21 +935,21 @@ function TabelaMontarMetas({
           const nova = !e.participa ? "Não participa" : !usaAlvo(meta.tipo) ? "Participa" : e.alvo === null ? "Pendente" : formatarValor(indicador, e.alvo);
           const pendente = l.premios[meta.id];
           const regra = pendente === undefined ? regraAtual(meta, codigo) : comValorDoPremio(regraAtual(meta, codigo), pendente);
-          const anteriorTexto = [
-            ...(usaAlvo(meta.tipo) ? [`${avaliacoes ? "Valor inicial anterior" : "Meta anterior"} ${a?.alvo === null || a?.alvo === undefined ? "–" : formatarValor(indicador, a.alvo)}`] : []),
-            `${avaliacoes ? "Saldo anterior" : "Atingido"} ${a ? formatarValor(indicador, a.realizado) : "–"}`,
-          ].join(" · ");
+          // Mesma grade da tela, com campos travados: rótulos e valores alinhados em todas as linhas do papel.
+          const campo = (v: string) => <Input readOnly tabIndex={-1} value={v} />;
+          const anteriorLinha = [
+            ...(usaAlvo(meta.tipo)
+              ? [{ label: avaliacoes ? "Valor inicial anterior" : "Meta anterior", value: campo(a?.alvo === null || a?.alvo === undefined ? "–" : formatarValor(indicador, a.alvo)) }]
+              : []),
+            { label: avaliacoes ? "Saldo anterior" : "Atingido", value: campo(a ? formatarValor(indicador, a.realizado) : "–") },
+          ];
           // Na impressão, o Prêmio de um Tipo que não o mostra ao Colaborador sai só se o gestor pediu.
           const imprimePremio = temPremio && e.participa && (!soPremioVisivel || meta.tipo.mostrarPremio);
-          const atualTexto = [`${avaliacoes ? "Valor inicial" : "Nova meta"} ${nova}`, ...(imprimePremio ? [`Prêmio ${resumoPremio(regra)}`] : [])].join(" · ");
-          return (
-            <Stack>
-              <Text variant="caption" tone="muted">
-                {anteriorTexto}
-              </Text>
-              <Text variant="caption">{atualTexto}</Text>
-            </Stack>
-          );
+          const atualLinha = [
+            { label: avaliacoes ? "Valor inicial" : "Nova meta", value: campo(nova) },
+            ...(imprimePremio ? [{ label: "Prêmio", value: campo(resumoPremio(regra)) }] : []),
+          ];
+          return <PairGrid pairs={2} rows={[anteriorLinha, atualLinha]} valueWidths={["7rem", "13rem"]} />;
         },
         cellClassName: "min-w-md",
       });

@@ -1484,6 +1484,9 @@ function PrintTable<TRow>({
   [data-slot="data-table-print"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   /* Papel em preto: os tons de destaque da tela (verde, cinza) não carregam sentido impressos. */
   [data-slot="data-table-print"] td, [data-slot="data-table-print"] td * { color: #000 !important; }
+  /* Linhas visíveis no papel: o tom da tela some na impressão. */
+  [data-slot="data-table-print"] tr { border-color: #9ca3af !important; }
+  [data-slot="data-table-print"] input { border-color: #9ca3af !important; background: transparent !important; }
 }`;
 
   return createPortal(
