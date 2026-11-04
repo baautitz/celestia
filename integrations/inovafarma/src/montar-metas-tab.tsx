@@ -826,7 +826,8 @@ function TabelaMontarMetas({
       cols.push({
         key: `${meta.id}:meta`,
         group,
-        label: !usaAlvo(meta.tipo) ? "Participa" : avaliacoes ? "Valor inicial anterior / novo" : "Meta anterior / Nova meta",
+        label: !usaAlvo(meta.tipo) ? "Participa" : avaliacoes ? "Valor inicial anterior" : "Meta anterior",
+        labelBelow: !usaAlvo(meta.tipo) ? undefined : avaliacoes ? "Novo valor inicial" : "Nova meta",
         value: (l) => textoParticipacao(meta, l.estados[meta.id]!),
         render: (l) => {
           const a = antes(l)?.alvo;
@@ -847,12 +848,13 @@ function TabelaMontarMetas({
             </Stack>
           );
         },
-        cellClassName: usaAlvo(meta.tipo) ? "min-w-44" : undefined,
+        cellClassName: usaAlvo(meta.tipo) ? "min-w-44 align-top" : "align-top",
       });
       cols.push({
         key: `${meta.id}:premio`,
         group,
-        label: temPremio ? (avaliacoes ? "Saldo anterior / Prêmio" : "Atingido / Prêmio") : avaliacoes ? "Saldo anterior" : "Atingido",
+        label: avaliacoes ? "Saldo anterior" : "Atingido",
+        labelBelow: temPremio ? "Prêmio" : undefined,
         value: (l) => (temPremio ? resumoPremio(regraAtual(meta, l.colaborador.codigoColaborador)) : (antes(l)?.realizado ?? null)),
         render: (l) => {
           const a = antes(l);
@@ -891,7 +893,7 @@ function TabelaMontarMetas({
             </Stack>
           );
         },
-        cellClassName: "min-w-44 whitespace-normal",
+        cellClassName: "min-w-44 whitespace-normal align-top",
       });
     }
     return cols;
