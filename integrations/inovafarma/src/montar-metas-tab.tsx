@@ -676,15 +676,15 @@ interface VisaoProps {
   loading: boolean;
 }
 
-/** Opções da impressão do Montar Metas: por padrão, só as Metas cujo Prêmio o Colaborador vê. */
+/** Opções da impressão do Montar Metas: todas as Metas saem; por padrão, o Prêmio só onde o Colaborador o vê. */
 function ImprimirMetasWindow() {
   const { resolve } = useWindow<boolean>();
   const [soVisivel, setSoVisivel] = useState(true);
   return (
     <>
       <Stack direction="row" gap="field" align="center">
-        <Switch checked={soVisivel} onCheckedChange={(on: boolean) => setSoVisivel(on)} aria-label="Imprimir só as Metas com Prêmio visível ao Colaborador" />
-        <Text variant="small">Imprimir só as Metas com Prêmio visível ao Colaborador</Text>
+        <Switch checked={soVisivel} onCheckedChange={(on: boolean) => setSoVisivel(on)} aria-label="Imprimir o Prêmio só das Metas que o mostram ao Colaborador" />
+        <Text variant="small">Imprimir o Prêmio só das Metas que o mostram ao Colaborador</Text>
       </Stack>
       <WindowActions>
         <WindowCancelButton />
@@ -813,7 +813,7 @@ function TabelaMontarMetas({
     const r = await windows.open<boolean>({
       surface: "dialog",
       title: "Imprimir Metas",
-      description: "O Prêmio visível é o que o Tipo de Meta mostra ao Colaborador em Minhas Metas.",
+      description: "Todas as Metas são impressas. O Prêmio visível é o que o Tipo de Meta mostra ao Colaborador em Minhas Metas.",
       content: () => <ImprimirMetasWindow />,
     });
     if (r.status !== "confirmed") return false;
@@ -939,7 +939,9 @@ function TabelaMontarMetas({
             ...(usaAlvo(meta.tipo) ? [`${avaliacoes ? "Valor inicial anterior" : "Meta anterior"} ${a?.alvo === null || a?.alvo === undefined ? "–" : formatarValor(indicador, a.alvo)}`] : []),
             `${avaliacoes ? "Saldo anterior" : "Atingido"} ${a ? formatarValor(indicador, a.realizado) : "–"}`,
           ].join(" · ");
-          const atualTexto = [`${avaliacoes ? "Valor inicial" : "Nova meta"} ${nova}`, ...(temPremio && e.participa ? [`Prêmio ${resumoPremio(regra)}`] : [])].join(" · ");
+          // Na impressão, o Prêmio de um Tipo que não o mostra ao Colaborador sai só se o gestor pediu.
+          const imprimePremio = temPremio && e.participa && (!soPremioVisivel || meta.tipo.mostrarPremio);
+          const atualTexto = [`${avaliacoes ? "Valor inicial" : "Nova meta"} ${nova}`, ...(imprimePremio ? [`Prêmio ${resumoPremio(regra)}`] : [])].join(" · ");
           return (
             <Stack>
               <Text variant="caption" tone="muted">
@@ -953,7 +955,7 @@ function TabelaMontarMetas({
       });
     }
     return cols;
-  }, [metas, anterior, somenteLeitura, editar, alterarPremio, editarPremio]);
+  }, [metas, anterior, somenteLeitura, editar, alterarPremio, editarPremio, soPremioVisivel]);
 
   return (
     <DataTable
@@ -975,10 +977,9 @@ function TabelaMontarMetas({
       striped
       print={{
         orientation: "landscape",
-        description: soPremioVisivel ? `${impressao.description} · Só Metas com Prêmio visível ao Colaborador` : impressao.description,
+        description: soPremioVisivel ? `${impressao.description} · Prêmio só das Metas que o mostram ao Colaborador` : impressao.description,
         fileName: impressao.fileName,
         prepare: prepararImpressao,
-        columns: soPremioVisivel ? colunas.filter((c) => metas.find((m) => m.id === c.key)?.tipo.mostrarPremio !== false) : colunas,
       }}
     />
   );
