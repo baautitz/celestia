@@ -29,6 +29,7 @@ import {
   WindowCancelButton,
   useWindow,
 } from "@platform/ui/imperative/use-window";
+import { abbreviateName } from "@platform/ui/lib/abbreviate-name";
 import { apiFetch } from "@platform/ui/lib/api";
 import { AlvoInput, rotuloAlvo } from "./alvo-input";
 import { DefinirAlvoWindow } from "./alvo-padrao-window";
@@ -848,7 +849,21 @@ function TabelaMontarMetas({
   const colunas = useMemo(() => {
     const doAnterior = new Map((anterior?.metas ?? []).map((m) => [m.tipoId, new Map(m.participantes.map((p) => [p.codigoColaborador, p]))]));
     const cols: DataTableColumn<LinhaTabela>[] = [
-      { key: "nome", label: "Colaborador", value: (l) => l.colaborador.nome, searchable: true, sortable: true, mobileRole: "primary", nowrap: true },
+      {
+        key: "nome",
+        label: "Colaborador",
+        value: (l) => l.colaborador.nome,
+        // No papel, maior e abreviado pela regra do passaporte para não alargar a coluna.
+        printValue: (l) => (
+          <Text variant="small" weight="semibold">
+            {abbreviateName(l.colaborador.nome, 24)}
+          </Text>
+        ),
+        searchable: true,
+        sortable: true,
+        mobileRole: "primary",
+        nowrap: true,
+      },
     ];
     for (const meta of metas) {
       const indicador = indicadorDoTipo(meta.tipo);
