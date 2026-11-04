@@ -336,6 +336,31 @@ describe("Metas: Montar Metas na Tabela", () => {
   });
 });
 
+describe("Metas: Definir Alvo fora do Por Meta", () => {
+  it("na Tabela, o menu Definir Alvo abre a janela da Meta escolhida", async () => {
+    preferencias["inovafarma:montar-metas:view"] = null;
+    renderizar();
+    fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Definir Alvo" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "CMV" }));
+    expect(await screen.findByText('Meta "CMV" · Abril')).toBeTruthy();
+  });
+});
+
+describe("Metas: Montar Metas por Colaborador", () => {
+  it("edita o Prêmio Fixo na linha expandida do Colaborador", async () => {
+    preferencias["inovafarma:montar-metas:view"] = "by-colaborador";
+    const padrao = apiFetch.getMockImplementation()!;
+    const fixo = { ...metaCmv, tipo: { ...cmv, regra: { tipo: "fixo", valorCentavos: 10000 } } };
+    apiFetch.mockImplementation(async (url: string, init?: RequestInit) => (url.includes("/metas?periodoId=") ? { ...montagem, metas: [fixo] } : padrao(url, init)));
+    renderizar();
+    fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Expandir linha" }))[0]!);
+    fireEvent.change(await screen.findByRole("textbox", { name: "Prêmio de ANA na Meta CMV" }), { target: { value: "R$ 150,00" } });
+    expect(await screen.findByRole("button", { name: "Salvar alterações (1)" })).toBeTruthy();
+  });
+});
+
 describe("Metas: Montar Metas", () => {
   const abrir = async () => {
     renderizar();

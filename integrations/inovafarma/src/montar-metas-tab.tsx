@@ -675,6 +675,32 @@ interface VisaoProps {
   loading: boolean;
 }
 
+/** Abre a janela do Prêmio do Participante (Faixas em R$, que não cabem numa célula) e atualiza a Meta gravada. */
+function useAlterarPremio(atualizar: (meta: MetaVista) => void) {
+  const { windows } = useUi();
+  return useCallback(
+    async (meta: MetaVista, c: Colaborador) => {
+      const participante = meta.participantes.find((p) => p.codigoColaborador === c.codigoColaborador);
+      if (!participante) return;
+      const r = await windows.open<MetaVista>({
+        surface: "dialog",
+        title: "Prêmio do Participante",
+        description: `${c.nome} · Meta "${meta.tipo.nome}". Começa com o Prêmio do Tipo de Meta.`,
+        content: () => <PremioParticipanteWindow meta={meta} participante={participante} />,
+      });
+      if (r.status === "confirmed") atualizar(r.value);
+    },
+    [windows, atualizar],
+  );
+}
+
+/** Edição do Prêmio na célula, comum à Tabela e ao Por Colaborador. */
+interface EdicaoPremioProps {
+  atualizar: (meta: MetaVista) => void;
+  premio: (meta: MetaVista, codigo: number) => number | undefined;
+  editarPremio: (meta: MetaVista, codigo: number, valor: number | null) => void;
+}
+
 /** Uma linha da Tabela: o Colaborador e a participação dele em cada Meta. Mantém a identidade enquanto nada muda nela. */
 interface LinhaTabela {
   colaborador: Colaborador;
@@ -756,21 +782,7 @@ function TabelaMontarMetas({
   premio: (meta: MetaVista, codigo: number) => number | undefined;
   editarPremio: (meta: MetaVista, codigo: number, valor: number | null) => void;
 }) {
-  const { windows } = useUi();
-  const alterarPremio = useCallback(
-    async (meta: MetaVista, c: Colaborador) => {
-      const participante = meta.participantes.find((p) => p.codigoColaborador === c.codigoColaborador);
-      if (!participante) return;
-      const r = await windows.open<MetaVista>({
-        surface: "dialog",
-        title: "Prêmio do Participante",
-        description: `${c.nome} · Meta "${meta.tipo.nome}". Começa com o Prêmio do Tipo de Meta.`,
-        content: () => <PremioParticipanteWindow meta={meta} participante={participante} />,
-      });
-      if (r.status === "confirmed") atualizar(r.value);
-    },
-    [windows, atualizar],
-  );
+  const alterarPremio = useAlterarPremio(atualizar);
 
   // Reaproveita a linha anterior quando nenhuma participação dela mudou: o DataTable não a redesenha.
   const cache = useRef(new Map<number, LinhaTabela>());
@@ -904,7 +916,8 @@ function TabelaMontarMetas({
 }
 
 /** Visualização Por Colaborador: uma linha por Colaborador; expande para as Metas dele, com Participa e Alvo. */
-function PorColaboradorMontarMetas({ metas, colaboradores, somenteLeitura, estado, editar, loading }: VisaoProps) {
+function PorColaboradorMontarMetas({ metas, colaboradores, somenteLeitura, estado, editar, loading, atualizar, premio, editarPremio }: VisaoProps & EdicaoPremioProps) {
+  const alterarPremio = useAlterarPremio(atualizar);
   const colunas: DataTableColumn<Colaborador>[] = [
     { key: "nome", label: "Colaborador", value: (c) => c.nome, searchable: true, sortable: true, mobileRole: "primary" },
     {
@@ -955,6 +968,24 @@ function PorColaboradorMontarMetas({ metas, colaboradores, somenteLeitura, estad
                 />
               ),
             },
+            {
+              key: "premio",
+              label: "Prêmio",
+              value: (m: MetaVista) => (m.tipo.regra.tipo === "saldo" ? "" : resumoPremio(regraAtual(m, c.codigoColaborador))),
+              render: (m: MetaVista) =>
+                m.tipo.regra.tipo === "saldo" ? null : (
+                  <CelulaPremio
+                    meta={m}
+                    colaborador={c}
+                    participa={estado(m, c.codigoColaborador).participa}
+                    pendente={premio(m, c.codigoColaborador)}
+                    somenteLeitura={somenteLeitura}
+                    editar={editarPremio}
+                    alterar={(mm, cc) => void alterarPremio(mm, cc)}
+                  />
+                ),
+              cellClassName: "min-w-44 whitespace-normal",
+            },
           ]}
           rows={metas}
           getRowId={(m) => m.id}
@@ -990,7 +1021,8 @@ export function MontarMetas({
   const consulta = useRef(0);
   const periodo = periodos.find((p) => p.id === periodoId);
 
-  const carregar = useCallback(async () => {
+  /** `manterEdicoes`: depois do Definir Alvo, as edições ainda não salvas da tela continuam. */
+  const carregar = useCallback(async (manterEdicoes = false) => {
     if (!periodoId) return;
     const minha = ++consulta.current;
     try {
@@ -999,8 +1031,10 @@ export function MontarMetas({
       );
       if (minha !== consulta.current) return;
       setMontagem(m);
-      setEdicoes({});
-      setPremios({});
+      if (!manterEdicoes) {
+        setEdicoes({});
+        setPremios({});
+      }
       if (m.copiadoDe)
         feedback.notify({
           type: "success",
@@ -1030,6 +1064,23 @@ export function MontarMetas({
       vivo = false;
     };
   }, [periodoId, visao]);
+
+  /** Definir Alvo (ou valor inicial) de uma Meta para vários Participantes, fora da visualização Por Meta. */
+  const definirAlvo = async (meta: MetaVista) => {
+    const avaliacoes = meta.tipo.indicador === "avaliacoes";
+    const r = await windows.open<true>({
+      surface: "sheet",
+      title: avaliacoes ? "Definir valor inicial" : "Definir Alvo",
+      description: `Meta "${meta.tipo.nome}" · ${periodo?.name ?? ""}`,
+      content: () => (
+        <DefinirAlvoWindow
+          indicador={indicadorDoTipo(meta.tipo)}
+          meta={{ id: meta.periodoId, name: periodo?.name ?? "", metaId: meta.id, version: meta.version, participantes: meta.participantes }}
+        />
+      ),
+    });
+    if (r.status === "confirmed") void carregar(true);
+  };
 
   const adicionar = async () => {
     if (!montagem) return;
@@ -1214,6 +1265,24 @@ export function MontarMetas({
       </HeaderActions>
       <Stack direction="row" align="end" gap="section" wrap>
         <VisaoSelect visao={visao} disponiveis={disponiveis} onChange={salvarVisao} />
+        {visao !== "by-meta" && montagem && !montagem.somenteLeitura && montagem.metas.some((m) => usaAlvo(m.tipo)) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+              <Target />
+              Definir Alvo
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {montagem.metas
+                .filter((m) => usaAlvo(m.tipo))
+                .map((m) => (
+                  <DropdownMenuItem key={m.id} onClick={() => void definirAlvo(m)}>
+                    {m.tipo.nome}
+                    {m.tipo.indicador === "avaliacoes" ? " · valor inicial" : ""}
+                  </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         <Stack gap="field">
           <Label>Período de Fechamento</Label>
           <Select value={periodoId} onValueChange={(v) => v && setPeriodoId(v)}>
@@ -1267,7 +1336,7 @@ export function MontarMetas({
         </Alert>
       )}
       {visao === "table" && <TabelaMontarMetas {...visaoProps} anterior={anterior} atualizar={atualizar} premio={premioDe} editarPremio={editarPremio} />}
-      {visao === "by-colaborador" && <PorColaboradorMontarMetas {...visaoProps} />}
+      {visao === "by-colaborador" && <PorColaboradorMontarMetas {...visaoProps} atualizar={atualizar} premio={premioDe} editarPremio={editarPremio} />}
       {visao === "by-meta" && <DataTable
         scroll="page"
         columns={colunasMetas}
