@@ -825,6 +825,7 @@ function TabelaMontarMetas({
       cols.push({
         key: meta.id,
         label: meta.tipo.nome,
+        centered: true,
         divider: true,
         value: (l) => textoParticipacao(meta, l.estados[meta.id]!),
         render: (l) => {
@@ -888,7 +889,7 @@ function TabelaMontarMetas({
                 ]
               : []),
           ];
-          return <PairGrid pairs={2} rows={[anteriorLinha, atualLinha]} />;
+          return <PairGrid pairs={2} rows={[anteriorLinha, atualLinha]} valueWidths={["13rem", "11rem"]} />;
         },
         cellClassName: "min-w-md",
       });

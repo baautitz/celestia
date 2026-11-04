@@ -67,11 +67,13 @@ const colunasTabela = (olho: (m: MinhaMeta) => React.ReactNode): DataTableColumn
   {
     key: "valores",
     label: "Metas",
+    centered: true,
     divider: true,
     value: (m) => m.realizado ?? "",
     render: (m) => (
       <PairGrid
         pairs={3}
+        valueWidths={["6.5rem", "8rem", "6.5rem"]}
         rows={[
           [
             { label: "Meta anterior", value: m.anterior?.alvo ?? "–" },

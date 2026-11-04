@@ -254,9 +254,10 @@ function colunasTabela(metas: LinhaMeta[], olho: Olho | null, periodo: PeriodoDa
     colunas.push({
       key: meta.metaId,
       label: meta.tipo.nome,
+      centered: true,
       divider: true,
+      // Ordena pelo Prêmio da Meta; sem `format`, a célula não alinha à direita como número.
       value: (c) => (linha(c)?.premioCentavos ?? 0) / 100,
-      format: "currency",
       sortable: true,
       render: (c) => {
         const l = linha(c);
@@ -271,6 +272,7 @@ function colunasTabela(metas: LinhaMeta[], olho: Olho | null, periodo: PeriodoDa
         return (
           <PairGrid
             pairs={4}
+            valueWidths={["6.5rem", "8rem", "7rem", "6.5rem"]}
             rows={[
               [
                 { label: avaliacoes ? "Valor inicial anterior" : "Meta anterior", value: v(a?.alvo) },
