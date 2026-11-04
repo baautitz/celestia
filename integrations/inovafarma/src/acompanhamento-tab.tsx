@@ -6,7 +6,6 @@ import {
 } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Label } from "@platform/ui/components/label";
-import { Stack } from "@platform/ui/components/layout";
 import type { ReactNode } from "react";
 import {
   Select,
@@ -29,6 +28,9 @@ import { OlhoAvaliacoes } from "./avaliacoes-do-colaborador";
 import { formatarValor } from "./indicadores";
 import { useVisaoMetas, VisaoSelect } from "./metas-visualizacao";
 import { indicadorDoTipo } from "./tipos-meta";
+import { hojeLocal, projetar, type PeriodoDaProjecao } from "./projecao";
+import { Stack, Text } from "@platform/ui/components/layout";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@platform/ui/components/tooltip";
 
 const TODAS = "todas";
 
@@ -67,12 +69,46 @@ const comOlho = (olho: Olho | null, l: LinhaAcompanhamento, conteudo: ReactNode)
     conteudo
   );
 
+/** Projeção até o fim do Período, com a dica no tooltip: verde se atinge o Alvo no ritmo atual. */
+function CelulaProjecao({ linha, periodo }: { linha: LinhaAcompanhamento; periodo: PeriodoDaProjecao | null }) {
+  if (!periodo) return null;
+  const indicador = indicadorDoTipo(linha.tipo);
+  const p = projetar(indicador, linha.realizado, linha.alvo, periodo, hojeLocal());
+  if (!p) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<Text variant="small" tone={p.atinge === null ? "default" : p.atinge ? "success" : "destructive"} />}>
+        {formatarValor(indicador, p.valor)}
+      </TooltipTrigger>
+      <TooltipContent>{p.dica}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+const colunaProjecao = <T,>(key: string, linha: (r: T) => LinhaAcompanhamento | undefined, periodo: PeriodoDaProjecao | null, group?: string): DataTableColumn<T> => ({
+  key,
+  group,
+  label: "Projeção",
+  tooltip: "Onde termina o Período no ritmo atual. Passe o mouse para ver o que falta para atingir o Alvo.",
+  value: (r) => {
+    const l = linha(r);
+    const p = l && periodo ? projetar(indicadorDoTipo(l.tipo), l.realizado, l.alvo, periodo, hojeLocal()) : null;
+    return p ? formatarValor(indicadorDoTipo(l!.tipo), p.valor) : "";
+  },
+  render: (r) => {
+    const l = linha(r);
+    return l ? <CelulaProjecao linha={l} periodo={periodo} /> : null;
+  },
+  nowrap: true,
+});
+
 /** As Metas de um Colaborador (ou os Participantes de uma Meta), na linha expandida. */
-const colunasDe = (olho: Olho | null, primeira: "meta" | "colaborador" = "meta"): DataTableColumn<LinhaAcompanhamento>[] => [
+const colunasDe = (olho: Olho | null, primeira: "meta" | "colaborador" = "meta", periodo: PeriodoDaProjecao | null = null): DataTableColumn<LinhaAcompanhamento>[] => [
   primeira === "meta"
     ? { key: "meta", label: "Meta", value: (l) => l.tipo.nome, sortable: true, nowrap: true, mobileRole: "primary" }
     : { key: "colaborador", label: "Colaborador", value: (l) => l.nome, searchable: true, sortable: true, mobileRole: "primary" },
   { key: "resultado", label: "Resultado", value: (l) => l.resultado, render: (l) => comOlho(olho, l, l.resultado) },
+  ...(periodo ? [colunaProjecao<LinhaAcompanhamento>("projecao", (l) => l, periodo)] : []),
   {
     key: "situacao",
     centered: true,
@@ -179,7 +215,7 @@ const colunasMeta: DataTableColumn<LinhaMeta>[] = [
 ];
 
 /** Visualização Tabela: uma linha por Colaborador; cada Meta mostra Alvo, Realizado e % Atingido. */
-function colunasTabela(metas: LinhaMeta[], olho: Olho | null): DataTableColumn<LinhaColaborador>[] {
+function colunasTabela(metas: LinhaMeta[], olho: Olho | null, periodo: PeriodoDaProjecao | null): DataTableColumn<LinhaColaborador>[] {
   const colunas: DataTableColumn<LinhaColaborador>[] = [
     { key: "colaborador", label: "Colaborador", value: (c) => c.nome, searchable: true, sortable: true, mobileRole: "primary", nowrap: true },
   ];
@@ -225,6 +261,7 @@ function colunasTabela(metas: LinhaMeta[], olho: Olho | null): DataTableColumn<L
         format: "percent",
         sortable: true,
       });
+    if (meta.tipo.indicador !== "avaliacoes") colunas.push(colunaProjecao<LinhaColaborador>(`${meta.metaId}:projecao`, linha, periodo, group));
   }
   colunas.push({ key: "premio", label: "Total de Prêmios", value: (c) => c.premioCentavos / 100, format: "currency", sortable: true });
   return colunas;
@@ -301,7 +338,7 @@ export function AcompanhamentoMetas({
   const olho: Olho | null = lerAvaliacoes
     ? (l) => <OlhoAvaliacoes periodoId={periodoId} codigoColaborador={l.codigoColaborador} nome={l.nome} acesso="gerenciar" />
     : null;
-  const colunasExpandidas = colunasDe(olho);
+  const colunasExpandidas = colunasDe(olho, "meta", periodo ?? null);
   const metasAgrupadas = porMeta(dados);
   const linhasColaborador = porColaborador(dados);
   const impressao = periodo
@@ -388,7 +425,7 @@ export function AcompanhamentoMetas({
       {visao === "table" && (
         <DataTable
           scroll="page"
-          columns={colunasTabela(metasAgrupadas, olho)}
+          columns={colunasTabela(metasAgrupadas, olho, periodo ?? null)}
           rows={linhasColaborador}
           getRowId={(c) => String(c.codigoColaborador)}
           loading={carregando}
@@ -439,7 +476,7 @@ export function AcompanhamentoMetas({
           renderExpanded={(m) => (
             <DataTable
               scroll="page"
-              columns={colunasDe(olho, "colaborador")}
+              columns={colunasDe(olho, "colaborador", periodo ?? null)}
               rows={m.participantes}
               getRowId={(l) => String(l.codigoColaborador)}
             />
