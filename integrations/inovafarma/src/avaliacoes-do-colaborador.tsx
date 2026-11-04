@@ -5,7 +5,6 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
-import { dataHora } from "./datas";
 
 /** Quem pode ler as Avaliações: quem gerencia (as das Lojas dele) ou o próprio Colaborador (as dele). */
 export type AcessoAvaliacoes = "gerenciar" | "minhas";
@@ -37,7 +36,7 @@ function AvaliacoesDoColaboradorWindow({ periodoId, codigoColaborador, acesso }:
   }, [periodoId, codigoColaborador, acesso, feedback]);
 
   const colunas: DataTableColumn<AvaliacaoLida>[] = [
-    { key: "data", centered: true, label: "Data", value: (a) => a.criadoEm, render: (a) => dataHora(a.criadoEm), sortable: true },
+    { key: "data", label: "Data", value: (a) => a.criadoEm, format: "date", sortable: true },
     { key: "loja", label: "Loja", value: (a) => `Loja ${a.codigoLoja}` },
     { key: "descricao", label: "Descrição", value: (a) => a.descricao, cellClassName: "min-w-64 whitespace-normal", mobileRole: "primary" },
     { key: "valor", label: "Valor", value: (a) => a.valor, format: "currency", sortable: true },
@@ -73,7 +72,8 @@ export function OlhoAvaliacoes({ periodoId, codigoColaborador, nome, acesso }: {
       onClick={(e) => {
         e.stopPropagation();
         void windows.open({
-          surface: "sheet",
+          surface: "dialog",
+          size: "large",
           title: "Avaliações",
           description: `${nome} · descontadas do valor inicial da Meta de Avaliações.`,
           content: () => <AvaliacoesDoColaboradorWindow periodoId={periodoId} codigoColaborador={codigoColaborador} acesso={acesso} />,
