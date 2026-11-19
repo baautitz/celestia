@@ -1,5 +1,9 @@
 # Testes
 
+## Quando rodar
+
+A suíte inteira (`pnpm test`, que o hook de pré-push também roda) fica para **o final**, uma vez. Durante o trabalho rode só o arquivo ou o fluxo afetado: `pnpm exec vitest run <arquivo>`. O Vitest limita os processos a 4 (`maxWorkers` em `vitest.config.ts`) para não saturar a CPU; sob carga, os testes de UI estouram o tempo.
+
 ## Componente (jsdom) — `pnpm test`
 
 Vitest roda tudo em um comando. Testes de componente ficam ao lado do código (`*.test.tsx`) e declaram `// @vitest-environment jsdom` na primeira linha. Usam `@testing-library/react` e consultas por papel/rótulo (`getByRole`, `getByLabel`). Cobrem hoje o formulário dinâmico (`DynamicFormFields`) e o host de janelas (`UiProvider`/`WindowHost`).

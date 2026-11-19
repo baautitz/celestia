@@ -79,6 +79,8 @@ pnpm check:plugins     # Plugin boundary check (integrations import only @platfo
 - **Commits** are One-Line Conventional Commits: `<type>(<scope>): <short description in english>`, split by responsibility. Never commit unilaterally: present the plan (messages + files), get confirmation, then commit.
   - Exception: integration merges into `main`, and merges of the integration branch into ticket branches, are `--no-ff` merge commits with git's default message (see [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)); they are not one-line Conventional Commits.
 
+- **Tests**: run the whole suite (`pnpm test`, and the pre-push hook) once, at the end. While working, run only the affected test file or flow. See [docs/conventions/testing.md](docs/conventions/testing.md).
+
 ## Agent skills
 
 - **Issue tracker**: GitHub Issues (`baautitz/celestia`, via `gh` CLI). See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
