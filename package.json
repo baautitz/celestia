@@ -30,7 +30,7 @@
     "prepare": "node scripts/setup-git-hooks.mjs"
   },
   "dependencies": {
-    "@hono/node-server": "^1.13.7",
+    "@hono/node-server": "^2.0.0",
     "@hono/zod-validator": "^0.4.1",
     "esbuild": "^0.24.0",
     "hono": "^4.13.19",

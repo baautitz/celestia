@@ -15,7 +15,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@hono/node-server": "^1.13.7",
+    "@hono/node-server": "^2.0.0",
     "@hono/zod-validator": "^0.4.1",
     "@platform/core": "workspace:*",
     "@platform/shared": "workspace:*",
