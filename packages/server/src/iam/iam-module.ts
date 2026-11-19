@@ -96,7 +96,7 @@ export function createIamModule({
         return { id: caller.sub, name: caller.fullname };
       };
 
-      const completeLogin = async (c: Context, user: User, usedDevice?: { id: string; name: string }) => {
+      const completeLogin = async (c: Context, user: User, usedDevice?: { id: string; name: string }, withoutDeviceReason: "no_device" | "ca_unavailable" = "no_device") => {
         loginRateLimiter.recordSuccess(user.username);
         const role = await userStore.getRole(user.roleId);
         let tokens: { accessToken: string; refreshToken: string; payload: JWTAccessPayload } | undefined;
@@ -110,6 +110,8 @@ export function createIamModule({
         const { accessToken, refreshToken, payload } = tokens;
         if (usedDevice) {
           await recordIamAudit({ id: user.id, name: user.fullname }, "login_with_device", { type: DEVICE_AUDIT_TARGET, id: usedDevice.id }, { username: user.username, deviceName: usedDevice.name }, usedDevice);
+        } else {
+          await recordIamAudit({ id: user.id, name: user.fullname }, "login_without_certificate", { type: USER_AUDIT_TARGET, id: user.id }, { username: user.username, reason: withoutDeviceReason });
         }
 
         setCookie(c, "refresh_token", refreshToken, refreshCookie());
@@ -153,7 +155,7 @@ export function createIamModule({
             challenge = await certificateAuthority.createChallenge(user.id);
           } catch (err: unknown) {
             if (!(err instanceof CertificateAuthorityUnavailableError)) throw err;
-            if (user.allowWithoutCertificate) return completeLogin(c, user);
+            if (user.allowWithoutCertificate) return completeLogin(c, user, undefined, "ca_unavailable");
             return c.json({ error: err.message }, 503);
           }
           setCookie(c, LOGIN_CHALLENGE_COOKIE, await tokenService.generateLoginChallengeToken(user.id, challenge.challengeId), loginChallengeCookie());
@@ -179,7 +181,7 @@ export function createIamModule({
           } catch (err: unknown) {
             if (!(err instanceof CertificateAuthorityUnavailableError)) throw err;
             const exempt = await userStore.findById(bound.userId);
-            if (exempt?.allowWithoutCertificate && exempt.status !== "inactive") return completeLogin(c, exempt);
+            if (exempt?.allowWithoutCertificate && exempt.status !== "inactive") return completeLogin(c, exempt, undefined, "ca_unavailable");
             return c.json({ error: err.message }, 503);
           }
           const user = exchange.userId === bound.userId ? await userStore.findById(exchange.userId) : null;
