@@ -231,7 +231,7 @@ function ComTendencia({ indicador, atual, anterior, rotulo, children }: { indica
   const formato = indicador.unidade === "reais" ? "currency" : indicador.unidade === "percentual" ? "percent" : "number";
   const exibir = (v: number) => (indicador.unidade === "reais" ? v / 100 : v);
   return (
-    <TrendTooltip trend={{ current: exibir(atual), previous: exibir(anterior), label: rotulo, format: formato, favorable: indicador.direcao === "menor" ? "down" : "up" }}>
+    <TrendTooltip title={indicador.nome} trend={{ current: exibir(atual), previous: exibir(anterior), label: rotulo, format: formato, favorable: indicador.direcao === "menor" ? "down" : "up" }}>
       {children}
     </TrendTooltip>
   );

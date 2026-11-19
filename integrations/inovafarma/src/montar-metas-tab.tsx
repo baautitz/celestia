@@ -883,13 +883,12 @@ function TabelaMontarMetas({
         render: (l) => {
           const a = antes(l);
           const estadoMeta = l.estados[meta.id]!;
-          const atingido = !a ? (
-            "–"
-          ) : (
+          const atingidoTexto = a ? (
             <Text variant="small" tone={a.atingida === true ? "success" : "default"}>
               {formatarValor(indicador, a.realizado)}
             </Text>
-          );
+          ) : null;
+          const atingido = atingidoTexto ?? "–";
           const anteriorLinha = [
             ...(usaAlvo(meta.tipo)
               ? [{ label: avaliacoes ? "Valor inicial anterior" : "Meta anterior", value: a?.alvo === null || a?.alvo === undefined ? "–" : formatarValor(indicador, a.alvo) }]
@@ -898,11 +897,12 @@ function TabelaMontarMetas({
               label: avaliacoes ? "Saldo anterior" : "Atingido",
               // Como no Desempenho de Vendas: o tooltip compara o Atingido com a Meta anterior, em %.
               value:
-                a && a.alvo !== null ? (
+                a && a.alvo !== null && atingidoTexto ? (
                   <TrendTooltip
+                    title={indicador.nome}
                     trend={{ current: emExibicao(a.realizado), previous: emExibicao(a.alvo), label: "Meta anterior", format: formato, favorable: indicador.direcao === "menor" ? "down" : "up" }}
                   >
-                    {atingido}
+                    {atingidoTexto}
                   </TrendTooltip>
                 ) : (
                   atingido
