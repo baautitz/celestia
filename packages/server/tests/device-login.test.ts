@@ -277,17 +277,38 @@ describe("Audit Log do acesso por certificado", () => {
     expect(entry?.summary).toBe('Negou o login de "com.cert": o acesso exige o certificado de um Dispositivo ativo.');
   });
 
-  it("registra o login que entrou por um Dispositivo, e nenhum quando o acesso foi sem certificado", async () => {
+  it("registra o login que entrou por um Dispositivo e o que entrou sem Dispositivo reconhecido", async () => {
     const auditLog = new AuditLog(new MemoryAuditStore());
     const { comCert: user, device, loginWithCertificate } = await setup({ auditLog });
 
     expect((await loginWithCertificate("sem.cert")).status).toBe(200);
-    expect(await auditLog.list({ plugin: "iam" })).toEqual([]);
+    const [semCert] = await auditLog.list({ plugin: "iam" });
+    expect(semCert).toMatchObject({ action: "login_without_certificate", targetType: "user", attributes: { username: "sem.cert", reason: "no_device" } });
+    expect(semCert?.summary).toBe('Entrou sem certificado: "sem.cert".');
 
     expect((await loginWithCertificate("com.cert", device.fingerprint)).status).toBe(200);
     const [entry] = await auditLog.list({ plugin: "iam" });
     expect(entry).toMatchObject({ action: "login_with_device", actorId: user.id, actorName: "Com Cert", targetType: "device", targetId: device.id });
     expect(entry?.summary).toBe('Entrou pelo Dispositivo "Caixa 1".');
+  });
+
+  it("registra o login de quem tem a opção com um certificado desconhecido", async () => {
+    const auditLog = new AuditLog(new MemoryAuditStore());
+    const { loginWithCertificate } = await setup({ auditLog });
+
+    expect((await loginWithCertificate("sem.cert", "fingerprint-desconhecido")).status).toBe(200);
+    const [entry] = await auditLog.list({ plugin: "iam" });
+    expect(entry).toMatchObject({ action: "login_without_certificate", attributes: { username: "sem.cert", reason: "no_device" } });
+  });
+
+  it("registra o login sem certificado com a CA fora do ar, com o motivo", async () => {
+    const auditLog = new AuditLog(new MemoryAuditStore());
+    const { login, ca } = await setup({ auditLog });
+    ca.setDown(true);
+
+    expect((await login("sem.cert")).status).toBe(200);
+    const [entry] = await auditLog.list({ plugin: "iam" });
+    expect(entry).toMatchObject({ action: "login_without_certificate", attributes: { username: "sem.cert", reason: "ca_unavailable" } });
   });
 
   describe("Dispositivo no Audit Log", () => {
@@ -341,12 +362,15 @@ describe("Audit Log do acesso por certificado", () => {
     const put = (allow: boolean) =>
       admin.request(`/api/iam/users/${user.id}`, { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify({ allowWithoutCertificate: allow }) });
 
+    // O login do administrador (sem certificado) também é registrado: só interessam as mudanças da opção.
+    const mudancas = async () => (await auditLog.list({ plugin: "iam" })).filter((e) => e.action === "change_certificate_exemption");
+
     await put(false);
-    expect(await auditLog.list({ plugin: "iam" })).toEqual([]);
+    expect(await mudancas()).toEqual([]);
 
     await put(true);
     await put(false);
-    const entries = await auditLog.list({ plugin: "iam" });
+    const entries = await mudancas();
     expect(entries.map((e) => e.summary).sort()).toEqual([
       'Deixou de permitir o acesso sem certificado de "alvo".',
       'Permitiu o acesso sem certificado de "alvo".',

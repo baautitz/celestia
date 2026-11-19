@@ -120,7 +120,7 @@ describe("Dispositivos (/api/iam/devices)", () => {
     const created = (await (await issue("gestor.disp")).json()) as Issued;
     await as("gestor.disp").request(`/api/iam/devices/${created.device.id}/revoke`, { method: "POST" });
 
-    const entries = await auditLog.list({ plugin: "iam" });
+    const entries = (await auditLog.list({ plugin: "iam" })).filter((e) => e.action !== "login_without_certificate");
     expect(entries.map((e) => e.action).sort()).toEqual(["issue_device", "revoke_device"]);
     const issueEntry = entries.find((e) => e.action === "issue_device")!;
     expect(issueEntry).toMatchObject({ actorName: "Gestor de Dispositivos", targetType: "device", targetId: created.device.id });

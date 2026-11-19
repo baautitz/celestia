@@ -50,9 +50,10 @@ describe("GET /api/audit", () => {
     await rec("cp-1", "u1", "2026-01-10T12:00:00Z");
     await rec("cp-2", "u2", "2026-02-10T12:00:00Z");
     const token = await login("carlos.admin");
+    // O próprio login do administrador (sem certificado) também cai no Audit Log: o filtro isola o plugin `erp`.
     const ids = async (qs: string) =>
       ((await (await get(`/api/audit?${qs}`, token)).json()) as { targetId: string }[]).map((e) => e.targetId);
-    expect(await ids("")).toEqual(["cp-2", "cp-1"]);
+    expect(await ids("plugin=erp")).toEqual(["cp-2", "cp-1"]);
     expect(await ids("targetType=closing_period&targetId=cp-1")).toEqual(["cp-1"]);
     expect(await ids("actorId=u2")).toEqual(["cp-2"]);
     expect(await ids("plugin=nope")).toEqual([]);
@@ -83,12 +84,12 @@ describe("GET /api/audit/facets", () => {
     await rec({ id: "u1", name: "Ana" }, "2026-02-01T00:00:00Z");
     await rec({ id: "u2", name: "Bruno" }, "2026-01-15T00:00:00Z");
     const res = await get("/api/audit/facets", await login("carlos.admin"));
-    expect(await res.json()).toEqual({
-      actors: [
-        { id: "u1", name: "Ana" },
-        { id: "u2", name: "Bruno" },
-      ],
-      plugins: ["erp"],
-    });
+    // O login do próprio administrador (plugin `iam`) também aparece; o que importa são os atores e o Plugin do `erp`.
+    const facets = (await res.json()) as { actors: { id: string; name: string }[]; plugins: string[] };
+    expect(facets.actors.filter((a) => a.id === "u1" || a.id === "u2")).toEqual([
+      { id: "u1", name: "Ana" },
+      { id: "u2", name: "Bruno" },
+    ]);
+    expect(facets.plugins).toContain("erp");
   });
 });

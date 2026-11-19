@@ -17,6 +17,11 @@ export function declareIamAudit(auditLog: AuditLog): void {
   declare("delete_device", Device, (a) => `Excluiu o Dispositivo revogado "${a.name}".`);
   declare("login_with_device", z.object({ username: z.string(), deviceName: z.string() }), (a) => `Entrou pelo Dispositivo "${a.deviceName}".`);
   declare(
+    "login_without_certificate",
+    z.object({ username: z.string(), reason: z.enum(["no_device", "ca_unavailable"]) }),
+    (a) => `Entrou sem certificado: "${a.username}"${a.reason === "ca_unavailable" ? " (autoridade certificadora indisponível)" : ""}.`,
+  );
+  declare(
     "deny_login_without_certificate",
     z.object({ username: z.string() }),
     (a) => `Negou o login de "${a.username}": o acesso exige o certificado de um Dispositivo ativo.`,
