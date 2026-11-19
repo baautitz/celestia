@@ -108,7 +108,9 @@ describe("Avaliações do Colaborador", () => {
     const { req, lancar } = await boot();
     expect((await lancar("gil", { codigoColaborador: 10 })).status).toBe(403);
     const todos = (await (await req("rh", "GET", "/api/m/inovafarma/avaliacoes/colaboradores")).json()) as { codigoColaborador: number; lojas: number[] }[];
-    expect(todos).toEqual(expect.arrayContaining([expect.objectContaining({ codigoColaborador: 10, lojas: [] }), expect.objectContaining({ codigoColaborador: 11, lojas: [] })]));
+    expect(todos).toEqual(expect.arrayContaining([expect.objectContaining({ codigoColaborador: 10, lojas: [] })]));
+    // Colaborador inativo não é avaliado, mesmo sem Vínculo.
+    expect(todos.map((c) => c.codigoColaborador)).not.toContain(11);
     expect(await (await lancar("rh", { codigoColaborador: 10, codigoLoja: 2 })).json()).toMatchObject({ nomeColaborador: "CAIO SEM VINCULO", codigoLoja: 2 });
   });
 
