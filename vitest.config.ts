@@ -9,6 +9,9 @@ export default defineConfig({
     globals: true,
     environment: "node",
     exclude: [...configDefaults.exclude, ".claude/**"],
+    // Sem limite, o Vitest sobe um processo por núcleo e a suíte satura a CPU (e derruba a VPS); os testes de UI
+    // estouram o tempo sob essa carga. O limite mantém a máquina respirando e a suíte estável.
+    maxWorkers: 4,
   },
   resolve: {
     alias: {
