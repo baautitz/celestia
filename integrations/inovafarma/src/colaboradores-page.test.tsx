@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render as renderTela, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, configure, fireEvent, render as renderTela, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { createMemoryRouter, Link, RouterProvider } from "react-router-dom";
 import { confirmLeave } from "@platform/ui/adapters/leave-guard";
@@ -79,6 +79,9 @@ async function escolherLoja(row: HTMLElement, nome: string) {
 const botao = (row: HTMLElement, nome: string) => within(row).getByRole("button", { name: nome }) as HTMLButtonElement;
 /** O botão único de salvar, no cabeçalho da página. */
 const salvarTudo = () => screen.getByRole("button", { name: /^Salvar \(/ }) as HTMLButtonElement;
+
+// Sob carga (suíte inteira em paralelo) os popovers e a revalidação passam do 1 s padrão do `findBy`/`waitFor`.
+configure({ asyncUtilTimeout: 4000 });
 
 beforeEach(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -167,7 +170,7 @@ describe("ColaboradoresPage", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ usuarioId: "bia", lojas: [], version: 0 }),
     });
-    expect((salvarTudo()).disabled).toBe(true);
+    await waitFor(() => expect(salvarTudo().disabled).toBe(true));
   });
 
   it("depois de gravar, revalida a tabela com o servidor e mostra o que mudou nas outras linhas", async () => {
@@ -304,7 +307,7 @@ describe("ColaboradoresPage", () => {
         "/api/m/inovafarma/colaboradores/7/vinculo",
         expect.objectContaining({ body: JSON.stringify({ usuarioId: null, lojas: [1, 2], version: 0 }) }),
       );
-      expect(salvarTudo().disabled).toBe(true);
+      await waitFor(() => expect(salvarTudo().disabled).toBe(true));
     });
 
     it("grava Usuário e Lojas juntos", async () => {
@@ -397,7 +400,7 @@ describe("ColaboradoresPage", () => {
       render(<ColaboradoresPage />);
       const row = await linha("ANA SOUZA");
       expect(salvarTudo().textContent).toBe("Salvar (0)");
-      expect(salvarTudo().disabled).toBe(true);
+      await waitFor(() => expect(salvarTudo().disabled).toBe(true));
       expect(within(row).getByText("Pendente")).toBeTruthy();
     });
 
@@ -539,7 +542,7 @@ describe("ColaboradoresPage", () => {
         render(<ColaboradoresPage />);
         const row = await linha("ANA SOUZA");
         await escolherUsuario(row, "Bia Lima");
-        expect(salvarTudo().disabled).toBe(true);
+        await waitFor(() => expect(salvarTudo().disabled).toBe(true));
       });
 
       it("o Salvar geral avisa quando pula uma linha bloqueada e grava as demais", async () => {
@@ -610,7 +613,7 @@ describe("rascunhos não salvos", () => {
       "/api/m/inovafarma/colaboradores/9/vinculo",
       "/api/m/inovafarma/colaboradores",
     ]);
-    expect(salvarTudo().textContent).toBe("Salvar (0)");
+    await waitFor(() => expect(salvarTudo().textContent).toBe("Salvar (0)"));
   });
 
   it("numa falha parcial grava as outras, marca a que falhou e mantém o rascunho dela", async () => {
