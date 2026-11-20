@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pencil, Plus, MoreHorizontal } from "lucide-react";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
@@ -14,29 +14,32 @@ import { AcompanhamentoMetas, type VisualizacaoMetas } from "./acompanhamento-ta
 import { AlvoPadraoWindow } from "./alvo-padrao-window";
 import { formatarValor, indicadorPorId } from "./indicadores";
 import { MinhasMetas } from "./minhas-metas-tab";
-import { MontarMetas, type LojaMetas, type PeriodoMetas } from "./montar-metas-tab";
+import { MontarMetas, type LojaMetas } from "./montar-metas-tab";
+import type { Periodo } from "./periodos";
 import { EXIBICAO_LABEL, indicadorDoTipo } from "./tipos-meta";
 import { BASE, TipoMetaWindow, type TipoMetaComPremio, type TipoMetaSalvo } from "./tipo-meta-window";
+import { API } from "./inovafarma-api";
+import { useLatestFetch } from "./use-latest-fetch";
 
 /** Aba Tipos de Meta: cadastro dos Tipos com a prévia do Prêmio. */
 function TiposDeMeta() {
   const { feedback, windows } = useUi();
   const [tipos, setTipos] = useState<TipoMetaComPremio[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const consulta = useRef(0);
+  const novaConsulta = useLatestFetch();
 
   const carregar = useCallback(async () => {
-    const minha = ++consulta.current;
+    const vale = novaConsulta();
     setCarregando(true);
     try {
       const lista = await apiFetch<TipoMetaComPremio[]>(BASE);
-      if (minha === consulta.current) setTipos(lista);
+      if (vale()) setTipos(lista);
     } catch (err: unknown) {
-      if (minha === consulta.current) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar os Tipos de Meta."));
+      if (vale()) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar os Tipos de Meta."));
     } finally {
-      if (minha === consulta.current) setCarregando(false);
+      if (vale()) setCarregando(false);
     }
-  }, [feedback]);
+  }, [feedback, novaConsulta]);
   useEffect(() => {
     void carregar();
   }, [carregar]);
@@ -124,7 +127,7 @@ function TiposDeMeta() {
 
 interface Contexto {
   abas: { tipos: boolean; montar: boolean; acompanhamento: boolean; minhas: boolean };
-  periodos: PeriodoMetas[];
+  periodos: Periodo[];
   lojas: LojaMetas[];
   visualizacoes: VisualizacaoMetas[];
   avaliacoes?: { gerenciar: boolean; minhas: boolean };
@@ -140,7 +143,7 @@ export function MetasPage() {
   );
 
   useEffect(() => {
-    apiFetch<Contexto>("/api/m/inovafarma/metas/contexto")
+    apiFetch<Contexto>(`${API}/metas/contexto`)
       .then(setContexto)
       .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao abrir as Metas.")));
   }, [feedback]);

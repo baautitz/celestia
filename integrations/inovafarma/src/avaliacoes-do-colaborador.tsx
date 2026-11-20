@@ -5,6 +5,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
+import { API } from "./inovafarma-api";
 
 /** Quem pode ler as Avaliações: quem gerencia (as das Lojas dele) ou o próprio Colaborador (as dele). */
 export type AcessoAvaliacoes = "gerenciar" | "minhas";
@@ -25,8 +26,8 @@ function AvaliacoesDoColaboradorWindow({ periodoId, codigoColaborador, acesso }:
   useEffect(() => {
     const url =
       acesso === "minhas"
-        ? `/api/m/inovafarma/avaliacoes/minhas?periodoId=${encodeURIComponent(periodoId)}`
-        : `/api/m/inovafarma/avaliacoes?periodoId=${encodeURIComponent(periodoId)}&codigoColaborador=${codigoColaborador}`;
+        ? `${API}/avaliacoes/minhas?periodoId=${encodeURIComponent(periodoId)}`
+        : `${API}/avaliacoes?periodoId=${encodeURIComponent(periodoId)}&codigoColaborador=${codigoColaborador}`;
     apiFetch<AvaliacaoLida[]>(url)
       .then(setLinhas)
       .catch((err: unknown) => {

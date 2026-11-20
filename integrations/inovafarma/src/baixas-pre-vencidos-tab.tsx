@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, Undo2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Button } from "@platform/ui/components/button";
@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import { formatDate } from "@platform/ui/lib/format";
 import { searchScore } from "@platform/ui/lib/fuzzy-search";
 import { CorrecaoBaixaWindow, type CorrecaoDaBaixa } from "./correcao-baixa-window";
 import type { BaixaPublica } from "./baixas-do-periodo";
@@ -16,16 +15,11 @@ import { dataHora } from "./datas";
 import type { LojaOpcao } from "./loja-opcao";
 import { LojaSelect, TODAS_AS_LOJAS } from "./loja-select";
 import type { Visualizacao } from "./visualizacoes";
+import { type Periodo, periodoInicial, periodoLabel } from "./periodos";
+import { API } from "./inovafarma-api";
+import { useLatestFetch } from "./use-latest-fetch";
 
-const BASE = "/api/m/inovafarma/pre-vencidos";
-
-interface Periodo {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status?: "open" | "closed";
-}
+const BASE = `${API}/pre-vencidos`;
 
 /** Uma Visualização das Baixas que o servidor liberou, com as Lojas que ela filtra (vazio em Individual). */
 export interface VisualizacaoDasBaixas {
@@ -59,7 +53,6 @@ function filtrarPorProduto(grupos: BaixasDoColaborador[], busca: string): Baixas
 }
 
 const VISUALIZACAO_LABEL: Record<Visualizacao, string> = { geral: "Geral", loja: "Loja", individual: "Individual" };
-const periodoLabel = (p: Periodo) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})${p.status === "closed" ? " · fechado" : ""}`;
 
 const colunasVenda: DataTableColumn<Baixa>[] = [
   { key: "venda", label: "Venda", value: (b) => String(b.vendaId) },
@@ -89,7 +82,7 @@ export function BaixasPreVencidosTab({ visualizacoes, periodos, lojasDaCorrecao 
   const [visualizacao, setVisualizacao] = useState<Visualizacao | undefined>(visualizacoes[0]?.id);
   const [loja, setLoja] = useState(TODAS_AS_LOJAS);
   // Abre no período aberto de data mais recente; sem nenhum aberto, no mais recente.
-  const [periodoId, setPeriodoId] = useState((periodos.find((p) => p.status !== "closed") ?? periodos[0])?.id ?? "");
+  const [periodoId, setPeriodoId] = useState(periodoInicial(periodos));
   const [grupos, setGrupos] = useState<BaixasDoColaborador[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [busca, setBusca] = useState("");
@@ -97,25 +90,25 @@ export function BaixasPreVencidosTab({ visualizacoes, periodos, lojasDaCorrecao 
   const [recarga, setRecarga] = useState(0);
 
   // Só a resposta da última consulta vale.
-  const consulta = useRef(0);
+  const novaConsulta = useLatestFetch();
   // biome-ignore lint/correctness/useExhaustiveDependencies: `recarga` é o contador que o botão de recarregar incrementa para refazer a consulta, sem ser lido no efeito.
   useEffect(() => {
     if (!visualizacao || !periodoId) return;
-    const minha = ++consulta.current;
+    const vale = novaConsulta();
     setCarregando(true);
     const params = new URLSearchParams({ visualizacao, periodoId });
     if (visualizacao !== "individual" && loja !== TODAS_AS_LOJAS) params.set("codigoLoja", loja);
     apiFetch<BaixasDoColaborador[]>(`${BASE}/baixas?${params.toString()}`)
       .then((recebidos) => {
-        if (minha === consulta.current) setGrupos(recebidos);
+        if (vale()) setGrupos(recebidos);
       })
       .catch((err: unknown) => {
-        if (minha === consulta.current) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar as Baixas."));
+        if (vale()) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar as Baixas."));
       })
       .finally(() => {
-        if (minha === consulta.current) setCarregando(false);
+        if (vale()) setCarregando(false);
       });
-  }, [visualizacao, loja, periodoId, feedback, recarga]);
+  }, [visualizacao, loja, periodoId, feedback, recarga, novaConsulta]);
 
   if (!visualizacao) {
     return (

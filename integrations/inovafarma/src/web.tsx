@@ -20,6 +20,7 @@ import { FuroEstoquePage } from "./furo-estoque-page";
 import { MetasPage } from "./metas-page";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
+import { API } from "./inovafarma-api";
 
 interface Loja {
   codigoEmpresa: number;
@@ -427,7 +428,7 @@ function VendasComissoesPage() {
             console.error("Erro ao buscar períodos:", err);
             return [] as ClosingPeriod[];
           }),
-          apiFetch<{ visualizacoes: VisualizacaoDisponivel[] }>("/api/m/inovafarma/relatorios/vendas-colaborador/visualizacoes")
+          apiFetch<{ visualizacoes: VisualizacaoDisponivel[] }>(`${API}/relatorios/vendas-colaborador/visualizacoes`)
             .then((r) => r.visualizacoes)
             .catch((err) => {
               console.error("Erro ao buscar visualizações:", err);
@@ -470,7 +471,7 @@ function VendasComissoesPage() {
         if (visualizacao !== "individual" && selectedLoja !== "all") {
           params.append("codigoEmpresa", selectedLoja);
         }
-        return apiFetch<RelatorioVendas>(`/api/m/inovafarma/relatorios/vendas-colaborador?${params.toString()}`);
+        return apiFetch<RelatorioVendas>(`${API}/relatorios/vendas-colaborador?${params.toString()}`);
       };
       const range = previousClosingPeriodRange(periods, selectedPeriod, today());
 

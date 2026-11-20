@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { SidebarMenuBadge } from "@platform/ui/components/sidebar";
 import { apiFetch } from "@platform/ui/lib/api";
+import { API } from "./inovafarma-api";
 
 const VINCULO_ALTERADO = "inovafarma:vinculo-alterado";
 
@@ -14,7 +15,7 @@ export function ColaboradoresPendentesBadge() {
   useEffect(() => {
     let ativo = true;
     const buscar = () => {
-      apiFetch<{ total: number }>("/api/m/inovafarma/colaboradores/pendentes")
+      apiFetch<{ total: number }>(`${API}/colaboradores/pendentes`)
         .then((r) => ativo && setTotal(r.total))
         .catch(() => ativo && setTotal(0));
     };

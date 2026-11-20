@@ -1,5 +1,4 @@
-import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
 import { Label } from "@platform/ui/components/label";
@@ -11,9 +10,11 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { dataHora } from "./datas";
 import { reais } from "./indicadores";
 import type { MinhaBaixa, MinhaMeta } from "./minhas-metas";
-import type { PeriodoMetas } from "./montar-metas-tab";
 import { OlhoAvaliacoes } from "./avaliacoes-do-colaborador";
 import { useVisaoMetas, VisaoSelect } from "./metas-visualizacao";
+import { API } from "./inovafarma-api";
+import { type Periodo, periodoInicial } from "./periodos";
+import { useLatestFetch } from "./use-latest-fetch";
 
 interface MinhasMetas {
   congelada: boolean;
@@ -69,7 +70,7 @@ const coluna = (indice: number): DataTableColumn<MinhaMeta> => {
 };
 
 /** Visualização Tabela: cada Meta com rótulo e valor; em cima o Período anterior, embaixo o atual. */
-const colunasTabela = (olho: (m: MinhaMeta) => React.ReactNode): DataTableColumn<MinhaMeta>[] => [
+const colunasTabela = (olho: (m: MinhaMeta) => ReactNode): DataTableColumn<MinhaMeta>[] => [
   coluna(0),
   {
     key: "valores",
@@ -120,33 +121,31 @@ const colunasBaixa: DataTableColumn<MinhaBaixa>[] = [
   { key: "correcao", label: "Correção", value: (b) => (b.correcao ? `Corrigida: ${b.correcao.motivo}` : "") },
 ];
 
-const periodoInicial = (periodos: PeriodoMetas[]) => (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
-
 /** Aba Minhas Metas: as Metas do Colaborador vinculado ao Usuário, na Exibição de cada Tipo de Meta. Sem impressão. */
-export function MinhasMetas({ periodos, lerAvaliacoes = false }: { periodos: PeriodoMetas[]; lerAvaliacoes?: boolean }) {
+export function MinhasMetas({ periodos, lerAvaliacoes = false }: { periodos: Periodo[]; lerAvaliacoes?: boolean }) {
   const { feedback } = useUi();
   const { visao, salvar: salvarVisao, disponiveis } = useVisaoMetas("minhas-metas", ["table", "list"], "list");
   const [periodoId, setPeriodoId] = useState(() => periodoInicial(periodos));
   const [dados, setDados] = useState<MinhasMetas | null>(null);
   const [carregando, setCarregando] = useState(false);
-  const consulta = useRef(0);
+  const novaConsulta = useLatestFetch();
 
   const carregar = useCallback(async () => {
     if (!periodoId) return;
-    const minha = ++consulta.current;
+    const vale = novaConsulta();
     setCarregando(true);
     try {
-      const d = await apiFetch<MinhasMetas>(`/api/m/inovafarma/metas/minhas?periodoId=${encodeURIComponent(periodoId)}`);
-      if (minha === consulta.current) setDados(d);
+      const d = await apiFetch<MinhasMetas>(`${API}/metas/minhas?periodoId=${encodeURIComponent(periodoId)}`);
+      if (vale()) setDados(d);
     } catch (err: unknown) {
-      if (minha === consulta.current) {
+      if (vale()) {
         setDados(null);
         feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar as suas Metas."));
       }
     } finally {
-      if (minha === consulta.current) setCarregando(false);
+      if (vale()) setCarregando(false);
     }
-  }, [periodoId, feedback]);
+  }, [periodoId, feedback, novaConsulta]);
   useEffect(() => {
     void carregar();
   }, [carregar]);

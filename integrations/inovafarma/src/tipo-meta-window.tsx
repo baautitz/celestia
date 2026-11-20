@@ -33,13 +33,13 @@ import {
   type ProblemaDoTipo,
   type UnidadeLista,
   type DadosTipoMeta, type Exibicao, type RegraPremio, type TipoMeta, type TipoRegra } from "./tipos-meta";
+import { API, json } from "./inovafarma-api";
 
-export const BASE = "/api/m/inovafarma/metas/tipos";
+export const BASE = `${API}/metas/tipos`;
 
 /** Como a API devolve o Tipo de Meta: com a prévia do Prêmio e se já tem Metas em algum Período. */
 export type TipoMetaComPremio = TipoMeta & { premio: string; temMetas?: boolean };
 
-const json = (method: string, body: unknown) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 /** Indicadores de valor vendido em R$, base do Percentual. */
 const BASES_PERCENTUAL = INDICADORES.filter((i: Indicador) => Boolean(i.valorVendido));

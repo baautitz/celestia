@@ -12,8 +12,9 @@ import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imper
 import { apiFetch } from "@platform/ui/lib/api";
 import { dataBr } from "./datas";
 import { ProdutoBusca } from "./produto-busca";
+import { API } from "./inovafarma-api";
 
-const BASE = "/api/m/inovafarma/pre-vencidos";
+const BASE = `${API}/pre-vencidos`;
 
 /** Item de Pré-vencido como a API devolve: nunca o código do produto no ERP. */
 export interface ItemPreVencido {

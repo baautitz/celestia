@@ -12,8 +12,9 @@ import { Textarea } from "@platform/ui/components/textarea";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
+import { API, json } from "./inovafarma-api";
 
-export const BASE = "/api/m/inovafarma/furo-estoque";
+export const BASE = `${API}/furo-estoque`;
 const MAX_OBSERVACAO = 500;
 
 export interface Motivo {
@@ -33,7 +34,6 @@ export interface Justificativa {
   justificadoPor: string;
 }
 
-const json = (method: string, body: unknown) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 const schemaJustificativa = z.object({
   motivoId: z.string().min(1, "Selecione o Motivo."),

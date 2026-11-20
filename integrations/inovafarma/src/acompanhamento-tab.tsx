@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   AlertDescription,
@@ -23,7 +23,7 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import type { ResultadoParticipante } from "./apuracao";
 import type { TipoApuracao } from "./apuracao-store";
-import type { LojaMetas, PeriodoMetas } from "./montar-metas-tab";
+import type { LojaMetas } from "./montar-metas-tab";
 import { OlhoAvaliacoes } from "./avaliacoes-do-colaborador";
 import { formatarValor, reais, type Indicador } from "./indicadores";
 import { TrendTooltip } from "@platform/ui/components/trend";
@@ -32,6 +32,9 @@ import { indicadorDoTipo } from "./tipos-meta";
 import { hojeLocal, projetar, type PeriodoDaProjecao } from "./projecao";
 import { PairGrid, Stack, Text } from "@platform/ui/components/layout";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@platform/ui/components/tooltip";
+import { API } from "./inovafarma-api";
+import { type Periodo, periodoInicial } from "./periodos";
+import { useLatestFetch } from "./use-latest-fetch";
 
 const TODAS = "todas";
 
@@ -56,9 +59,6 @@ interface Acompanhamento {
 }
 
 const VISUALIZACAO_LABEL = { geral: "Geral", loja: "Loja" } as const;
-const periodoInicial = (periodos: PeriodoMetas[]) =>
-  (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
-
 /** Olho das Avaliações na Meta de Avaliações; null quando o Usuário não pode lê-las. */
 type Olho = (l: LinhaAcompanhamento) => ReactNode;
 
@@ -321,7 +321,7 @@ export function AcompanhamentoMetas({
   visualizacoes,
   lerAvaliacoes = false,
 }: {
-  periodos: PeriodoMetas[];
+  periodos: Periodo[];
   visualizacoes: VisualizacaoMetas[];
   /** Quem gerencia as Avaliações ganha o olho para lê-las na Meta de Avaliações. */
   lerAvaliacoes?: boolean;
@@ -335,23 +335,23 @@ export function AcompanhamentoMetas({
   const [loja, setLoja] = useState(TODAS);
   const [dados, setDados] = useState<Acompanhamento | null>(null);
   const [carregando, setCarregando] = useState(false);
-  const consulta = useRef(0);
+  const novaConsulta = useLatestFetch();
   const periodo = periodos.find((p) => p.id === periodoId);
   const lojas = visualizacoes.find((v) => v.id === visualizacao)?.lojas ?? [];
 
   const carregar = useCallback(async () => {
     if (!periodoId) return;
-    const minha = ++consulta.current;
+    const vale = novaConsulta();
     setCarregando(true);
     const filtro =
       loja === TODAS ? "" : `&codigoEmpresa=${encodeURIComponent(loja)}`;
     try {
       const a = await apiFetch<Acompanhamento>(
-        `/api/m/inovafarma/metas/acompanhamento?periodoId=${encodeURIComponent(periodoId)}&visualizacao=${visualizacao}${filtro}`,
+        `${API}/metas/acompanhamento?periodoId=${encodeURIComponent(periodoId)}&visualizacao=${visualizacao}${filtro}`,
       );
-      if (minha === consulta.current) setDados(a);
+      if (vale()) setDados(a);
     } catch (err: unknown) {
-      if (minha === consulta.current) {
+      if (vale()) {
         setDados(null);
         feedback.notifyError(
           err instanceof Error
@@ -360,9 +360,9 @@ export function AcompanhamentoMetas({
         );
       }
     } finally {
-      if (minha === consulta.current) setCarregando(false);
+      if (vale()) setCarregando(false);
     }
-  }, [periodoId, visualizacao, loja, feedback]);
+  }, [periodoId, visualizacao, loja, feedback, novaConsulta]);
   useEffect(() => {
     void carregar();
   }, [carregar]);

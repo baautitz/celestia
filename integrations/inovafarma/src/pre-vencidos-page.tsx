@@ -8,16 +8,10 @@ import { BaixasPreVencidosTab, type VisualizacaoDasBaixas } from "./baixas-pre-v
 import { EstoquePreVencidosTab } from "./estoque-pre-vencidos-tab";
 import type { LojaOpcao } from "./loja-opcao";
 import type { InclusaoRetroativa } from "./item-pre-vencido-window";
+import type { Periodo } from "./periodos";
+import { API } from "./inovafarma-api";
 
-const BASE = "/api/m/inovafarma/pre-vencidos";
-
-interface Periodo {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status?: "open" | "closed";
-}
+const BASE = `${API}/pre-vencidos`;
 
 interface Contexto {
   podeEstoque: boolean;

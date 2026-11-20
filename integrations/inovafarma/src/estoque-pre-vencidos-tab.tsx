@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
@@ -14,8 +14,10 @@ import { dataBr } from "./datas";
 import { ItemPreVencidoWindow, type InclusaoRetroativa, type ItemPreVencido, type ItemSalvo } from "./item-pre-vencido-window";
 import type { LojaOpcao } from "./loja-opcao";
 import { LojaSelect, SemLojas } from "./loja-select";
+import { API } from "./inovafarma-api";
+import { useLatestFetch } from "./use-latest-fetch";
 
-const BASE = "/api/m/inovafarma/pre-vencidos";
+const BASE = `${API}/pre-vencidos`;
 
 /**
  * Aba Estoque: os Itens de Pré-vencido de uma Loja do Vínculo, com inclusão, edição e exclusão em janela.
@@ -29,20 +31,20 @@ export function EstoquePreVencidosTab({ lojas, retroativa }: { lojas: LojaOpcao[
   const [carregando, setCarregando] = useState(false);
 
   // Só a resposta da última consulta vale: uma resposta atrasada não apaga o que uma consulta mais nova trouxe.
-  const consulta = useRef(0);
+  const novaConsulta = useLatestFetch();
   const carregar = useCallback(async () => {
     if (!loja) return;
-    const minha = ++consulta.current;
+    const vale = novaConsulta();
     setCarregando(true);
     try {
       const recebidos = await apiFetch<ItemPreVencido[]>(`${BASE}/estoque/itens?codigoLoja=${encodeURIComponent(loja)}${zerados ? "&zerados=true" : ""}`);
-      if (minha === consulta.current) setItens(recebidos);
+      if (vale()) setItens(recebidos);
     } catch (err: unknown) {
-      if (minha === consulta.current) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar o Estoque de Pré-vencidos."));
+      if (vale()) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar o Estoque de Pré-vencidos."));
     } finally {
-      if (minha === consulta.current) setCarregando(false);
+      if (vale()) setCarregando(false);
     }
-  }, [loja, zerados, feedback]);
+  }, [loja, zerados, feedback, novaConsulta]);
 
   useEffect(() => {
     void carregar();

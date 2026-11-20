@@ -49,18 +49,12 @@ import { MoneyInput } from "@platform/ui/components/money-input";
 import type { TipoMetaComPremio } from "./tipo-meta-window";
 import { useVisaoMetas, VisaoSelect } from "./metas-visualizacao";
 import { TrendTooltip } from "@platform/ui/components/trend";
+import { API, json } from "./inovafarma-api";
+import { type Periodo, periodoInicial } from "./periodos";
+import { useLatestFetch } from "./use-latest-fetch";
 
-const BASE = "/api/m/inovafarma/metas";
+const BASE = `${API}/metas`;
 const TODAS = "todas";
-const JSON_HEADERS = { "Content-Type": "application/json" };
-
-export interface PeriodoMetas {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status: "open" | "closed";
-}
 
 export interface LojaMetas {
   codigo: number;
@@ -122,9 +116,6 @@ const colunasMetas: DataTableColumn<MetaVista>[] = [
   },
 ];
 
-const periodoInicial = (periodos: PeriodoMetas[]) =>
-  (periodos.find((p) => p.status === "open") ?? periodos[0])?.id ?? "";
-
 /** Adicionar Meta: escolhe um ou vários Tipos de Meta ativos de uma vez; cada um vira uma Meta do Período. */
 function AdicionarMetaWindow({
   periodoId,
@@ -145,11 +136,7 @@ function AdicionarMetaWindow({
     setEnviando(true);
     try {
       for (const tipoId of marcados)
-        await apiFetch(BASE, {
-          method: "POST",
-          headers: JSON_HEADERS,
-          body: JSON.stringify({ periodoId, tipoId }),
-        });
+        await apiFetch(BASE, json("POST", { periodoId, tipoId }));
       feedback.notify({
         type: "success",
         title:
@@ -251,11 +238,7 @@ function SalvarAlteracoesWindow({ alteracoes }: { alteracoes: Alteracao[] }) {
       for (const a of alteracoes) {
         const version = versoes.get(a.meta.id) ?? a.meta.version;
         if (!a.edicao) {
-          const salva = await apiFetch<MetaVista>(`${BASE}/${a.meta.id}/participantes/${a.codigoColaborador}/premio`, {
-            method: "PUT",
-            headers: JSON_HEADERS,
-            body: JSON.stringify({ version, premio: a.premio ?? null }),
-          });
+          const salva = await apiFetch<MetaVista>(`${BASE}/${a.meta.id}/participantes/${a.codigoColaborador}/premio`, json("PUT", { version, premio: a.premio ?? null }));
           versoes.set(a.meta.id, salva.version);
           continue;
         }
@@ -268,7 +251,7 @@ function SalvarAlteracoesWindow({ alteracoes }: { alteracoes: Alteracao[] }) {
         };
         const salva = await apiFetch<MetaVista>(
           `${BASE}/${a.meta.id}/participantes/${a.codigoColaborador}`,
-          { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(corpo) },
+          json("PUT", corpo),
         );
         versoes.set(a.meta.id, salva.version);
       }
@@ -1095,7 +1078,7 @@ export function MontarMetas({
   periodos,
   lojas,
 }: {
-  periodos: PeriodoMetas[];
+  periodos: Periodo[];
   lojas: LojaMetas[];
 }) {
   const { feedback, windows } = useUi();
@@ -1111,18 +1094,18 @@ export function MontarMetas({
     setEdicoes({});
     setPremios({});
   };
-  const consulta = useRef(0);
+  const novaConsulta = useLatestFetch();
   const periodo = periodos.find((p) => p.id === periodoId);
 
   /** `manterEdicoes`: depois do Definir Alvo, as edições ainda não salvas da tela continuam. */
   const carregar = useCallback(async (manterEdicoes = false) => {
     if (!periodoId) return;
-    const minha = ++consulta.current;
+    const vale = novaConsulta();
     try {
       const m = await apiFetch<Montagem>(
         `${BASE}?periodoId=${encodeURIComponent(periodoId)}`,
       );
-      if (minha !== consulta.current) return;
+      if (!vale()) return;
       setMontagem(m);
       if (!manterEdicoes) {
         setEdicoes({});
@@ -1135,12 +1118,12 @@ export function MontarMetas({
           description: "Confira os Participantes novos e os pendentes.",
         });
     } catch (err: unknown) {
-      if (minha === consulta.current)
+      if (vale())
         feedback.notifyError(
           err instanceof Error ? err : new Error("Erro ao carregar as Metas."),
         );
     }
-  }, [periodoId, feedback]);
+  }, [periodoId, feedback, novaConsulta]);
   useEffect(() => {
     void carregar();
   }, [carregar]);

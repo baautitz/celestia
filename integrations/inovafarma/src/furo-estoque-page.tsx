@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowDownToLine, CheckCircle2, Eye, MessageSquarePlus, Pencil, Plus, Trash2, MoreHorizontal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
@@ -13,18 +13,13 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import { formatCurrency, formatDate, formatNumber } from "@platform/ui/lib/format";
+import { formatCurrency, formatNumber } from "@platform/ui/lib/format";
 import { BASE, JustificativaWindow, MotivoWindow, VerJustificativaWindow, type Justificativa, type Motivo } from "./furo-estoque-window";
+import type { Periodo } from "./periodos";
+import { periodoInicial, periodoLabel } from "./periodos";
+import { useLatestFetch } from "./use-latest-fetch";
 
 const TODAS = "todas";
-
-interface Periodo {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status?: "open" | "closed";
-}
 
 interface Loja {
   codigo: number;
@@ -66,8 +61,6 @@ export interface Ajuste {
 /** Grupo de Ajustes de um card; sem grupo escolhido, a tabela mostra todos. */
 type Grupo = "furo" | "entradas" | "justificados";
 
-const periodoLabel = (p: Periodo) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})${p.status === "closed" ? " · fechado" : ""}`;
-const periodoInicial = (periodos: Periodo[]) => (periodos.find((p) => p.status !== "closed") ?? periodos[0])?.id ?? "";
 /** `AAAA-MM-DD HH:mm` → `DD/MM/AAAA HH:mm`. */
 const dataHora = (data: string) => `${data.slice(8, 10)}/${data.slice(5, 7)}/${data.slice(0, 4)} ${data.slice(11, 16)}`;
 const somaCusto = (ajustes: Ajuste[]) => ajustes.reduce((n, a) => n + a.totalCusto, 0);
@@ -81,26 +74,26 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
   const [grupo, setGrupo] = useState<Grupo | null>("furo");
   const [ajustes, setAjustes] = useState<Ajuste[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const consulta = useRef(0);
+  const novaConsulta = useLatestFetch();
 
   const carregar = useCallback(async () => {
     if (!periodoId) return;
-    const minha = ++consulta.current;
+    const vale = novaConsulta();
     const params = new URLSearchParams({ periodoId });
     if (loja !== TODAS) params.set("codigoLoja", loja);
     setCarregando(true);
     try {
       const recebidos = await apiFetch<Ajuste[]>(`${BASE}/ajustes?${params}`);
-      if (minha === consulta.current) setAjustes(recebidos);
+      if (vale()) setAjustes(recebidos);
     } catch (err: unknown) {
-      if (minha === consulta.current) {
+      if (vale()) {
         setAjustes([]);
         feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar os Ajustes de Estoque."));
       }
     } finally {
-      if (minha === consulta.current) setCarregando(false);
+      if (vale()) setCarregando(false);
     }
-  }, [periodoId, loja, feedback]);
+  }, [periodoId, loja, feedback, novaConsulta]);
 
   useEffect(() => {
     void carregar();
