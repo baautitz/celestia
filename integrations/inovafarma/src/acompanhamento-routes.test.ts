@@ -199,6 +199,28 @@ describe("Acompanhamento das Metas", () => {
     expect((await res("zé", "")).status).toBe(403);
   });
 
+  it("recusa a Visualização inexistente e a Loja que não é um código inteiro com o corpo de validação da plataforma, antes da Permission", async () => {
+    const { res } = await boot();
+    for (const who of ["gil", "lia", "zé"]) {
+      const visualizacao = await res(who, "&visualizacao=individual");
+      expect(visualizacao.status).toBe(400);
+      expect(await visualizacao.json()).toEqual({ error: { issues: [{ path: ["visualizacao"], message: "Parâmetro 'visualizacao' deve ser geral ou loja." }] } });
+    }
+    for (const loja of ["abc", "1.5", "0"]) {
+      const res400 = await res("gil", `&codigoEmpresa=${loja}`);
+      expect(res400.status).toBe(400);
+      expect(await res400.json()).toEqual({ error: { issues: [{ path: ["codigoEmpresa"], message: "Informe um código inteiro maior que zero." }] } });
+    }
+  });
+
+  it("responde 404 ao Período que não existe, sem apurar nada", async () => {
+    const { app, erp } = await boot();
+    erp.falha = true;
+    const res = await app.request("/metas/acompanhamento?periodoId=nao-existe", { headers: { "x-user": "gil" } });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Período de Fechamento não encontrado." });
+  });
+
   it("congela a Apuração no fechamento e volta a apurar ao vivo ao reabrir", async () => {
     const { ver, vendas, evento } = await boot();
     await evento("closing_period.close", "closed");
@@ -266,7 +288,7 @@ describe("Período anterior", () => {
     // Minhas Metas também traz a mesma Meta no Período anterior, cortada pela Exibição.
     const minha = (await (await minhas("ana", "junho")).json()) as { periodoAnterior: { name: string }; metas: { anterior?: unknown }[] };
     expect(minha.periodoAnterior.name).toBe("Maio");
-    expect(defined(minha.metas[0], "the first Meta").anterior).toBeDefined();
+    expect(defined(minha.metas[0], "the first Meta").anterior).toEqual({ atingida: true });
   });
 });
 

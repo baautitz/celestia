@@ -144,6 +144,43 @@ describe("Montar Metas", () => {
     expect(volta.participantes.find((p) => p.codigoColaborador === 1)?.premio).toBeNull();
   });
 
+  it("recusa com o corpo de validação da plataforma o corpo inválido, o código que não é inteiro positivo e a version fora do padrão", async () => {
+    const { req, tipos } = await boot();
+    const tipo = await tipos.criar(cmv);
+    const criada = (await (await req("gil", "POST", "/metas", { periodoId: "abril", tipoId: tipo.id })).json()) as Meta;
+    const invalido = await req("gil", "PUT", `/metas/${criada.id}/participantes/1`, { version: 0, participa: true });
+    expect(invalido.status).toBe(400);
+    expect(await invalido.json()).toEqual({ error: { issues: [{ path: ["version"], message: "Too small: expected number to be >=1" }] } });
+    const codigoRuim = { error: { issues: [{ path: [], message: "Informe um código inteiro maior que zero." }] } };
+    for (const codigo of ["abc", "1.5", "0", "1e2"]) {
+      for (const [url, corpo] of [
+        [`/metas/${criada.id}/participantes/${codigo}`, { version: criada.version, participa: false }],
+        [`/metas/${criada.id}/participantes/${codigo}/premio`, { version: criada.version, premio: null }],
+      ] as const) {
+        const res = await req("gil", "PUT", url, corpo);
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual(codigoRuim);
+      }
+    }
+    for (const version of ["", "abc", "0", "1.5"]) {
+      const res = await req("gil", "DELETE", `/metas/${criada.id}?version=${version}`);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["version"], message: "Parâmetro 'version' é obrigatório." }] } });
+    }
+  });
+
+  it("responde 404, e não 409 de Período fechado, à Meta cujo Período não existe mais", async () => {
+    const { req, tipos, metas } = await boot();
+    const tipo = await tipos.criar(cmv);
+    const orfa = await metas.criar({ periodoId: "sumiu", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 30 }], excluidos: [] });
+    const res = await req("gil", "DELETE", `/metas/${orfa?.id}?version=1`);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Período de Fechamento não encontrado." });
+    // Um Período que existe e está fechado continua sendo 409.
+    const fechada = await metas.criar({ periodoId: "marco", tipoId: tipo.id, participantes: [], excluidos: [] });
+    expect((await req("gil", "DELETE", `/metas/${fechada?.id}?version=1`)).status).toBe(409);
+  });
+
   it("exige a Permission e só altera Metas de Período aberto", async () => {
     const { req, tipos } = await boot();
     const tipo = await tipos.criar(cmv);

@@ -2,14 +2,14 @@ import { COLABORADORES_SQL } from "./colaboradores-routes.js";
 import { META_TARGET, METAS_ACTIONS, METAS_PLUGIN } from "./metas-audit.js";
 import type { Meta, MetaStore } from "./metas-store.js";
 import { copiarMeta, pendentes, periodoAtualizadoPorUltimo, type ColaboradorAtivo } from "./montar-metas.js";
+import type { ErpQuery } from "./metas-comum.js";
 import type { PeriodoResumo } from "./pre-vencidos-routes.js";
-import type { ErpQueryClient } from "./server.js";
 import type { TipoMeta } from "./tipos-meta.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
 import type { AuditService } from "./vinculo-audit.js";
 
 export interface MetasDoPeriodoDeps {
-  erpClient: () => ErpQueryClient | undefined;
+  erpClient: () => ErpQuery | undefined;
   tipos: TipoMetaStore;
   metas: MetaStore;
   audit: AuditService;
