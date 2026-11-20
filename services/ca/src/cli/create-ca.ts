@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { linkSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
 import { DeviceCertificateAuthority } from "../authority.js";
@@ -9,6 +9,17 @@ export interface CreateCaFilesInput {
   commonName: string;
 }
 
+/** Grava `content` em `file` só se ele ainda não existe (EEXIST), sem nunca deixar o arquivo pela metade. */
+function publishNew(file: string, content: string, mode: number): void {
+  const temp = `${file}.${process.pid}.tmp`;
+  try {
+    writeFileSync(temp, content, { flag: "wx", mode });
+    linkSync(temp, file);
+  } finally {
+    rmSync(temp, { force: true });
+  }
+}
+
 /**
  * Cria a CA que emite os certificados dos Dispositivos e a grava em dois arquivos. A chave fica só para o dono
  * (0600) e nada é sobrescrito: perder a chave obriga a reemitir todos os certificados.
@@ -17,9 +28,16 @@ export async function createCaFiles({ certFile, keyFile, commonName }: CreateCaF
   const material = await DeviceCertificateAuthority.create({ commonName });
   try {
     for (const file of [certFile, keyFile]) mkdirSync(dirname(file), { recursive: true });
-    // `wx` falha se o arquivo já existe, então uma CA em uso nunca é trocada por engano.
-    writeFileSync(keyFile, material.privateKeyPem, { flag: "wx", mode: 0o600 });
-    writeFileSync(certFile, material.certificatePem, { flag: "wx", mode: 0o644 });
+    // Cada arquivo é escrito completo num temporário e publicado com `link`, que falha se o destino já existe: uma CA em
+    // uso nunca é trocada por engano. Se a publicação do certificado falha, a chave recém-publicada é desfeita, para não
+    // sobrar uma chave sem certificado (que o `wx` trataria como "a CA já existe").
+    publishNew(keyFile, material.privateKeyPem, 0o600);
+    try {
+      publishNew(certFile, material.certificatePem, 0o644);
+    } catch (err: unknown) {
+      rmSync(keyFile, { force: true });
+      throw err;
+    }
   } catch (err: unknown) {
     const failure = err as NodeJS.ErrnoException;
     if (failure.code === "EEXIST") {
