@@ -83,7 +83,7 @@ describe("sessões revogáveis", () => {
   it("a resposta de renovação não carrega o refresh token no corpo", async () => {
     const { app, login } = await setup();
     const res = await app.request("/api/auth/refresh", { method: "POST", headers: { Cookie: `refresh_token=${await login()}` } });
-    expect(await res.json()).toEqual({ accessToken: expect.any(String), expiresIn: 300, user: expect.objectContaining({ username: "alvo" }) });
+    expect(await res.json()).toEqual({ accessToken: expect.any(String), expiresIn: 300, idleSeconds: expect.any(Number), user: expect.objectContaining({ username: "alvo" }) });
   });
 
   it("ganhar ou perder o acesso de administrador revoga", async () => {

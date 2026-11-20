@@ -19,6 +19,9 @@ import { AuditLog } from "./audit/audit-log.js";
 import { MemoryAuditStore } from "./audit/audit-store.js";
 import { createAuditModule } from "./audit/audit-module.js";
 import { TokenService } from "./iam/token-service.js";
+import { SessionService } from "./iam/session-service.js";
+import { loadSessionPolicy, type SessionPolicy } from "./iam/session-policy.js";
+import { MemorySessionStore, type SessionStore } from "./iam/session-store.js";
 import { MemoryUserStore, type UserStore } from "./iam/user-store.js";
 import { unavailableCertificateAuthority, type CertificateAuthorityClient } from "./iam/certificate-authority-client.js";
 import { loadCertificateAuthorityClient } from "./boot/certificate-authority.js";
@@ -57,6 +60,12 @@ export interface CreatePlatformAppOptions {
   /** Autoridade certificadora dos Dispositivos. Sem ela, quem exige certificado não entra (falha fechado). */
   certificateAuthority?: CertificateAuthorityClient;
   tokenService?: TokenService;
+  /** Armazenamento dos refresh tokens; por padrão, em memória. */
+  sessionStore?: SessionStore;
+  /** Limites da sessão (tolerância de reuso, vida absoluta, inatividade); por padrão, os do env. */
+  sessionPolicy?: SessionPolicy;
+  /** Relógio em ms (injetável em testes). */
+  now?: () => number;
   closingPeriodStore?: ClosingPeriodStore;
   /** Audit Log do sistema; por padrão, em memória. */
   auditLog?: AuditLog;
@@ -97,6 +106,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   const userStore = options?.userStore || new MemoryUserStore();
   const certificateAuthority = options?.certificateAuthority ?? unavailableCertificateAuthority;
   const tokenService = options?.tokenService || new TokenService();
+  const sessions = new SessionService(options?.sessionStore ?? new MemorySessionStore(), options?.sessionPolicy ?? loadSessionPolicy(), options?.now);
   const closingPeriodStore = options?.closingPeriodStore || new MemoryClosingPeriodStore();
 
   // Registro de Permissions preenchido pelo Core ao carregar os Modules (inclui Plugins extras).
@@ -118,7 +128,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
   // Base System: iam e audit. Plugins: closing_period e erp (ADR 0003). Todos compartilham o registro de Permissions.
   const auditLog = options?.auditLog ?? new AuditLog(new MemoryAuditStore());
   const entries: ModuleEntry[] = [
-    { tier: "base", def: createIamModule({ userStore, certificateAuthority, auditLog, extraPermissions: NON_IAM_PERMISSIONS, tokenService, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
+    { tier: "base", def: createIamModule({ userStore, certificateAuthority, auditLog, extraPermissions: NON_IAM_PERMISSIONS, tokenService, sessions, auth, withAdminBypass, loginRateLimiter: options?.loginRateLimiter }) },
     { tier: "base", def: createAuditModule({ auditLog, auth }) },
     { tier: "plugin", def: createClosingPeriodModule({ store: closingPeriodStore, auditLog, auth }) },
     {
@@ -180,6 +190,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     const certificateAuthority = loadCertificateAuthorityClient();
     assertEncryptionKey();
     let userStore: UserStore | undefined;
+    let sessionStore: SessionStore | undefined;
     const erpClients = Object.create(null) as ErpClientRegistry;
     let erpStore: ErpStore | undefined;
     let closingPeriodStore: ClosingPeriodStore | undefined;
@@ -194,6 +205,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       ]);
       pluginDb = db;
       userStore = new PostgresUserStore(db);
+      sessionStore = new (await import("./iam/postgres-session-store.js")).PostgresSessionStore(db);
       erpStore = new PostgresErpStore(db);
       closingPeriodStore = new PostgresClosingPeriodStore(db);
       const { PostgresAuditStore } = await import("./audit/postgres-audit-store.js");
@@ -211,6 +223,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
 
     const platform = createPlatform({
       userStore,
+      sessionStore,
       certificateAuthority,
       erpStore, closingPeriodStore,
       erpClients,

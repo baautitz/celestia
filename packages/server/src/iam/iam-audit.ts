@@ -54,4 +54,12 @@ export function declareIamAudit(auditLog: AuditLog): void {
     z.object({ username: z.string(), allowWithoutCertificate: z.boolean() }),
     (a) => `${a.allowWithoutCertificate ? "Permitiu" : "Deixou de permitir"} o acesso sem certificado de "${a.username}".`,
   );
+  declare("lock_session", z.object({ username: z.string() }), (a) => `Bloqueou a sessão de "${a.username}" por inatividade.`);
+  declare("unlock_session", z.object({ username: z.string() }), (a) => `Desbloqueou a sessão de "${a.username}" com a senha.`);
+  declare(
+    "detect_session_reuse",
+    z.object({ username: z.string() }),
+    (a) => `Detectou o reuso de um token de renovação de "${a.username}" e encerrou a sessão.`,
+  );
+  declare("logout", z.object({ username: z.string() }), (a) => `Encerrou a sessão de "${a.username}".`);
 }

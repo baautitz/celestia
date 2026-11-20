@@ -5,6 +5,9 @@ import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { loadModules } from "@platform/core/loader";
 import { createIamModule } from "../src/iam/iam-module.js";
+import { SessionService } from "../src/iam/session-service.js";
+import { DEFAULT_SESSION_POLICY } from "../src/iam/session-policy.js";
+import { MemorySessionStore } from "../src/iam/session-store.js";
 import { IAM_PERMISSIONS } from "../src/iam/iam-permissions.js";
 import { TokenService } from "../src/iam/token-service.js";
 import { createAuthMiddleware } from "../src/iam/middleware.js";
@@ -20,6 +23,7 @@ async function boot() {
     certificateAuthority: unavailableCertificateAuthority,
     auditLog: new AuditLog(new MemoryAuditStore()),
     tokenService,
+    sessions: new SessionService(new MemorySessionStore(), DEFAULT_SESSION_POLICY),
     auth: createAuthMiddleware(tokenService, (p) => p),
     withAdminBypass: (p) => p,
   });
@@ -65,6 +69,7 @@ describe("catálogo agrupado por Module", () => {
       auditLog: new AuditLog(new MemoryAuditStore()),
       extraPermissions: [{ key: "pharmacy:audit:run", label: "Auditar", module: "pharmacy" }],
       tokenService,
+      sessions: new SessionService(new MemorySessionStore(), DEFAULT_SESSION_POLICY),
       auth: createAuthMiddleware(tokenService, (p) => p),
       withAdminBypass: (p) => p,
     });

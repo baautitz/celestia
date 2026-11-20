@@ -46,7 +46,7 @@ function ManagedWindow({ entry, controller }: {
   const body = Content ? <Content /> : null
   // `open` é sempre true: o controller remove a entrada ao liquidar.
   const onOpenChange = (open: boolean, details: { reason: string }) => {
-    if (open) return
+    if (open || options.dismissible === false) return
     const reason: DismissRequestReason =
       details.reason === "escape-key" ? "escape" : details.reason === "outside-press" ? "outside" : "cancel"
     controller.requestDismiss(id, reason)
@@ -95,7 +95,7 @@ function ManagedWindow({ entry, controller }: {
                 <DialogFooter ref={setFooter} className="p-4 border-t shrink-0 gap-2 empty:hidden" />
               </DialogContent>
             ) : (
-              <DialogContent className={DIALOG_WIDTH[options.size ?? "medium"]}>
+              <DialogContent className={DIALOG_WIDTH[options.size ?? "medium"]} showCloseButton={options.dismissible !== false}>
                 <DialogHeader>
                   <DialogTitle>{title}</DialogTitle>
                   {options.description && <DialogDescription>{options.description}</DialogDescription>}

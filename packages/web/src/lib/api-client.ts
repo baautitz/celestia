@@ -17,12 +17,113 @@ import type {
   IssuedDevice,
 } from "@platform/shared";
 
-class ApiClient {
+export class ApiClient {
   private accessToken: string | null = null;
   private refreshPromise: Promise<string | null> | null = null;
   private sessionExpiredHandler: (() => void) | null = null;
   // Evita avisar mais de uma vez por sessão encerrada, mesmo com várias requisições falhando em sequência.
   private sessionExpiredNotified = false;
+
+  // ─── Bloqueio por inatividade ───────────────────────────────────────────
+  // Bloqueado, o access token sai da memória e nenhuma requisição sai: elas esperam a senha e depois seguem com o token novo.
+  private locked = false;
+  private lockWaiters: Array<(token: string | null) => void> = [];
+  private lockHandler: ((locked: boolean) => void) | null = null;
+  private idleSeconds: number | null = null;
+  /** Quem está logado (ou bloqueado): a janela de senha mostra o nome. */
+  private knownUser: { fullname: string; username: string } | null = null;
+  private inFlight = 0;
+  /** Avisa as outras abas do mesmo navegador: elas compartilham o cookie, logo a sessão e o bloqueio. */
+  private channel: BroadcastChannel | null = null;
+
+  constructor() {
+    if (typeof BroadcastChannel === "undefined") return;
+    this.channel = new BroadcastChannel("celestia-session");
+    this.channel.onmessage = (event: MessageEvent<string>) => {
+      if (event.data === "lock") this.enterLock(false);
+      else if (event.data === "unlock") void this.unlockedElsewhere();
+    };
+  }
+
+  /** Quem muda o estado de bloqueio (a UI mostra ou esconde a janela de senha). */
+  onLockChange(handler: ((locked: boolean) => void) | null) {
+    this.lockHandler = handler;
+  }
+
+  isLocked(): boolean {
+    return this.locked;
+  }
+
+  /** Segundos de inatividade que o servidor manda bloquear; `null` antes do primeiro login. */
+  getIdleSeconds(): number | null {
+    return this.idleSeconds;
+  }
+
+  getKnownUser(): { fullname: string; username: string } | null {
+    return this.knownUser;
+  }
+
+  /** Há requisição em andamento: o bloqueio espera ela terminar. */
+  isBusy(): boolean {
+    return this.inFlight > 0;
+  }
+
+  /** Bloqueia a sessão e descarta o access token da memória. */
+  lock() {
+    this.enterLock(true);
+  }
+
+  private enterLock(broadcast: boolean) {
+    if (this.locked) return;
+    this.locked = true;
+    this.accessToken = null;
+    this.lockHandler?.(true);
+    if (!broadcast) return;
+    this.channel?.postMessage("lock");
+    // O servidor passa a ser a autoridade: sem o aviso, recarregar a página renovaria o token e destravaria a tela.
+    // Sem rede o bloqueio local segue de pé, e o servidor ainda o impõe pelo tempo parado.
+    void fetch("/api/auth/lock", { method: "POST", credentials: "include" }).catch(() => undefined);
+  }
+
+  private waitForUnlock(): Promise<string | null> {
+    return new Promise((resolve) => this.lockWaiters.push(resolve));
+  }
+
+  private releaseLock(token: string | null) {
+    this.locked = false;
+    const waiters = this.lockWaiters;
+    this.lockWaiters = [];
+    for (const resolve of waiters) resolve(token);
+    this.lockHandler?.(false);
+  }
+
+  /** Outra aba desbloqueou: o cookie já tem o token novo, basta renovar o access token daqui. */
+  private async unlockedElsewhere() {
+    if (!this.locked) return;
+    try {
+      const res = await fetch("/api/auth/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", credentials: "include" });
+      if (res.ok) {
+        const data = (await res.json()) as AuthTokens;
+        this.acceptTokens(data);
+        this.releaseLock(data.accessToken);
+        return;
+      }
+    } catch {
+      // Sem rede: continua bloqueada até a senha ser digitada aqui.
+      return;
+    }
+    this.expireSession();
+  }
+
+  private expireSession() {
+    this.setAccessToken(null);
+    this.knownUser = null;
+    if (this.locked) this.releaseLock(null);
+    if (!this.sessionExpiredNotified) {
+      this.sessionExpiredNotified = true;
+      this.sessionExpiredHandler?.();
+    }
+  }
 
   setAccessToken(token: string | null) {
     this.accessToken = token;
@@ -42,6 +143,18 @@ class ApiClient {
    * Executa requisição HTTP autenticada com suporte a renovação silenciosa de JWT (5 min).
    */
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    this.inFlight += 1;
+    try {
+      return await this.send<T>(path, options);
+    } finally {
+      this.inFlight -= 1;
+    }
+  }
+
+  private async send<T>(path: string, options: RequestInit): Promise<T> {
+    // Bloqueada, a requisição não sai: espera a senha e segue com o token novo (ou falha se o usuário sair).
+    if (this.locked && !(await this.waitForUnlock())) throw new Error("Sessão encerrada.");
+
     const headers = new Headers(options.headers || {});
     headers.set("Content-Type", "application/json");
 
@@ -93,19 +206,21 @@ class ApiClient {
         });
 
         if (!res.ok) {
+          // Sessão ociosa: pede a senha em vez de encerrar, e a requisição espera o desbloqueio.
+          const refused = res.status === 401 ? ((await res.clone().json().catch(() => null)) as { code?: string; user?: { fullname: string; username: string } } | null) : null;
+          if (refused?.code === "session_locked") {
+            if (refused.user) this.knownUser = refused.user;
+            this.enterLock(true);
+            return this.waitForUnlock();
+          }
           // Uma renovação recusada que chega depois de um login (ex.: a restauração da sessão ao abrir a página, sem
           // cookie) não pode apagar a sessão nova nem avisar que ela acabou.
           if (this.accessToken !== tokenAtStart) return this.accessToken;
-          this.setAccessToken(null);
-          if (!this.sessionExpiredNotified) {
-            this.sessionExpiredNotified = true;
-            this.sessionExpiredHandler?.();
-          }
+          this.expireSession();
           return null;
         }
 
-        const data = (await res.json()) as AuthTokens;
-        this.setAccessToken(data.accessToken);
+        const data = this.acceptTokens((await res.json()) as AuthTokens);
         return data.accessToken;
       } finally {
         this.refreshPromise = null;
@@ -117,6 +232,8 @@ class ApiClient {
 
   private acceptTokens(tokens: AuthTokens): AuthTokens {
     this.setAccessToken(tokens.accessToken);
+    this.idleSeconds = tokens.idleSeconds ?? this.idleSeconds;
+    if (tokens.user) this.knownUser = { fullname: tokens.user.fullname, username: tokens.user.username };
     return tokens;
   }
 
@@ -145,11 +262,35 @@ class ApiClient {
       return this.request<JWTAccessPayload>("/api/auth/me");
     },
 
+    /** Desbloqueia a sessão ociosa com a senha do próprio usuário; senha errada mantém o bloqueio. */
+    unlock: async (password: string): Promise<AuthTokens> => {
+      const res = await fetch("/api/auth/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const error = await parseApiError(res);
+        // A sessão em si acabou (limite absoluto, tentativas esgotadas, revogada): volta ao login. Senha errada fica.
+        if (res.status === 401 && error.message !== "Credenciais inválidas.") this.expireSession();
+        throw error;
+      }
+      const tokens = this.acceptTokens((await res.json()) as AuthTokens);
+      this.releaseLock(tokens.accessToken);
+      this.channel?.postMessage("unlock");
+      return tokens;
+    },
+
     logout: async (): Promise<void> => {
       try {
-        await this.request("/api/auth/logout", { method: "POST" });
+        // Bloqueada a requisição esperaria a senha: o logout sai direto, pelo cookie.
+        if (this.locked) await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        else await this.request("/api/auth/logout", { method: "POST" });
       } finally {
         this.setAccessToken(null);
+        if (this.locked) this.releaseLock(null);
+        this.channel?.postMessage("unlock");
       }
     },
   };

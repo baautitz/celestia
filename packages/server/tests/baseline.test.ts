@@ -22,6 +22,8 @@ const results: Record<string, Recorded> = {};
 const normalize = (s: string): string =>
   s
     .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "<token>")
+    // Refresh token opaco (32 bytes em base64url): só o valor do cookie, sem mexer nos demais atributos.
+    .replace(/refresh_token=[A-Za-z0-9_-]{43}/g, "refresh_token=<token>")
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<uuid>")
     .replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z/g, "<ts>");
 

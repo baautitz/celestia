@@ -21,6 +21,8 @@ export interface OpenWindowOptions<TContent = unknown> {
   surface?: WindowSurface
   size?: WindowSize
   content?: TContent
+  /** `false`: sem botão X e sem fechar por Esc ou clique fora; só o conteúdo a resolve (p.ex. um bloqueio que pede a senha). */
+  dismissible?: boolean
 }
 
 export interface ConfirmOptions {

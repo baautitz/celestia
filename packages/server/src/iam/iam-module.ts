@@ -12,6 +12,8 @@ import { IAM_PERMISSIONS } from "./iam-permissions.js";
 import { getAuthenticatedUser, requireAdmin, requirePermission } from "./middleware.js";
 import { hasPermission } from "./has-permission.js";
 import { TokenService } from "./token-service.js";
+import type { SessionService } from "./session-service.js";
+import type { SessionRecord } from "./session-store.js";
 import { ConflictError, NotFoundError, RoleNotFoundError, UserNotFoundError, type UserStore } from "./user-store.js";
 import {
   CertificateAuthorityUnavailableError,
@@ -33,6 +35,8 @@ export interface IamModuleDeps {
   /** Permissões `system:*` de áreas ainda não modularizadas, registradas no catálogo junto das do iam. */
   extraPermissions?: readonly PermissionItem[];
   tokenService: TokenService;
+  /** Refresh tokens opacos: rotação a cada uso e detecção de reuso. */
+  sessions: SessionService;
   auth: MiddlewareHandler;
   withAdminBypass: (payload: JWTAccessPayload) => JWTAccessPayload;
   /** Autoridade certificadora: dona dos Dispositivos e do certificado que cada um apresenta. */
@@ -50,7 +54,6 @@ function getDummyHash(): string {
 }
 
 const REFRESH_COOKIE = "refresh_token";
-const REFRESH_TTL_SECONDS = 7 * 24 * 3600;
 /** Cookie do Desafio de Certificado: só vale entre a senha e a volta da CA. */
 const LOGIN_CHALLENGE_COOKIE = "login_challenge";
 
@@ -58,16 +61,17 @@ const LOGIN_CHALLENGE_COOKIE = "login_challenge";
  * Opções dos cookies de autenticação, as mesmas para gravar e para apagar (o navegador só remove o cookie
  * quando path e `Secure` coincidem). `Secure` em produção (HTTPS); fora dela o cookie precisa funcionar em http://localhost.
  */
-const cookieOptions = (maxAge: number): CookieOptions => ({
+const cookieOptions = (maxAge?: number): CookieOptions => ({
   path: "/api/auth",
   httpOnly: true,
   sameSite: "Lax",
-  maxAge,
+  ...(maxAge === undefined ? {} : { maxAge }),
   secure: process.env.NODE_ENV === "production",
 });
 
 const ADMIN_TARGET_ONLY = "Somente administradores podem inativar outro administrador.";
 const CERTIFICATE_REQUIRED = "Dispositivo não autorizado.";
+const SESSION_LOCKED = "Sessão bloqueada por inatividade.";
 const CERTIFICATE_EXEMPTION_ADMIN_ONLY = "Somente administradores podem alterar o acesso sem certificado.";
 const WILDCARD_ADMIN_ONLY = "Somente administradores podem conceder acesso total (*) a um grupo de acesso.";
 
@@ -84,6 +88,7 @@ export function createIamModule({
   auditLog,
   extraPermissions = [],
   tokenService,
+  sessions,
   auth,
   withAdminBypass,
   loginRateLimiter = new LoginRateLimiter(),
@@ -105,6 +110,11 @@ export function createIamModule({
       const P = IAM_PERMISSIONS.keys;
       const recordIamAudit = (actor: { id: string; name: string }, action: string, target: { type: string; id: string }, attributes: Record<string, unknown>, device?: { id: string; name: string }) =>
         auditLog.record({ plugin: IAM_AUDIT_PLUGIN, action, actor, target, attributes, device });
+      /** Audita um evento da sessão em nome do dono dela (o endpoint é chamado só com o cookie, sem Access Token). */
+      const auditSession = async (userId: string, action: string) => {
+        const owner = await userStore.findById(userId);
+        if (owner) await recordIamAudit({ id: owner.id, name: owner.fullname }, action, { type: USER_AUDIT_TARGET, id: owner.id }, { username: owner.username });
+      };
       const requestActor = (c: Context) => {
         const caller = getAuthenticatedUser(c);
         return { id: caller.sub, name: caller.fullname };
@@ -115,7 +125,7 @@ export function createIamModule({
         const role = await userStore.getRole(user.roleId);
         const ran = await events.run("iam.login", { userId: user.id, username: user.username }, async () => {
           const access = await tokenService.generateAccessToken(user, role || undefined, usedDevice);
-          const refresh = await tokenService.generateRefreshToken(user, usedDevice?.id);
+          const refresh = await sessions.open(user, usedDevice?.id);
           return { accessToken: access.token, refreshToken: refresh.token, payload: access.payload };
         });
         if (ran.cancelled) return cancelled(c, ran.reason);
@@ -127,9 +137,9 @@ export function createIamModule({
         }
 
         // O refresh token vive só no cookie HttpOnly: o corpo da resposta nunca o carrega.
-        setCookie(c, REFRESH_COOKIE, refreshToken, cookieOptions(REFRESH_TTL_SECONDS));
+        setCookie(c, REFRESH_COOKIE, refreshToken, cookieOptions());
 
-        const body: AuthTokens = { accessToken, expiresIn: tokenService.accessTtlSeconds, user: withAdminBypass(payload) };
+        const body: AuthTokens = { accessToken, expiresIn: tokenService.accessTtlSeconds, idleSeconds: sessions.idleSeconds, user: withAdminBypass(payload) };
         return c.json(body);
       };
 
@@ -200,73 +210,110 @@ export function createIamModule({
         },
       );
 
+      /**
+       * Renova a sessão do refresh token já conferido: reavalia o usuário e o Dispositivo, rotaciona o token e devolve
+       * um Access Token novo. Serve à renovação silenciosa e ao desbloqueio com a senha.
+       */
+      const renewSession = async (c: Context, session: SessionRecord) => {
+        try {
+          const user = await userStore.findById(session.userId);
+
+          if (!user || user.status === "inactive" || (user.sessionVersion ?? 0) !== session.userSessionVersion) {
+            return c.json({ error: "Usuário não encontrado ou inativo." }, 401);
+          }
+
+          // A sessão continua enquanto o Dispositivo que a abriu seguir ativo; o certificado não é pedido de novo.
+          // Quem exige certificado e tem uma sessão sem Dispositivo não renova (falha fechado). Quem tem a opção de
+          // acesso sem certificado não depende do Dispositivo: revogado, a sessão segue sem ele; com a CA fora do
+          // ar, renova sem o nome dele e o tenta de novo na próxima renovação.
+          let sessionDevice: { id: string; name: string } | undefined;
+          let sessionDeviceId = session.deviceId;
+          if (sessionDeviceId) {
+            let device: Awaited<ReturnType<CertificateAuthorityClient["getDevice"]>> | undefined;
+            try {
+              device = await certificateAuthority.getDevice(sessionDeviceId);
+            } catch (err: unknown) {
+              if (!(err instanceof CertificateAuthorityUnavailableError) || !user.allowWithoutCertificate) throw err;
+            }
+            if (device?.status === "active") sessionDevice = { id: device.id, name: device.name };
+            else if (!user.allowWithoutCertificate) return c.json({ error: CERTIFICATE_REQUIRED }, 401);
+            else if (device !== undefined) sessionDeviceId = undefined;
+          } else if (!user.allowWithoutCertificate) {
+            return c.json({ error: CERTIFICATE_REQUIRED }, 401);
+          }
+
+          const role = await userStore.getRole(user.roleId);
+          const { token: newAccessToken, payload: userPayload } = await tokenService.generateAccessToken(user, role || undefined, sessionDevice);
+          const { token: newRefreshToken } = await sessions.next(session, sessionDeviceId);
+
+          setCookie(c, REFRESH_COOKIE, newRefreshToken, cookieOptions());
+
+          const body: AuthTokens = { accessToken: newAccessToken, expiresIn: tokenService.accessTtlSeconds, idleSeconds: sessions.idleSeconds, user: withAdminBypass(userPayload) };
+          return c.json(body);
+        } catch (err: unknown) {
+          // Com a CA fora do ar, quem exige certificado não renova (falha fechado), mas sem confundir com token inválido.
+          if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
+          return c.json({ error: "Refresh token inválido ou expirado." }, 401);
+        }
+      };
+
       // Silent refresh via cookie HttpOnly
-      routes.post(
-        "/auth/refresh",
-        async (c) => {
-          const refreshToken = getCookie(c, REFRESH_COOKIE);
+      routes.post("/auth/refresh", async (c) => {
+        const refreshToken = getCookie(c, REFRESH_COOKIE);
+        if (!refreshToken) return c.json({ error: "Refresh token não fornecido." }, 401);
+        const checked = await sessions.check(refreshToken);
+        // Sessão ociosa: o cliente pede a senha por cima da tela em vez de mandar de volta ao login.
+        if (!checked.ok && checked.reason === "locked") {
+          const owner = await userStore.findById(checked.record.userId);
+          return c.json({ error: SESSION_LOCKED, code: "session_locked", ...(owner ? { user: { fullname: owner.fullname, username: owner.username } } : {}) }, 401);
+        }
+        if (!checked.ok && checked.reason === "reuse") await auditSession(checked.record.userId, "detect_session_reuse");
+        if (!checked.ok) return c.json({ error: "Refresh token inválido ou expirado." }, 401);
+        return renewSession(c, checked.record);
+      });
 
-          if (!refreshToken) {
-            return c.json({ error: "Refresh token não fornecido." }, 401);
-          }
+      // O cliente ficou ocioso e bloqueou a tela: a sessão passa a recusar renovar (inclusive depois de recarregar a página).
+      routes.post("/auth/lock", async (c) => {
+        const refreshToken = getCookie(c, REFRESH_COOKIE);
+        const locked = refreshToken ? await sessions.lock(refreshToken) : undefined;
+        if (!locked) return c.json({ error: "Refresh token inválido ou expirado." }, 401);
+        await auditSession(locked.userId, "lock_session");
+        return c.json({ success: true });
+      });
 
-          try {
-            const refreshPayload = await tokenService.verifyRefreshToken(refreshToken);
-            const user = await userStore.findById(refreshPayload.sub);
-
-            if (!user || user.status === "inactive" || (user.sessionVersion ?? 0) !== refreshPayload.ver) {
-              return c.json({ error: "Usuário não encontrado ou inativo." }, 401);
-            }
-
-            // A sessão continua enquanto o Dispositivo que a abriu seguir ativo; o certificado não é pedido de novo.
-            // Quem exige certificado e tem uma sessão sem Dispositivo não renova (falha fechado). Quem tem a opção de
-            // acesso sem certificado não depende do Dispositivo: revogado, a sessão segue sem ele; com a CA fora do
-            // ar, renova sem o nome dele e o tenta de novo na próxima renovação.
-            let sessionDevice: { id: string; name: string } | undefined;
-            let sessionDeviceId = refreshPayload.deviceId;
-            if (sessionDeviceId) {
-              let device: Awaited<ReturnType<CertificateAuthorityClient["getDevice"]>> | undefined;
-              try {
-                device = await certificateAuthority.getDevice(sessionDeviceId);
-              } catch (err: unknown) {
-                if (!(err instanceof CertificateAuthorityUnavailableError) || !user.allowWithoutCertificate) throw err;
-              }
-              if (device?.status === "active") sessionDevice = { id: device.id, name: device.name };
-              else if (!user.allowWithoutCertificate) return c.json({ error: CERTIFICATE_REQUIRED }, 401);
-              else if (device !== undefined) sessionDeviceId = undefined;
-            } else if (!user.allowWithoutCertificate) {
-              return c.json({ error: CERTIFICATE_REQUIRED }, 401);
-            }
-
-            const role = await userStore.getRole(user.roleId);
-            const { token: newAccessToken, payload: userPayload } = await tokenService.generateAccessToken(
-              user,
-              role || undefined,
-              sessionDevice,
-            );
-            const { token: newRefreshToken } = await tokenService.generateRefreshToken(user, sessionDeviceId);
-
-            setCookie(c, REFRESH_COOKIE, newRefreshToken, cookieOptions(REFRESH_TTL_SECONDS));
-
-            const body: AuthTokens = { accessToken: newAccessToken, expiresIn: tokenService.accessTtlSeconds, user: withAdminBypass(userPayload) };
-            return c.json(body);
-          } catch (err: unknown) {
-            // Com a CA fora do ar, quem exige certificado não renova (falha fechado), mas sem confundir com token inválido.
-            if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
-            return c.json({ error: "Refresh token inválido ou expirado." }, 401);
-          }
-        },
-      );
+      // Desbloqueio: a sessão ociosa volta com a senha do próprio usuário, sem novo login nem perda do trabalho aberto.
+      routes.post("/auth/unlock", zValidator("json", z.object({ password: z.string() })), async (c) => {
+        const refreshToken = getCookie(c, REFRESH_COOKIE);
+        if (!refreshToken) return c.json({ error: "Refresh token não fornecido." }, 401);
+        const checked = await sessions.check(refreshToken, { allowLocked: true });
+        if (!checked.ok) return c.json({ error: "Refresh token inválido ou expirado." }, 401);
+        const user = await userStore.findById(checked.record.userId);
+        if (!user || user.status === "inactive" || (user.sessionVersion ?? 0) !== checked.record.userSessionVersion) {
+          return c.json({ error: "Usuário não encontrado ou inativo." }, 401);
+        }
+        const retryAfter = loginRateLimiter.retryAfterSeconds(user.username);
+        if (retryAfter > 0) {
+          c.header("Retry-After", String(retryAfter));
+          return c.json({ error: "Muitas tentativas de login. Tente novamente mais tarde." }, 429);
+        }
+        if (!PasswordService.verify(c.req.valid("json").password, user.passwordHash ?? getDummyHash())) {
+          loginRateLimiter.recordFailure(user.username);
+          // Estourou o limite: a sessão cai e o usuário volta ao login.
+          if (loginRateLimiter.retryAfterSeconds(user.username) > 0) await sessions.revoke(refreshToken);
+          return c.json({ error: "Credenciais inválidas." }, 401);
+        }
+        loginRateLimiter.recordSuccess(user.username);
+        const renewed = await renewSession(c, checked.record);
+        if (renewed.status === 200) await auditSession(user.id, "unlock_session");
+        return renewed;
+      });
 
       routes.post("/auth/logout", async (c) => {
         const refreshToken = getCookie(c, REFRESH_COOKIE);
         if (refreshToken) {
-          try {
-            const { sub } = await tokenService.verifyRefreshToken(refreshToken);
-            await userStore.revokeSessions(sub);
-          } catch {
-            // Token inválido ou expirado: não há sessão a revogar; o logout segue limpando o cookie.
-          }
+          // Revoga só a sessão deste navegador; token desconhecido ou expirado não há o que revogar.
+          const ended = await sessions.revoke(refreshToken);
+          if (ended) await auditSession(ended.userId, "logout");
         }
         deleteCookie(c, REFRESH_COOKIE, cookieOptions(0));
         return c.json({ success: true, message: "Sessão encerrada com sucesso." });
