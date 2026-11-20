@@ -68,15 +68,12 @@
         "issues": [
           {
             "code": "invalid_type",
-            "expected": "string",
-            "received": "undefined",
+            "message": "Invalid input: expected string, received undefined",
             "path": [
               "password"
-            ],
-            "message": "Required"
+            ]
           }
-        ],
-        "name": "ZodError"
+        ]
       }
     }
   },
@@ -1179,39 +1176,34 @@
       "error": {
         "issues": [
           {
-            "validation": "regex",
-            "code": "invalid_string",
+            "code": "invalid_format",
             "message": "A senha deve conter no mínimo 8 caracteres.",
             "path": [
               "password"
             ]
           },
           {
-            "validation": "regex",
-            "code": "invalid_string",
+            "code": "invalid_format",
             "message": "A senha deve conter ao menos uma letra maiúscula.",
             "path": [
               "password"
             ]
           },
           {
-            "validation": "regex",
-            "code": "invalid_string",
+            "code": "invalid_format",
             "message": "A senha deve conter ao menos um número.",
             "path": [
               "password"
             ]
           },
           {
-            "validation": "regex",
-            "code": "invalid_string",
+            "code": "invalid_format",
             "message": "A senha deve conter ao menos um caractere especial (!@#$%^&*...).",
             "path": [
               "password"
             ]
           }
-        ],
-        "name": "ZodError"
+        ]
       }
     }
   },
@@ -1223,17 +1215,12 @@
         "issues": [
           {
             "code": "too_small",
-            "minimum": 3,
-            "type": "string",
-            "inclusive": true,
-            "exact": false,
-            "message": "String must contain at least 3 character(s)",
+            "message": "Too small: expected string to have >=3 characters",
             "path": [
               "username"
             ]
           }
-        ],
-        "name": "ZodError"
+        ]
       }
     }
   },
@@ -1309,19 +1296,13 @@
       "error": {
         "issues": [
           {
-            "received": "foo",
-            "code": "invalid_enum_value",
-            "options": [
-              "active",
-              "inactive"
-            ],
+            "code": "invalid_value",
+            "message": "Invalid option: expected one of \"active\"|\"inactive\"",
             "path": [
               "status"
-            ],
-            "message": "Invalid enum value. Expected 'active' | 'inactive', received 'foo'"
+            ]
           }
-        ],
-        "name": "ZodError"
+        ]
       }
     }
   },
@@ -1380,39 +1361,34 @@
       "error": {
         "issues": [
           {
-            "validation": "regex",
-            "code": "invalid_string",
+            "code": "invalid_format",
             "message": "A senha deve conter no mínimo 8 caracteres.",
             "path": [
               "newPassword"
             ]
           },
           {
-            "validation": "regex",
-            "code": "invalid_string",
+            "code": "invalid_format",
             "message": "A senha deve conter ao menos uma letra maiúscula.",
             "path": [
               "newPassword"
             ]
           },
           {
-            "validation": "regex",
-            "code": "invalid_string",
+            "code": "invalid_format",
             "message": "A senha deve conter ao menos um número.",
             "path": [
               "newPassword"
             ]
           },
           {
-            "validation": "regex",
-            "code": "invalid_string",
+            "code": "invalid_format",
             "message": "A senha deve conter ao menos um caractere especial (!@#$%^&*...).",
             "path": [
               "newPassword"
             ]
           }
-        ],
-        "name": "ZodError"
+        ]
       }
     }
   },
@@ -1556,17 +1532,12 @@
         "issues": [
           {
             "code": "too_small",
-            "minimum": 2,
-            "type": "string",
-            "inclusive": true,
-            "exact": false,
-            "message": "String must contain at least 2 character(s)",
+            "message": "Too small: expected string to have >=2 characters",
             "path": [
               "id"
             ]
           }
-        ],
-        "name": "ZodError"
+        ]
       }
     }
   },
@@ -1769,8 +1740,7 @@
               "endDate"
             ]
           }
-        ],
-        "name": "ZodError"
+        ]
       }
     }
   },
@@ -1782,24 +1752,19 @@
         "issues": [
           {
             "code": "invalid_type",
-            "expected": "string",
-            "received": "undefined",
+            "message": "Invalid input: expected string, received undefined",
             "path": [
               "startDate"
-            ],
-            "message": "Required"
+            ]
           },
           {
             "code": "invalid_type",
-            "expected": "string",
-            "received": "undefined",
+            "message": "Invalid input: expected string, received undefined",
             "path": [
               "endDate"
-            ],
-            "message": "Required"
+            ]
           }
-        ],
-        "name": "ZodError"
+        ]
       }
     }
   },
@@ -2107,35 +2072,26 @@
         "issues": [
           {
             "code": "too_small",
-            "minimum": 1,
-            "type": "string",
-            "inclusive": true,
-            "exact": false,
-            "message": "String must contain at least 1 character(s)",
+            "message": "Too small: expected string to have >=1 characters",
             "path": [
               "name"
             ]
           },
           {
             "code": "invalid_type",
-            "expected": "string",
-            "received": "undefined",
+            "message": "Invalid input: expected string, received undefined",
             "path": [
               "driver"
-            ],
-            "message": "Required"
+            ]
           },
           {
             "code": "invalid_type",
-            "expected": "object",
-            "received": "undefined",
+            "message": "Invalid input: expected record, received undefined",
             "path": [
               "values"
-            ],
-            "message": "Required"
+            ]
           }
-        ],
-        "name": "ZodError"
+        ]
       }
     }
   },
