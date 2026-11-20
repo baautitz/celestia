@@ -63,15 +63,13 @@
   "auth.login.invalid_body": {
     "status": 400,
     "body": {
-      "success": false,
       "error": {
         "issues": [
           {
-            "code": "invalid_type",
-            "message": "Invalid input: expected string, received undefined",
             "path": [
               "password"
-            ]
+            ],
+            "message": "Entrada inválida: esperava um texto, recebeu um valor \"undefined\""
           }
         ]
       }
@@ -1172,36 +1170,31 @@
   "iam.users.create.400_weak_password": {
     "status": 400,
     "body": {
-      "success": false,
       "error": {
         "issues": [
           {
-            "code": "invalid_format",
-            "message": "A senha deve conter no mínimo 8 caracteres.",
             "path": [
               "password"
-            ]
+            ],
+            "message": "A senha deve conter no mínimo 8 caracteres."
           },
           {
-            "code": "invalid_format",
-            "message": "A senha deve conter ao menos uma letra maiúscula.",
             "path": [
               "password"
-            ]
+            ],
+            "message": "A senha deve conter ao menos uma letra maiúscula."
           },
           {
-            "code": "invalid_format",
-            "message": "A senha deve conter ao menos um número.",
             "path": [
               "password"
-            ]
+            ],
+            "message": "A senha deve conter ao menos um número."
           },
           {
-            "code": "invalid_format",
-            "message": "A senha deve conter ao menos um caractere especial (!@#$%^&*...).",
             "path": [
               "password"
-            ]
+            ],
+            "message": "A senha deve conter ao menos um caractere especial (!@#$%^&*...)."
           }
         ]
       }
@@ -1210,15 +1203,13 @@
   "iam.users.create.400_short_username": {
     "status": 400,
     "body": {
-      "success": false,
       "error": {
         "issues": [
           {
-            "code": "too_small",
-            "message": "Too small: expected string to have >=3 characters",
             "path": [
               "username"
-            ]
+            ],
+            "message": "Pequeno demais: esperava que o texto tivesse >= 3 caracteres"
           }
         ]
       }
@@ -1292,15 +1283,13 @@
   "iam.users.update.400_invalid_status": {
     "status": 400,
     "body": {
-      "success": false,
       "error": {
         "issues": [
           {
-            "code": "invalid_value",
-            "message": "Invalid option: expected one of \"active\"|\"inactive\"",
             "path": [
               "status"
-            ]
+            ],
+            "message": "Opção inválida: esperava uma das seguintes opções: \"active\"|\"inactive\""
           }
         ]
       }
@@ -1357,36 +1346,31 @@
   "iam.users.reset.400_weak": {
     "status": 400,
     "body": {
-      "success": false,
       "error": {
         "issues": [
           {
-            "code": "invalid_format",
-            "message": "A senha deve conter no mínimo 8 caracteres.",
             "path": [
               "newPassword"
-            ]
+            ],
+            "message": "A senha deve conter no mínimo 8 caracteres."
           },
           {
-            "code": "invalid_format",
-            "message": "A senha deve conter ao menos uma letra maiúscula.",
             "path": [
               "newPassword"
-            ]
+            ],
+            "message": "A senha deve conter ao menos uma letra maiúscula."
           },
           {
-            "code": "invalid_format",
-            "message": "A senha deve conter ao menos um número.",
             "path": [
               "newPassword"
-            ]
+            ],
+            "message": "A senha deve conter ao menos um número."
           },
           {
-            "code": "invalid_format",
-            "message": "A senha deve conter ao menos um caractere especial (!@#$%^&*...).",
             "path": [
               "newPassword"
-            ]
+            ],
+            "message": "A senha deve conter ao menos um caractere especial (!@#$%^&*...)."
           }
         ]
       }
@@ -1527,15 +1511,13 @@
   "iam.roles.create.400_short_id": {
     "status": 400,
     "body": {
-      "success": false,
       "error": {
         "issues": [
           {
-            "code": "too_small",
-            "message": "Too small: expected string to have >=2 characters",
             "path": [
               "id"
-            ]
+            ],
+            "message": "Pequeno demais: esperava que o texto tivesse >= 2 caracteres"
           }
         ]
       }
@@ -1730,15 +1712,13 @@
   "cp.create.400_dates": {
     "status": 400,
     "body": {
-      "success": false,
       "error": {
         "issues": [
           {
-            "code": "custom",
-            "message": "A Data Final não pode ser anterior à Data Inicial.",
             "path": [
               "endDate"
-            ]
+            ],
+            "message": "A Data Final não pode ser anterior à Data Inicial."
           }
         ]
       }
@@ -1747,22 +1727,19 @@
   "cp.create.400_missing_fields": {
     "status": 400,
     "body": {
-      "success": false,
       "error": {
         "issues": [
           {
-            "code": "invalid_type",
-            "message": "Invalid input: expected string, received undefined",
             "path": [
               "startDate"
-            ]
+            ],
+            "message": "Entrada inválida: esperava um texto, recebeu um valor \"undefined\""
           },
           {
-            "code": "invalid_type",
-            "message": "Invalid input: expected string, received undefined",
             "path": [
               "endDate"
-            ]
+            ],
+            "message": "Entrada inválida: esperava um texto, recebeu um valor \"undefined\""
           }
         ]
       }
@@ -2067,29 +2044,25 @@
   "admin.erps.put.400_invalid_body": {
     "status": 400,
     "body": {
-      "success": false,
       "error": {
         "issues": [
           {
-            "code": "too_small",
-            "message": "Too small: expected string to have >=1 characters",
             "path": [
               "name"
-            ]
+            ],
+            "message": "Pequeno demais: esperava que o texto tivesse >= 1 caracteres"
           },
           {
-            "code": "invalid_type",
-            "message": "Invalid input: expected string, received undefined",
             "path": [
               "driver"
-            ]
+            ],
+            "message": "Entrada inválida: esperava um texto, recebeu um valor \"undefined\""
           },
           {
-            "code": "invalid_type",
-            "message": "Invalid input: expected record, received undefined",
             "path": [
               "values"
-            ]
+            ],
+            "message": "Entrada inválida: esperava um registro, recebeu um valor \"undefined\""
           }
         ]
       }
