@@ -1,6 +1,8 @@
 #!/bin/sh
-# Fast checks on every commit; the full guardrail runs on pre-push and in CI.
+# Fast checks on every commit that touches code; the full guardrail runs on pre-push and in CI.
 set -e
-pnpm -s check:ui
-pnpm -s check:plugins
-git diff --cached --name-only --diff-filter=ACMR -z -- '*.ts' '*.tsx' '*.mjs' | xargs -0 -r pnpm exec biome lint --no-errors-on-unmatched
+if git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' '*.mjs' | grep -q .; then
+  pnpm -s check:ui
+  pnpm -s check:plugins
+  git diff --cached --name-only --diff-filter=ACMR -z -- '*.ts' '*.tsx' '*.mjs' | xargs -0 -r pnpm exec biome lint --no-errors-on-unmatched
+fi

@@ -1,3 +1,4 @@
 #!/bin/sh
-# Runs the unified guardrail before every push.
+# Runs the unified guardrail (`pnpm check`: check:ui, check:plugins, lint, build and the whole test suite) before every push.
+# It is the one full-suite run of the workflow: do not run `pnpm test` by hand beforehand (docs/conventions/testing.md).
 exec pnpm check
