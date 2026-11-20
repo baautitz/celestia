@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import forge from "node-forge";
 import { DeviceCertificateAuthority } from "../src/authority.js";
 
 const openssl = (args: string[]) => execFileSync("openssl", args, { encoding: "utf8" });
@@ -92,5 +94,45 @@ describe("DeviceCertificateAuthority", () => {
     expect(info).toContain("MAC: sha1");
     expect(info).toContain("pbeWithSHA1And3-KeyTripleDES-CBC");
     expect(info).not.toContain("PBES2");
+  });
+
+  it("embute no .pfx o DER original da CA e do Dispositivo, sem o forge reescrever a assinatura", async () => {
+    const issued = await ca.issue({ name: "Fiel" });
+    const pfxPath = join(dir, "fiel.pfx");
+    writeFileSync(pfxPath, issued.pfx);
+    const pem = openssl(["pkcs12", "-in", pfxPath, "-passin", `pass:${issued.password}`, "-nokeys"]);
+    const bundle = pem.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ?? [];
+    expect(bundle).toHaveLength(2);
+    const derOf = (certificate: string) => Buffer.from(certificate.replace(/-----[^-]+-----|\s/g, ""), "base64");
+    const sha256 = (der: Buffer) => createHash("sha256").update(der).digest("hex");
+    const fingerprints = bundle.map((certificate) => sha256(derOf(certificate)));
+    expect(fingerprints).toContain(issued.fingerprint);
+    expect(fingerprints).toContain(sha256(derOf(caPem)));
+  });
+
+  it("não deixa o forge trocado depois de emitir, nem com emissões concorrentes", async () => {
+    const before = forge.pki.certificateToAsn1;
+    const issued = await Promise.all([ca.issue({ name: "A" }), ca.issue({ name: "B" }), ca.issue({ name: "C" })]);
+    expect(forge.pki.certificateToAsn1).toBe(before);
+    expect(new Set(issued.map((i) => i.fingerprint)).size).toBe(3);
+  });
+
+  it("identifica as chaves, limita a CA a assinar Dispositivos e tolera relógio atrasado", async () => {
+    const now = new Date("2026-06-01T12:00:00Z");
+    const created = await DeviceCertificateAuthority.create({ commonName: "CA perfil", now });
+    const issued = await new DeviceCertificateAuthority(created).issue({ name: "Perfil", now });
+
+    const caPath = join(dir, "ca-perfil.pem");
+    writeFileSync(caPath, created.certificatePem);
+    const caText = openssl(["x509", "-in", caPath, "-noout", "-text"]);
+    expect(caText).toContain("pathlen:0");
+    expect(caText).toContain("Subject Key Identifier");
+    expect(caText).toContain("Not Before: Jun  1 11:55:00 2026 GMT");
+
+    const deviceText = openssl(["x509", "-in", extractCert(issued, "perfil"), "-noout", "-text"]);
+    const keyId = (text: string, label: string) => new RegExp(`${label}:\\s*(?:keyid:)?([0-9A-F:]{59})`).exec(text)?.[1];
+    expect(keyId(deviceText, "X509v3 Authority Key Identifier")).toBe(keyId(caText, "X509v3 Subject Key Identifier"));
+    expect(deviceText).toContain("Issuer: CN=CA perfil");
+    expect(deviceText).toContain("Not Before: Jun  1 11:55:00 2026 GMT");
   });
 });
