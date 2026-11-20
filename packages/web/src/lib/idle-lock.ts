@@ -24,6 +24,7 @@ export class IdleLock {
   private timer: ReturnType<typeof setInterval> | null = null;
   private channel: BroadcastChannel | null = null;
   private readonly now: () => number;
+  private readonly options: IdleLockOptions;
   private readonly onActivity = () => {
     const at = this.now();
     this.lastActivity = at;
@@ -33,7 +34,8 @@ export class IdleLock {
     }
   };
 
-  constructor(private readonly options: IdleLockOptions) {
+  constructor(options: IdleLockOptions) {
+    this.options = options;
     this.now = options.now ?? Date.now;
     this.lastActivity = this.now();
   }
