@@ -37,6 +37,7 @@ import { registerCongelamentoBaixas, type BaixasDoPeriodoDeps } from "./baixas-d
 import { MemoryCorrecaoBaixaStore } from "./correcoes-baixa-store.js";
 import { PostgresCorrecaoBaixaStore } from "./postgres-correcoes-baixa-store.js";
 import { declareCorrecaoBaixaAudit } from "./correcoes-baixa-audit.js";
+import { declareBaixasCongeladasAudit } from "./baixas-congeladas-audit.js";
 import { PostgresEstoquePreVencidoStore } from "./postgres-estoque-pre-vencidos-store.js";
 import { declareVinculoAudit, type AuditService } from "./vinculo-audit.js";
 import { MemoryVinculoStore } from "./vinculo-store.js";
@@ -81,6 +82,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declareVinculoAudit(audit);
       declareItemPreVencidoAudit(audit);
       declareCorrecaoBaixaAudit(audit);
+      declareBaixasCongeladasAudit(audit);
       declareAvaliacaoAudit(audit);
       declareFuroEstoqueAudit(audit);
       declareTiposMetaAudit(audit);
@@ -111,7 +113,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       const baixasCongeladas = db ? new PostgresBaixasCongeladasStore(db) : new MemoryBaixasCongeladasStore();
       const correcoesBaixa = db ? new PostgresCorrecaoBaixaStore(db) : new MemoryCorrecaoBaixaStore();
       const baixasDeps: BaixasDoPeriodoDeps = { erpClient: () => erpClients[erpId], store: estoquePreVencidos, congeladas: baixasCongeladas, correcoes: correcoesBaixa };
-      registerCongelamentoBaixas({ events, periods, ...baixasDeps });
+      registerCongelamentoBaixas({ events, periods, audit, users, ...baixasDeps });
       registerEstoquePreVencidosRoutes({ routes, permissions, auth, ...baixasDeps, vinculos: store, periods, audit });
       registerBaixasPreVencidosRoutes({ routes, permissions, auth, ...baixasDeps, vinculos: store, periods, audit });
       registerAvaliacoesRoutes({

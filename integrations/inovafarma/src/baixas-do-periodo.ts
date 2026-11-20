@@ -1,4 +1,8 @@
 import type { ModuleContext } from "@platform/core/module";
+import type { UsersService } from "./colaboradores-routes.js";
+import { BAIXAS_CONGELADAS_ACTIONS, BAIXAS_CONGELADAS_PLUGIN, BAIXAS_CONGELADAS_TARGET, type AtributosDescarteBaixas } from "./baixas-congeladas-audit.js";
+import { atorDoEvento, pendentesDoFechamento, periodoDoPayload } from "./pendentes-do-fechamento.js";
+import type { AuditService } from "./vinculo-audit.js";
 import { baixasDaLoja, type VendaDaLoja } from "./baixas-da-loja.js";
 import type { BaixasCongeladas, BaixasCongeladasStore } from "./baixas-congeladas-store.js";
 import { chaveDaLinha, type VendaParaBaixa } from "./baixas-pre-vencidos.js";
@@ -160,31 +164,29 @@ export async function congelamentoDoPeriodo(deps: BaixasDoPeriodoDeps, periodo: 
 const FECHAMENTO_SEM_BAIXAS = "ERP InovaFarma indisponível: não foi possível calcular as Baixas de Pré-vencido, e o Período não pode ser fechado agora. Tente novamente em instantes.";
 /** O fechamento consulta as vendas de todas as Lojas com Estoque: mais que os 2 s padrão de um handler. */
 const TEMPO_CONGELAMENTO_MS = 120_000;
-const MAX_PENDENTES = 100;
 
 export interface CongelamentoBaixasDeps extends BaixasDoPeriodoDeps {
   events: Pick<ModuleContext["events"], "before" | "after">;
   periods: PeriodsService;
+  audit: AuditService;
+  users: UsersService;
 }
 
 /**
  * Congela as Baixas no fechamento do Closing Period, como a Apuração (ADR 0007): o `before` calcula (só lê) e recusa o
- * fechamento se o ERP falhar, sem gravar nada; o `after` grava. Reabrir descarta o congelado.
+ * fechamento se o ERP falhar, sem gravar nada; o `after` grava. Reabrir descarta o congelado e registra o descarte no
+ * Audit Log, como a Apuração das Metas.
  */
-export function registerCongelamentoBaixas({ events, periods, ...deps }: CongelamentoBaixasDeps): void {
-  const periodoId = (payload: object) => (payload as { periodId?: string }).periodId ?? "";
-  const pendentes = new Map<string, BaixasCongeladas[]>();
+export function registerCongelamentoBaixas({ events, periods, audit, users, ...deps }: CongelamentoBaixasDeps): void {
+  const pendentes = pendentesDoFechamento<BaixasCongeladas[]>();
 
   events.before(
     "closing_period.close",
     async (ctx) => {
-      const periodo = (await periods.list()).find((p) => p.id === periodoId(ctx.payload));
+      const periodo = (await periods.list()).find((p) => p.id === periodoDoPayload(ctx.payload));
       if (!periodo) return;
       try {
-        const congelamento = await congelamentoDoPeriodo(deps, periodo);
-        pendentes.delete(periodo.id);
-        if (pendentes.size >= MAX_PENDENTES) pendentes.delete(pendentes.keys().next().value as string);
-        pendentes.set(periodo.id, congelamento);
+        pendentes.guardar(periodo.id, await congelamentoDoPeriodo(deps, periodo));
       } catch {
         ctx.cancel(FECHAMENTO_SEM_BAIXAS);
       }
@@ -194,12 +196,32 @@ export function registerCongelamentoBaixas({ events, periods, ...deps }: Congela
   events.after(
     "closing_period.close",
     async (payload) => {
-      const congelamento = pendentes.get(periodoId(payload));
+      const congelamento = pendentes.retirar(periodoDoPayload(payload));
       if (!congelamento) return;
-      pendentes.delete(periodoId(payload));
-      await deps.congeladas.gravar(periodoId(payload), congelamento);
+      await deps.congeladas.gravar(periodoDoPayload(payload), congelamento);
     },
     { module: "inovafarma" },
   );
-  events.after("closing_period.reopen", (payload) => deps.congeladas.descartar(periodoId(payload)), { module: "inovafarma" });
+  events.after(
+    "closing_period.reopen",
+    async (payload) => {
+      const id = periodoDoPayload(payload);
+      const descartadas = await deps.congeladas.doPeriodo(id);
+      await deps.congeladas.descartar(id);
+      if (descartadas.length === 0) return;
+      const atributos: AtributosDescarteBaixas = {
+        periodo: (await periods.list()).find((p) => p.id === id)?.name ?? id,
+        lojas: descartadas.length,
+        baixas: descartadas.reduce((total, c) => total + c.baixas.length, 0),
+      };
+      await audit.record({
+        plugin: BAIXAS_CONGELADAS_PLUGIN,
+        action: BAIXAS_CONGELADAS_ACTIONS.descartar,
+        actor: await atorDoEvento(users, payload),
+        target: { type: BAIXAS_CONGELADAS_TARGET, id },
+        attributes: atributos,
+      });
+    },
+    { module: "inovafarma" },
+  );
 }

@@ -1,8 +1,8 @@
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { buscaProdutosSql, MIN_BUSCA_PRODUTO, parametrosBusca } from "./produtos-erp.js";
-import { ERP_INDISPONIVEL, SEM_CONEXAO, type ErpQuery } from "./metas-comum.js";
+import { ERP_INDISPONIVEL, SEM_CONEXAO, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import { inclusaoRetroativa, lojasDoErp, lojasDoVinculo, visualizacoesDasBaixas } from "./pre-vencidos-comum.js";
 import type { VinculoStore } from "./vinculo-store.js";
 import type { Visualizacao } from "./visualizacoes.js";
@@ -27,8 +27,6 @@ export interface PreVencidosRoutesDeps {
   vinculos: VinculoStore;
   periods: PeriodsService;
 }
-
-type AuthContext = Context<{ Variables: { user?: { sub?: string; permissions?: string[] } } }>;
 
 export type LinhaBusca = { produtoId: string; nome: string | null; codigoBarra: string | null };
 

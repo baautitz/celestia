@@ -1,11 +1,11 @@
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { baixaPublica, baixasDoPeriodo, tetoDaCorrecao, type BaixaDoPeriodo, type BaixaPublica, type BaixasDoPeriodoDeps } from "./baixas-do-periodo.js";
-import { erroDoErp } from "./metas-comum.js";
+import { ator, Codigo, CodigoEmTexto, erroDoErp, PERIODO_NAO_ENCONTRADO, periodoAindaAberto, recusaDeValidacao, Version, versaoDaQuery, versaoDesatualizada, type AuthContext } from "./metas-comum.js";
 import { LOJA_FORA_DO_VINCULO, recusaDeLoja, visualizacoesDasBaixas } from "./pre-vencidos-comum.js";
-import { SEM_VISUALIZACAO, VISUALIZACAO_PERMISSION_BAIXAS, VISUALIZACOES, type Visualizacao } from "./visualizacoes.js";
+import { VISUALIZACAO_PERMISSION_BAIXAS, visualizacaoPedida } from "./visualizacoes.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
 import { CORRECAO_BAIXA_ACTIONS, CORRECAO_BAIXA_PLUGIN, CORRECAO_BAIXA_TARGET, type AtributosCorrecaoBaixa } from "./correcoes-baixa-audit.js";
 import { CorrecaoDuplicadaError, type CorrecaoBaixa } from "./correcoes-baixa-store.js";
@@ -21,8 +21,6 @@ export interface BaixasPreVencidosRoutesDeps extends BaixasDoPeriodoDeps {
   audit: AuditService;
 }
 
-type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
-
 export interface BaixasDoColaborador {
   codigoColaborador: number;
   nomeColaborador: string;
@@ -33,18 +31,22 @@ export interface BaixasDoColaborador {
 
 const SO_PERIODO_ABERTO = "Só se corrige Baixa no Período aberto.";
 const CORRECAO_EXISTENTE = { error: "A venda já tem Correção de Baixa: altere a que existe.", code: "correcao_existente" };
-const CORRECAO_DESATUALIZADA = { error: "A Correção de Baixa foi alterada por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
+const CORRECAO_DESATUALIZADA = versaoDesatualizada("A Correção de Baixa foi alterada por outra pessoa. A lista foi recarregada.");
 const Motivo = z.string({ error: "Informe o motivo." }).trim().min(1, "Informe o motivo da Correção.").max(500, "O motivo tem no máximo 500 caracteres.");
 const QuantidadeCorrigida = z.number({ error: "Informe a quantidade." }).int("Informe uma quantidade inteira.").min(0, "A quantidade corrigida não pode ser negativa.");
 const NovaCorrecao = z.object({
-  codigoLoja: z.number().int().min(1),
+  codigoLoja: Codigo,
   periodoId: z.string().min(1),
   vendaId: z.number().int(),
   produtoId: z.string().min(1),
   quantidade: QuantidadeCorrigida,
   motivo: Motivo,
 });
-const EdicaoCorrecao = z.object({ quantidade: QuantidadeCorrigida, motivo: Motivo, version: z.number().int().min(1) });
+const EdicaoCorrecao = z.object({ quantidade: QuantidadeCorrigida, motivo: Motivo, version: Version });
+const FiltroBaixas = z.object({
+  periodoId: z.string({ error: "Parâmetro 'periodoId' é obrigatório." }).min(1, "Parâmetro 'periodoId' é obrigatório."),
+  codigoLoja: CodigoEmTexto.optional(),
+});
 
 /** Agrupa as Baixas por Colaborador (pelo nome), cada um com as suas vendas na ordem da data. */
 export function porColaborador(baixas: readonly BaixaDoPeriodo[]): BaixasDoColaborador[] {
@@ -72,23 +74,17 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, vin
    */
   routes.get("/pre-vencidos/baixas", auth, async (c: AuthContext) => {
     const { disponiveis, lojas: lojasVinculo, codigoColaborador } = await visualizacoesDasBaixas(c, permissions, vinculos);
-    if (disponiveis.length === 0) return c.json({ error: SEM_VISUALIZACAO }, 403);
-    const pedida = c.req.query("visualizacao") ?? disponiveis[0];
-    if (!VISUALIZACOES.includes(pedida as Visualizacao)) return c.json({ error: "Parâmetro 'visualizacao' deve ser geral, loja ou individual." }, 400);
-    const visualizacao = pedida as Visualizacao;
-    if (!disponiveis.includes(visualizacao)) {
-      const item = INOVAFARMA_PERMISSIONS.items.find((i) => i.key === VISUALIZACAO_PERMISSION_BAIXAS[visualizacao]);
-      return c.json({ error: item?.deniedMessage ?? SEM_VISUALIZACAO }, 403);
-    }
-    const periodoId = c.req.query("periodoId");
-    const loja = c.req.query("codigoLoja");
-    const codigoLoja = loja === undefined || loja === "" ? null : Number(loja);
-    if (!periodoId || (codigoLoja !== null && (!Number.isInteger(codigoLoja) || codigoLoja < 1))) return c.json({ error: "Parâmetro 'periodoId' é obrigatório e 'codigoLoja', se informado, é o código da Loja." }, 400);
-    if (visualizacao === "loja" && codigoLoja !== null && !lojasVinculo.includes(codigoLoja)) return c.json({ error: LOJA_FORA_DO_VINCULO }, 403);
+    const pedida = visualizacaoPedida(c, disponiveis, VISUALIZACAO_PERMISSION_BAIXAS);
+    if ("recusa" in pedida) return pedida.recusa;
+    const { visualizacao } = pedida;
+    const consulta = FiltroBaixas.safeParse({ periodoId: c.req.query("periodoId"), codigoLoja: c.req.query("codigoLoja") || undefined });
+    if (!consulta.success) return recusaDeValidacao(c, consulta.error);
+    const { periodoId, codigoLoja } = consulta.data;
+    if (visualizacao === "loja" && codigoLoja !== undefined && !lojasVinculo.includes(codigoLoja)) return c.json({ error: LOJA_FORA_DO_VINCULO }, 403);
     const periodo = (await periods.list()).find((p) => p.id === periodoId);
-    if (!periodo) return c.json({ error: "Período de Fechamento não encontrado." }, 404);
+    if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
 
-    const lojas = visualizacao === "individual" ? undefined : codigoLoja !== null ? [codigoLoja] : visualizacao === "loja" ? lojasVinculo : undefined;
+    const lojas = visualizacao === "individual" ? undefined : codigoLoja !== undefined ? [codigoLoja] : visualizacao === "loja" ? lojasVinculo : undefined;
     try {
       const baixas = await baixasDoPeriodo(deps, periodo, lojas);
       return c.json(porColaborador(visualizacao === "individual" ? baixas.filter((b) => b.venda.codigoColaborador === codigoColaborador) : baixas));
@@ -100,7 +96,7 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, vin
   /** A Baixa da venda (venda + produto) na Loja e no Período aberto; senão, a resposta de recusa. */
   const linhaNoPeriodoAberto = async (c: AuthContext, codigoLoja: number, periodoId: string, vendaId: number, produtoId: string) => {
     const periodo = (await periods.list()).find((p) => p.id === periodoId);
-    if (!periodo) return { recusa: c.json({ error: "Período de Fechamento não encontrado." }, 404) } as const;
+    if (!periodo) return { recusa: c.json({ error: PERIODO_NAO_ENCONTRADO }, 404) } as const;
     if (periodo.status === "closed") return { recusa: c.json({ error: SO_PERIODO_ABERTO }, 409) } as const;
     let linha: BaixaDoPeriodo | undefined;
     let teto: number;
@@ -115,7 +111,6 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, vin
   };
 
   const registrar = (c: AuthContext, action: string, id: string, linha: BaixaDoPeriodo, antes: AtributosCorrecaoBaixa["antes"], depois: AtributosCorrecaoBaixa["depois"]) => {
-    const user = c.get("user");
     const attributes: AtributosCorrecaoBaixa = {
       codigoLoja: linha.codigoLoja,
       vendaId: linha.venda.vendaId,
@@ -125,7 +120,7 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, vin
       antes,
       depois,
     };
-    return audit.record({ plugin: CORRECAO_BAIXA_PLUGIN, action, actor: { id: user?.sub ?? "", name: user?.fullname ?? "" }, target: { type: CORRECAO_BAIXA_TARGET, id }, attributes });
+    return audit.record({ plugin: CORRECAO_BAIXA_PLUGIN, action, actor: ator(c), target: { type: CORRECAO_BAIXA_TARGET, id }, attributes });
   };
 
   /**
@@ -138,7 +133,7 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, vin
   routes.post("/pre-vencidos/baixas/correcoes", auth, async (c: AuthContext) => {
     if (!permissions.has(c.get("user")?.permissions, gerir.key)) return c.json({ error: gerir.deniedMessage }, 403);
     const parsed = NovaCorrecao.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const { codigoLoja, periodoId, vendaId, produtoId, quantidade, motivo } = parsed.data;
     const recusa = await recusaLoja(c, codigoLoja);
     if (recusa) return recusa;
@@ -147,6 +142,8 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, vin
     if (alvo.linha.correcao) return c.json(CORRECAO_EXISTENTE, 409);
     const fora = foraDoTeto(c, quantidade, alvo.teto);
     if (fora) return fora;
+    // O Período pode ter fechado durante a consulta ao ERP: confere de novo logo antes de gravar.
+    if (!(await periodoAindaAberto(periods, periodoId))) return c.json({ error: SO_PERIODO_ABERTO }, 409);
     const user = c.get("user");
     let criada: CorrecaoBaixa;
     try {
@@ -175,10 +172,11 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, vin
     const alvo = await correcaoDaLoja(c);
     if ("recusa" in alvo) return alvo.recusa;
     const parsed = EdicaoCorrecao.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const { quantidade, motivo, version } = parsed.data;
     const fora = foraDoTeto(c, quantidade, alvo.teto);
     if (fora) return fora;
+    if (!(await periodoAindaAberto(periods, alvo.correcao.periodoId))) return c.json({ error: SO_PERIODO_ABERTO }, 409);
     const user = c.get("user");
     const atualizada = await correcoes.atualizar(alvo.correcao.id, { quantidade, motivo, autorId: user?.sub ?? "", autorNome: user?.fullname ?? "" }, version);
     if (!atualizada) return c.json(CORRECAO_DESATUALIZADA, 409);
@@ -190,9 +188,10 @@ export function registerBaixasPreVencidosRoutes({ routes, permissions, auth, vin
   routes.delete("/pre-vencidos/baixas/correcoes/:id", auth, async (c: AuthContext) => {
     const alvo = await correcaoDaLoja(c);
     if ("recusa" in alvo) return alvo.recusa;
-    const version = Number(c.req.query("version"));
-    if (!Number.isInteger(version) || version < 1) return c.json({ error: "Parâmetro 'version' é obrigatório." }, 400);
-    if (!(await correcoes.excluir(alvo.correcao.id, version))) return c.json(CORRECAO_DESATUALIZADA, 409);
+    const lida = versaoDaQuery(c);
+    if ("recusa" in lida) return lida.recusa;
+    if (!(await periodoAindaAberto(periods, alvo.correcao.periodoId))) return c.json({ error: SO_PERIODO_ABERTO }, 409);
+    if (!(await correcoes.excluir(alvo.correcao.id, lida.version))) return c.json(CORRECAO_DESATUALIZADA, 409);
     await registrar(c, CORRECAO_BAIXA_ACTIONS.excluir, alvo.correcao.id, alvo.linha, { quantidade: alvo.correcao.quantidade, motivo: alvo.correcao.motivo }, null);
     return c.json({ success: true });
   });

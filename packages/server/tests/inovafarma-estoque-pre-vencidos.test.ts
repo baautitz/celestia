@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@platform/shared";
 import { TestUserStore } from "./helpers/fixtures.js";
 import { createPlatform } from "../src/index.js";
@@ -29,6 +29,18 @@ const COLABORADORES = [
 type VendaFake = { codigoLoja: number; vendaId: number; data: string; cancelada: boolean; codigoColaborador: number; nomeColaborador: string; codigoProduto: number; produtoId: string; quantidade: number };
 let vendas: VendaFake[] = [];
 let erpFora = false;
+/** Roda uma vez, no meio da próxima consulta de vendas ao ERP: simula o que acontece fora da requisição enquanto ela espera o ERP. */
+let aoConsultarVendas: (() => Promise<void>) | null = null;
+
+// Só o relógio (`Date`) é fixo: os testes de datas não dependem do dia em que rodam, e os timers seguem reais.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2027-04-15T15:00:00.000Z"));
+});
+afterEach(() => {
+  vi.useRealTimers();
+  aoConsultarVendas = null;
+});
 
 const DIA = 24 * 60 * 60 * 1000;
 /** Dia (UTC) a `dias` de hoje, `AAAA-MM-DD`: com dias inteiros de folga, o fuso do ERP não muda o lado da inclusão. */
@@ -50,6 +62,9 @@ const erp: ErpClient = {
   query: async <TRow>(sql: string, params?: Record<string, unknown>) => {
     if (sql.includes("Venda_Produto")) {
       if (erpFora) throw new Error("ERP fora do ar");
+      const durante = aoConsultarVendas;
+      aoConsultarVendas = null;
+      await durante?.();
       const produtos = Object.entries(params ?? {}).filter(([k]) => /^p\d+$/.test(k)).map(([, v]) => v);
       return vendas
         .filter((v) => v.codigoLoja === params?.codigoLoja && v.data >= String(params?.dataInicio) && produtos.includes(v.codigoProduto))
@@ -150,6 +165,24 @@ describe("Estoque de Pré-vencidos", () => {
     expect((await incluir("ana", { quantidade: 0 })).status).toBe(400);
     expect((await incluir("ana", { quantidade: 1.5 })).status).toBe(400);
     expect((await incluir("ana", { produtoId: "6f1c0a52-0000-4000-8000-0000000000ff" })).status).toBe(404);
+  });
+
+  it("recusa com o corpo de validação da plataforma o campo inválido, e Loja ou version que não são inteiros positivos", async () => {
+    const { incluir, req } = await boot();
+    const invalido = await incluir("ana", { validade: "06/2027" });
+    expect(invalido.status).toBe(400);
+    expect(await invalido.json()).toEqual({ error: { issues: [{ path: ["validade"], message: "Informe a validade como mês e ano (AAAA-MM)." }] } });
+    for (const loja of ["", "abc", "0", "1.5"]) {
+      const res = await req("ana", "GET", `/api/m/inovafarma/pre-vencidos/estoque/itens?codigoLoja=${loja}`);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["codigoLoja"], message: "Informe um código inteiro maior que zero." }] } });
+    }
+    const criado = (await (await incluir("ana")).json()) as Item;
+    for (const version of ["", "abc", "0"]) {
+      const res = await req("ana", "DELETE", `/api/m/inovafarma/pre-vencidos/estoque/itens/${criado.id}?version=${version}`);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["version"], message: "Parâmetro 'version' é obrigatório." }] } });
+    }
   });
 
   it("recusa quem não tem a Permission ou não tem Vínculo", async () => {
@@ -279,6 +312,23 @@ describe("Visualizações das Baixas", () => {
     expect(await baixas("rui")).toEqual({ status: 200, grupos: [[10, [2]]] });
   });
 
+  it("recusa com o corpo de validação da plataforma a Visualização inexistente (antes da Permission) e a Loja que não é um código", async () => {
+    const { baixas, req, periodoId } = await comVendas();
+    const url = `/api/m/inovafarma/pre-vencidos/baixas?periodoId=${periodoId}`;
+    for (const who of ["gil", "ana"] as const) {
+      const res = await req(who, "GET", `${url}&visualizacao=xyz`);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["visualizacao"], message: "Parâmetro 'visualizacao' deve ser geral, loja ou individual." }] } });
+    }
+    const loja = await req("dir", "GET", `${url}&codigoLoja=abc`);
+    expect(loja.status).toBe(400);
+    expect(await loja.json()).toEqual({ error: { issues: [{ path: ["codigoLoja"], message: "Informe um código inteiro maior que zero." }] } });
+    const semPeriodo = await req("dir", "GET", "/api/m/inovafarma/pre-vencidos/baixas");
+    expect(semPeriodo.status).toBe(400);
+    expect(await semPeriodo.json()).toEqual({ error: { issues: [{ path: ["periodoId"], message: "Parâmetro 'periodoId' é obrigatório." }] } });
+    expect((await baixas("dir")).status).toBe(200);
+  });
+
   it("gerir as Baixas sem Visualização abre a aba, mas não lista as Baixas", async () => {
     const { baixas, req } = await comVendas();
     expect((await baixas("teo")).status).toBe(403);
@@ -351,6 +401,28 @@ describe("Congelamento das Baixas no fechamento do Closing Period", () => {
     expect(await baixas(periodoId)).toEqual([]);
     expect(await baixas(seguinteId)).toEqual([[7, 4, [[3, 4]]]]);
   });
+
+  it("reabrir registra no Audit Log que as Baixas gravadas foram descartadas, com o autor", async () => {
+    const { incluir, req, periodoId, fechar, reabrir } = await comDoisPeriodos();
+    await incluir("ana", { quantidade: 5 });
+    vendas = [venda(1, 2, 2), venda(2, 3, 1, { codigoColaborador: 8, nomeColaborador: "GIL COSTA" })];
+    expect((await fechar(periodoId)).status).toBe(200);
+    const entradas = async () =>
+      ((await (await req("auditor", "GET", "/api/audit?plugin=inovafarma")).json()) as { action: string; summary: string; actorName: string }[]).filter((e) => e.action === "baixas_congeladas_discard");
+    expect(await entradas()).toEqual([]);
+    expect((await reabrir(periodoId)).status).toBe(200);
+    expect(await entradas()).toMatchObject([
+      { summary: 'Descartou na reabertura as Baixas de Pré-vencido gravadas no fechamento do período "Atual" (2 Baixas em 1 Loja): o período volta a ser calculado ao vivo.', actorName: "adm" },
+    ]);
+  });
+
+  it("reabrir um Período sem Baixas gravadas não registra descarte", async () => {
+    const { req, periodoId, fechar, reabrir } = await comDoisPeriodos();
+    expect((await fechar(periodoId)).status).toBe(200);
+    expect((await reabrir(periodoId)).status).toBe(200);
+    const eventos = (await (await req("auditor", "GET", "/api/audit?plugin=inovafarma")).json()) as { action: string }[];
+    expect(eventos.filter((e) => e.action === "baixas_congeladas_discard")).toEqual([]);
+  });
 });
 
 describe("Inclusão retroativa de Item", () => {
@@ -379,6 +451,24 @@ describe("Inclusão retroativa de Item", () => {
     expect((await incluir("rui", { incluidoEm: dia(-21) })).status).toBe(400);
     const contexto = await (await req("rui", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
     expect(contexto.inclusaoRetroativa).toEqual({ inicio: dia(-20), hoje: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+  });
+
+  it("recusa com o corpo de validação da plataforma o dia que não existe no calendário, em vez de falhar com 500", async () => {
+    const { incluir, listar } = await boot();
+    for (const incluidoEm of ["2027-02-31", "2027-13-01", "2027-04-00"]) {
+      const res = await incluir("rui", { incluidoEm });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["incluidoEm"], message: "Informe a data de inclusão (AAAA-MM-DD)." }] } });
+    }
+    expect(await listar("rui")).toEqual([]);
+  });
+
+  it("o relógio fixo decide os limites: hoje é o último dia e o início do Período aberto, o primeiro", async () => {
+    const { incluir } = await boot();
+    expect((await incluir("rui", { incluidoEm: "2027-04-15" })).status).toBe(201);
+    expect((await incluir("rui", { incluidoEm: "2027-04-16" })).status).toBe(400);
+    expect((await incluir("rui", { incluidoEm: "2027-04-10" })).status).toBe(201);
+    expect((await incluir("rui", { incluidoEm: "2027-04-09" })).status).toBe(400);
   });
 
   it("sem a Permission de Baixas, a data retroativa é recusada", async () => {
@@ -458,6 +548,41 @@ describe("Correção de Baixa", () => {
     expect((await corrigir("lia")).status).toBe(403);
     expect((await req("adm", "POST", `/api/closing-periods/${periodoId}/close`)).status).toBe(200);
     expect((await corrigir("gil")).status).toBe(409);
+  });
+
+  it("não grava a Correção de um Período que fechou enquanto a rota consultava o ERP", async () => {
+    const { baixas, corrigir, req, periodoId } = await comBaixas();
+    aoConsultarVendas = async () => void expect((await req("adm", "POST", `/api/closing-periods/${periodoId}/close`)).status).toBe(200);
+    const res = await corrigir("gil");
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Só se corrige Baixa no Período aberto." });
+    // Fechado, valem as Baixas gravadas no fechamento: sem Correção nenhuma.
+    expect(resumo(await baixas())).toEqual([[7, [[1, 2]]], [8, [[2, 1]]]]);
+  });
+
+  it("não edita nem desfaz a Correção de um Período que fechou durante a consulta ao ERP", async () => {
+    const { corrigir, req, periodoId } = await comBaixas();
+    const criada = (await (await corrigir("gil")).json()) as Correcao;
+    const url = `/api/m/inovafarma/pre-vencidos/baixas/correcoes/${criada.id}`;
+    aoConsultarVendas = async () => void expect((await req("adm", "POST", `/api/closing-periods/${periodoId}/close`)).status).toBe(200);
+    expect((await req("gil", "PUT", url, { quantidade: 0, motivo: "Nenhuma era", version: 1 })).status).toBe(409);
+    // Já fechado, a Correção não é mais do Período aberto: nem o DELETE a alcança.
+    const apagar = await req("gil", "DELETE", `${url}?version=1`);
+    expect(apagar.status).toBe(409);
+    expect(await apagar.json()).toEqual({ error: "Só se corrige Baixa no Período aberto." });
+  });
+
+  it("recusa com o corpo de validação da plataforma a Correção sem motivo e a version que não é um inteiro", async () => {
+    const { corrigir, req } = await comBaixas();
+    const semMotivo = await corrigir("gil", { motivo: "  " });
+    expect(semMotivo.status).toBe(400);
+    expect(await semMotivo.json()).toEqual({ error: { issues: [{ path: ["motivo"], message: "Informe o motivo da Correção." }] } });
+    const criada = (await (await corrigir("gil")).json()) as Correcao;
+    for (const version of ["", "abc", "0", "1.5", "-1"]) {
+      const res = await req("gil", "DELETE", `/api/m/inovafarma/pre-vencidos/baixas/correcoes/${criada.id}?version=${version}`);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["version"], message: "Parâmetro 'version' é obrigatório." }] } });
+    }
   });
 
   it("edita e desfaz a Correção pela version, com 409 quando ela está desatualizada", async () => {
