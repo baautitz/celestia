@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { zValidator } from "./validation.js";
 import { z } from "zod";
 import type { DeviceCertificateAuthority } from "./authority.js";
 import { ChallengeStore } from "./challenge-store.js";
