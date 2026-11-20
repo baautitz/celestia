@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, configure, fireEvent, render as renderTela, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render as renderTela, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { createMemoryRouter, Link, RouterProvider } from "react-router-dom";
 import { confirmLeave } from "@platform/ui/adapters/leave-guard";
@@ -54,8 +54,11 @@ const listaComVinculo = {
   colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna }],
 };
 
+/** A linha pelo texto do nome: consultar `row` por nome acessível percorre a tabela inteira e é lento no jsdom. */
 async function linha(nome: string) {
-  return screen.findByRole("row", { name: new RegExp(nome) });
+  const linha = (await screen.findByText(nome)).closest("tr");
+  if (!linha) throw new Error(`Linha de ${nome} não encontrada.`);
+  return linha;
 }
 
 async function escolherUsuario(row: HTMLElement, nome: string) {
@@ -79,9 +82,6 @@ async function escolherLoja(row: HTMLElement, nome: string) {
 const botao = (row: HTMLElement, nome: string) => within(row).getByRole("button", { name: nome }) as HTMLButtonElement;
 /** O botão único de salvar, no cabeçalho da página. */
 const salvarTudo = () => screen.getByRole("button", { name: /^Salvar \(/ }) as HTMLButtonElement;
-
-// Sob carga (suíte inteira em paralelo) os popovers e a revalidação passam do 1 s padrão do `findBy`/`waitFor`.
-configure({ asyncUtilTimeout: 4000 });
 
 beforeEach(() => {
   Object.defineProperty(window, "matchMedia", {
