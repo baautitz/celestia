@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@/context/HeaderActionsContext";
 import { toLocalISODate } from "@platform/ui/lib/utils";
@@ -118,8 +118,9 @@ describe("AuditLogPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mais filtros" }));
     fireEvent.change(screen.getByLabelText("Id do alvo"), { target: { value: "cp-1" } });
     await screen.findByText("Ana");
-    slow([{ ...entry, id: "old", actorName: "Velho" }]);
-    await new Promise((r) => setTimeout(r, 0));
+    await act(async () => {
+      slow([{ ...entry, id: "old", actorName: "Velho" }]);
+    });
     expect(screen.queryByText("Velho")).toBeNull();
   });
 });

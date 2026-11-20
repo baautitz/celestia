@@ -120,7 +120,7 @@ describe("IAMDevicesPage", () => {
 
     expect(await screen.findByText(/Revogar o certificado do Dispositivo "Caixa 1"\?/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => expect(screen.queryByText(/Revogar o certificado do Dispositivo "Caixa 1"\?/)).toBeNull());
     expect(api.iam.revokeDevice).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Revogar Dispositivo" }));

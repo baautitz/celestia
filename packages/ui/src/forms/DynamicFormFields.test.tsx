@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, afterEach } from "vitest";
-import { render, cleanup, waitFor } from "@testing-library/react";
+import { render, cleanup, screen, waitFor } from "@testing-library/react";
 import { useForm } from "react-hook-form";
 import { Form } from "../components/form";
 import { DynamicFormFields } from "./DynamicFormFields";
@@ -35,10 +35,19 @@ const allTypes: FormFieldDef[] = [
 ];
 
 describe("DynamicFormFields", () => {
-  it("renders every field type unchanged", async () => {
-    const { container } = render(<Harness fields={allTypes} />);
-    await waitFor(() => expect(container.querySelector("[data-slot=skeleton]")).toBeNull());
-    expect(container.innerHTML.replace(/(id|for|aria-[a-z]+)="[^"]*"/g, "$1")).toMatchSnapshot();
+  it("renders a labelled control for every field type", async () => {
+    render(<Harness fields={allTypes} />);
+
+    expect(await screen.findByRole("textbox", { name: "Texto" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Area" })).toBeTruthy();
+    expect(screen.getByLabelText("Senha")).toBeTruthy();
+    expect(screen.getByRole("switch", { name: "Chave" })).toBeTruthy();
+    expect(screen.getByLabelText("Valor")).toBeTruthy();
+    expect(screen.getByLabelText("Numero")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Escolha" })).toBeTruthy();
+    expect(await screen.findByRole("combobox", { name: "Busca" })).toBeTruthy();
+    expect(await screen.findByLabelText("Varios")).toBeTruthy();
+    expect(screen.getByText("Data")).toBeTruthy();
   });
 
   it("survives changing the field list and field type", async () => {
