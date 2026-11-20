@@ -172,6 +172,17 @@ describe("Vínculo do Colaborador com Usuário", () => {
     expect(await res.json()).toEqual({ error: "O vínculo foi alterado por outra pessoa. A linha foi recarregada.", code: "versao_desatualizada" });
   });
 
+  it("recusa com o corpo de validação da plataforma o corpo inválido e o código que não é inteiro positivo, juntando os dois", async () => {
+    const { salvar } = await boot();
+    const semVersion = await salvar(7, { usuarioId: "ana", lojas: [] });
+    expect(semVersion.status).toBe(400);
+    const campos = async (res: Response) => ((await res.json()) as { error: { issues: { path: (string | number)[] }[] } }).error.issues.map((i) => i.path);
+    expect(await campos(semVersion)).toEqual([["version"]]);
+    const codigoRuim = await salvar("1.5", { usuarioId: "ana", lojas: [0], version: 0 });
+    expect(codigoRuim.status).toBe(400);
+    expect(await campos(codigoRuim)).toEqual([["lojas", 0], ["codigo"]]);
+  });
+
   it("recusa Usuário inexistente ou inativo e Colaborador fora do ERP", async () => {
     const { salvar } = await boot();
     expect((await salvar(7, { usuarioId: "caio", lojas: [], version: 0 })).status).toBe(400);
