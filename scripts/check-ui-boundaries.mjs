@@ -1,4 +1,4 @@
-import ts from "typescript"
+import ts from "@typescript/typescript6"
 import { readFileSync } from "node:fs"
 import { glob } from "node:fs/promises"
 import { resolve, sep } from "node:path"
