@@ -105,9 +105,8 @@ class ApiClient {
         }
 
         const data = (await res.json()) as AuthTokens;
-        const token = data.accessToken || data.access_token || null;
-        this.setAccessToken(token);
-        return token;
+        this.setAccessToken(data.accessToken);
+        return data.accessToken;
       } finally {
         this.refreshPromise = null;
       }
@@ -117,9 +116,8 @@ class ApiClient {
   }
 
   private acceptTokens(tokens: AuthTokens): AuthTokens {
-    const token = tokens.accessToken || tokens.access_token || "";
-    this.setAccessToken(token);
-    return { ...tokens, accessToken: token };
+    this.setAccessToken(tokens.accessToken);
+    return tokens;
   }
 
   // ─── AUTHENTICATION & IAM ENDPOINTS ─────────────────────────────────────
