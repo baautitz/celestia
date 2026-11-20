@@ -116,7 +116,7 @@ const renderizar = () =>
 describe("Metas: Tipos de Meta", () => {
   it("lista os Tipos de Meta com a prévia do Prêmio", async () => {
     renderizar();
-    expect(await screen.findByRole("tab", { name: "Tipos de Meta" })).toBeTruthy();
+    await screen.findByRole("tab", { name: "Tipos de Meta" });
     expect((await screen.findAllByText("CMV % até 30% paga R$ 100,00")).length).toBeGreaterThan(0);
   });
 
@@ -126,7 +126,7 @@ describe("Metas: Tipos de Meta", () => {
     const alvo = (await screen.findByLabelText(/Alvo padrão/)) as HTMLInputElement;
     expect(alvo.value).toBe("30");
     fireEvent.change(alvo, { target: { value: "28" } });
-    expect(await screen.findByText("CMV % até 28% paga R$ 100,00")).toBeTruthy();
+    await screen.findByText("CMV % até 28% paga R$ 100,00");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Desmarcar todos" }));
@@ -184,15 +184,15 @@ describe("Metas: construtor de Tipo de Meta", () => {
 
   it("abre num modal com O que mede e Como paga lado a lado e a Prévia do Prêmio embaixo", async () => {
     const modal = await alterar("CMV");
-    expect(within(modal).getByText("O que mede")).toBeTruthy();
-    expect(within(modal).getByText("Como paga")).toBeTruthy();
-    expect(within(modal).getByText("Prévia do Prêmio")).toBeTruthy();
+    within(modal).getByText("O que mede");
+    within(modal).getByText("Como paga");
+    within(modal).getByText("Prévia do Prêmio");
     expect((within(modal).getByLabelText("Alvo padrão (opcional)") as HTMLInputElement).value).toBe("30");
   });
 
   it("mostra embaixo do Gatilho o valor equivalente com o Alvo padrão", async () => {
     const modal = await alterar("Foco");
-    expect(within(modal).getByText("= 40 incentivos com o Alvo padrão de 50")).toBeTruthy();
+    within(modal).getByText("= 40 incentivos com o Alvo padrão de 50");
   });
 
   it("no Percentual do valor vendido, Calcular sobre começa no próprio Indicador em R$", async () => {
@@ -210,8 +210,8 @@ describe("Metas: construtor de Tipo de Meta", () => {
 
   it("em O que mede, resume a Lista em uma linha com as entradas fora do ERP", async () => {
     const modal = await alterar("Mix");
-    expect(within(modal).getByText("1 Produto · 1 Grupo · 1 Laboratório")).toBeTruthy();
-    expect(await within(modal).findByText("1 não encontrado no ERP")).toBeTruthy();
+    within(modal).getByText("1 Produto · 1 Grupo · 1 Laboratório");
+    await within(modal).findByText("1 não encontrado no ERP");
     expect(within(modal).queryByRole("row")).toBeNull();
   });
 
@@ -219,7 +219,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
     const construtor = await alterar("Mix");
     await within(construtor).findByText("1 não encontrado no ERP");
     const lista = await montarLista(construtor);
-    expect(within(lista).getByRole("heading", { name: "Lista de Produtos" })).toBeTruthy();
+    within(lista).getByRole("heading", { name: "Lista de Produtos" });
     expect(document.activeElement).toBe(within(lista).getByPlaceholderText("Buscar Produto no ERP"));
     const linhas = () => within(lista).getAllByRole("row").slice(1).map((r) => r.textContent);
     expect(linhas()).toEqual([expect.stringContaining("ProdutoDipirona 1g"), expect.stringContaining("GrupoVitaminas"), expect.stringContaining("LaboratórioEMS")]);
@@ -233,7 +233,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
 
     fireEvent.click(within(lista).getByRole("button", { name: "Concluir" }));
     await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(1));
-    expect(within(construtor).getByText("1 Produto · 1 Grupo · 1 Seção · 1 Laboratório")).toBeTruthy();
+    within(construtor).getByText("1 Produto · 1 Grupo · 1 Seção · 1 Laboratório");
   });
 
   it("Cancelar na Lista descarta as mudanças feitas nela", async () => {
@@ -244,7 +244,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
     fireEvent.click(within(lista).getByRole("button", { name: "Cancelar" }));
     fireEvent.click(await screen.findByRole("button", { name: "Descartar" }));
     await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(1));
-    expect(within(construtor).getByText("1 Produto · 1 Grupo · 1 Laboratório")).toBeTruthy();
+    within(construtor).getByText("1 Produto · 1 Grupo · 1 Laboratório");
   });
 
   it("ao trocar a Lista de R$ para unidades com Sem Alvo ligado, volta a Regra e a Exibição de antes", async () => {
@@ -267,7 +267,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Alterar Tipo de Meta Mix" }));
     const modal = await screen.findByRole("dialog");
     expect(within(modal).getByRole("combobox", { name: "A Lista mede" }).hasAttribute("data-disabled")).toBe(true);
-    expect(within(modal).getByText("A unidade não muda: as Metas deste Tipo de Meta já têm Alvos nela.")).toBeTruthy();
+    within(modal).getByText("A unidade não muda: as Metas deste Tipo de Meta já têm Alvos nela.");
   });
 
   it("Esc na busca da Lista fecha primeiro a busca, sem fechar o modal da Lista", async () => {
@@ -276,7 +276,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
     await escolher(within(lista).getByRole("combobox", { name: "Tipo da entrada" }), "Seção");
     const busca = within(lista).getByPlaceholderText("Buscar Seção no ERP");
     fireEvent.input(busca, { target: { value: "GEN" }, inputType: "insertText" });
-    expect(await screen.findByRole("option", { name: "GENERICOS" })).toBeTruthy();
+    await screen.findByRole("option", { name: "GENERICOS" });
     fireEvent.keyDown(busca, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("option", { name: "GENERICOS" })).toBeNull());
     expect(screen.getAllByRole("dialog")).toEqual([construtor, lista]);
@@ -295,7 +295,6 @@ describe("Metas: construtor de Tipo de Meta", () => {
     fireEvent.click(within(modal).getByRole("button", { name: "Salvar" }));
     const erro = await waitFor(() => {
       const achado = within(modal).getAllByText("Duas Faixas não podem ter o mesmo % Atingido.").find((e) => e.getAttribute("role") === "alert");
-      expect(achado).toBeTruthy();
       return defined(achado, "the alert");
     });
     // Logo abaixo das Faixas, antes do botão de adicionar outra.
@@ -313,14 +312,14 @@ describe("Metas: Montar Metas na Tabela", () => {
     expect(bia.getAttribute("aria-checked")).toBe("false");
     fireEvent.change(screen.getByRole("textbox", { name: /de BIA na Meta CMV/ }), { target: { value: "25" } });
     expect(bia.getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByRole("button", { name: "Salvar alterações (1)" })).toBeTruthy();
+    screen.getByRole("button", { name: "Salvar alterações (1)" });
     // A Tabela tem impressão, com a opção de de imprimir o Prêmio só onde o Colaborador o vê, marcada por padrão.
     fireEvent.click(screen.getByRole("button", { name: /Imprimir/ }));
     const soVisivel = await screen.findByRole("switch", { name: "Imprimir o Prêmio só das Metas que o mostram ao Colaborador" });
     expect(soVisivel.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     // Faixas em R$ têm vários valores: o Prêmio fica com o lápis.
-    expect(screen.getByRole("button", { name: "Alterar o Prêmio de ANA na Meta CMV" })).toBeTruthy();
+    screen.getByRole("button", { name: "Alterar o Prêmio de ANA na Meta CMV" });
   });
 
   it("edita o Prêmio Fixo na própria célula e grava no Salvar alterações", async () => {
@@ -349,7 +348,7 @@ describe("Metas: Definir Alvo fora do Por Meta", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
     fireEvent.click(await screen.findByRole("button", { name: "Definir Alvo" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "CMV" }));
-    expect(await screen.findByText('Meta "CMV" · Abril')).toBeTruthy();
+    await screen.findByText('Meta "CMV" · Abril');
   });
 });
 
@@ -363,7 +362,7 @@ describe("Metas: Montar Metas por Colaborador", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
     fireEvent.click(defined((await screen.findAllByRole("button", { name: "Expandir linha" }))[0], "the expand button"));
     fireEvent.change(await screen.findByRole("textbox", { name: "Prêmio de ANA na Meta CMV" }), { target: { value: "R$ 150,00" } });
-    expect(await screen.findByRole("button", { name: "Salvar alterações (1)" })).toBeTruthy();
+    await screen.findByRole("button", { name: "Salvar alterações (1)" });
   });
 });
 

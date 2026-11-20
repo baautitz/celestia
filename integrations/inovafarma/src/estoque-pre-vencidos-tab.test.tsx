@@ -81,11 +81,11 @@ const renderizar = () =>
 describe("aba Estoque", () => {
   it("lista os Itens da Loja do Vínculo com validade, quantidade e data de inclusão", async () => {
     renderizar();
-    expect(await screen.findByRole("tab", { name: "Estoque" })).toBeTruthy();
+    await screen.findByRole("tab", { name: "Estoque" });
     expect(screen.getByRole("combobox", { name: "Loja" }).textContent).toContain("Centro");
-    expect(await screen.findByRole("cell", { name: "DIPIRONA 500MG" })).toBeTruthy();
-    expect(screen.getByRole("cell", { name: "06/2027" })).toBeTruthy();
-    expect(screen.getByRole("cell", { name: "10/04/2027" })).toBeTruthy();
+    await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
+    screen.getByRole("cell", { name: "06/2027" });
+    screen.getByRole("cell", { name: "10/04/2027" });
     expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/estoque/itens?codigoLoja=1"));
   });
 
@@ -98,7 +98,7 @@ describe("aba Estoque", () => {
   it("mostra o Restante e traz os Itens zerados só pelo filtro", async () => {
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
-    expect(screen.getByRole("columnheader", { name: /Restante/ })).toBeTruthy();
+    screen.getByRole("columnheader", { name: /Restante/ });
     fireEvent.click(screen.getByRole("switch", { name: "Mostrar Itens zerados" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/estoque/itens?codigoLoja=1&zerados=true")));
   });
@@ -113,7 +113,7 @@ describe("aba Estoque", () => {
     fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("mm/aaaa"), { target: { value: "082027" } });
     fireEvent.click(screen.getByRole("button", { name: "Incluir" }));
-    expect(await screen.findByRole("cell", { name: "08/2027" })).toBeTruthy();
+    await screen.findByRole("cell", { name: "08/2027" });
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "POST");
     expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ codigoLoja: 1, produtoId: "guid-1", quantidade: 5, validade: "2027-08" });
   });
@@ -149,12 +149,12 @@ describe("aba Estoque", () => {
     await waitFor(() => expect(campo.value).toContain("DIPIRONA 500MG"));
     fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("mm/aaaa"), { target: { value: "082027" } });
-    expect(screen.getByText("Data de inclusão")).toBeTruthy();
+    screen.getByText("Data de inclusão");
     const data = screen.getByPlaceholderText("dd/mm/aaaa");
 
     fireEvent.change(data, { target: { value: ddmmaaaa(dia(-6)) } });
     fireEvent.click(screen.getByRole("button", { name: "Incluir" }));
-    expect(await screen.findByText(/não pode ser antes do início do Período aberto/)).toBeTruthy();
+    await screen.findByText(/não pode ser antes do início do Período aberto/);
     expect(apiFetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
 
     fireEvent.change(data, { target: { value: ddmmaaaa(dia(-5)) } });
