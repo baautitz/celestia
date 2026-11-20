@@ -206,7 +206,7 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroativa, onSalvo }: 
       </Form>
       <WindowActions>
         {!item && (
-          <Stack direction="row" align="center" gap="field">
+          <Stack direction="row" align="center" gap="field" grow>
             <Switch id="item-pre-vencido-adicionar-mais" checked={adicionarMais} onCheckedChange={(on: boolean) => setAdicionarMais(on)} />
             <Label htmlFor="item-pre-vencido-adicionar-mais">Adicionar mais</Label>
           </Stack>

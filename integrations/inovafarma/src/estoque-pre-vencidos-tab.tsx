@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
 import { Show, Stack } from "@platform/ui/components/layout";
 import { Switch } from "@platform/ui/components/switch";
@@ -110,17 +109,9 @@ export function EstoquePreVencidosTab({ lojas, retroativa }: { lojas: LojaOpcao[
           </Button>
         </Show>
         <Show on="belowLg">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="Mais ações" />}>
-              <MoreHorizontal />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => void abrir()}>
-                <Plus />
-                Incluir Item
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="outline" size="icon" aria-label="Incluir Item" title="Incluir Item" onClick={() => void abrir()}>
+            <Plus />
+          </Button>
         </Show>
       </HeaderActions>
       <LojaSelect lojas={lojas} value={loja} onChange={setLoja} />
