@@ -447,6 +447,20 @@ describe("ColaboradoresPage", () => {
       await waitFor(() => expect(row.getAttribute("data-highlight")).toBe("true"));
     });
 
+    it("Desfazer descarta a alteração da linha e Descartar alterações, a de todas", async () => {
+      apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      fireEvent.click(within(row).getByRole("button", { name: "Aceitar a sugestão de ANA SOUZA" }));
+      fireEvent.click(await within(row).findByRole("button", { name: "Desfazer as alterações de ANA SOUZA" }));
+      await waitFor(() => expect(salvarTudo().textContent).toBe("Salvar (0)"));
+      expect(row.getAttribute("data-highlight")).toBeNull();
+
+      fireEvent.click(within(row).getByRole("button", { name: "Aceitar a sugestão de ANA SOUZA" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Descartar alterações" }));
+      await waitFor(() => expect(salvarTudo().textContent).toBe("Salvar (0)"));
+    });
+
     it("Aceitar sugestões põe todas as linhas sugeridas no Salvar", async () => {
       apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
       render(<ColaboradoresPage />);

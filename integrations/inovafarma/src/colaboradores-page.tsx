@@ -82,6 +82,12 @@ const mudou = (a: Valores, b: Valores) => a.usuarioId !== b.usuarioId || !mesmas
 
 const naoEncontrado = (c: CamposVinculo) => c.avisos.some((a) => a.tipo === "colaborador_nao_encontrado");
 
+/** A linha tem uma alteração ainda não gravada, que se pode desfazer. */
+const alterada = (c: Colaborador, edicoes: Record<number, Rascunho>) => {
+  const edicao = edicoes[c.codigoColaborador];
+  return edicao !== undefined && mudou(edicao, c);
+};
+
 /** A linha tem uma sugestão ainda não aceita nem editada: aparece preenchida, mas só entra no Salvar depois de aceita. */
 const sugestaoPendente = (c: Colaborador, edicoes: Record<number, Rascunho>) =>
   !c.confirmado && !naoEncontrado(c) && edicoes[c.codigoColaborador] === undefined && c.sugestao !== null && (c.sugestao.usuarioId !== null || c.sugestao.lojas.length > 0);
@@ -285,6 +291,10 @@ export function ColaboradoresPage() {
     () => colaboradores.filter((c) => (situacao === "todos" || c.ativo) && (filtroStatus === "todos" || c.confirmado === (filtroStatus === "confirmados")) && sugestaoPendente(c, edicoes)),
     [colaboradores, edicoes, situacao, filtroStatus],
   );
+  const descartarTudo = () => {
+    setEdicoes({});
+    setFalhas({});
+  };
   const aceitarSugestoes = () =>
     setEdicoes((atual) => ({ ...Object.fromEntries(aceitaveis.map((c) => [c.codigoColaborador, novoRascunhoDe(c)])), ...atual }));
 
@@ -333,6 +343,10 @@ export function ColaboradoresPage() {
       if (salvando.has(r.codigoColaborador)) return;
       limparFalha(r.codigoColaborador);
       setEdicoes((atual) => ({ ...atual, [r.codigoColaborador]: { ...(atual[r.codigoColaborador] ?? novoRascunho(r)), ...alteracao } }));
+    };
+    const desfazer = (r: Colaborador) => {
+      descartarEdicao(r.codigoColaborador);
+      limparFalha(r.codigoColaborador);
     };
     // O Usuário criado entra só como rascunho: o vínculo continua dependendo de confirmar a linha.
     const criarUsuario = async (r: Colaborador) => {
@@ -419,6 +433,11 @@ export function ColaboradoresPage() {
                 Aceitar
               </Button>
             )}
+            {alterada(r, edicoes) && (
+              <Button type="button" variant="ghost" size="default" aria-label={`Desfazer as alterações de ${r.nome}`} disabled={salvando.has(r.codigoColaborador)} onClick={() => desfazer(r)}>
+                Desfazer
+              </Button>
+            )}
             {falhas[r.codigoColaborador] && (
               <Badge variant="destructive" title={falhas[r.codigoColaborador]}>
                 Não salvo
@@ -433,7 +452,7 @@ export function ColaboradoresPage() {
         ),
       },
     ];
-  }, [edicoes, falhas, limparFalha, lojas, opcoes, salvando, podeCriarUsuario, windows, feedback, usuariosIam]);
+  }, [edicoes, falhas, limparFalha, descartarEdicao, lojas, opcoes, salvando, podeCriarUsuario, windows, feedback, usuariosIam]);
 
   useLeaveGuard(
     colaboradores.some((c) => {
@@ -474,6 +493,11 @@ export function ColaboradoresPage() {
         {aceitaveis.length > 0 && (
           <Button variant="outline" disabled={salvandoTudo} onClick={aceitarSugestoes}>
             Aceitar sugestões ({aceitaveis.length})
+          </Button>
+        )}
+        {pendentes.length > 0 && (
+          <Button variant="outline" disabled={salvandoTudo} onClick={descartarTudo}>
+            Descartar alterações
           </Button>
         )}
         <Button disabled={pendentes.length === 0 || salvandoTudo} onClick={() => void salvarTudo()}>
@@ -519,10 +543,7 @@ export function ColaboradoresPage() {
         emptyMessage="Nenhum Colaborador encontrado."
         striped
         bordered
-        highlightRow={(c) => {
-          const edicao = edicoes[c.codigoColaborador];
-          return edicao !== undefined && mudou(edicao, c);
-        }}
+        highlightRow={(c) => alterada(c, edicoes)}
       />
     </Stack>
   );
