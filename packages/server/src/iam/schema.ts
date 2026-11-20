@@ -1,4 +1,5 @@
-import { boolean, integer, jsonb, pgSchema, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 /** Schema Postgres do Module `iam`. */
 export const iamSchema = pgSchema("iam");
@@ -10,22 +11,27 @@ export const roles = iamSchema.table("roles", {
   permissions: jsonb("permissions").$type<string[]>().notNull().default([]),
 });
 
-export const users = iamSchema.table("users", {
-  id: text("id").primaryKey(),
-  fullname: text("fullname").notNull(),
-  username: text("username").notNull().unique(),
-  email: text("email"),
-  passwordHash: text("password_hash").notNull(),
-  roleId: text("role_id")
-    .notNull()
-    .references(() => roles.id),
-  status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
-  isAdmin: boolean("is_admin").notNull().default(false),
-  allowWithoutCertificate: boolean("allow_without_certificate").notNull().default(false),
-  sessionVersion: integer("session_version").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at"),
-});
+export const users = iamSchema.table(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    fullname: text("fullname").notNull(),
+    username: text("username").notNull().unique(),
+    email: text("email"),
+    passwordHash: text("password_hash").notNull(),
+    roleId: text("role_id")
+      .notNull()
+      .references(() => roles.id),
+    status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
+    isAdmin: boolean("is_admin").notNull().default(false),
+    allowWithoutCertificate: boolean("allow_without_certificate").notNull().default(false),
+    sessionVersion: integer("session_version").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at"),
+  },
+  // O login compara sem diferenciar maiúsculas: o índice impede dois usernames que só diferem na caixa.
+  (t) => [uniqueIndex("users_username_lower_key").on(sql`lower(${t.username})`)],
+);
 
 /** Preferência do Usuário (p.ex. a visualização escolhida numa tela): `value` é opaco para o iam. */
 export const userPreferences = iamSchema.table(

@@ -6,7 +6,26 @@ import { returned } from "../db/returned.js";
 import { roles, userPreferences, users } from "./schema.js";
 import { PasswordService } from "./password-service.js";
 import { pruneOrphans } from "@platform/core/permissions";
-import { LastAdminError, type UserStore } from "./user-store.js";
+import {
+  LastAdminError,
+  RoleIdTakenError,
+  RoleInUseError,
+  RoleNotFoundError,
+  UserNotFoundError,
+  UsernameTakenError,
+  type UserStore,
+} from "./user-store.js";
+
+const UNIQUE_VIOLATION = "23505";
+const FOREIGN_KEY_VIOLATION = "23503";
+
+/** Código SQLSTATE de um erro do driver `pg` (possivelmente embrulhado em `cause` pelo Drizzle). */
+function pgCode(err: unknown): string | undefined {
+  for (let current = err; current instanceof Error; current = current.cause) {
+    if ("code" in current && typeof current.code === "string") return current.code;
+  }
+  return undefined;
+}
 
 type UserRow = typeof users.$inferSelect;
 type RoleRow = typeof roles.$inferSelect;
@@ -76,31 +95,33 @@ export class PostgresUserStore implements UserStore {
   }
 
   async createUser(input: CreateUserInput): Promise<User> {
-    if (await this.findByUsername(input.username)) {
-      throw new Error(`Usuário '${input.username}' já existe.`);
-    }
-    if (!(await this.getRole(input.roleId))) {
-      throw new Error(`Role '${input.roleId}' não encontrada.`);
-    }
+    if (!(await this.getRole(input.roleId))) throw new RoleNotFoundError(input.roleId);
 
-    const [row] = await this.db
-      .insert(users)
-      .values({
-        id: `usr_${randomUUID()}`,
-        fullname: input.fullname,
-        username: input.username,
-        email: input.email,
-        passwordHash: PasswordService.hash(input.password),
-        roleId: input.roleId,
-        allowWithoutCertificate: input.allowWithoutCertificate ?? false,
-      })
-      .returning();
-    return toUser(returned(row));
+    try {
+      const [row] = await this.db
+        .insert(users)
+        .values({
+          id: `usr_${randomUUID()}`,
+          fullname: input.fullname,
+          username: input.username,
+          email: input.email || null,
+          passwordHash: PasswordService.hash(input.password),
+          roleId: input.roleId,
+          allowWithoutCertificate: input.allowWithoutCertificate ?? false,
+        })
+        .returning();
+      return toUser(returned(row));
+    } catch (err: unknown) {
+      // O índice único em lower(username) decide a corrida entre dois cadastros simultâneos.
+      if (pgCode(err) === UNIQUE_VIOLATION) throw new UsernameTakenError(input.username);
+      if (pgCode(err) === FOREIGN_KEY_VIOLATION) throw new RoleNotFoundError(input.roleId);
+      throw err;
+    }
   }
 
   async updateUser(id: string, input: UpdateUserInput): Promise<User> {
     if (input.roleId && !(await this.getRole(input.roleId))) {
-      throw new Error(`Role '${input.roleId}' não encontrada.`);
+      throw new RoleNotFoundError(input.roleId);
     }
 
     return this.db.transaction(async (tx) => {
@@ -110,14 +131,17 @@ export class PostgresUserStore implements UserStore {
       await this.assertAdminRemains(tx, user, { isAdmin, status });
       const revoke = (input.roleId !== undefined && input.roleId !== user.roleId) || (input.status === "inactive" && user.status !== "inactive") ||
         // Mudar a regra de certificado encerra as sessões abertas sob a regra anterior.
-        (input.allowWithoutCertificate !== undefined && input.allowWithoutCertificate !== user.allowWithoutCertificate);
+        (input.allowWithoutCertificate !== undefined && input.allowWithoutCertificate !== user.allowWithoutCertificate) ||
+        // Ganhar ou perder o acesso de administrador muda o que o token carrega.
+        (input.isAdmin !== undefined && input.isAdmin !== user.isAdmin);
 
       const [row] = await tx
         .update(users)
         .set({
           roleId: input.roleId || user.roleId,
-          fullname: input.fullname || user.fullname,
-          email: input.email || user.email,
+          fullname: input.fullname ?? user.fullname,
+          // Texto vazio limpa o e-mail; ausente mantém.
+          email: input.email === undefined ? user.email : input.email || null,
           status,
           ...(input.isAdmin !== undefined ? { isAdmin: input.isAdmin } : {}),
           ...(input.allowWithoutCertificate !== undefined ? { allowWithoutCertificate: input.allowWithoutCertificate } : {}),
@@ -161,7 +185,7 @@ export class PostgresUserStore implements UserStore {
       .orderBy(users.id)
       .for("update");
     const row = locked.find((u) => u.id === id);
-    if (!row) throw new Error(`Usuário '${id}' não encontrado.`);
+    if (!row) throw new UserNotFoundError(id);
     return row;
   }
 
@@ -171,7 +195,7 @@ export class PostgresUserStore implements UserStore {
       .set({ passwordHash: newPasswordHash, sessionVersion: sql`${users.sessionVersion} + 1`, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning({ id: users.id });
-    if (updated.length === 0) throw new Error(`Usuário '${id}' não encontrado.`);
+    if (updated.length === 0) throw new UserNotFoundError(id);
   }
 
   async revokeSessions(id: string): Promise<void> {
@@ -190,7 +214,10 @@ export class PostgresUserStore implements UserStore {
     await this.db.transaction(async (tx) => {
       const user = await this.lockUser(tx, id);
       await this.assertAdminRemains(tx, user, { isAdmin, status: user.status });
-      await tx.update(users).set({ isAdmin }).where(eq(users.id, id));
+      await tx
+        .update(users)
+        .set({ isAdmin, ...(isAdmin !== user.isAdmin ? { sessionVersion: sql`${users.sessionVersion} + 1` } : {}) })
+        .where(eq(users.id, id));
     });
   }
 
@@ -205,32 +232,43 @@ export class PostgresUserStore implements UserStore {
   }
 
   async createRole(role: Role): Promise<Role> {
-    if (await this.getRole(role.id)) throw new Error(`Role '${role.id}' já existe.`);
-    const [row] = await this.db.insert(roles).values(role).returning();
-    return toRole(returned(row));
+    try {
+      const [row] = await this.db.insert(roles).values(role).returning();
+      return toRole(returned(row));
+    } catch (err: unknown) {
+      if (pgCode(err) === UNIQUE_VIOLATION) throw new RoleIdTakenError(role.id);
+      throw err;
+    }
   }
 
   async updateRole(id: string, input: Partial<Role>): Promise<Role> {
-    const role = await this.getRole(id);
-    if (!role) throw new Error(`Role '${id}' não encontrada.`);
+    return this.db.transaction(async (tx) => {
+      const [current] = await tx.select().from(roles).where(eq(roles.id, id)).for("update").limit(1);
+      if (!current) throw new RoleNotFoundError(id);
 
-    const [row] = await this.db
-      .update(roles)
-      .set({
-        name: input.name || role.name,
-        description: input.description !== undefined ? input.description : role.description,
-        permissions: input.permissions ? [...input.permissions] : role.permissions,
-      })
-      .where(eq(roles.id, id))
-      .returning();
-    return toRole(returned(row));
+      const [row] = await tx
+        .update(roles)
+        .set({
+          name: input.name ?? current.name,
+          description: input.description !== undefined ? input.description : current.description,
+          permissions: input.permissions ? [...input.permissions] : current.permissions,
+        })
+        .where(eq(roles.id, id))
+        .returning();
+
+      // Retirar permissões encerra as sessões dos Users do grupo: o token já emitido ainda as carrega.
+      if (input.permissions && current.permissions.some((key) => !input.permissions?.includes(key))) {
+        await tx.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.roleId, id));
+      }
+      return toRole(returned(row));
+    });
   }
 
   async deleteRole(id: string): Promise<void> {
     const [linked] = await this.db.select({ total: count() }).from(users).where(eq(users.roleId, id));
     if (linked === undefined) throw new Error("A contagem de usuários vinculados não retornou.");
     if (linked.total > 0) {
-      throw new Error(`Não é possível excluir o grupo '${id}' pois existem usuários vinculados a ele.`);
+      throw new RoleInUseError(id);
     }
     await this.db.delete(roles).where(eq(roles.id, id));
   }
