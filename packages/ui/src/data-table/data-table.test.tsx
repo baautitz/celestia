@@ -12,7 +12,7 @@ const columns = [{ key: "name", label: "Nome", value: (r: Row) => r.name }];
 function setViewport(width: number) {
   Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
   window.matchMedia = (query: string): MediaQueryList => ({
-    matches: false,
+    matches: width < 1024,
     media: query,
     onchange: null,
     addListener: () => {},
@@ -540,9 +540,15 @@ describe("comparação com o anterior", () => {
     await userEvent.hover(cell);
     expect(await screen.findByText("▲ 12,2%")).toBeTruthy();
 
-    await userEvent.click(cell);
-    await new Promise((r) => setTimeout(r, 300));
-    expect(screen.getByText("▲ 12,2%")).toBeTruthy();
+    // "Não fechou": avança o relógio simulado além de qualquer atraso de fechamento do tooltip.
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(cell);
+      await vi.advanceTimersByTimeAsync(300);
+      expect(screen.getByText("▲ 12,2%")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("troca o detalhe ao passar para outra célula comparada", async () => {
