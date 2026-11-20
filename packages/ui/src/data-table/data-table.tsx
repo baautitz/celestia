@@ -1124,9 +1124,11 @@ export function DataTable<TRow>({
               >
                 <TableHeader
                   ref={headRef}
-                  className={
-                    nested && pageScroll ? "static" : pageScroll ? PAGE_STICKY_HEAD_CLASS : undefined
-                  }
+                  className={cn(
+                    nested && pageScroll ? "static" : pageScroll ? PAGE_STICKY_HEAD_CLASS : undefined,
+                    // A cópia grudada é o cabeçalho visível; o real só mede as colunas e nunca aparece junto com ela.
+                    wide && "invisible",
+                  )}
                 >
                   {headerRows(true)}
                 </TableHeader>
