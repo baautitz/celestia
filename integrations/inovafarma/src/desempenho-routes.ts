@@ -3,7 +3,6 @@ import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import type { ColunaDesempenho, MedidaColuna } from "./colunas-desempenho.js";
 import type { ColunaDesempenhoStore } from "./colunas-desempenho-store.js";
-import { semearColunas } from "./colunas-desempenho-seed.js";
 import { desempenhoSql } from "./desempenho-vendas.js";
 import { CodigoEmTexto, DiaDoCalendario, ERP_INDISPONIVEL, recusaDeValidacao, SEM_CONEXAO, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
@@ -134,7 +133,6 @@ export function registerDesempenhoRoutes({ routes, permissions, auth, erpClient,
     }
 
     try {
-      await semearColunas(colunas, client);
       const personalizadas = await colunas.listar();
       const { sql, sqlTotalVendas, params: paramsColunas } = desempenhoSql(filtroEmpresa, personalizadas);
       Object.assign(params, paramsColunas);

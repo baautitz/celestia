@@ -190,8 +190,6 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
     const erp = mockErpClient(async (sql, params) => {
       if (sql.includes("FROM Funcionario")) return [{ codigoColaborador: 7, nome: "ANA", ativo: true }];
       if (sql.includes("Config")) return [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }, { codigoEmpresa: 3, nome: "Norte" }];
-      // A conferência do seed das colunas não é o relatório: o ERP do teste não tem os cadastros.
-      if (sql.includes(" AS tipo")) return [];
       sqls.push({ sql, params });
       return sql.includes("totalVendasGeral") ? [{ totalVendasGeral: 0, totalVendasComCadastro: 0 }] : [];
     });
@@ -295,10 +293,8 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
     });
   });
 
-  it("semeia as colunas do cliente e soma Qtde, Valor, CMV e Ticket de cada uma por colaborador e no resumo, o Total Foco sem contar em dobro", async () => {
+  it("soma Qtde, Valor, CMV e Ticket de cada coluna por colaborador e no resumo, o Total Foco sem contar em dobro", async () => {
     const mockClient = mockErpClient(async (sql: string, params?: Record<string, unknown>) => {
-      // Conferência do seed: os quatro ids existem na base do cliente.
-      if (sql.includes(" AS tipo")) return Object.entries(params ?? {}).map(([k, v]) => ({ tipo: k.replace(/\d+$/, ""), id: String(v) }));
       if (sql.includes("totalVendasGeral")) return [{ totalVendasGeral: 3, totalVendasComCadastro: 0 }];
       // Vitaminas (0), Genéricos (1), Similares (2), Incentivos (3) e Total Foco (4, a união das quatro, por OR).
       expect(params).toMatchObject({ col0_grupo0: 44, col1_secao0: 261, col2_secao0: 271, col3_secao0: 281 });
@@ -316,7 +312,18 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
         },
       ];
     });
-    const { platform, headers } = await boot(["inovafarma:vendas-geral:view"], { inovafarma: mockClient });
+    const { platform, headers } = await boot(["inovafarma:vendas-geral:view", "inovafarma:colunas-desempenho:manage"], { inovafarma: mockClient });
+    // O cliente monta as colunas: quatro por entrada e o Total Foco, a união das quatro.
+    const criar = async (corpo: unknown) => (await platform.app.request("/api/m/inovafarma/colunas-desempenho", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(corpo) })).json() as Promise<{ id: string }>;
+    const entradas = [
+      ["Vitaminas", { tipo: "grupo", id: "44", nome: "VITAMINAS" }],
+      ["Genéricos", { tipo: "secao", id: "261", nome: "GENERICOS" }],
+      ["Similares", { tipo: "secao", id: "271", nome: "SIMILARES" }],
+      ["Incentivos", { tipo: "secao", id: "281", nome: "INCENTIVOS" }],
+    ] as const;
+    const ids: string[] = [];
+    for (const [nome, entrada] of entradas) ids.push((await criar({ nome, entradas: [entrada], uniao: [], medidas: ["quantidade", "valor", "participacaoPercent", "cmvPercent", "ticketMedio"] })).id);
+    await criar({ nome: "Total Foco", entradas: [], uniao: ids, medidas: ["quantidade", "valor"] });
     const res = await platform.app.request("/api/m/inovafarma/relatorios/vendas-colaborador?dataInicio=2026-10-01&dataFim=2026-10-31", { headers });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {

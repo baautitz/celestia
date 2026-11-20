@@ -3,7 +3,6 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { registerColunasDesempenhoRoutes } from "./colunas-desempenho-routes";
 import { declareColunasDesempenhoAudit } from "./colunas-desempenho-audit";
 import { MemoryColunaDesempenhoStore } from "./colunas-desempenho-store";
-import { semearColunas } from "./colunas-desempenho-seed";
 import type { ColunaDesempenho } from "./colunas-desempenho";
 import { condicaoDaColuna, desempenhoSql } from "./desempenho-vendas";
 import type { AuditService } from "./vinculo-audit";
@@ -90,35 +89,5 @@ describe("SQL das colunas", () => {
     expect(sql).toContain("AS colValor2");
     expect(sql).not.toMatch(/IN \(44\)/);
     expect(condicaoDaColuna(coluna("x", []), [], 0, {})).toBe("1 = 0");
-  });
-});
-
-describe("Seed das colunas", () => {
-  const erpCom = (existem: string[]) => ({
-    query: async <T,>(_sql: string, params: Record<string, unknown> = {}): Promise<T[]> =>
-      Object.entries(params).flatMap(([k, v]) => {
-        const tipo = k.replace(/\d+$/, "");
-        return existem.includes(`${tipo}:${v}`) ? [{ tipo, id: String(v) }] : [];
-      }) as T[],
-  });
-  const todos = ["grupo:44", "secao:261", "secao:271", "secao:281"];
-
-  it("cria as quatro colunas e o Total Foco quando os ids existem no ERP, uma única vez", async () => {
-    const store = new MemoryColunaDesempenhoStore();
-    expect(await semearColunas(store, erpCom(todos))).toBe(true);
-    const colunas = await store.listar();
-    expect(colunas.map((c) => c.nome)).toEqual(["Vitaminas", "Genéricos", "Similares", "Incentivos", "Total Foco"]);
-    expect(defined(colunas[4], "Total Foco").uniao).toHaveLength(4);
-    expect(await semearColunas(store, erpCom(todos))).toBe(false);
-  });
-
-  it("cria só o que existe, sem Total Foco, e nada sem ERP ou com o ERP fora do ar", async () => {
-    const parcial = new MemoryColunaDesempenhoStore();
-    await semearColunas(parcial, erpCom(["grupo:44"]));
-    expect((await parcial.listar()).map((c) => c.nome)).toEqual(["Vitaminas"]);
-    const semErp = new MemoryColunaDesempenhoStore();
-    expect(await semearColunas(semErp, undefined)).toBe(false);
-    expect(await semearColunas(semErp, { query: async () => Promise.reject(new Error("fora")) })).toBe(false);
-    expect(await semErp.listar()).toEqual([]);
   });
 });
