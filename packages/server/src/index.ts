@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
@@ -27,6 +28,9 @@ import { integrationPlugins, integrationErpDrivers } from "./plugins.js";
 import { createClosingPeriodModule } from "./closing-period/closing-period-module.js";
 import { MemoryClosingPeriodStore, type ClosingPeriodStore } from "./closing-period/closing-period-store.js";
 import type { JWTAccessPayload } from "@platform/shared";
+
+// Mensagens de validação do zod em português (as de cada campo, quando existem, têm precedência).
+z.config(z.locales.ptBR());
 
 export interface CreatePlatformAppOptions {
   erpClients?: ErpClientRegistry;

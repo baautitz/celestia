@@ -15,6 +15,7 @@ import type {
   AuditLogFilter,
   Device,
   IssuedDevice,
+  ValidationErrorBody,
 } from "@platform/shared";
 
 class ApiClient {
@@ -71,14 +72,14 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const errBody: { error?: string | { issues?: { path: (string | number)[]; message: string }[] }; code?: string } =
+      const errBody: ValidationErrorBody | { error?: string; code?: string } =
         await response.json().catch(() => ({ error: response.statusText }));
-      // Erros de validação (Zod) chegam como { error: { issues } }; senão { error: "mensagem" }.
+      // Recusa de validação chega como `ValidationErrorBody`; qualquer outra falha como { error: "mensagem" }.
       const detail =
         typeof errBody.error === "string"
           ? errBody.error
-          : errBody.error?.issues?.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-      throw new ApiError(detail || `Erro HTTP ${response.status}`, response.status, errBody.code);
+          : errBody.error?.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+      throw new ApiError(detail || `Erro HTTP ${response.status}`, response.status, "code" in errBody ? errBody.code : undefined);
     }
 
     return response.json() as Promise<T>;

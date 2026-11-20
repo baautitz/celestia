@@ -1,4 +1,5 @@
 import React from "react";
+import { z } from "zod";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
@@ -11,6 +12,9 @@ import { App } from "./App";
 import { webServices } from "./modules";
 import { WebServicesProvider } from "@platform/ui/contracts/web-services";
 import "./index.css";
+
+// Mensagens de validação do zod em português (as de cada campo, quando existem, têm precedência).
+z.config(z.locales.ptBR());
 
 // Conecta o transporte autenticado da plataforma ao helper da UI (usado por Plugins)
 setApiFetch((path, options) => api.request(path, options));
