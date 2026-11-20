@@ -874,7 +874,10 @@ describe("DataTable desempenho", () => {
     type L = { id: string; nome: string };
     const cols = [
       { key: "nome", label: "Nome", value: (r: L) => r.nome },
-      { key: "x", label: "X", render: (r: L) => (renders++, r.nome) },
+      { key: "x", label: "X", render: (r: L) => {
+          renders++;
+          return r.nome;
+        } },
     ];
     const ana = { id: "1", nome: "Ana" };
     const bia = { id: "2", nome: "Bia" };

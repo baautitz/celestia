@@ -120,7 +120,7 @@ export function createCaApp({
       if (!result.granted) return c.json({ error: "device_required", userId: result.userId }, 403);
       const device = await deviceStore.findById(result.deviceId);
       // O Dispositivo pode ter sido revogado entre a leitura e a troca.
-      if (!device || device.status !== "active") return c.json({ error: "device_required", userId: result.userId }, 403);
+      if (device?.status !== "active") return c.json({ error: "device_required", userId: result.userId }, 403);
       return c.json({ userId: result.userId, deviceId: device.id, deviceName: device.name });
     },
   );

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import { Stack, Text } from "@platform/ui/components/layout";
 import { api } from "@/lib/api-client";

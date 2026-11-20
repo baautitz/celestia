@@ -88,8 +88,14 @@ async function boot() {
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
     auth,
     events: {
-      after: (event, handler) => (handlers.set(event, handler as (p: object) => unknown), () => undefined),
-      before: (event, handler) => (antes.set(event, handler as never), () => undefined),
+      after: (event, handler) => {
+        handlers.set(event, handler as (p: object) => unknown);
+        return () => undefined;
+      },
+      before: (event, handler) => {
+        antes.set(event, handler as never);
+        return () => undefined;
+      },
     },
     audit: { declareAction: () => undefined, record: async (r) => registros.push(r) },
     users: { list: async () => [{ id: "gil", fullname: "Gil Gestor", username: "gil", status: "active" }] },

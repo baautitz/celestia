@@ -265,7 +265,9 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
           }
           const permitidas = lojaPedida === null ? lojasVinculo : [lojaPedida];
           filtroEmpresa = `AND v.CodigoEmpresa IN (${permitidas.map((_, i) => `@loja${i}`).join(", ")})`;
-          permitidas.forEach((codigo, i) => (params[`loja${i}`] = codigo));
+          permitidas.forEach((codigo, i) => {
+            params[`loja${i}`] = codigo;
+          });
         } else if (lojaPedida !== null) {
           filtroEmpresa = "AND v.CodigoEmpresa = @codigoEmpresa";
           params.codigoEmpresa = lojaPedida;

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import type React from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { AuthTokens, JWTAccessPayload } from "@platform/shared";
 import { api } from "@/lib/api-client";
 
@@ -25,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Conta os logins concluídos: uma restauração de sessão que começou antes de um login não pode desfazê-lo ao falhar.
   const signIns = useRef(0);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     const startedAt = signIns.current;
     try {
       const res = await api.auth.me();
@@ -35,11 +36,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     refreshUser();
-  }, []);
+  }, [refreshUser]);
 
   // O servidor recusou renovar a sessão (ex.: o Dispositivo foi revogado): sai do cliente em vez de ficar "logado" com erro.
   useEffect(() => {
@@ -76,13 +77,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasPermission = (permission: string): boolean => {
-    if (!user || !user.permissions) return false;
+    if (!user?.permissions) return false;
     // Permissão universal de admin se configurada, ou correspondência exata
     return user.permissions.includes(permission) || user.permissions.includes("*");
   };
 
   const hasAnyPermission = (...permissions: string[]): boolean => {
-    if (!user || !user.permissions) return false;
+    if (!user?.permissions) return false;
     if (user.permissions.includes("*")) return true;
     return permissions.some((p) => user.permissions.includes(p));
   };

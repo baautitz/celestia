@@ -129,6 +129,7 @@ function ListaProdutosWindow({ inicial, ausentes }: { inicial: EntradaLista[]; a
     return () => setDirtyCheck(null);
   }, [entradas, inicial, setDirtyCheck]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `tentativa` é o contador que o botão de tentar de novo incrementa para refazer a busca, sem ser lido no efeito.
   useEffect(() => {
     const q = termo.trim();
     if (q.length < MIN_BUSCA_LISTA[tipo]) {

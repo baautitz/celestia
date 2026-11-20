@@ -71,14 +71,14 @@ export function declareMetasAudit(audit: AuditService): void {
     schema: AtributosCopia,
     action: METAS_ACTIONS.copiar,
     summary: (a) =>
-      [
+      `${[
         `Copiou a Meta "${a.tipo}" do período "${a.origem}" para "${a.periodo}" com ${plural(a.participantes, "Participante")}`,
         a.novos.length ? `entraram ${a.novos.join(", ")}` : "",
         a.sairam.length ? `saíram ${a.sairam.join(", ")}` : "",
         a.pendentes ? `${plural(a.pendentes, "pendente")}` : "",
       ]
         .filter(Boolean)
-        .join("; ") + ".",
+        .join("; ")}.`,
   });
   audit.declareAction({ ...base, schema: AtributosParticipante, action: METAS_ACTIONS.participante, summary: resumoParticipante });
   audit.declareAction({

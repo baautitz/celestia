@@ -105,9 +105,8 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
           const period = await store.get(c.req.param("id"));
           if (!period) return c.json({ error: NOT_FOUND }, 404);
           if (period.status !== from) return c.json({ error: refusal }, 409);
-          let ran;
           try {
-            ran = await events.run(
+            const ran = await events.run(
               `closing_period.${action}`,
               { actorId: getAuthenticatedUser(c).sub, ...detail(period) },
               async () => {
@@ -116,13 +115,13 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
                 return updated;
               },
             );
+            if (ran.cancelled) return c.json({ error: ran.reason }, 409);
+            await audit(c, action, ran.result);
+            return c.json(ran.result);
           } catch (err) {
             if (err instanceof ConcurrentChangeError) return c.json({ error: CONCURRENT_CHANGE }, 409);
             throw err;
           }
-          if (ran.cancelled) return c.json({ error: ran.reason }, 409);
-          await audit(c, action, ran.result);
-          return c.json(ran.result);
         });
       transition("close", "open", "closed", "O período já está fechado.");
       transition("reopen", "closed", "open", "O período já está aberto.");

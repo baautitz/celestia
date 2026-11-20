@@ -1,4 +1,5 @@
-import React, { useEffect } from "react";
+import type React from "react";
+import { useEffect } from "react";
 import { confirmLeave } from "@platform/ui/adapters/leave-guard";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -47,6 +48,7 @@ const SidebarAutoClose: React.FC = () => {
   const { setOpenMobile } = useSidebar();
   const location = useLocation();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `location.pathname` não é lido no efeito, mas cada navegação deve fechar o menu.
   useEffect(() => {
     setOpenMobile(false);
   }, [location.pathname, setOpenMobile]);

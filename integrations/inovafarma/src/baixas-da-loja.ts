@@ -91,7 +91,9 @@ export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: 
   for (let i = 0; i < codigos.length; i += LOTE_PRODUTOS) {
     const lote = codigos.slice(i, i + LOTE_PRODUTOS);
     const params: Record<string, unknown> = { codigoLoja, dataInicio };
-    lote.forEach((codigo, n) => (params[`p${n}`] = codigo));
+    lote.forEach((codigo, n) => {
+      params[`p${n}`] = codigo;
+    });
     const linhas = await client.query<LinhaVendaErp>(vendasDaLojaSql(lote.length), params);
     vendas.push(
       ...linhas.map((l) => ({

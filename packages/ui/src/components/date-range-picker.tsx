@@ -73,6 +73,7 @@ export function DateRangePicker({
   const fromTime = value?.from?.getTime();
   const toTime = value?.to?.getTime();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `fromTime` e `toTime` são o que identifica uma mudança de valor (o `value` é lido pela ref).
   React.useEffect(() => {
     if (typed.current) {
       typed.current = false;

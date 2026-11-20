@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPlatformApp } from "../src/index.js";
-import { MemoryUserStore } from "../src/iam/user-store.js";
+import type { MemoryUserStore } from "../src/iam/user-store.js";
 import type { ErpClient } from "../src/erp/erp-client.js";
 import { createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
 
@@ -104,7 +104,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     R = await login("root.admin"); // isAdmin com role sem permissões
   });
   afterAll(() => {
-    if (updating) writeFileSync(FILE, JSON.stringify(results, null, 2) + "\n");
+    if (updating) writeFileSync(FILE, `${JSON.stringify(results, null, 2)}\n`);
     vi.useRealTimers();
   });
 

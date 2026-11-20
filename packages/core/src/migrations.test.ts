@@ -12,7 +12,7 @@ vi.mock("drizzle-orm/node-postgres/migrator", () => ({ migrate: migrateMock }));
 
 import { assertMigrationsUpToDate, planMigrations, runModuleMigrations, type MigrationsDb } from "./migrations.js";
 
-const mig = (id: string) => ({ moduleId: id, folder: "/x/" + id });
+const mig = (id: string) => ({ moduleId: id, folder: `/x/${id}` });
 
 describe("planMigrations", () => {
   it("ordena por dependsOn e ignora módulos sem migrations", () => {
@@ -140,7 +140,7 @@ describe.skipIf(!process.env.POSTGRES_HOST || process.env.MIGRATIONS_TEST_DB !==
       await assertMigrationsUpToDate(db, plan);
     } finally {
       await db.execute(sql`DROP SCHEMA IF EXISTS ${sql.identifier(id)} CASCADE`);
-      await db.execute(sql`DROP TABLE IF EXISTS drizzle.${sql.identifier("__migrations_" + id)}`);
+      await db.execute(sql`DROP TABLE IF EXISTS drizzle.${sql.identifier(`__migrations_${id}`)}`);
     }
   });
 });

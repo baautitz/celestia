@@ -357,7 +357,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     // Geral sem Loja: todos. Loja sem Loja escolhida: as Lojas do Vínculo do Usuário.
     const filtro = loja !== null ? [loja] : visualizacao === "loja" ? acesso.lojas! : null;
 
-    let resultado;
+    let resultado: Awaited<ReturnType<typeof apuracaoDe>>;
     try {
       resultado = await apuracaoDe(periodo, ator(c));
     } catch (err: unknown) {
@@ -388,7 +388,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     if (codigo === null) return c.json({ error: individualRef.deniedMessage }, 403);
     const periodo = (await periods.list()).find((p) => p.id === c.req.query("periodoId"));
     if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
-    let resultado;
+    let resultado: Awaited<ReturnType<typeof apuracaoDe>>;
     try {
       resultado = await apuracaoDe(periodo, ator(c));
     } catch (err: unknown) {

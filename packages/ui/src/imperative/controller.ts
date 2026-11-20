@@ -115,7 +115,7 @@ export class WindowController<TContent = unknown> {
     this.windows = []
     this.pendingClose.clear()
     this.publish()
-    closing.forEach((w) => w.resolve({ status: "cancelled", reason: "unmounted" }))
+    for (const w of closing) w.resolve({ status: "cancelled", reason: "unmounted" })
   }
 
   /** Rearma após dispose(): o StrictMode do React executa mount, cleanup e mount de novo. */
@@ -155,6 +155,6 @@ export class WindowController<TContent = unknown> {
   private publish(): void {
     const windows = this.windows.map(({ id, options, focusTarget }) => ({ id, options, focusTarget }))
     this.current = { windows, activeId: windows.at(-1)?.id ?? null }
-    this.listeners.forEach((listener) => listener())
+    for (const listener of this.listeners) listener()
   }
 }

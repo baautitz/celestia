@@ -20,7 +20,7 @@ export async function openMenu(page: Page, name: string): Promise<void> {
  */
 export async function apiLoginAsAdmin(request: APIRequestContext): Promise<string> {
   const first = (await (await request.post("/api/auth/login", { data: { username: ADMIN_USERNAME, password: ADMIN_PASSWORD } })).json()) as { verifyUrl: string };
-  const callback = new URL((await request.get(first.verifyUrl, { maxRedirects: 0 })).headers()["location"]!);
+  const callback = new URL((await request.get(first.verifyUrl, { maxRedirects: 0 })).headers().location!);
   const done = await request.post("/api/auth/login/certificate", {
     data: { challengeId: callback.searchParams.get("challenge"), code: callback.searchParams.get("code") ?? undefined },
   });

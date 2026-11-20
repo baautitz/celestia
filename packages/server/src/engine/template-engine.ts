@@ -19,6 +19,7 @@ export interface ParameterizedQuery {
   paramNames: string[];
 }
 
+// biome-ignore lint/complexity/noStaticOnlyClass: `TemplateEngine.parse()` is the public entry point mandated by CODING_STANDARDS.
 export class TemplateEngine {
   /**
    * Converte uma query contendo tokens {{...}} em uma query parametrizada segura contra SQL Injection.
@@ -64,20 +65,20 @@ export class TemplateEngine {
       const record = current as Record<string, unknown>;
       if (record[part] !== undefined) {
         current = record[part];
-      } else if (part === "start_date" && record["startDate"] !== undefined) {
-        current = record["startDate"];
-      } else if (part === "end_date" && record["endDate"] !== undefined) {
-        current = record["endDate"];
-      } else if (part === "startDate" && record["start_date"] !== undefined) {
-        current = record["start_date"];
-      } else if (part === "endDate" && record["end_date"] !== undefined) {
-        current = record["end_date"];
+      } else if (part === "start_date" && record.startDate !== undefined) {
+        current = record.startDate;
+      } else if (part === "end_date" && record.endDate !== undefined) {
+        current = record.endDate;
+      } else if (part === "startDate" && record.start_date !== undefined) {
+        current = record.start_date;
+      } else if (part === "endDate" && record.end_date !== undefined) {
+        current = record.end_date;
       } else if (
-        record["params"] !== null &&
-        typeof record["params"] === "object" &&
-        (record["params"] as Record<string, unknown>)[part] !== undefined
+        record.params !== null &&
+        typeof record.params === "object" &&
+        (record.params as Record<string, unknown>)[part] !== undefined
       ) {
-        current = (record["params"] as Record<string, unknown>)[part];
+        current = (record.params as Record<string, unknown>)[part];
       } else {
         current = null;
       }
