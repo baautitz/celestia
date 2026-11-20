@@ -4,7 +4,7 @@ interface TotaisGerais {
   totalDescontoGeral: number;
   totalLiquidoGeral: number;
   totalCmvGeral: number;
-  categorias: Record<string, { quantidade: number; valor: number }>;
+  colunas: { id: string; quantidade: number; valor: number; cmv: number }[];
 }
 
 /**
@@ -13,17 +13,14 @@ interface TotaisGerais {
  */
 export function colaboradoresTotals(resumo: TotaisGerais | null): Record<string, number> | undefined {
   if (!resumo) return undefined;
-  const categorias = Object.entries(resumo.categorias).flatMap(([key, { quantidade, valor }]) => [
-    [`${key}-quantidade`, quantidade] as const,
-    [`${key}-valor`, valor] as const,
-  ]);
+  const colunas = resumo.colunas.flatMap(({ id, quantidade, valor, cmv }) => [[`${id}-quantidade`, quantidade] as const, [`${id}-valor`, valor] as const, [`${id}-cmv`, cmv] as const]);
   return {
     quantidadeVendas: resumo.totalVendasGeral,
     totalBruto: resumo.totalBrutoGeral,
     totalDesconto: resumo.totalDescontoGeral,
     totalLiquido: resumo.totalLiquidoGeral,
     totalCmv: resumo.totalCmvGeral,
-    ...Object.fromEntries(categorias),
+    ...Object.fromEntries(colunas),
   };
 }
 

@@ -164,7 +164,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       cmvPercentGeral: (10000 / 15000) * 100,
       cadastroPercentGeral: 50,
       totalColaboradores: 2,
-      categorias: expect.any(Object),
+      colunas: [],
     });
     expect(body.colaboradores[0]).toEqual({
       codigoColaborador: 10,
@@ -179,7 +179,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       ticketMedio: 100,
       participacaoPercent: (10000 / 15000) * 100,
       cadastroPercent: 40,
-      categorias: expect.any(Object),
+      colunas: [],
     });
   });
 
@@ -190,6 +190,8 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
     const erp = mockErpClient(async (sql, params) => {
       if (sql.includes("FROM Funcionario")) return [{ codigoColaborador: 7, nome: "ANA", ativo: true }];
       if (sql.includes("Config")) return [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }, { codigoEmpresa: 3, nome: "Norte" }];
+      // A conferência do seed das colunas não é o relatório: o ERP do teste não tem os cadastros.
+      if (sql.includes(" AS tipo")) return [];
       sqls.push({ sql, params });
       return sql.includes("totalVendasGeral") ? [{ totalVendasGeral: 0, totalVendasComCadastro: 0 }] : [];
     });
@@ -217,6 +219,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       ]);
       const res = await platform.app.request(`${RELATORIO}/visualizacoes`, { headers });
       expect(await res.json()).toEqual({
+        podeGerenciarColunas: false,
         periodos: [],
         visualizacoes: [
           { id: "geral", lojas: [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }, { codigoEmpresa: 3, nome: "Norte" }] },
@@ -243,7 +246,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
 
     it("Loja e Individual exigem vínculo; sem ele só resta o que a Permission liberar sem vínculo", async () => {
       const { platform, headers } = await bootVinculado(["inovafarma:vendas-loja:view", "inovafarma:vendas-individual:view"], false);
-      expect(await (await platform.app.request(`${RELATORIO}/visualizacoes`, { headers })).json()).toEqual({ periodos: [], visualizacoes: [] });
+      expect(await (await platform.app.request(`${RELATORIO}/visualizacoes`, { headers })).json()).toEqual({ podeGerenciarColunas: false, periodos: [], visualizacoes: [] });
       const res = await platform.app.request(`${RELATORIO}?${PERIODO}`, { headers });
       expect(res.status).toBe(403);
       expect(await res.json()).toEqual({ error: "Seu perfil não possui nenhuma visualização disponível." });
@@ -292,93 +295,41 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
     });
   });
 
-  it("soma Qtde e Valor de Vitaminas, Genéricos, Similares, Incentivos e Total Foco por colaborador e no resumo", async () => {
-    const mockClient = mockErpClient(async (sql: string) => {
-        if (sql.includes("totalVendasGeral")) return [{ totalVendasGeral: 3, totalVendasComCadastro: 0 }];
-        for (const filtro of ["p.CodigoGrupo = 44", "p.CodigoSessao = 261", "p.CodigoSessao = 271", "p.CodigoSessao = 281"]) {
-          expect(sql).toContain(`CASE WHEN ${filtro} THEN vp.Quantidade END`);
-          expect(sql).toContain(`CASE WHEN ${filtro} THEN vp.Total END`);
-        }
-        // Total Foco: um item conta uma vez, mesmo sendo Vitamina e também de uma seção.
-        const foco = "(p.CodigoGrupo = 44 OR p.CodigoSessao = 261 OR p.CodigoSessao = 271 OR p.CodigoSessao = 281)";
-        expect(sql).toContain(`CASE WHEN ${foco} THEN vp.Quantidade END`);
-        expect(sql).toContain(`CASE WHEN ${foco} THEN vp.Total END`);
-        return [
-          {
-            codigoColaborador: 10,
-            nomeColaborador: "MARCOS SILVA",
-            quantidadeVendas: 2,
-            totalBruto: 500,
-            totalDesconto: 0,
-            totalLiquido: 500,
-            totalCmv: 0,
-            vendasComCadastro: 0,
-            qtdVitaminas: 3,
-            valorVitaminas: 90.5,
-            qtdGenericos: 10,
-            valorGenericos: 200,
-            qtdSimilares: 0,
-            valorSimilares: 0,
-            qtdIncentivos: 1,
-            valorIncentivos: 35,
-            qtdTotalFoco: 13,
-            valorTotalFoco: 290.5,
-          },
-          {
-            codigoColaborador: 20,
-            nomeColaborador: "ANA SOUZA",
-            quantidadeVendas: 1,
-            totalBruto: 100,
-            totalDesconto: 0,
-            totalLiquido: 100,
-            totalCmv: 0,
-            vendasComCadastro: 0,
-            qtdVitaminas: null,
-            valorVitaminas: null,
-            qtdGenericos: 2,
-            valorGenericos: 40,
-            qtdSimilares: 4,
-            valorSimilares: 60,
-            qtdIncentivos: null,
-            valorIncentivos: null,
-            qtdTotalFoco: 6,
-            valorTotalFoco: 100,
-          },
-        ];
+  it("semeia as colunas do cliente e soma Qtde, Valor, CMV e Ticket de cada uma por colaborador e no resumo, o Total Foco sem contar em dobro", async () => {
+    const mockClient = mockErpClient(async (sql: string, params?: Record<string, unknown>) => {
+      // Conferência do seed: os quatro ids existem na base do cliente.
+      if (sql.includes(" AS tipo")) return Object.entries(params ?? {}).map(([k, v]) => ({ tipo: k.replace(/\d+$/, ""), id: String(v) }));
+      if (sql.includes("totalVendasGeral")) return [{ totalVendasGeral: 3, totalVendasComCadastro: 0 }];
+      // Vitaminas (0), Genéricos (1), Similares (2), Incentivos (3) e Total Foco (4, a união das quatro, por OR).
+      expect(params).toMatchObject({ col0_grupo0: 44, col1_secao0: 261, col2_secao0: 271, col3_secao0: 281 });
+      expect(sql).toContain("CASE WHEN (p.CodigoGrupo IN (@col0_grupo0)) THEN vp.Quantidade END");
+      expect(sql).toMatch(/CASE WHEN \(p\.CodigoGrupo IN \(@col4_grupo0\) OR p\.CodigoSessao IN \(@col4_secao0, @col4_secao1, @col4_secao2\)\) THEN vp\.Total END/);
+      const linha = (n: number, v: number, cmv: number, vendas: number) => ({ [`colQtd${n}`]: v === 0 ? null : v, [`colValor${n}`]: v === 0 ? null : v * 10, [`colCmv${n}`]: cmv, [`colVendas${n}`]: vendas });
+      return [
+        {
+          codigoColaborador: 10, nomeColaborador: "MARCOS SILVA", quantidadeVendas: 2, totalBruto: 500, totalDesconto: 0, totalLiquido: 500, totalCmv: 0, vendasComCadastro: 0,
+          ...linha(0, 3, 15, 2), ...linha(1, 10, 50, 1), ...linha(2, 0, 0, 0), ...linha(3, 1, 5, 1), ...linha(4, 13, 70, 2),
+        },
+        {
+          codigoColaborador: 20, nomeColaborador: "ANA SOUZA", quantidadeVendas: 1, totalBruto: 100, totalDesconto: 0, totalLiquido: 100, totalCmv: 0, vendasComCadastro: 0,
+          ...linha(0, 0, 0, 0), ...linha(1, 2, 8, 1), ...linha(2, 4, 20, 1), ...linha(3, 0, 0, 0), ...linha(4, 6, 28, 1),
+        },
+      ];
     });
     const { platform, headers } = await boot(["inovafarma:vendas-geral:view"], { inovafarma: mockClient });
-    const res = await platform.app.request(
-      "/api/m/inovafarma/relatorios/vendas-colaborador?dataInicio=2026-10-01&dataFim=2026-10-31",
-      { headers }
-    );
+    const res = await platform.app.request("/api/m/inovafarma/relatorios/vendas-colaborador?dataInicio=2026-10-01&dataFim=2026-10-31", { headers });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      resumo: { categorias: unknown };
-      colaboradores: { categorias: unknown }[];
+      resumo: { colunas: { nome: string; quantidade: number; valor: number; cmvPercent: number }[] };
+      colaboradores: { colunas: { nome: string; quantidade: number; valor: number; ticketMedio: number; participacaoPercent: number }[] }[];
     };
-    expect(body.colaboradores.map((c) => c.categorias)).toEqual([
-      {
-        vitaminas: { quantidade: 3, valor: 90.5 },
-        genericos: { quantidade: 10, valor: 200 },
-        similares: { quantidade: 0, valor: 0 },
-        incentivos: { quantidade: 1, valor: 35 },
-        totalFoco: { quantidade: 13, valor: 290.5 },
-      },
-      {
-        vitaminas: { quantidade: 0, valor: 0 },
-        genericos: { quantidade: 2, valor: 40 },
-        similares: { quantidade: 4, valor: 60 },
-        incentivos: { quantidade: 0, valor: 0 },
-        totalFoco: { quantidade: 6, valor: 100 },
-      },
-    ]);
-    expect(body.resumo.categorias).toEqual({
-      vitaminas: { quantidade: 3, valor: 90.5 },
-      genericos: { quantidade: 12, valor: 240 },
-      similares: { quantidade: 4, valor: 60 },
-      incentivos: { quantidade: 1, valor: 35 },
-      totalFoco: { quantidade: 19, valor: 390.5 },
-    });
+    expect(body.resumo.colunas.map((c) => c.nome)).toEqual(["Vitaminas", "Genéricos", "Similares", "Incentivos", "Total Foco"]);
+    expect(body.colaboradores[0]?.colunas.map((c) => [c.quantidade, c.valor])).toEqual([[3, 30], [10, 100], [0, 0], [1, 10], [13, 130]]);
+    expect(body.colaboradores[0]?.colunas[0]).toMatchObject({ ticketMedio: 15, participacaoPercent: 30 / 600 * 100 });
+    expect(body.colaboradores[1]?.colunas.map((c) => [c.quantidade, c.valor])).toEqual([[0, 0], [2, 20], [4, 40], [0, 0], [6, 60]]);
+    // O Total Foco do resumo é a soma por Colaborador do que cada um somou uma vez; as colunas somam aos poucos.
+    expect(body.resumo.colunas.map((c) => [c.quantidade, c.valor])).toEqual([[3, 30], [12, 120], [4, 40], [1, 10], [19, 190]]);
+    expect(body.resumo.colunas[0]?.cmvPercent).toBe(50);
   });
 
   describe("Validação e falhas do relatório de vendas", () => {

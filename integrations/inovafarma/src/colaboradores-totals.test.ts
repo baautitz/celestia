@@ -2,20 +2,14 @@ import { describe, expect, it } from "vitest";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { defined } from "./test/defined";
 
-const categoria = (quantidade: number, valor: number) => ({ quantidade, valor });
+const coluna = (id: string, quantidade: number, valor: number) => ({ id, quantidade, valor, cmv: valor / 2 });
 const resumo = {
   totalVendasGeral: 5000,
   totalBrutoGeral: 1000,
   totalDescontoGeral: 100,
   totalLiquidoGeral: 900,
   totalCmvGeral: 450,
-  categorias: {
-    vitaminas: categoria(10, 100),
-    genericos: categoria(20, 200),
-    similares: categoria(30, 300),
-    incentivos: categoria(40, 400),
-    totalFoco: categoria(90, 950),
-  },
+  colunas: [coluna("vitaminas", 10, 100), coluna("genericos", 20, 200), coluna("totalFoco", 90, 950)],
 };
 
 describe("colaboradoresTotals", () => {
@@ -28,14 +22,13 @@ describe("colaboradoresTotals", () => {
       totalCmv: 450,
       "vitaminas-quantidade": 10,
       "vitaminas-valor": 100,
+      "vitaminas-cmv": 50,
       "genericos-quantidade": 20,
       "genericos-valor": 200,
-      "similares-quantidade": 30,
-      "similares-valor": 300,
-      "incentivos-quantidade": 40,
-      "incentivos-valor": 400,
+      "genericos-cmv": 100,
       "totalFoco-quantidade": 90,
       "totalFoco-valor": 950,
+      "totalFoco-cmv": 475,
     });
   });
 

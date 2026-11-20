@@ -105,8 +105,12 @@ _Avoid_: Sobra
 ### Metas
 
 **Indicador** (en: Indicator):
-A measure that Celestia knows how to calculate for a Colaborador within a Closing Period, such as CMV %, Ticket Médio, Total Foco, sales with an identified customer, Pré-vencidos sold or what was sold of a Lista de Produtos. Indicadores come ready with the Plugin and are not created by the customer; each one knows whether higher or lower is better.
+A measure that Celestia knows how to calculate for a Colaborador within a Closing Period, such as CMV %, Ticket Médio, sales with an identified customer, Pré-vencidos sold or what was sold of a Lista de Produtos. Indicadores come ready with the Plugin and are not created by the customer; each one knows whether higher or lower is better.
 _Avoid_: Métrica, KPI
+
+**Coluna do Desempenho** (en: Performance Column):
+A column of the Desempenho de Vendas that the customer builds: a name plus what it adds up (Produtos, Grupos, Seções and Laboratórios, and optionally the entries of other columns). Each product sold counts once in a column even when it matches more than one entry, so a column that unites others (such as Total Foco) never double-counts. It shows Qtde, Valor, share of sales, CMV % and Ticket. Nothing about the customer's categories is fixed in the code.
+_Avoid_: Categoria, Foco
 
 **Tipo de Meta** (en: Goal Type):
 A reusable definition kept by the customer: which Indicador it measures (with its Lista de Produtos, for that Indicador), how the result is shown to the Colaborador, whether the Prêmio is shown to them, how the Prêmio is calculated, and optionally a default Alvo for new Participantes. An inactive Tipo de Meta can no longer be used in new Metas.

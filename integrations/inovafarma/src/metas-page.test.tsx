@@ -141,7 +141,7 @@ describe("Metas: Tipos de Meta", () => {
 
 describe("Metas: construtor de Tipo de Meta", () => {
   const DIPIRONA = "8F14E45F-CEEA-467F-A8F4-5E1D2C3B4A01";
-  const foco = { ...cmv, id: "tme_2", nome: "Foco", indicador: "incentivos-qtd", regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: 80, teto: null }, alvoPadrao: 50, premio: "…" };
+  const foco = { ...cmv, id: "tme_2", nome: "Foco", indicador: "vendas-cadastro-qtd", regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: 80, teto: null }, alvoPadrao: 50, premio: "…" };
   const venda = { ...cmv, id: "tme_3", nome: "Venda", indicador: "venda-liquida", regra: { tipo: "fixo", valorCentavos: 10000 }, alvoPadrao: null, premio: "…" };
   const mix = {
     ...cmv,
@@ -193,7 +193,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
 
   it("mostra embaixo do Gatilho o valor equivalente com o Alvo padrão", async () => {
     const modal = await alterar("Foco");
-    within(modal).getByText("= 40 incentivos com o Alvo padrão de 50");
+    within(modal).getByText("= 40 vendas com o Alvo padrão de 50");
   });
 
   it("no Percentual do valor vendido, Calcular sobre começa no próprio Indicador em R$", async () => {

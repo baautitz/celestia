@@ -1,0 +1,1 @@
+ALTER TABLE "inovafarma"."colunas_desempenho" ADD COLUMN "medidas" jsonb DEFAULT '["quantidade","valor","participacaoPercent","cmvPercent","ticketMedio"]' NOT NULL;
