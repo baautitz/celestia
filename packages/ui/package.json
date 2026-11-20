@@ -21,7 +21,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "biome lint ."
   },
   "peerDependencies": {
     "@base-ui/react": "^1.9.0",

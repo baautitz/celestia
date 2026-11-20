@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import React from "react";
 import { describe, expect, it, afterEach } from "vitest";
 import { render, cleanup, waitFor } from "@testing-library/react";
 import { useForm } from "react-hook-form";

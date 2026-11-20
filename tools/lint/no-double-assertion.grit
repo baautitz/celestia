@@ -1,0 +1,8 @@
+language js;
+
+or {
+  `$_ as unknown as $_`,
+  `$_ as any as $_`
+} as $x where {
+  register_diagnostic(span = $x, message = "Double assertion is forbidden. Use the exact type.", severity = "error")
+}

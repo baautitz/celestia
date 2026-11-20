@@ -49,7 +49,7 @@ O SPA abre em `http://localhost:5173`. A API roda na porta 3000 e a autoridade c
 | `pnpm test` | Testes unitários e de componente (Vitest) |
 | `pnpm test:db` | Testes com integração em Postgres, num container descartável |
 | `pnpm test:e2e` | Testes de navegador (Playwright) |
-| `pnpm lint` | ESLint em todos os pacotes |
+| `pnpm lint` | Biome (lint) em todos os pacotes |
 | `pnpm check:ui` | Verifica os limites de UI |
 | `pnpm check:plugins` | Verifica os limites dos Plugins |
 | `pnpm check` | Roda verificações, lint, build e testes unitários |

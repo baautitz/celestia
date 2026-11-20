@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "lint": "eslint ."
+    "lint": "biome lint ."
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.0",

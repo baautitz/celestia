@@ -3,4 +3,4 @@
 set -e
 pnpm -s check:ui
 pnpm -s check:plugins
-git diff --cached --name-only --diff-filter=ACMR -z -- '*.ts' '*.tsx' '*.mjs' | xargs -0 -r pnpm exec eslint --no-warn-ignored
+git diff --cached --name-only --diff-filter=ACMR -z -- '*.ts' '*.tsx' '*.mjs' | xargs -0 -r pnpm exec biome lint --no-errors-on-unmatched

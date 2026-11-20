@@ -53,7 +53,7 @@ pnpm db:migrate        # apply all Module migrations in dependency order (server
 pnpm dev               # run the server, the certificate authority and the web app together
 pnpm create-admin      # create or promote (--force) an Administrator user
 pnpm test:e2e          # Playwright E2E suite
-pnpm lint              # ESLint across workspaces
+pnpm lint              # Biome lint across workspaces
 pnpm check:ui          # UI boundary check
 pnpm check:plugins     # Plugin boundary check (integrations import only @platform/core and @platform/ui)
 ```

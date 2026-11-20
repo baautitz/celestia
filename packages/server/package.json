@@ -13,7 +13,7 @@
     "db:migrate": "tsx --conditions=source --env-file=../../.env src/db/migrate.ts",
     "create-admin": "tsx --conditions=source --env-file=../../.env src/cli/create-admin.ts",
     "erp:query": "tsx --conditions=source --env-file=../../.env src/cli/erp-query.ts",
-    "lint": "eslint ."
+    "lint": "biome lint ."
   },
   "dependencies": {
     "@hono/node-server": "^2.0.0",

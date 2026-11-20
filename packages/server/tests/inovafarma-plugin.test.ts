@@ -92,7 +92,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       expect(consulta).toContain("FROM Funcionario");
       expect(consulta).toContain("c.Eliminado = 0");
       expect(consulta).not.toContain("DataDesligamento");
-      expect(consulta).not.toMatch(/WHERE[^]*Ativo/);
+      expect(consulta).not.toMatch(/WHERE[\s\S]*Ativo/);
     });
 
     it("nega sem a Permission com a mensagem em PT-BR, mesmo com a Permission do relatório", async () => {

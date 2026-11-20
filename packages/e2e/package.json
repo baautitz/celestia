@@ -6,7 +6,7 @@
   "scripts": {
     "install:browsers": "playwright install chromium",
     "test": "playwright test",
-    "lint": "eslint ."
+    "lint": "biome lint ."
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",

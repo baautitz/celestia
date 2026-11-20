@@ -12,7 +12,7 @@
     "test": "vitest run",
     "db:migrate": "tsx --conditions=source --env-file=../../.env src/migrate.ts",
     "create-ca": "tsx --conditions=source --env-file=../../.env src/cli/create-ca.ts",
-    "lint": "eslint ."
+    "lint": "biome lint ."
   },
   "dependencies": {
     "@hono/node-server": "^2.0.0",

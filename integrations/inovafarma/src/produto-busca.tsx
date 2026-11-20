@@ -63,8 +63,7 @@ export function ProdutoBusca({ url, id, onChange }: Props) {
       atual = false;
       clearTimeout(espera);
     };
-    // `escolher` e `feedback` não mudam o resultado da busca.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `escolher` e `feedback` não mudam o resultado da busca.
   }, [busca]);
 
   return (

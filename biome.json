@@ -1,0 +1,52 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
+  "root": true,
+  "vcs": {
+    "enabled": false
+  },
+  "files": {
+    "includes": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.mjs",
+      "**/*.js",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/drizzle"
+    ]
+  },
+  "formatter": {
+    "enabled": false
+  },
+  "assist": {
+    "enabled": false
+  },
+  "plugins": [
+    "./tools/lint/no-double-assertion.grit"
+  ],
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedFunctionParameters": "error",
+        "noUnusedImports": "error",
+        "useHookAtTopLevel": "error",
+        "useExhaustiveDependencies": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "error",
+        "useIterableCallbackReturn": "off",
+        "noAssignInExpressions": "off",
+        "noImplicitAnyLet": "off",
+        "noDoubleEquals": "off",
+        "noGlobalIsNan": "off",
+        "noDocumentCookie": "off"
+      },
+      "a11y": { "preset": "none" },
+      "style": { "preset": "none" },
+      "performance": { "preset": "none" },
+      "complexity": { "preset": "none" }
+    }
+  }
+}

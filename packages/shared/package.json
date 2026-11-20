@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -b",
     "dev": "tsc -b -w",
-    "lint": "eslint ."
+    "lint": "biome lint ."
   },
   "dependencies": {
     "@platform/core": "workspace:*",
