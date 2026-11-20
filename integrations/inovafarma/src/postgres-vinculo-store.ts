@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { violouRestricao } from "./erros-de-store.js";
 import { vinculosColaborador } from "./schema.js";
 import {
   UsuarioJaVinculadoError,
@@ -13,14 +14,6 @@ type Row = typeof vinculosColaborador.$inferSelect;
 
 const toRecord = (row: Row): VinculoColaborador => ({ ...row, atualizadoEm: row.atualizadoEm.toISOString() });
 
-/** O erro do Postgres pode vir embrulhado pelo drizzle: procura na cadeia de `cause`. */
-function violouUsuarioUnico(err: unknown): boolean {
-  for (let e = err; e instanceof Error; e = e.cause) {
-    if ("constraint" in e && e.constraint === "vinculos_colaborador_usuario_id_unique") return true;
-  }
-  return false;
-}
-
 export class PostgresVinculoStore implements VinculoStore {
   constructor(private readonly db: NodePgDatabase) {}
 
@@ -30,6 +23,11 @@ export class PostgresVinculoStore implements VinculoStore {
 
   async get(codigoColaborador: number): Promise<VinculoColaborador | null> {
     const [row] = await this.db.select().from(vinculosColaborador).where(eq(vinculosColaborador.codigoColaborador, codigoColaborador));
+    return row ? toRecord(row) : null;
+  }
+
+  async porUsuario(usuarioId: string): Promise<VinculoColaborador | null> {
+    const [row] = await this.db.select().from(vinculosColaborador).where(eq(vinculosColaborador.usuarioId, usuarioId));
     return row ? toRecord(row) : null;
   }
 
@@ -50,7 +48,7 @@ export class PostgresVinculoStore implements VinculoStore {
               .where(and(eq(vinculosColaborador.codigoColaborador, input.codigoColaborador), eq(vinculosColaborador.version, expectedVersion)))
               .returning();
     } catch (err: unknown) {
-      if (violouUsuarioUnico(err)) throw new UsuarioJaVinculadoError();
+      if (violouRestricao(err, "vinculos_colaborador_usuario_id_unique")) throw new UsuarioJaVinculadoError();
       throw err;
     }
     const [row] = rows;
