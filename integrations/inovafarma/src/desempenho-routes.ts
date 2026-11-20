@@ -4,6 +4,7 @@ import type { ModuleContext } from "@platform/core/module";
 import { CATEGORIAS, desempenhoSql, porCategoria, type CategoriaColuna, type CategoriaTotais } from "./desempenho-vendas.js";
 import { CodigoEmTexto, DiaDoCalendario, ERP_INDISPONIVEL, recusaDeValidacao, SEM_CONEXAO, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import { lojasDoErp, visualizacoesDoContexto } from "./pre-vencidos-comum.js";
+import type { PeriodsService } from "./pre-vencidos-routes.js";
 import type { VinculoStore } from "./vinculo-store.js";
 import { VISUALIZACAO_PERMISSION, visualizacaoPedida, type Visualizacao } from "./visualizacoes.js";
 
@@ -13,6 +14,7 @@ export interface DesempenhoRoutesDeps {
   auth: MiddlewareHandler;
   erpClient: () => ErpQuery | undefined;
   vinculos: VinculoStore;
+  periods: PeriodsService;
 }
 
 const DATAS_OBRIGATORIAS = "Parâmetros 'dataInicio' e 'dataFim' são obrigatórios no formato YYYY-MM-DD.";
@@ -47,16 +49,19 @@ const categoriasDe = (r: ColaboradorRow): CategoriaTotais =>
   });
 
 /** Desempenho de Vendas por Colaborador: as Visualizações do Usuário e o relatório de cada uma. */
-export function registerDesempenhoRoutes({ routes, permissions, auth, erpClient, vinculos }: DesempenhoRoutesDeps): void {
+export function registerDesempenhoRoutes({ routes, permissions, auth, erpClient, vinculos, periods }: DesempenhoRoutesDeps): void {
   const visualizacoesDe = (c: AuthContext) => visualizacoesDoContexto(c, permissions, vinculos, VISUALIZACAO_PERMISSION);
 
-  // A tela decide o que mostrar por aqui: Visualizações disponíveis e as Lojas que cada uma permite filtrar.
+  // A tela decide o que mostrar por aqui: os Períodos, as Visualizações disponíveis e as Lojas que cada uma permite filtrar.
   routes.get("/relatorios/vendas-colaborador/visualizacoes", auth, async (c: AuthContext) => {
     const { disponiveis, lojas } = await visualizacoesDe(c);
     const lojasErp = disponiveis.some((v) => v !== "individual") ? (await lojasDoErp(erpClient())).map(({ codigo, nome }) => ({ codigoEmpresa: codigo, nome })) : [];
     const lojasDe = (v: Visualizacao) =>
       v === "geral" ? lojasErp : v === "loja" ? lojas.map((codigoEmpresa) => lojasErp.find((l) => l.codigoEmpresa === codigoEmpresa) ?? { codigoEmpresa, nome: "" }) : [];
-    return c.json({ visualizacoes: disponiveis.map((id) => ({ id, lojas: lojasDe(id) })) });
+    return c.json({
+      periodos: (await periods.list()).sort((a, b) => b.startDate.localeCompare(a.startDate)),
+      visualizacoes: disponiveis.map((id) => ({ id, lojas: lojasDe(id) })),
+    });
   });
 
   routes.get("/relatorios/vendas-colaborador", auth, async (c: AuthContext) => {

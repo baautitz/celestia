@@ -156,7 +156,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         audit,
         users,
       });
-      registerDesempenhoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], vinculos: store });
+      registerDesempenhoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], vinculos: store, periods });
     },
   });
 }

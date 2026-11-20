@@ -217,6 +217,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       ]);
       const res = await platform.app.request(`${RELATORIO}/visualizacoes`, { headers });
       expect(await res.json()).toEqual({
+        periodos: [],
         visualizacoes: [
           { id: "geral", lojas: [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }, { codigoEmpresa: 3, nome: "Norte" }] },
           { id: "loja", lojas: [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }] },
@@ -225,9 +226,24 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       });
     });
 
+    it("entrega os Períodos do serviço de Períodos, do mais recente ao mais antigo, sem exigir a Permission do Fechamento", async () => {
+      const { platform, headers } = await bootVinculado(["inovafarma:vendas-geral:view", "closing_period:period:create"]);
+      const criar = (name: string, startDate: string, endDate: string) =>
+        platform.app.request("/api/closing-periods", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify({ name, startDate, endDate }) });
+      expect((await criar("Setembro", "2026-09-01", "2026-09-30")).status).toBe(201);
+      expect((await criar("Outubro", "2026-10-01", "2026-10-31")).status).toBe(201);
+      const { platform: semFechamento, headers: semHeaders } = await bootVinculado(["inovafarma:vendas-geral:view"]);
+      const sem = (await (await semFechamento.app.request(`${RELATORIO}/visualizacoes`, { headers: semHeaders })).json()) as { periodos: unknown[] };
+      expect(sem.periodos).toEqual([]);
+      const res = await platform.app.request(`${RELATORIO}/visualizacoes`, { headers });
+      const body = (await res.json()) as { periodos: { name: string; status: string }[] };
+      expect(body.periodos.map((p) => p.name)).toEqual(["Outubro", "Setembro"]);
+      expect(body.periodos[0]).toMatchObject({ startDate: "2026-10-01", endDate: "2026-10-31", status: "open" });
+    });
+
     it("Loja e Individual exigem vínculo; sem ele só resta o que a Permission liberar sem vínculo", async () => {
       const { platform, headers } = await bootVinculado(["inovafarma:vendas-loja:view", "inovafarma:vendas-individual:view"], false);
-      expect(await (await platform.app.request(`${RELATORIO}/visualizacoes`, { headers })).json()).toEqual({ visualizacoes: [] });
+      expect(await (await platform.app.request(`${RELATORIO}/visualizacoes`, { headers })).json()).toEqual({ periodos: [], visualizacoes: [] });
       const res = await platform.app.request(`${RELATORIO}?${PERIODO}`, { headers });
       expect(res.status).toBe(403);
       expect(await res.json()).toEqual({ error: "Seu perfil não possui nenhuma visualização disponível." });
