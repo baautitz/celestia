@@ -3,6 +3,7 @@ import { z } from "zod";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { SessionLockGate } from "./components/SessionLockGate";
 import { HeaderActionsProvider } from "./context/HeaderActionsContext";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { useRouterNavigation } from "@platform/ui/adapters/navigation-router";
@@ -20,7 +21,13 @@ z.config(z.locales.ptBR());
 setApiFetch((path, options) => api.request(path, options));
 
 function RouterUiProvider({ children }: { children: React.ReactNode }) {
-  return <UiProvider navigation={useRouterNavigation()}>{children}</UiProvider>;
+  return (
+    <UiProvider navigation={useRouterNavigation()}>
+      {children}
+      {/* Fora das rotas: a senha também é pedida ao recarregar a página com a sessão bloqueada, antes de a tela carregar. */}
+      <SessionLockGate />
+    </UiProvider>
+  );
 }
 
 // Roteador de dados: é o que permite a uma tela segurar a saída (useLeaveGuard). As rotas seguem em <App />.

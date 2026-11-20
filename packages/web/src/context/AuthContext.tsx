@@ -2,6 +2,7 @@ import type React from "react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthTokens, JWTAccessPayload } from "@platform/shared";
 import { api } from "@/lib/api-client";
+import { IdleLock } from "@/lib/idle-lock";
 
 interface AuthContextType {
   user: JWTAccessPayload | null;
@@ -12,6 +13,11 @@ interface AuthContextType {
   /** Termina o login por certificado com o código que a autoridade certificadora devolveu ao navegador. */
   loginWithCertificate: (challengeId: string, code?: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Sessão bloqueada por inatividade: só a senha a destrava. */
+  locked: boolean;
+  /** Quem a janela de senha mostra enquanto a sessão está bloqueada. */
+  lockedUser: { fullname: string; username: string } | null;
+  unlock: (password: string) => Promise<void>;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (...permissions: string[]) => boolean;
   refreshUser: () => Promise<void>;
@@ -22,9 +28,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<JWTAccessPayload | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [locked, setLocked] = useState<boolean>(false);
+  const userRef = useRef<{ fullname: string; username: string } | null>(null);
+  const [lockedUser, setLockedUser] = useState<{ fullname: string; username: string } | null>(null);
 
   // Conta os logins concluídos: uma restauração de sessão que começou antes de um login não pode desfazê-lo ao falhar.
   const signIns = useRef(0);
+  userRef.current = user;
 
   const refreshUser = useCallback(async () => {
     const startedAt = signIns.current;
@@ -46,6 +56,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     api.onSessionExpired(() => setUser(null));
     return () => api.onSessionExpired(null);
+  }, []);
+
+  useEffect(() => {
+    api.onLockChange((isLocked) => {
+      setLockedUser(isLocked ? (api.getKnownUser() ?? userRef.current) : null);
+      setLocked(isLocked);
+    });
+    return () => api.onLockChange(null);
+  }, []);
+
+  // Sem ação do usuário pelo tempo que o servidor manda, bloqueia a tela e pede a senha (sem recarregar nada).
+  const idleSeconds = user && !locked ? api.getIdleSeconds() : null;
+  useEffect(() => {
+    if (!idleSeconds) return;
+    const idle = new IdleLock({ idleSeconds, onIdle: () => api.lock(), isBusy: () => api.isBusy() });
+    idle.start();
+    return () => idle.stop();
+  }, [idleSeconds]);
+
+  const unlock = useCallback(async (password: string) => {
+    const tokens = await api.auth.unlock(password);
+    setUser(tokens.user);
   }, []);
 
   const signIn = useCallback(
@@ -111,11 +143,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login,
       loginWithCertificate,
       logout,
+      locked,
+      lockedUser,
+      unlock,
       hasPermission,
       hasAnyPermission,
       refreshUser,
     }),
-    [user, isLoading, login, loginWithCertificate, logout, hasPermission, hasAnyPermission, refreshUser],
+    [user, isLoading, login, loginWithCertificate, logout, locked, lockedUser, unlock, hasPermission, hasAnyPermission, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
