@@ -46,6 +46,16 @@ const mssql: ErpDriverDef = {
 
 export const ERP_DRIVERS: Record<string, ErpDriverDef> = { [mssql.id]: mssql };
 
+/** Valor inválido de um campo do driver; `field` nomeia o campo para o contrato de erros de validação. */
+export class ErpValuesError extends Error {
+  constructor(
+    readonly field: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 /**
  * Valida os valores enviados contra os campos do driver e separa config (pública) de segredos.
  * Segredo vazio reaproveita o valor já salvo (`currentSecrets`), quando existir.
@@ -64,20 +74,20 @@ export function parseErpValues(
 
     if (field.type === "password") {
       const value = empty ? currentSecrets[field.name] : String(raw);
-      if (!value && field.required) throw new Error(`${field.label} é obrigatório.`);
+      if (!value && field.required) throw new ErpValuesError(field.name, `${field.label} é obrigatório.`);
       if (value) secrets[field.name] = value;
     } else if (field.type === "switch") {
       config[field.name] = raw === true;
     } else if (field.type === "number") {
       const value = empty ? field.defaultValue : Number(raw);
-      if (value === undefined && field.required) throw new Error(`${field.label} é obrigatório.`);
-      if (value !== undefined && !Number.isFinite(value)) throw new Error(`${field.label} deve ser um número.`);
+      if (value === undefined && field.required) throw new ErpValuesError(field.name, `${field.label} é obrigatório.`);
+      if (value !== undefined && !Number.isFinite(value)) throw new ErpValuesError(field.name, `${field.label} deve ser um número.`);
       if (value !== undefined && ((field.min !== undefined && value < field.min) || (field.max !== undefined && value > field.max))) {
-        throw new Error(`${field.label} fora do intervalo permitido.`);
+        throw new ErpValuesError(field.name, `${field.label} fora do intervalo permitido.`);
       }
       config[field.name] = value;
     } else {
-      if (empty && field.required) throw new Error(`${field.label} é obrigatório.`);
+      if (empty && field.required) throw new ErpValuesError(field.name, `${field.label} é obrigatório.`);
       if (!empty) config[field.name] = String(raw);
     }
   }

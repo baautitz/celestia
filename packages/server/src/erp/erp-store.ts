@@ -5,7 +5,7 @@ export interface ErpRecord {
   driver: string;
   /** Valores públicos do formulário do driver (sem segredos). */
   config: Record<string, unknown>;
-  /** Campos do tipo "password", em JSON cifrado (AES-256-GCM). */
+  /** Campos do tipo "password", em JSON cifrado (AES-128-GCM, chave de 16 bytes; ver secret-box.ts). */
   secretsEncrypted: string;
   createdAt: string;
   updatedAt: string;
