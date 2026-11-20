@@ -28,6 +28,38 @@ describe("assertReadOnlyQuery", () => {
   });
 });
 
+describe("assertReadOnlyQuery: literais, comentários e identificadores na ordem do texto", () => {
+  it("não deixa um '--' dentro de literal esconder instruções seguintes", () => {
+    expect(() => assertReadOnlyQuery("SELECT '--'; DROP TABLE t; --'")).toThrow();
+    expect(() => assertReadOnlyQuery("SELECT '--' AS a, 'x'; DELETE FROM t; --'")).toThrow();
+    expect(() => assertReadOnlyQuery("SELECT '/*'; DROP TABLE t; --*/'")).toThrow();
+  });
+
+  it("não deixa aspas dentro de comentário abrir literal", () => {
+    expect(() => assertReadOnlyQuery("SELECT 1 -- it's\n; DROP TABLE t")).toThrow();
+    expect(() => assertReadOnlyQuery("SELECT 1 /* ' */; DROP TABLE t; /* ' */")).toThrow();
+  });
+
+  it("trata comentários de bloco aninhados e literais com aspa duplicada", () => {
+    expect(() => assertReadOnlyQuery("SELECT 1 /* a /* b */ ; DROP TABLE t */")).not.toThrow();
+    expect(() => assertReadOnlyQuery("SELECT 1 /* a /* b */ */; DROP TABLE t")).toThrow();
+    expect(() => assertReadOnlyQuery("SELECT 'it''s; DROP' AS a")).not.toThrow();
+    expect(() => assertReadOnlyQuery("SELECT 'it''s'; DROP TABLE t")).toThrow();
+  });
+
+  it("trata identificadores entre colchetes e aspas duplas", () => {
+    expect(() => assertReadOnlyQuery("SELECT [delete], [a]]; drop] FROM t")).not.toThrow();
+    expect(() => assertReadOnlyQuery('SELECT "update" FROM t')).not.toThrow();
+    expect(() => assertReadOnlyQuery("SELECT [--] FROM t; DROP TABLE t; --]")).toThrow();
+    expect(() => assertReadOnlyQuery("SELECT [a]; DROP TABLE t")).toThrow();
+  });
+
+  it("recusa construções sem fechamento que escondiam o resto", () => {
+    expect(() => assertReadOnlyQuery("DROP TABLE t -- SELECT")).toThrow();
+    expect(() => assertReadOnlyQuery("/* SELECT 1 */ DROP TABLE t")).toThrow();
+  });
+});
+
 describe("ERPs (/api/admin/erps)", () => {
   let app: ReturnType<typeof createPlatformApp>;
   let erpStore: MemoryErpStore;
