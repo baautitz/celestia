@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Hono } from "hono";
 import { loadModules } from "./loader.js";
 import { defineModule, type ModuleDef } from "./module.js";
@@ -110,6 +110,45 @@ describe("loadModules", () => {
     expect(r.registry.allKeys().has("a:r:read")).toBe(true);
     expect((await app.request("/api/m/a/x")).status).toBe(404);
     expect((await app.request("/api/m/c/x")).status).toBe(200);
+  });
+
+  it("módulo cujo dependência falhou não publica permissões", async () => {
+    const r = await loadModules(
+      new Hono(),
+      [
+        mod("a", [], () => { throw new Error("boom"); }),
+        defineModule({ id: "b", version: "1.0.0", dependsOn: ["a"], permissions: definePermissions("b", { "r:read": "Ler" }), register() {} }),
+      ],
+      { logger: quiet },
+    );
+    expect(r.failed.map((f) => f.moduleId)).toEqual(["a", "b"]);
+    expect(r.registry.allKeys().has("b:r:read")).toBe(false);
+  });
+
+  it("falha ao montar as rotas retira as permissões e os handlers do módulo", async () => {
+    const app = new Hono();
+    vi.spyOn(app, "route").mockImplementation(() => {
+      throw new Error("mount falhou");
+    });
+    const seen: string[] = [];
+    const r = await loadModules(
+      app,
+      [
+        defineModule({
+          id: "a",
+          version: "1.0.0",
+          permissions: definePermissions("a", { "r:read": "Ler" }),
+          register(ctx) {
+            ctx.events.after("x", () => void seen.push("a"));
+          },
+        }),
+      ],
+      { logger: quiet },
+    );
+    expect(r.failed).toEqual([{ moduleId: "a", reason: "mount falhou" }]);
+    expect(r.registry.allKeys().has("a:r:read")).toBe(false);
+    await r.events.run("x", {}, () => 1);
+    expect(seen).toEqual([]);
   });
 
   it("routeMiddleware aplicado e permissões em catalog()", async () => {
