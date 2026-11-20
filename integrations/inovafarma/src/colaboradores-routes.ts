@@ -51,6 +51,7 @@ export const COLABORADORES_SQL = `
   FROM Funcionario f
   JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
   WHERE c.Eliminado = 0
+    AND f.CodigoFuncionario <> 0 -- 0 é o "CONSUMIDOR" (venda sem vendedor), não uma pessoa
 `;
 
 type LinhaErp = { codigoColaborador: number; nome: string | null; ativo: boolean | number | null; codigoEmpresa: number | null };
