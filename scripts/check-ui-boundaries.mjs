@@ -1,8 +1,8 @@
-import ts from "@typescript/typescript6"
 import { readFileSync } from "node:fs"
 import { glob } from "node:fs/promises"
 import { resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
+import { lineOf, parse, stringValue, walk } from "./ast.mjs"
 
 const rootArg = process.argv.indexOf("--root")
 const root = rootArg > -1 ? resolve(process.argv[rootArg + 1]) : resolve(fileURLToPath(new URL("..", import.meta.url)))
@@ -21,82 +21,77 @@ const violations = []
 for await (const rel of glob("{packages/*/src/**/*.{ts,tsx},integrations/**/*.{ts,tsx}}", { cwd: root })) {
   const file = rel.split(sep).join("/")
   if (file.startsWith("packages/ui/") || /(^|\/)(node_modules|dist)\//.test(file)) continue
-  const source = ts.createSourceFile(file, readFileSync(resolve(root, file), "utf8"), ts.ScriptTarget.Latest, true)
+  const code = readFileSync(resolve(root, file), "utf8")
+  const program = parse(file, code)
+  const text = (node) => code.slice(node.start, node.end)
   const windowTags = new Set()
   const report = (node, label) => {
-    const { line } = source.getLineAndCharacterOfPosition(node.getStart(source))
-    violations.push(`${file}:${line + 1} - ${label}`)
+    violations.push(`${file}:${lineOf(code, node)} - ${label}`)
   }
-  const visit = (node) => {
-    if (ts.isImportDeclaration(node)) {
-      const name = node.moduleSpecifier.text
-      if (name === "sonner") report(node, "import direto de sonner")
-      if (name.startsWith("@base-ui/react")) report(node, "import direto de @base-ui/react")
-      if (name.startsWith("@/components/ui")) report(node, "import de @/components/ui (legado)")
-      const bindings = node.importClause?.namedBindings
-      if (windowModules.test(name) && bindings && ts.isNamedImports(bindings)) {
-        for (const el of bindings.elements) windowTags.add(el.name.text)
-      }
+  walk(program, (node) => {
+    if (node.type !== "ImportDeclaration") return
+    const name = node.source.value
+    if (name === "sonner") report(node, "import direto de sonner")
+    if (name.startsWith("@base-ui/react")) report(node, "import direto de @base-ui/react")
+    if (name.startsWith("@/components/ui")) report(node, "import de @/components/ui (legado)")
+    if (windowModules.test(name)) {
+      for (const el of node.specifiers) if (el.type === "ImportSpecifier") windowTags.add(el.local.name)
     }
-    ts.forEachChild(node, visit)
-  }
-  visit(source)
+  })
   const styledObjects = new Set()
   const hasStyleKey = (obj) =>
-    ts.isObjectLiteralExpression(obj) &&
-    obj.properties.some((p) => p.name && ["className", "style"].includes(p.name.getText(source)))
-  const collect = (node) => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && hasStyleKey(node.initializer)) {
-      styledObjects.add(node.name.text)
+    obj.type === "ObjectExpression" &&
+    obj.properties.some(
+      (p) => p.type === "Property" && !p.computed && p.key.type === "Identifier" && ["className", "style"].includes(p.key.name),
+    )
+  walk(program, (node) => {
+    if (node.type === "VariableDeclarator" && node.id.type === "Identifier" && node.init && hasStyleKey(node.init)) {
+      styledObjects.add(node.id.name)
     }
-    ts.forEachChild(node, collect)
+  })
+  /** Valor de um atributo JSX quando é um literal de string (`a="x"`, `a={"x"}` ou `a={`x`}`). */
+  const literalValue = (attr) => {
+    const init = attr.value
+    return stringValue(init && init.type === "JSXExpressionContainer" ? init.expression : init)
   }
-  collect(source)
-  const visitJsx = (node) => {
-    if (ts.isJsxOpeningLikeElement(node)) {
-      const tag = node.tagName.getText(source)
-      if (forbiddenTags.has(tag)) report(node, `elemento HTML intrinseco <${tag}> (use componentes de @platform/ui)`)
-      for (const attr of node.attributes.properties) {
-        if (ts.isJsxSpreadAttribute(attr)) {
-          const e = attr.expression
-          if (hasStyleKey(e) || (ts.isIdentifier(e) && styledObjects.has(e.text))) {
-            report(attr, "className/style em props espalhadas fora de @platform/ui")
-          }
-          continue
+  walk(program, (node) => {
+    if (node.type !== "JSXOpeningElement") return
+    const tag = text(node.name)
+    if (forbiddenTags.has(tag)) report(node, `elemento HTML intrinseco <${tag}> (use componentes de @platform/ui)`)
+    for (const attr of node.attributes) {
+      if (attr.type === "JSXSpreadAttribute") {
+        const e = attr.argument
+        if (hasStyleKey(e) || (e.type === "Identifier" && styledObjects.has(e.name))) {
+          report(attr, "className/style em props espalhadas fora de @platform/ui")
         }
-        if (!ts.isJsxAttribute(attr)) continue
-        const name = attr.name.getText(source)
-        if (name === "className" || name === "style") report(attr, `${name} em JSX fora de @platform/ui`)
-        if (name === "type" && /^[Ii]nput$/.test(tag)) {
-          const init = attr.initializer
-          const expr = init && ts.isJsxExpression(init) ? init.expression : init
-          if (expr && ts.isStringLiteralLike(expr) && nativeDateInputTypes.has(expr.text)) {
-            report(attr, `<${tag} type="${expr.text}"> nativo (use DatePicker, DateRangePicker ou MonthPicker de @platform/ui/components/*)`)
-          }
-          if (expr && ts.isStringLiteralLike(expr) && expr.text === "password") {
-            report(attr, `<${tag} type="password"> (use PasswordInput de @platform/ui/components/password-input)`)
-          }
+        continue
+      }
+      const name = text(attr.name)
+      if (name === "className" || name === "style") report(attr, `${name} em JSX fora de @platform/ui`)
+      if (name === "type" && /^[Ii]nput$/.test(tag)) {
+        const value = literalValue(attr)
+        if (value !== undefined && nativeDateInputTypes.has(value)) {
+          report(attr, `<${tag} type="${value}"> nativo (use DatePicker, DateRangePicker ou MonthPicker de @platform/ui/components/*)`)
         }
-        if (/(^|[a-z])Button$/.test(tag) && name === "size") {
-          const init = attr.initializer
-          const expr = init && ts.isJsxExpression(init) ? init.expression : init
-          const value = expr && ts.isStringLiteralLike(expr) ? expr.text : undefined
-          if (value === undefined || !allowedButtonSizes.has(value)) {
-            report(attr, `${tag} size deve ser "default" ou "icon" (literal)`)
-          }
+        if (value === "password") {
+          report(attr, `<${tag} type="password"> (use PasswordInput de @platform/ui/components/password-input)`)
         }
       }
-      if (windowTags.has(tag)) {
-        for (const attr of node.attributes.properties) {
-          if (ts.isJsxAttribute(attr) && (attr.name.text === "open" || attr.name.text === "onOpenChange")) {
-            report(attr, `${attr.name.text} declarativo em ${tag}`)
-          }
+      if (/(^|[a-z])Button$/.test(tag) && name === "size") {
+        const value = literalValue(attr)
+        if (value === undefined || !allowedButtonSizes.has(value)) {
+          report(attr, `${tag} size deve ser "default" ou "icon" (literal)`)
         }
       }
     }
-    ts.forEachChild(node, visitJsx)
-  }
-  visitJsx(source)
+    if (windowTags.has(tag)) {
+      for (const attr of node.attributes) {
+        if (attr.type === "JSXAttribute" && attr.name.type === "JSXIdentifier" && (attr.name.name === "open" || attr.name.name === "onOpenChange")) {
+          report(attr, `${attr.name.name} declarativo em ${tag}`)
+        }
+      }
+    }
+  })
 }
 
 if (violations.length) {
