@@ -284,6 +284,33 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
   ]),
 ];
 
+/** Colunas que cada Cartão de resumo do Desempenho de Vendas liga ou desliga na tabela. */
+const COLUNAS_DO_CARTAO: Record<string, readonly string[]> = {
+  vendas: ["quantidadeVendas"],
+  bruto: ["totalBruto"],
+  descontos: ["totalDesconto"],
+  descontosPercent: ["descontoPercent"],
+  liquido: ["totalLiquido"],
+  cmv: ["totalCmv"],
+  cmvPercent: ["cmvPercent"],
+  ticket: ["ticketMedio"],
+  cadastros: ["cadastroPercent"],
+  ...Object.fromEntries(CATEGORIAS.map(({ key }) => [key, [`${key}-quantidade`, `${key}-valor`]])),
+};
+type CartaoColuna = string;
+const CARTOES: CartaoColuna[] = Object.keys(COLUNAS_DO_CARTAO);
+const CARTOES_KEY = "inovafarma:vendas:cartoes";
+
+function lerCartoes(): CartaoColuna[] {
+  try {
+    const salvo: unknown = JSON.parse(localStorage.getItem(CARTOES_KEY) ?? "null");
+    if (Array.isArray(salvo)) return CARTOES.filter((c) => salvo.includes(c));
+  } catch {
+    // sem armazenamento ou valor inválido: todas as colunas
+  }
+  return CARTOES;
+}
+
 interface Filtros {
   periodId: string;
   loja: string;
@@ -520,6 +547,34 @@ export function VendasComissoesPage() {
 
   const tableColumns = useMemo(() => withComparison(columns, anterior), [anterior]);
 
+  const [cartoes, setCartoes] = useState<CartaoColuna[]>(lerCartoes);
+  const alternarCartao = (c: CartaoColuna) =>
+    setCartoes((atual) => {
+      const proximo = CARTOES.filter((x) => (x === c ? !atual.includes(x) : atual.includes(x)));
+      try {
+        localStorage.setItem(CARTOES_KEY, JSON.stringify(proximo));
+      } catch {
+        // a escolha vale só nesta sessão
+      }
+      return proximo;
+    });
+  const definirCartoes = (proximo: CartaoColuna[]) => {
+    setCartoes(proximo);
+    try {
+      localStorage.setItem(CARTOES_KEY, JSON.stringify(proximo));
+    } catch {
+      // a escolha vale só nesta sessão
+    }
+  };
+  const colunasVisiveis = useMemo(
+    () => [
+      ...tableColumns.filter((c) => !CARTOES.some((k) => COLUNAS_DO_CARTAO[k]?.includes(c.key))).map((c) => c.key),
+      ...cartoes.flatMap((k) => COLUNAS_DO_CARTAO[k] ?? []),
+    ],
+    [tableColumns, cartoes],
+  );
+  const cartao = (c: CartaoColuna) => ({ selected: cartoes.includes(c), onSelect: () => alternarCartao(c) });
+
   const trend = (
     pick: (r: ResumoVendas) => number,
     format: Trend["format"],
@@ -626,9 +681,18 @@ export function VendasComissoesPage() {
       )}
 
       {/* Cards de Resumo / KPI */}
+      <Stack direction="row" align="center" justify="end" gap="field">
+        <Button variant="outline" size="default" disabled={cartoes.length === CARTOES.length} onClick={() => definirCartoes(CARTOES)}>
+          Selecionar todas
+        </Button>
+        <Button variant="outline" size="default" disabled={cartoes.length === 0} onClick={() => definirCartoes([])}>
+          Desmarcar todas
+        </Button>
+      </Stack>
       <Grid columns="cards">
         <KpiCard
           loading={loading}
+          {...cartao("vendas")}
           label="Qtd. Vendas"
           trend={trend((r) => r.totalVendasGeral, "number")}
           value={resumo ? formatNumber(resumo.totalVendasGeral) : "-"}
@@ -638,6 +702,7 @@ export function VendasComissoesPage() {
         />
         <KpiCard
           loading={loading}
+          {...cartao("bruto")}
           label="Total Bruto"
           trend={trend((r) => r.totalBrutoGeral, "currency")}
           value={formatCurrency(resumo?.totalBrutoGeral)}
@@ -646,6 +711,7 @@ export function VendasComissoesPage() {
         />
         <KpiCard
           loading={loading}
+          {...cartao("descontos")}
           label="Descontos"
           trend={trend((r) => r.totalDescontoGeral, "currency", FAVORABLE.totalDesconto)}
           value={formatCurrency(resumo?.totalDescontoGeral)}
@@ -654,6 +720,7 @@ export function VendasComissoesPage() {
         />
         <KpiCard
           loading={loading}
+          {...cartao("descontosPercent")}
           label="Descontos (%)"
           trend={trend((r) => r.descontoPercentGeral, "percent", FAVORABLE.descontoPercent)}
           value={resumo ? formatPercent(resumo.descontoPercentGeral) : "-"}
@@ -663,6 +730,7 @@ export function VendasComissoesPage() {
         />
         <KpiCard
           loading={loading}
+          {...cartao("liquido")}
           label="Total Líquido"
           trend={trend((r) => r.totalLiquidoGeral, "currency")}
           value={formatCurrency(resumo?.totalLiquidoGeral)}
@@ -671,6 +739,7 @@ export function VendasComissoesPage() {
         />
         <KpiCard
           loading={loading}
+          {...cartao("cmv")}
           label="CMV (R$)"
           trend={trend((r) => r.totalCmvGeral, "currency", FAVORABLE.totalCmv)}
           value={formatCurrency(resumo?.totalCmvGeral)}
@@ -679,6 +748,7 @@ export function VendasComissoesPage() {
         />
         <KpiCard
           loading={loading}
+          {...cartao("cmvPercent")}
           label="CMV (%)"
           trend={trend((r) => r.cmvPercentGeral, "percent", FAVORABLE.cmvPercent)}
           value={resumo ? formatPercent(resumo.cmvPercentGeral) : "-"}
@@ -688,6 +758,7 @@ export function VendasComissoesPage() {
         />
         <KpiCard
           loading={loading}
+          {...cartao("ticket")}
           label="Ticket Médio"
           trend={trend(ticketMedio, "currency")}
           value={resumo ? formatCurrency(ticketMedio(resumo)) : "R$ 0,00"}
@@ -697,6 +768,7 @@ export function VendasComissoesPage() {
         />
         <KpiCard
           loading={loading}
+          {...cartao("cadastros")}
           label="Cadastros (%)"
           trend={trend((r) => r.cadastroPercentGeral, "percent")}
           value={resumo ? formatPercent(resumo.cadastroPercentGeral) : "-"}
@@ -708,6 +780,7 @@ export function VendasComissoesPage() {
           <KpiCard
             key={key}
             loading={loading}
+            {...cartao(key)}
             label={label}
             trend={trend((r) => r.categorias[key].valor, "currency")}
             value={formatCurrency(resumo?.categorias[key].valor)}
@@ -722,6 +795,7 @@ export function VendasComissoesPage() {
       <DataTable
         scroll="page"
         columns={tableColumns}
+        visibleColumns={colunasVisiveis}
         rows={colaboradores}
         getRowId={(r) => String(r.codigoColaborador)}
         loading={loading}

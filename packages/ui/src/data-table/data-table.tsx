@@ -5,6 +5,7 @@ import React, {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -174,6 +175,8 @@ export interface DataTablePrintOptions<TRow = unknown> {
 
 export interface DataTableProps<TRow> {
   columns: DataTableColumn<TRow>[];
+  /** `key` das colunas exibidas, na ordem de `columns`; sem ela, todas aparecem. Quem usa a tabela decide o que mostrar. */
+  visibleColumns?: string[];
   rows: TRow[];
   getRowId: (row: TRow) => string;
   loading?: boolean;
@@ -460,7 +463,8 @@ const MemoRow = React.memo(
 );
 
 export function DataTable<TRow>({
-  columns,
+  columns: allColumns,
+  visibleColumns,
   rows,
   getRowId,
   loading = false,
@@ -490,6 +494,10 @@ export function DataTable<TRow>({
   totals,
   totalsCompare,
 }: DataTableProps<TRow>) {
+  const columns = useMemo(
+    () => (visibleColumns ? allColumns.filter((c) => visibleColumns.includes(c.key)) : allColumns),
+    [allColumns, visibleColumns],
+  );
   const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
