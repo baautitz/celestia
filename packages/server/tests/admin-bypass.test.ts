@@ -14,7 +14,7 @@ describe("Flag isAdmin (bypass de permissões)", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password: TEST_PASSWORD }),
     });
-    return (await res.json()) as { access_token: string; user: { permissions: string[] } };
+    return (await res.json()) as { accessToken: string; user: { permissions: string[] } };
   }
 
   const call = (path: string, token: string, init: RequestInit = {}) =>
@@ -43,15 +43,15 @@ describe("Flag isAdmin (bypass de permissões)", () => {
     const admin = await login("chefe");
     const comum = await login("comum");
 
-    expect((await call("/api/iam/users", admin.access_token)).status).toBe(200);
-    expect((await call("/api/iam/users", comum.access_token)).status).toBe(403);
-    expect((await call("/api/admin/erps", admin.access_token)).status).toBe(200);
-    expect((await call("/api/admin/erps", comum.access_token)).status).toBe(403);
+    expect((await call("/api/iam/users", admin.accessToken)).status).toBe(200);
+    expect((await call("/api/iam/users", comum.accessToken)).status).toBe(403);
+    expect((await call("/api/admin/erps", admin.accessToken)).status).toBe(200);
+    expect((await call("/api/admin/erps", comum.accessToken)).status).toBe(403);
   });
 
   it("o token do admin carrega todas as chaves do sistema", async () => {
     const admin = await login("chefe");
-    const me = (await (await call("/api/auth/me", admin.access_token)).json()) as { permissions: string[]; isAdmin: boolean };
+    const me = (await (await call("/api/auth/me", admin.accessToken)).json()) as { permissions: string[]; isAdmin: boolean };
     expect(me.isAdmin).toBe(true);
     expect(me.permissions).toContain("*");
     expect(me.permissions).toContain("system:users:create");
@@ -66,7 +66,7 @@ describe("Flag isAdmin (bypass de permissões)", () => {
 
   it("a criação de usuário ignora isAdmin", async () => {
     const admin = await login("chefe");
-    const created = await call("/api/iam/users", admin.access_token, {
+    const created = await call("/api/iam/users", admin.accessToken, {
       method: "POST",
       body: JSON.stringify({ fullname: "Novo", username: "novo", password: "Senha@1234", roleId: "role_vazio", isAdmin: true }),
     });
@@ -80,16 +80,16 @@ describe("Flag isAdmin (bypass de permissões)", () => {
 
     // Quem tem system:users:update mas não é admin não consegue conceder.
     const gestor = await login("gestor");
-    expect((await put(gestor.access_token, "u2", true)).status).toBe(403);
+    expect((await put(gestor.accessToken, "u2", true)).status).toBe(403);
     expect(defined(await store.findById("u2"), "await store.findById('u2')").isAdmin).toBeFalsy();
 
     const admin = await login("chefe");
-    expect((await put(admin.access_token, "u2", true)).status).toBe(200);
+    expect((await put(admin.accessToken, "u2", true)).status).toBe(200);
     expect(defined(await store.findById("u2"), "await store.findById('u2')").isAdmin).toBe(true);
-    expect((await put(admin.access_token, "u2", false)).status).toBe(200);
+    expect((await put(admin.accessToken, "u2", false)).status).toBe(200);
     expect(defined(await store.findById("u2"), "await store.findById('u2')").isAdmin).toBeFalsy();
 
-    expect((await put(admin.access_token, "u1", false)).status).toBe(400);
+    expect((await put(admin.accessToken, "u1", false)).status).toBe(400);
     expect(defined(await store.findById("u1"), "await store.findById('u1')").isAdmin).toBe(true);
   });
 });

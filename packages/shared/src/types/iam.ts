@@ -64,16 +64,16 @@ export interface JWTRefreshPayload {
 }
 
 /**
- * Resposta de sucesso de autenticação contendo os tokens e dados do usuário.
+ * Resposta de sucesso de autenticação (login e renovação). O refresh token NÃO faz parte dela: viaja só no cookie
+ * HttpOnly `refresh_token`, fora do alcance de JavaScript.
  */
 export interface AuthTokens {
+  /** Access Token (JWT), enviado como `Authorization: Bearer`. */
   accessToken: string;
-  refreshToken: string;
-  expiresIn: number; // 300 segundos (5 minutos)
+  /** Validade do Access Token em segundos (padrão 300, 5 minutos). */
+  expiresIn: number;
+  /** Claims do Access Token (com as permissões já expandidas para o Administrator). */
   user: JWTAccessPayload;
-  access_token?: string;
-  refresh_token?: string;
-  expires_in?: number;
 }
 
 /**

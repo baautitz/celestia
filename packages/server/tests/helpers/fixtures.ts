@@ -88,8 +88,8 @@ export async function authHeader(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password: TEST_PASSWORD }),
   });
-  const body = (await res.json()) as { access_token?: string; verifyUrl?: string };
-  if (body.access_token) return { Authorization: `Bearer ${body.access_token}` };
+  const body = (await res.json()) as { accessToken?: string; verifyUrl?: string };
+  if (body.accessToken) return { Authorization: `Bearer ${body.accessToken}` };
   // Com a CA no ar todo login passa pelo Desafio de Certificado: volta dele sem certificado, como quem tem a opção de
   // acesso sem certificado e não apresentou um.
   const challengeId = new URL(defined(body.verifyUrl, "verifyUrl")).searchParams.get("challenge");
@@ -98,8 +98,8 @@ export async function authHeader(
     headers: { "Content-Type": "application/json", Cookie: (res.headers.get("set-cookie") ?? "").split(";")[0] ?? "" },
     body: JSON.stringify({ challengeId }),
   });
-  const { access_token } = (await done.json()) as { access_token: string };
-  return { Authorization: `Bearer ${access_token}` };
+  const { accessToken } = (await done.json()) as { accessToken: string };
+  return { Authorization: `Bearer ${accessToken}` };
 }
 
 interface Requester {
@@ -119,4 +119,11 @@ export function withAuth<T extends Requester>(app: T, username = "carlos.admin")
     return original(input, { ...init, headers });
   }) as T["request"];
   return app;
+}
+
+/** O refresh token que a resposta de login/renovação gravou no cookie HttpOnly (nunca vem no corpo). */
+export function refreshTokenOf(res: Response): string {
+  const token = /(?:^|,\s*)refresh_token=([^;]+)/.exec(res.headers.get("set-cookie") ?? "")?.[1];
+  if (!token) throw new Error("A resposta não gravou o cookie refresh_token.");
+  return token;
 }

@@ -10,11 +10,56 @@ import { pruneOrphans } from "@platform/core/permissions";
 
 export const LAST_ADMIN_MESSAGE = "O sistema precisa de ao menos um administrador ativo.";
 
+/** Erro de domínio: a operação conflita com o estado atual (HTTP 409). */
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = new.target.name;
+  }
+}
+
+/** Erro de domínio: o User ou a Role pedida não existe (HTTP 404). */
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = new.target.name;
+  }
+}
+
 /** A operação deixaria o sistema sem Administrator ativo. */
-export class LastAdminError extends Error {
+export class LastAdminError extends ConflictError {
   constructor() {
     super(LAST_ADMIN_MESSAGE);
-    this.name = "LastAdminError";
+  }
+}
+
+export class UsernameTakenError extends ConflictError {
+  constructor(username: string) {
+    super(`Usuário '${username}' já existe.`);
+  }
+}
+
+export class RoleIdTakenError extends ConflictError {
+  constructor(id: string) {
+    super(`Role '${id}' já existe.`);
+  }
+}
+
+export class RoleInUseError extends ConflictError {
+  constructor(id: string) {
+    super(`Não é possível excluir o grupo '${id}' pois existem usuários vinculados a ele.`);
+  }
+}
+
+export class UserNotFoundError extends NotFoundError {
+  constructor(id: string) {
+    super(`Usuário '${id}' não encontrado.`);
+  }
+}
+
+export class RoleNotFoundError extends NotFoundError {
+  constructor(id: string) {
+    super(`Role '${id}' não encontrada.`);
   }
 }
 
@@ -93,12 +138,12 @@ export class MemoryUserStore implements UserStore {
   async createUser(input: CreateUserInput): Promise<User> {
     const existing = await this.findByUsername(input.username);
     if (existing) {
-      throw new Error(`Usuário '${input.username}' já existe.`);
+      throw new UsernameTakenError(input.username);
     }
 
     const role = await this.getRole(input.roleId);
     if (!role) {
-      throw new Error(`Role '${input.roleId}' não encontrada.`);
+      throw new RoleNotFoundError(input.roleId);
     }
 
     const id = `usr_${randomUUID()}`;
@@ -124,11 +169,11 @@ export class MemoryUserStore implements UserStore {
 
   async updateUser(id: string, input: UpdateUserInput): Promise<User> {
     const user = this.users.get(id);
-    if (!user) throw new Error(`Usuário '${id}' não encontrado.`);
+    if (!user) throw new UserNotFoundError(id);
 
     if (input.roleId) {
       const role = await this.getRole(input.roleId);
-      if (!role) throw new Error(`Role '${input.roleId}' não encontrada.`);
+      if (!role) throw new RoleNotFoundError(input.roleId);
     }
     this.assertAdminRemains(user, { isAdmin: input.isAdmin ?? user.isAdmin ?? false, status: input.status ?? user.status });
 
@@ -136,9 +181,11 @@ export class MemoryUserStore implements UserStore {
     if (input.status === "inactive" && user.status !== "inactive") this.revoke(user);
     // Mudar a regra de certificado encerra as sessões abertas sob a regra anterior.
     if (input.allowWithoutCertificate !== undefined && input.allowWithoutCertificate !== (user.allowWithoutCertificate ?? false)) this.revoke(user);
+    // Ganhar ou perder o acesso de administrador muda o que o token carrega: encerra as sessões abertas.
+    if (input.isAdmin !== undefined && input.isAdmin !== (user.isAdmin ?? false)) this.revoke(user);
     if (input.roleId) user.roleId = input.roleId;
-    if (input.fullname) user.fullname = input.fullname;
-    if (input.email) user.email = input.email;
+    if (input.fullname !== undefined) user.fullname = input.fullname;
+    if (input.email !== undefined) user.email = input.email || undefined;
     if (input.status) user.status = input.status;
     if (input.isAdmin !== undefined) user.isAdmin = input.isAdmin;
     if (input.allowWithoutCertificate !== undefined) user.allowWithoutCertificate = input.allowWithoutCertificate;
@@ -170,7 +217,7 @@ export class MemoryUserStore implements UserStore {
 
   async resetPassword(id: string, newPasswordHash: string): Promise<void> {
     const user = this.users.get(id);
-    if (!user) throw new Error(`Usuário '${id}' não encontrado.`);
+    if (!user) throw new UserNotFoundError(id);
     user.passwordHash = newPasswordHash;
     this.revoke(user);
     user.updatedAt = new Date().toISOString();
@@ -179,15 +226,16 @@ export class MemoryUserStore implements UserStore {
 
   async deleteUser(id: string): Promise<void> {
     const user = this.users.get(id);
-    if (!user) throw new Error(`Usuário '${id}' não encontrado.`);
+    if (!user) throw new UserNotFoundError(id);
     this.assertAdminRemains(user, { isAdmin: false, status: "inactive" });
     this.users.delete(id);
   }
 
   async setAdmin(id: string, isAdmin: boolean): Promise<void> {
     const user = this.users.get(id);
-    if (!user) throw new Error(`Usuário '${id}' não encontrado.`);
+    if (!user) throw new UserNotFoundError(id);
     this.assertAdminRemains(user, { isAdmin, status: user.status });
+    if (isAdmin !== (user.isAdmin ?? false)) this.revoke(user);
     user.isAdmin = isAdmin;
   }
 
@@ -201,18 +249,24 @@ export class MemoryUserStore implements UserStore {
   }
 
   async createRole(role: Role): Promise<Role> {
-    if (this.roles.has(role.id)) throw new Error(`Role '${role.id}' já existe.`);
+    if (this.roles.has(role.id)) throw new RoleIdTakenError(role.id);
     this.roles.set(role.id, { ...role });
     return { ...role };
   }
 
   async updateRole(id: string, input: Partial<Role>): Promise<Role> {
     const role = this.roles.get(id);
-    if (!role) throw new Error(`Role '${id}' não encontrada.`);
+    if (!role) throw new RoleNotFoundError(id);
 
-    if (input.name) role.name = input.name;
+    if (input.name !== undefined) role.name = input.name;
     if (input.description !== undefined) role.description = input.description;
-    if (input.permissions) role.permissions = [...input.permissions];
+    if (input.permissions) {
+      // Retirar permissões encerra as sessões dos Users do grupo: o token já emitido ainda as carrega.
+      if (role.permissions.some((key) => !input.permissions?.includes(key))) {
+        for (const u of this.users.values()) if (u.roleId === id) this.revoke(u);
+      }
+      role.permissions = [...input.permissions];
+    }
 
     this.roles.set(id, role);
     return { ...role };
@@ -222,7 +276,7 @@ export class MemoryUserStore implements UserStore {
     // Impede excluir se houver usuário vinculado
     for (const u of this.users.values()) {
       if (u.roleId === id) {
-        throw new Error(`Não é possível excluir o grupo '${id}' pois existem usuários vinculados a ele.`);
+        throw new RoleInUseError(id);
       }
     }
     this.roles.delete(id);

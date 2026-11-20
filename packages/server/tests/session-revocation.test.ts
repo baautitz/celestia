@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createPlatformApp } from "../src/index.js";
-import { createSeededUserStore, TEST_PASSWORD, withAuth } from "./helpers/fixtures.js";
+import { createSeededUserStore, refreshTokenOf, TEST_PASSWORD, withAuth } from "./helpers/fixtures.js";
 import { defined } from "./helpers/defined.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -14,10 +14,10 @@ async function setup() {
   const admin = withAuth(createPlatformApp({ userStore: store }), "test.root");
   const login = async (): Promise<string> => {
     const res = await app.request("/api/auth/login", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ username: "alvo", password: TEST_PASSWORD }) });
-    return ((await res.json()) as { refresh_token: string }).refresh_token;
+    return refreshTokenOf(res);
   };
   const refresh = async (token: string) =>
-    (await app.request("/api/auth/refresh", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ refresh_token: token }) })).status;
+    (await app.request("/api/auth/refresh", { method: "POST", headers: { Cookie: `refresh_token=${token}` } })).status;
   const put = (id: string, body: object) =>
     admin.request(`/api/iam/users/${id}`, { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(body) });
   return { app, admin, store, target, login, refresh, put };
@@ -37,9 +37,9 @@ describe("sessões revogáveis", () => {
   it("o refresh rotacionado continua válido", async () => {
     const { app, login } = await setup();
     const token = await login();
-    const res = await app.request("/api/auth/refresh", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ refresh_token: token }) });
-    const next = ((await res.json()) as { refresh_token: string }).refresh_token;
-    const again = await app.request("/api/auth/refresh", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ refresh_token: next }) });
+    const res = await app.request("/api/auth/refresh", { method: "POST", headers: { Cookie: `refresh_token=${token}` } });
+    const next = refreshTokenOf(res);
+    const again = await app.request("/api/auth/refresh", { method: "POST", headers: { Cookie: `refresh_token=${next}` } });
     expect(again.status).toBe(200);
   });
 
@@ -71,6 +71,40 @@ describe("sessões revogáveis", () => {
     const token = await login();
     await put(target.id, { fullname: "Outro Nome" });
     expect(await refresh(token)).toBe(200);
+  });
+
+  it("o refresh token só vale pelo cookie: enviado no corpo é ignorado", async () => {
+    const { app, login } = await setup();
+    const token = await login();
+    const res = await app.request("/api/auth/refresh", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ refresh_token: token }) });
+    expect(res.status).toBe(401);
+  });
+
+  it("a resposta de renovação não carrega o refresh token no corpo", async () => {
+    const { app, login } = await setup();
+    const res = await app.request("/api/auth/refresh", { method: "POST", headers: { Cookie: `refresh_token=${await login()}` } });
+    expect(await res.json()).toEqual({ accessToken: expect.any(String), expiresIn: 300, user: expect.objectContaining({ username: "alvo" }) });
+  });
+
+  it("ganhar ou perder o acesso de administrador revoga", async () => {
+    const { target, login, refresh, put } = await setup();
+    const promoted = await login();
+    expect((await put(target.id, { isAdmin: true })).status).toBe(200);
+    expect(await refresh(promoted)).toBe(401);
+    const demoted = await login();
+    expect((await put(target.id, { isAdmin: false })).status).toBe(200);
+    expect(await refresh(demoted)).toBe(401);
+  });
+
+  it("retirar permissões do grupo revoga os usuários dele; só acrescentar não revoga", async () => {
+    const { admin, login, refresh } = await setup();
+    const token = await login();
+    const putRole = (permissions: string[]) =>
+      admin.request("/api/iam/roles/role_a", { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify({ permissions }) });
+    expect((await putRole(["system:users:read", "system:roles:read"])).status).toBe(200);
+    expect(await refresh(token)).toBe(200);
+    expect((await putRole(["system:roles:read"])).status).toBe(200);
+    expect(await refresh(token)).toBe(401);
   });
 
   it("exclusão revoga", async () => {

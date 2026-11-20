@@ -6,7 +6,7 @@ import { canGrant, grantDeniedMessage, missingGrants } from "../src/iam/can-gran
 import { SYSTEM_PERMISSION_KEYS } from "../src/iam/system-permissions.js";
 import { hasPermission } from "../src/iam/has-permission.js";
 import { PasswordService } from "../src/iam/password-service.js";
-import { authHeader, createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
+import { authHeader, createSeededUserStore, refreshTokenOf, TEST_PASSWORD } from "./helpers/fixtures.js";
 
 describe("hardening de auth: permissão ausente falha fechado", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -253,10 +253,10 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
       const local = createPlatformApp({ userStore: store });
       const login = async (username: string) => {
         const res = await local.request("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password: TEST_PASSWORD }) });
-        return ((await res.json()) as { refresh_token: string }).refresh_token;
+        return refreshTokenOf(res);
       };
       const refresh = (token: string) =>
-        local.request("/api/auth/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: token }) });
+        local.request("/api/auth/refresh", { method: "POST", headers: { Cookie: `refresh_token=${token}` } });
       const ra = await login("refresh.um");
       const rb = await login("refresh.dois");
       const rc = await login("refresh.tres");
@@ -358,7 +358,7 @@ describe("hardening de auth: permissão ausente falha fechado", () => {
     it("não devolvem a mensagem interna da biblioteca", async () => {
       const me = await app.request("/api/auth/me", { headers: { Authorization: "Bearer lixo.lixo.lixo" } });
       expect(((await me.json()) as { error: string }).error).toBe("Falha na autenticação: token expirado ou inválido.");
-      const refresh = await app.request("/api/auth/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: "lixo.lixo.lixo" }) });
+      const refresh = await app.request("/api/auth/refresh", { method: "POST", headers: { Cookie: "refresh_token=lixo.lixo.lixo" } });
       expect(refresh.status).toBe(401);
       expect(((await refresh.json()) as { error: string }).error).toBe("Refresh token inválido ou expirado.");
     });

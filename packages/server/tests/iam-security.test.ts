@@ -5,7 +5,7 @@ import { PasswordService } from "../src/iam/password-service.js";
 import { TokenService } from "../src/iam/token-service.js";
 import type { MemoryUserStore } from "../src/iam/user-store.js";
 import { SYSTEM_PERMISSION_KEYS } from "../src/iam/system-permissions.js";
-import { createSeededUserStore } from "./helpers/fixtures.js";
+import { createSeededUserStore, refreshTokenOf } from "./helpers/fixtures.js";
 import type {
   AuthTokens,
   User,
@@ -14,9 +14,8 @@ import type {
 } from "@platform/shared";
 
 interface AuthBody {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
+  accessToken: string;
+  expiresIn: number;
   username: string;
   role: string;
   user: { username: string; role: string; permissions: string[] };
@@ -76,9 +75,12 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
 
       expect(res.status).toBe(200);
       const data = (await res.json()) as AuthBody;
-      expect(data.access_token).toBeDefined();
-      expect(data.refresh_token).toBeDefined();
-      expect(data.expires_in).toBe(300); // 5 minutos
+      expect(data.accessToken).toBeDefined();
+      expect(data).not.toHaveProperty("refreshToken");
+      expect(data).not.toHaveProperty("refresh_token");
+      expect(data.expiresIn).toBe(300); // 5 minutos
+      expect(refreshTokenOf(res)).toBeTruthy(); // o refresh token vai só no cookie HttpOnly
+      expect(res.headers.get("set-cookie")).toMatch(/HttpOnly/i);
       expect(data.user.username).toBe("carlos.admin");
       expect(data.user.role).toBe("role_admin");
       expect(data.user.permissions).toContain("system:users:create");
@@ -107,20 +109,15 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
           password: "Senha@123",
         }),
       });
-      const loginData = (await loginRes.json()) as AuthBody;
-
       // 2. Faz refresh
       const refreshRes = await app.request("/api/auth/refresh", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          refresh_token: loginData.refresh_token,
-        }),
+        headers: { Cookie: `refresh_token=${refreshTokenOf(loginRes)}` },
       });
 
       expect(refreshRes.status).toBe(200);
       const refreshData = (await refreshRes.json()) as AuthBody;
-      expect(refreshData.access_token).toBeDefined();
+      expect(refreshData.accessToken).toBeDefined();
       expect(refreshData.user.username).toBe("joao.silva");
     });
 
@@ -133,10 +130,10 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
           password: "Senha@123",
         }),
       });
-      const { access_token } = (await loginRes.json()) as AuthBody;
+      const { accessToken } = (await loginRes.json()) as AuthBody;
 
       const meRes = await app.request("/api/auth/me", {
-        headers: { Authorization: `Bearer ${access_token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
 
       expect(meRes.status).toBe(200);

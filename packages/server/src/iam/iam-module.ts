@@ -2,19 +2,26 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import type { Context, MiddlewareHandler } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import type { CookieOptions } from "hono/utils/cookie";
 import { zValidator } from "../validation.js";
 import { z } from "zod";
 import { defineModule, type ModuleDef } from "@platform/core/module";
-import type { JWTAccessPayload, PermissionItem, User } from "@platform/shared";
+import type { AuthTokens, JWTAccessPayload, PermissionItem, User } from "@platform/shared";
 import { grantDeniedMessage, missingGrants } from "./can-grant.js";
 import { IAM_PERMISSIONS } from "./iam-permissions.js";
-import { getAuthenticatedUser, requirePermission } from "./middleware.js";
+import { getAuthenticatedUser, requireAdmin, requirePermission } from "./middleware.js";
 import { hasPermission } from "./has-permission.js";
 import { TokenService } from "./token-service.js";
-import { LAST_ADMIN_MESSAGE, LastAdminError, type UserStore } from "./user-store.js";
-import { CertificateAuthorityUnavailableError, DeviceNotFoundError, DeviceStillActiveError, type CertificateAuthorityClient } from "./certificate-authority-client.js";
+import { ConflictError, NotFoundError, RoleNotFoundError, UserNotFoundError, type UserStore } from "./user-store.js";
+import {
+  CertificateAuthorityUnavailableError,
+  CertificateAuthorityValidationError,
+  DeviceNotFoundError,
+  DeviceStillActiveError,
+  type CertificateAuthorityClient,
+} from "./certificate-authority-client.js";
 import type { AuditLog } from "../audit/audit-log.js";
-import { DEVICE_AUDIT_TARGET, IAM_AUDIT_PLUGIN, USER_AUDIT_TARGET, declareIamAudit } from "./iam-audit.js";
+import { DEVICE_AUDIT_TARGET, IAM_AUDIT_PLUGIN, ROLE_AUDIT_TARGET, USER_AUDIT_TARGET, declareIamAudit } from "./iam-audit.js";
 import { LoginRateLimiter } from "./login-rate-limiter.js";
 import { PASSWORD_RULES, PasswordService, PasswordPolicySchema } from "./password-service.js";
 
@@ -42,16 +49,23 @@ function getDummyHash(): string {
   return dummyHash;
 }
 
-/** `Secure` em produção (HTTPS); fora dela o cookie precisa funcionar em http://localhost. */
-const refreshCookie = () =>
-  ({ path: "/api/auth", httpOnly: true, sameSite: "Lax", maxAge: 7 * 24 * 3600, secure: process.env.NODE_ENV === "production" }) as const;
-
+const REFRESH_COOKIE = "refresh_token";
+const REFRESH_TTL_SECONDS = 7 * 24 * 3600;
 /** Cookie do Desafio de Certificado: só vale entre a senha e a volta da CA. */
 const LOGIN_CHALLENGE_COOKIE = "login_challenge";
-const loginChallengeCookie = () =>
-  ({ path: "/api/auth", httpOnly: true, sameSite: "Lax", maxAge: TokenService.LOGIN_CHALLENGE_TTL_SECONDS, secure: process.env.NODE_ENV === "production" }) as const;
 
-const LAST_ADMIN = LAST_ADMIN_MESSAGE;
+/**
+ * Opções dos cookies de autenticação, as mesmas para gravar e para apagar (o navegador só remove o cookie
+ * quando path e `Secure` coincidem). `Secure` em produção (HTTPS); fora dela o cookie precisa funcionar em http://localhost.
+ */
+const cookieOptions = (maxAge: number): CookieOptions => ({
+  path: "/api/auth",
+  httpOnly: true,
+  sameSite: "Lax",
+  maxAge,
+  secure: process.env.NODE_ENV === "production",
+});
+
 const ADMIN_TARGET_ONLY = "Somente administradores podem inativar outro administrador.";
 const CERTIFICATE_REQUIRED = "Dispositivo não autorizado.";
 const CERTIFICATE_EXEMPTION_ADMIN_ONLY = "Somente administradores podem alterar o acesso sem certificado.";
@@ -99,32 +113,24 @@ export function createIamModule({
       const completeLogin = async (c: Context, user: User, usedDevice?: { id: string; name: string }, withoutDeviceReason: "no_device" | "ca_unavailable" = "no_device") => {
         loginRateLimiter.recordSuccess(user.username);
         const role = await userStore.getRole(user.roleId);
-        let tokens: { accessToken: string; refreshToken: string; payload: JWTAccessPayload } | undefined;
         const ran = await events.run("iam.login", { userId: user.id, username: user.username }, async () => {
           const access = await tokenService.generateAccessToken(user, role || undefined, usedDevice);
           const refresh = await tokenService.generateRefreshToken(user, usedDevice?.id);
-          tokens = { accessToken: access.token, refreshToken: refresh.token, payload: access.payload };
+          return { accessToken: access.token, refreshToken: refresh.token, payload: access.payload };
         });
         if (ran.cancelled) return cancelled(c, ran.reason);
-        if (!tokens) return c.json({ error: "Credenciais inválidas." }, 401);
-        const { accessToken, refreshToken, payload } = tokens;
+        const { accessToken, refreshToken, payload } = ran.result;
         if (usedDevice) {
           await recordIamAudit({ id: user.id, name: user.fullname }, "login_with_device", { type: DEVICE_AUDIT_TARGET, id: usedDevice.id }, { username: user.username, deviceName: usedDevice.name }, usedDevice);
         } else {
           await recordIamAudit({ id: user.id, name: user.fullname }, "login_without_certificate", { type: USER_AUDIT_TARGET, id: user.id }, { username: user.username, reason: withoutDeviceReason });
         }
 
-        setCookie(c, "refresh_token", refreshToken, refreshCookie());
+        // O refresh token vive só no cookie HttpOnly: o corpo da resposta nunca o carrega.
+        setCookie(c, REFRESH_COOKIE, refreshToken, cookieOptions(REFRESH_TTL_SECONDS));
 
-        return c.json({
-          accessToken,
-          refreshToken,
-          expiresIn: 300,
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          expires_in: 300,
-          user: withAdminBypass(payload),
-        });
+        const body: AuthTokens = { accessToken, expiresIn: tokenService.accessTtlSeconds, user: withAdminBypass(payload) };
+        return c.json(body);
       };
 
       routes.post(
@@ -158,7 +164,7 @@ export function createIamModule({
             if (user.allowWithoutCertificate) return completeLogin(c, user, undefined, "ca_unavailable");
             return c.json({ error: err.message }, 503);
           }
-          setCookie(c, LOGIN_CHALLENGE_COOKIE, await tokenService.generateLoginChallengeToken(user.id, challenge.challengeId), loginChallengeCookie());
+          setCookie(c, LOGIN_CHALLENGE_COOKIE, await tokenService.generateLoginChallengeToken(user.id, challenge.challengeId), cookieOptions(TokenService.LOGIN_CHALLENGE_TTL_SECONDS));
           return c.json({ certificateRequired: true, verifyUrl: challenge.verifyUrl });
         },
       );
@@ -171,7 +177,7 @@ export function createIamModule({
           const { challengeId, code } = c.req.valid("json");
           // O desafio só vale no navegador que digitou a senha: o cookie dele tem que apontar para este desafio.
           const challengeToken = getCookie(c, LOGIN_CHALLENGE_COOKIE);
-          deleteCookie(c, LOGIN_CHALLENGE_COOKIE, { path: "/api/auth" });
+          deleteCookie(c, LOGIN_CHALLENGE_COOKIE, cookieOptions(0));
           const bound = challengeToken ? await tokenService.verifyLoginChallengeToken(challengeToken).catch(() => null) : null;
           if (!bound || bound.challengeId !== challengeId) return c.json({ error: CERTIFICATE_REQUIRED }, 403);
 
@@ -197,10 +203,8 @@ export function createIamModule({
       // Silent refresh via cookie HttpOnly
       routes.post(
         "/auth/refresh",
-        zValidator("json", z.object({ refresh_token: z.string().optional() }).optional()),
         async (c) => {
-          const body = c.req.valid("json");
-          const refreshToken = body?.refresh_token || getCookie(c, "refresh_token");
+          const refreshToken = getCookie(c, REFRESH_COOKIE);
 
           if (!refreshToken) {
             return c.json({ error: "Refresh token não fornecido." }, 401);
@@ -242,17 +246,10 @@ export function createIamModule({
             );
             const { token: newRefreshToken } = await tokenService.generateRefreshToken(user, sessionDeviceId);
 
-            setCookie(c, "refresh_token", newRefreshToken, refreshCookie());
+            setCookie(c, REFRESH_COOKIE, newRefreshToken, cookieOptions(REFRESH_TTL_SECONDS));
 
-            return c.json({
-              accessToken: newAccessToken,
-              refreshToken: newRefreshToken,
-              expiresIn: 300,
-              access_token: newAccessToken,
-              refresh_token: newRefreshToken,
-              expires_in: 300,
-              user: withAdminBypass(userPayload),
-            });
+            const body: AuthTokens = { accessToken: newAccessToken, expiresIn: tokenService.accessTtlSeconds, user: withAdminBypass(userPayload) };
+            return c.json(body);
           } catch (err: unknown) {
             // Com a CA fora do ar, quem exige certificado não renova (falha fechado), mas sem confundir com token inválido.
             if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
@@ -262,7 +259,7 @@ export function createIamModule({
       );
 
       routes.post("/auth/logout", async (c) => {
-        const refreshToken = getCookie(c, "refresh_token");
+        const refreshToken = getCookie(c, REFRESH_COOKIE);
         if (refreshToken) {
           try {
             const { sub } = await tokenService.verifyRefreshToken(refreshToken);
@@ -271,7 +268,7 @@ export function createIamModule({
             // Token inválido ou expirado: não há sessão a revogar; o logout segue limpando o cookie.
           }
         }
-        deleteCookie(c, "refresh_token", { path: "/api/auth" });
+        deleteCookie(c, REFRESH_COOKIE, cookieOptions(0));
         return c.json({ success: true, message: "Sessão encerrada com sucesso." });
       });
 
@@ -280,21 +277,30 @@ export function createIamModule({
       // Preferências do próprio Usuário (p.ex. a visualização de uma tela): o valor é opaco para o iam.
       const PREFERENCE_KEY = /^[a-z0-9][a-z0-9:._-]{0,99}$/;
       const MAX_PREFERENCE_BYTES = 4096;
-      routes.get("/iam/preferences/:key", auth, async (c) => {
-        const key = c.req.param("key");
-        if (!PREFERENCE_KEY.test(key)) return c.json({ error: "Chave de preferência inválida." }, 400);
+      const PreferenceParam = z.object({ key: z.string().regex(PREFERENCE_KEY, "Chave de preferência inválida.") });
+      routes.get("/iam/preferences/:key", auth, zValidator("param", PreferenceParam), async (c) => {
+        const { key } = c.req.valid("param");
         const value = await userStore.getPreference(getAuthenticatedUser(c).sub, key);
         return c.json({ key, value: value ?? null });
       });
-      routes.put("/iam/preferences/:key", auth, async (c) => {
-        const key = c.req.param("key");
-        if (!PREFERENCE_KEY.test(key)) return c.json({ error: "Chave de preferência inválida." }, 400);
-        const body = await c.req.json<{ value?: unknown }>().catch(() => null);
-        if (!body || body.value === undefined) return c.json({ error: "Informe o 'value' da preferência." }, 400);
-        if (JSON.stringify(body.value).length > MAX_PREFERENCE_BYTES) return c.json({ error: "Preferência grande demais." }, 400);
-        await userStore.setPreference(getAuthenticatedUser(c).sub, key, body.value);
-        return c.json({ key, value: body.value });
-      });
+      routes.put(
+        "/iam/preferences/:key",
+        auth,
+        zValidator("param", PreferenceParam),
+        zValidator(
+          "json",
+          z.object({ value: z.json() }).refine(({ value }) => Buffer.byteLength(JSON.stringify(value)) <= MAX_PREFERENCE_BYTES, {
+            message: "Preferência grande demais.",
+            path: ["value"],
+          }),
+        ),
+        async (c) => {
+          const { key } = c.req.valid("param");
+          const { value } = c.req.valid("json");
+          await userStore.setPreference(getAuthenticatedUser(c).sub, key, value);
+          return c.json({ key, value });
+        },
+      );
 
       // A tela mostra o que a senha já cumpre; a validação continua no servidor.
       routes.get("/iam/password-policy", auth, (c) =>
@@ -303,7 +309,12 @@ export function createIamModule({
 
       // ───────── Users e Roles ─────────
       const actorOf = (c: Context): string => getAuthenticatedUser(c).sub;
-      const failure = (err: unknown, fallback: string): string => (err instanceof Error ? err.message : fallback);
+      // Só erros de domínio das stores viram 4xx; o resto (driver, bug) sobe para o onError global.
+      const storeFailure = (c: Context, err: unknown) => {
+        if (err instanceof ConflictError) return c.json({ error: err.message }, 409);
+        if (err instanceof NotFoundError) return c.json({ error: err.message }, 404);
+        throw err;
+      };
 
       // Responde 403 quando o chamador tenta conceder chaves que não possui; devolve undefined se pode.
       const grantViolation = (c: Context, targets: readonly string[]) => {
@@ -337,8 +348,12 @@ export function createIamModule({
       const auditDevice = (c: Context, action: "issue_device" | "revoke_device" | "delete_device", device: { id: string; name: string }) =>
         recordIamAudit(requestActor(c), action, { type: DEVICE_AUDIT_TARGET, id: device.id }, { name: device.name });
 
-      const unavailable = (c: Context, err: unknown) => {
+      // Só as falhas conhecidas da CA viram resposta; o resto sobe para o onError global.
+      const deviceFailure = (c: Context, err: unknown) => {
         if (err instanceof CertificateAuthorityUnavailableError) return c.json({ error: err.message }, 503);
+        if (err instanceof CertificateAuthorityValidationError) return c.json(err.body, 400);
+        if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
+        if (err instanceof DeviceStillActiveError) return c.json({ error: err.message }, 409);
         throw err;
       };
 
@@ -346,7 +361,7 @@ export function createIamModule({
         try {
           return c.json(await certificateAuthority.listDevices());
         } catch (err: unknown) {
-          return unavailable(c, err);
+          return deviceFailure(c, err);
         }
       });
 
@@ -362,7 +377,7 @@ export function createIamModule({
           await auditDevice(c, "issue_device", ran.result.device);
           return c.json(ran.result, 201);
         } catch (err: unknown) {
-          return unavailable(c, err);
+          return deviceFailure(c, err);
         }
       });
 
@@ -377,15 +392,12 @@ export function createIamModule({
           if (before?.status === "active") await auditDevice(c, "revoke_device", ran.result);
           return c.json(ran.result);
         } catch (err: unknown) {
-          if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
-          if (err instanceof CertificateAuthorityUnavailableError) return unavailable(c, err);
-          return c.json({ error: failure(err, "Erro ao revogar o Dispositivo.") }, 400);
+          return deviceFailure(c, err);
         }
       });
 
       // Excluir apaga o registro de um Dispositivo já revogado: só Administrador.
-      routes.delete("/iam/devices/:id", auth, async (c) => {
-        if (!getAuthenticatedUser(c).isAdmin) return c.json({ error: "Somente administradores podem excluir Dispositivos." }, 403);
+      routes.delete("/iam/devices/:id", auth, requireAdmin("Somente administradores podem excluir Dispositivos."), async (c) => {
         const id = c.req.param("id");
         try {
           const device = await certificateAuthority.getDevice(id);
@@ -394,10 +406,7 @@ export function createIamModule({
           await auditDevice(c, "delete_device", device);
           return c.json({ success: true });
         } catch (err: unknown) {
-          if (err instanceof DeviceNotFoundError) return c.json({ error: err.message }, 404);
-          if (err instanceof DeviceStillActiveError) return c.json({ error: err.message }, 409);
-          if (err instanceof CertificateAuthorityUnavailableError) return unavailable(c, err);
-          return c.json({ error: failure(err, "Erro ao excluir o Dispositivo.") }, 400);
+          return deviceFailure(c, err);
         }
       });
 
@@ -414,7 +423,7 @@ export function createIamModule({
             username: z.string().min(3),
             password: PasswordPolicySchema,
             roleId: z.string(),
-            email: z.string().email().optional(),
+            email: z.email().optional(),
             allowWithoutCertificate: z.boolean().optional(),
           }),
         ),
@@ -435,10 +444,14 @@ export function createIamModule({
               () => userStore.createUser(body),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
-            if (body.allowWithoutCertificate) await auditExemption(c, { id: ran.result.id, username: ran.result.username }, true);
-            return c.json(ran.result, 201);
+            const created = ran.result;
+            await recordIamAudit(requestActor(c), "create_user", { type: USER_AUDIT_TARGET, id: created.id }, { username: created.username, fullname: created.fullname, roleId: created.roleId });
+            if (body.allowWithoutCertificate) await auditExemption(c, { id: created.id, username: created.username }, true);
+            return c.json(created, 201);
           } catch (err: unknown) {
-            return c.json({ error: failure(err, "Erro ao criar usuário.") }, 400);
+            // Role inexistente no corpo é entrada inválida (400), não recurso ausente.
+            if (err instanceof RoleNotFoundError) return c.json({ error: err.message }, 400);
+            return storeFailure(c, err);
           }
         },
       );
@@ -450,10 +463,11 @@ export function createIamModule({
         zValidator(
           "json",
           z.object({
-            fullname: z.string().optional(),
+            fullname: z.string().min(2).optional(),
             roleId: z.string().optional(),
             status: z.enum(["active", "inactive"]).optional(),
-            email: z.string().email().optional(),
+            // Texto vazio limpa o e-mail; ausente mantém.
+            email: z.union([z.email(), z.literal("")]).optional(),
             isAdmin: z.boolean().optional(),
             allowWithoutCertificate: z.boolean().optional(),
           }),
@@ -479,8 +493,10 @@ export function createIamModule({
               return c.json({ error: "Você não pode remover o seu próprio acesso de administrador." }, 400);
             }
           }
+          const previous = await userStore.findById(id);
+          if (!previous) return c.json({ error: new UserNotFoundError(id).message }, 404);
           // Só admin age sobre admin: nenhum campo de um administrador é alterável por não-admin.
-          if (!caller.isAdmin && (await userStore.findById(id))?.isAdmin) {
+          if (!caller.isAdmin && previous.isAdmin) {
             const message = body.status === "inactive" ? ADMIN_TARGET_ONLY : "Somente administradores podem alterar outro administrador.";
             return c.json({ error: message }, 403);
           }
@@ -491,7 +507,6 @@ export function createIamModule({
               if (denied) return denied;
             }
           }
-          const previous = await userStore.findById(id);
           try {
             const ran = await events.run(
               "iam.user.update",
@@ -499,18 +514,31 @@ export function createIamModule({
               () => userStore.updateUser(id, { ...body, isAdmin }),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
-            if (body.allowWithoutCertificate !== undefined && body.allowWithoutCertificate !== (previous?.allowWithoutCertificate ?? false)) {
-              await auditExemption(c, { id, username: ran.result.username }, body.allowWithoutCertificate);
+            const updated = ran.result;
+            const target = { type: USER_AUDIT_TARGET, id };
+            const deactivated = body.status === "inactive" && previous.status !== "inactive";
+            // Só nomes de campos: nada de valores (e-mail, senha, hash) no Audit Log.
+            const fields = [
+              body.fullname !== undefined && body.fullname !== previous.fullname ? "fullname" : undefined,
+              body.roleId !== undefined && body.roleId !== previous.roleId ? "roleId" : undefined,
+              body.email !== undefined && (body.email || undefined) !== previous.email ? "email" : undefined,
+              body.status !== undefined && body.status !== previous.status && !deactivated ? "status" : undefined,
+              isAdmin !== undefined && isAdmin !== (previous.isAdmin ?? false) ? "isAdmin" : undefined,
+            ].filter((field): field is string => field !== undefined);
+            if (fields.length > 0) await recordIamAudit(requestActor(c), "update_user", target, { username: updated.username, fields });
+            if (deactivated) await recordIamAudit(requestActor(c), "deactivate_user", target, { username: updated.username });
+            if (body.allowWithoutCertificate !== undefined && body.allowWithoutCertificate !== (previous.allowWithoutCertificate ?? false)) {
+              await auditExemption(c, { id, username: updated.username }, body.allowWithoutCertificate);
             }
-            return c.json(ran.result);
+            return c.json(updated);
           } catch (err: unknown) {
-            if (err instanceof LastAdminError) return c.json({ error: LAST_ADMIN }, 409);
-            return c.json({ error: failure(err, "Erro ao atualizar usuário.") }, 400);
+            if (err instanceof RoleNotFoundError) return c.json({ error: err.message }, 400);
+            return storeFailure(c, err);
           }
         },
       );
 
-      // A nova senha nunca entra em evento.
+      // A nova senha nunca entra em evento nem no Audit Log.
       routes.post(
         "/iam/users/:id/reset-password",
         auth,
@@ -521,7 +549,8 @@ export function createIamModule({
           const { newPassword } = c.req.valid("json");
 
           const target = await userStore.findById(id);
-          if (target?.isAdmin && !getAuthenticatedUser(c).isAdmin) {
+          if (!target) return c.json({ error: new UserNotFoundError(id).message }, 404);
+          if (target.isAdmin && !getAuthenticatedUser(c).isAdmin) {
             return c.json({ error: "Somente administradores podem redefinir a senha de outro administrador." }, 403);
           }
 
@@ -530,29 +559,29 @@ export function createIamModule({
               userStore.resetPassword(id, PasswordService.hash(newPassword)),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
+            await recordIamAudit(requestActor(c), "reset_password", { type: USER_AUDIT_TARGET, id }, { username: target.username });
             return c.json({ success: true, message: "Senha redefinida com sucesso." });
           } catch (err: unknown) {
-            return c.json({ error: failure(err, "Erro ao redefinir senha.") }, 400);
+            return storeFailure(c, err);
           }
         },
       );
 
       // Excluir é definitivo: só Administrador. Para impedir o acesso, há a inativação.
-      routes.delete("/iam/users/:id", auth, async (c) => {
+      routes.delete("/iam/users/:id", auth, requireAdmin("Somente administradores podem excluir usuários."), async (c) => {
         const id = c.req.param("id");
-        if (!getAuthenticatedUser(c).isAdmin) {
-          return c.json({ error: "Somente administradores podem excluir usuários." }, 403);
-        }
         if (id === getAuthenticatedUser(c).sub) {
           return c.json({ error: "Não é possível excluir a si mesmo." }, 409);
         }
+        const target = await userStore.findById(id);
+        if (!target) return c.json({ error: new UserNotFoundError(id).message }, 404);
         try {
           const ran = await events.run("iam.user.delete", { actorId: actorOf(c), userId: id }, () => userStore.deleteUser(id));
           if (ran.cancelled) return cancelled(c, ran.reason);
+          await recordIamAudit(requestActor(c), "delete_user", { type: USER_AUDIT_TARGET, id }, { username: target.username });
           return c.json({ success: true });
         } catch (err: unknown) {
-          if (err instanceof LastAdminError) return c.json({ error: LAST_ADMIN }, 409);
-          return c.json({ error: failure(err, "Erro ao excluir usuário.") }, 400);
+          return storeFailure(c, err);
         }
       });
 
@@ -590,9 +619,10 @@ export function createIamModule({
               () => userStore.createRole(body),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
+            await recordIamAudit(requestActor(c), "create_role", { type: ROLE_AUDIT_TARGET, id: ran.result.id }, { name: ran.result.name, permissions: ran.result.permissions });
             return c.json(ran.result, 201);
           } catch (err: unknown) {
-            return c.json({ error: failure(err, "Erro ao criar grupo.") }, 400);
+            return storeFailure(c, err);
           }
         },
       );
@@ -604,7 +634,7 @@ export function createIamModule({
         zValidator(
           "json",
           z.object({
-            name: z.string().optional(),
+            name: z.string().min(2).optional(),
             description: z.string().optional(),
             permissions: z.array(z.string()).optional(),
           }),
@@ -613,10 +643,12 @@ export function createIamModule({
           const id = c.req.param("id");
           const body = c.req.valid("json");
 
+          const current = await userStore.getRole(id);
+          if (!current) return c.json({ error: new RoleNotFoundError(id).message }, 404);
+
           // Alterar a posse do curinga "*" (conceder ou retirar) é ato de administrador.
           if (body.permissions && !getAuthenticatedUser(c).isAdmin) {
-            const current = (await userStore.getRole(id))?.permissions ?? [];
-            if (body.permissions.includes("*") !== current.includes("*")) {
+            if (body.permissions.includes("*") !== current.permissions.includes("*")) {
               return c.json({ error: WILDCARD_ADMIN_ONLY }, 403);
             }
           }
@@ -627,8 +659,7 @@ export function createIamModule({
               return c.json({ error: `Permissões inválidas: ${invalid.join(", ")}` }, 400);
             }
             // Só as chaves ADICIONADAS precisam ser possuídas; remover é permitido.
-            const current = (await userStore.getRole(id))?.permissions ?? [];
-            const denied = grantViolation(c, body.permissions.filter((key) => !current.includes(key)));
+            const denied = grantViolation(c, body.permissions.filter((key) => !current.permissions.includes(key)));
             if (denied) return denied;
           }
 
@@ -639,9 +670,29 @@ export function createIamModule({
               () => userStore.updateRole(id, body),
             );
             if (ran.cancelled) return cancelled(c, ran.reason);
-            return c.json(ran.result);
+            const updated = ran.result;
+            const nextPermissions = body.permissions ?? current.permissions;
+            const fields = [
+              body.name !== undefined && body.name !== current.name ? "name" : undefined,
+              body.description !== undefined && body.description !== (current.description ?? "") ? "description" : undefined,
+              nextPermissions.length !== current.permissions.length || nextPermissions.some((key) => !current.permissions.includes(key)) ? "permissions" : undefined,
+            ].filter((field): field is string => field !== undefined);
+            if (fields.length > 0) {
+              await recordIamAudit(
+                requestActor(c),
+                "update_role",
+                { type: ROLE_AUDIT_TARGET, id },
+                {
+                  name: updated.name,
+                  fields,
+                  addedPermissions: nextPermissions.filter((key) => !current.permissions.includes(key)),
+                  removedPermissions: current.permissions.filter((key) => !nextPermissions.includes(key)),
+                },
+              );
+            }
+            return c.json(updated);
           } catch (err: unknown) {
-            return c.json({ error: failure(err, "Erro ao atualizar grupo.") }, 400);
+            return storeFailure(c, err);
           }
         },
       );

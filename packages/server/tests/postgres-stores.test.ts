@@ -8,7 +8,7 @@ import { upsertAdminUser } from "../src/cli/create-admin.js";
 import { createPlatform } from "../src/index.js";
 import { DEFAULT_ADMIN_ROLE_ID, INITIAL_ROLES } from "../src/iam/initial-roles.js";
 import { PostgresUserStore } from "../src/iam/postgres-user-store.js";
-import { LastAdminError } from "../src/iam/user-store.js";
+import { LastAdminError, RoleIdTakenError, UsernameTakenError } from "../src/iam/user-store.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { PostgresErpStore } from "../src/erp/postgres-erp-store.js";
 import { PostgresEstoquePreVencidoStore } from "../../../integrations/inovafarma/src/postgres-estoque-pre-vencidos-store.js";
@@ -51,8 +51,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA) e a que troca Excluir por Inativar Usuários e a das Preferências do Usuário; o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos, a das Avaliações, a do Furo de Estoque, as cinco das Metas (Tipos de Meta, Montar Metas, Apuração, Prêmio do Participante e Lista de Produtos no Tipo de Meta), a dos Itens de Pré-vencido, a que remove os Lançamentos, a das Baixas congeladas e a das Correções de Baixa; o closing_period tem a inicial e a que passa as datas para `date` e impede faixas coincidentes; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 7 : item.moduleId === "erp" || item.moduleId === "audit" || item.moduleId === "closing_period" ? 2 : item.moduleId === "inovafarma" ? 14 : 1);
+        // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA), a que troca Excluir por Inativar Usuários, a das Preferências do Usuário e a do índice único em lower(username); o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos, a das Avaliações, a do Furo de Estoque, as cinco das Metas (Tipos de Meta, Montar Metas, Apuração, Prêmio do Participante e Lista de Produtos no Tipo de Meta), a dos Itens de Pré-vencido, a que remove os Lançamentos, a das Baixas congeladas e a das Correções de Baixa; o closing_period tem a inicial e a que passa as datas para `date` e impede faixas coincidentes; os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 8 : item.moduleId === "erp" || item.moduleId === "audit" || item.moduleId === "closing_period" ? 2 : item.moduleId === "inovafarma" ? 14 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -172,6 +172,32 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
         await store.updateUser(isento.id, { allowWithoutCertificate: false });
         expect((await store.findById(isento.id))?.sessionVersion).toBe((before ?? 0) + 1);
+      });
+      it("o índice único em lower(username) decide a corrida entre cadastros simultâneos e o 23505 vira erro de domínio", async () => {
+        const store = new PostgresUserStore(db);
+        await store.createRole({ id: "r1", name: "Op", permissions: [] });
+        const attempts = await Promise.allSettled(
+          ["ana", "ANA", "Ana"].map((username) => store.createUser({ fullname: "Ana", username, password: "Abcdef1!", roleId: "r1" })),
+        );
+        expect(attempts.filter((a) => a.status === "fulfilled")).toHaveLength(1);
+        for (const attempt of attempts.filter((a) => a.status === "rejected")) expect(attempt.reason).toBeInstanceOf(UsernameTakenError);
+        await expect(store.createRole({ id: "r1", name: "Outra", permissions: [] })).rejects.toBeInstanceOf(RoleIdTakenError);
+      });
+      it("e-mail e nome podem ser alterados e o e-mail limpo; ganhar admin e perder permissões do grupo revogam as sessões", async () => {
+        const store = new PostgresUserStore(db);
+        await store.createRole({ id: "r1", name: "Op", permissions: ["system:users:read", "system:roles:read"] });
+        const user = await store.createUser({ fullname: "Ana", username: "ana", password: "Abcdef1!", roleId: "r1", email: "ana@exemplo.com" });
+        expect((await store.updateUser(user.id, { email: "" })).email).toBeUndefined();
+        expect((await store.updateUser(user.id, { fullname: "Ana Lima" })).fullname).toBe("Ana Lima");
+
+        const version = async () => (await store.findById(user.id))?.sessionVersion ?? 0;
+        const start = await version();
+        await store.updateUser(user.id, { isAdmin: true });
+        expect(await version()).toBe(start + 1);
+        await store.updateRole("r1", { permissions: ["system:users:read", "system:roles:read", "system:erps:manage"] });
+        expect(await version()).toBe(start + 1);
+        await store.updateRole("r1", { permissions: ["system:users:read"] });
+        expect(await version()).toBe(start + 2);
       });
       it("setAdmin e syncOrphanPermissions persistem", async () => {
         const store = new PostgresUserStore(db);

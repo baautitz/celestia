@@ -60,7 +60,7 @@ interface Opts {
   cookie?: string;
 }
 
-async function rec(key: string, method: string, path: string, opts: Opts = {}): Promise<{ raw: unknown }> {
+async function rec(key: string, method: string, path: string, opts: Opts = {}): Promise<{ raw: unknown; setCookie: string | null }> {
   expect(results[key], `chave duplicada ${key}`).toBeUndefined();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
@@ -79,7 +79,7 @@ async function rec(key: string, method: string, path: string, opts: Opts = {}): 
   if (setCookie) out.cookie = normalize(setCookie).replace(/Expires=[^;]+/i, "Expires=<date>");
   results[key] = out;
   if (!updating) expect(out, `chave do caso: ${key}`).toEqual(expected[key]);
-  return { raw: parsed };
+  return { raw: parsed, setCookie };
 }
 
 const tick = () => vi.setSystemTime(new Date(Date.now() + 1000));
@@ -96,7 +96,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password: TEST_PASSWORD }),
       });
-      return ((await res.json()) as { access_token: string }).access_token;
+      return ((await res.json()) as { accessToken: string }).accessToken;
     };
     A = await login("carlos.admin"); // role_admin com todas as permissões system:*
     V = await login("joao.silva"); // colaborador: sem nenhuma permissão system:*
@@ -120,12 +120,13 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("auth.login.unknown_user", "POST", "/api/auth/login", { body: { username: "ninguem", password: "x" } });
     await rec("auth.login.invalid_body", "POST", "/api/auth/login", { body: { username: "carlos.admin" } });
     await rec("auth.login.admin_bypass", "POST", "/api/auth/login", { body: { username: "root.admin", password: TEST_PASSWORD } });
-    const refresh = (lg.raw as { refresh_token: string }).refresh_token;
+    const refresh = /refresh_token=([^;]+)/.exec(lg.setCookie ?? "")?.[1] ?? "";
+    // O refresh token só vale pelo cookie: o corpo da requisição é ignorado.
     await rec("auth.refresh.body", "POST", "/api/auth/refresh", { body: { refresh_token: refresh } });
     await rec("auth.refresh.cookie", "POST", "/api/auth/refresh", { body: {}, cookie: `refresh_token=${refresh}` });
     await rec("auth.refresh.missing", "POST", "/api/auth/refresh", { body: {} });
-    await rec("auth.refresh.invalid", "POST", "/api/auth/refresh", { body: { refresh_token: "lixo" } });
-    await rec("auth.refresh.access_token_as_refresh", "POST", "/api/auth/refresh", { body: { refresh_token: A } });
+    await rec("auth.refresh.invalid", "POST", "/api/auth/refresh", { cookie: "refresh_token=lixo" });
+    await rec("auth.refresh.access_token_as_refresh", "POST", "/api/auth/refresh", { cookie: `refresh_token=${A}` });
     await rec("auth.logout", "POST", "/api/auth/logout");
     await rec("auth.me.ok", "GET", "/api/auth/me", { token: A });
     await rec("auth.me.admin_bypass", "GET", "/api/auth/me", { token: R });
@@ -159,7 +160,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     tick();
     const created = await rec("iam.users.create.ok", "POST", "/api/iam/users", { token: A, body: newUser });
     const newId = (created.raw as { id: string }).id;
-    await rec("iam.users.create.400_duplicate", "POST", "/api/iam/users", { token: A, body: newUser });
+    await rec("iam.users.create.409_duplicate", "POST", "/api/iam/users", { token: A, body: newUser });
     await rec("iam.users.create.unknown_role", "POST", "/api/iam/users", { token: A, body: { ...newUser, username: "outro.user", roleId: "inexistente" } });
     tick();
     await rec("iam.users.create.admin_bypass", "POST", "/api/iam/users", { token: R, body: { ...newUser, username: "novo.root", isAdmin: true } });
@@ -168,7 +169,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
     await rec("iam.users.update.403", "PUT", `/api/iam/users/${newId}`, { token: V, body: { fullname: "X Y" } });
     await rec("iam.users.update.ok", "PUT", `/api/iam/users/${newId}`, { token: A, body: { fullname: "Nome Editado", status: "inactive", email: "a@b.com" } });
     await rec("iam.users.update.400_invalid_status", "PUT", `/api/iam/users/${newId}`, { token: A, body: { status: "foo" } });
-    await rec("iam.users.update.400_unknown_user", "PUT", "/api/iam/users/nao_existe", { token: A, body: { fullname: "X Y" } });
+    await rec("iam.users.update.404_unknown_user", "PUT", "/api/iam/users/nao_existe", { token: A, body: { fullname: "X Y" } });
     await rec("iam.users.update.403_isadmin_by_non_admin", "PUT", `/api/iam/users/${newId}`, { token: A, body: { isAdmin: true } });
     await rec("iam.users.update.ok_isadmin_by_admin", "PUT", `/api/iam/users/${newId}`, { token: R, body: { isAdmin: true } });
     await rec("iam.users.update.400_self_demote", "PUT", `/api/iam/users/${rootId}`, { token: R, body: { isAdmin: false } });
@@ -290,7 +291,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: "gestor.limitado", password: "Senha@456" }),
     });
-    const G = ((await gl.json()) as { access_token: string }).access_token;
+    const G = ((await gl.json()) as { accessToken: string }).accessToken;
 
     await rec("iam.grants.users.update.403_stronger_role", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { roleId: "role_admin" } });
     await rec("iam.grants.users.update.ok_subset_role", "PUT", `/api/iam/users/${comumId}`, { token: G, body: { roleId: "role_colaborador" } });
@@ -314,7 +315,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: "root.admin", password: TEST_PASSWORD }),
     });
-    const R2 = ((await rl.json()) as { access_token: string }).access_token;
+    const R2 = ((await rl.json()) as { accessToken: string }).accessToken;
     await rec("iam.users.delete.409_self", "DELETE", `/api/iam/users/${rootId}`, { token: R2 });
     await rec("iam.users.update.409_last_admin_inactivate", "PUT", `/api/iam/users/${rootId}`, { token: R2, body: { status: "inactive" } });
 

@@ -80,7 +80,7 @@ describe("ERPs (/api/admin/erps)", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password: TEST_PASSWORD }),
     });
-    return ((await res.json()) as { access_token: string }).access_token;
+    return ((await res.json()) as { accessToken: string }).accessToken;
   }
 
   const send = (method: string, path: string, token: string, payload?: unknown) =>

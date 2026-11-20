@@ -48,6 +48,11 @@ export class TokenService {
     this.refreshTtl = config?.refreshTtlSeconds ?? 7 * 24 * 3600; // 7 dias
   }
 
+  /** Validade do Access Token em segundos: o que o cliente recebe em `expiresIn`. */
+  get accessTtlSeconds(): number {
+    return this.accessTtl;
+  }
+
   /**
    * Gera o Access Token (JWT de 5 minutos) com todos os claims de autorização stateless.
    */

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { loadCertificateAuthorityClient } from "../src/boot/certificate-authority.js";
-import { CertificateAuthorityUnavailableError, HttpCertificateAuthorityClient } from "../src/iam/certificate-authority-client.js";
+import { CertificateAuthorityUnavailableError, CertificateAuthorityValidationError, HttpCertificateAuthorityClient } from "../src/iam/certificate-authority-client.js";
 
 const secret = "chave-em-comum-com-mais-de-32-caracteres";
 
@@ -48,5 +48,39 @@ describe("HttpCertificateAuthorityClient", () => {
 
   it("devolve null para Dispositivo inexistente", async () => {
     expect(await client(() => Response.json({ error: "x" }, { status: 404 })).getDevice("nao-existe")).toBeNull();
+  });
+
+  it("não trata status inesperado (3xx, 403, 404 e 409 fora do esperado) como sucesso", async () => {
+    await expect(client(() => new Response(null, { status: 302 })).listDevices()).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+    await expect(client(() => Response.json({}, { status: 403 })).listDevices()).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+    await expect(client(() => Response.json({}, { status: 404 })).listDevices()).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+    await expect(client(() => Response.json({}, { status: 409 })).issueDevice({ name: "Caixa" })).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+    await expect(client(() => Response.json({}, { status: 404 })).createChallenge("u1")).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+  });
+
+  it("devolve o corpo da validação quando a autoridade responde 400", async () => {
+    const body = { error: { issues: [{ path: ["name"], message: "Too small" }] } };
+    const rejected = await client(() => Response.json(body, { status: 400 })).issueDevice({ name: "" }).catch((err: unknown) => err);
+    expect(rejected).toBeInstanceOf(CertificateAuthorityValidationError);
+    expect((rejected as CertificateAuthorityValidationError).body).toEqual(body);
+    // 400 sem o contrato de validação é uma autoridade com defeito.
+    await expect(client(() => Response.json({ x: 1 }, { status: 400 })).issueDevice({ name: "" })).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+  });
+
+  it("corpo ilegível numa resposta de sucesso vira autoridade indisponível", async () => {
+    const broken = () => new Response("<html>not json</html>", { status: 200 });
+    await expect(client(broken).listDevices()).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+    await expect(client(broken).getDevice("d1")).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+    await expect(client(broken).issueDevice({ name: "Caixa" })).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+    await expect(client(broken).revokeDevice("d1")).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+    await expect(client(broken).createChallenge("u1")).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+    await expect(client(broken).exchangeChallenge({ challengeId: "c1" })).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
+  });
+
+  it("a troca do desafio só concede com 2xx; 403 nega e qualquer outro status falha", async () => {
+    const granted = { userId: "u1", deviceId: "d1", deviceName: "Caixa" };
+    expect(await client(() => Response.json(granted)).exchangeChallenge({ challengeId: "c1" })).toEqual({ granted: true, ...granted });
+    expect(await client(() => Response.json({ error: "device_required", userId: "u1" }, { status: 403 })).exchangeChallenge({ challengeId: "c1" })).toEqual({ granted: false, userId: "u1" });
+    await expect(client(() => Response.json({}, { status: 404 })).exchangeChallenge({ challengeId: "c1" })).rejects.toBeInstanceOf(CertificateAuthorityUnavailableError);
   });
 });

@@ -10,11 +10,7 @@
     "status": 200,
     "body": {
       "accessToken": "<token>",
-      "refreshToken": "<token>",
       "expiresIn": 300,
-      "access_token": "<token>",
-      "refresh_token": "<token>",
-      "expires_in": 300,
       "user": {
         "sub": "usr_1001",
         "username": "carlos.admin",
@@ -79,11 +75,7 @@
     "status": 200,
     "body": {
       "accessToken": "<token>",
-      "refreshToken": "<token>",
       "expiresIn": 300,
-      "access_token": "<token>",
-      "refresh_token": "<token>",
-      "expires_in": 300,
       "user": {
         "sub": "usr_<uuid>",
         "username": "root.admin",
@@ -140,56 +132,16 @@
     "cookie": "refresh_token=<token>; Max-Age=604800; Path=/api/auth; HttpOnly; SameSite=Lax"
   },
   "auth.refresh.body": {
-    "status": 200,
+    "status": 401,
     "body": {
-      "accessToken": "<token>",
-      "refreshToken": "<token>",
-      "expiresIn": 300,
-      "access_token": "<token>",
-      "refresh_token": "<token>",
-      "expires_in": 300,
-      "user": {
-        "sub": "usr_1001",
-        "username": "carlos.admin",
-        "fullname": "Carlos Oliveira",
-        "email": "carlos@farmacia.com.br",
-        "role": "role_admin",
-        "permissions": [
-          "system:users:create",
-          "system:users:read",
-          "system:users:update",
-          "system:users:reset_password",
-          "system:users:deactivate",
-          "system:roles:create",
-          "system:roles:read",
-          "system:roles:update",
-          "system:devices:read",
-          "system:devices:create",
-          "system:devices:revoke",
-          "system:erps:manage",
-          "system:audit:read",
-          "closing_period:period:read",
-          "closing_period:period:update",
-          "closing_period:period:create",
-          "closing_period:period:close",
-          "closing_period:period:reopen",
-          "closing_period:period:cancel"
-        ],
-        "iat": 1773144000,
-        "exp": 1773144300
-      }
-    },
-    "cookie": "refresh_token=<token>; Max-Age=604800; Path=/api/auth; HttpOnly; SameSite=Lax"
+      "error": "Refresh token não fornecido."
+    }
   },
   "auth.refresh.cookie": {
     "status": 200,
     "body": {
       "accessToken": "<token>",
-      "refreshToken": "<token>",
       "expiresIn": 300,
-      "access_token": "<token>",
-      "refresh_token": "<token>",
-      "expires_in": 300,
       "user": {
         "sub": "usr_1001",
         "username": "carlos.admin",
@@ -247,7 +199,7 @@
       "success": true,
       "message": "Sessão encerrada com sucesso."
     },
-    "cookie": "refresh_token=; Max-Age=0; Path=/api/auth"
+    "cookie": "refresh_token=; Max-Age=0; Path=/api/auth; HttpOnly; SameSite=Lax"
   },
   "auth.me.ok": {
     "status": 200,
@@ -1227,8 +1179,8 @@
       "createdAt": "<ts>"
     }
   },
-  "iam.users.create.400_duplicate": {
-    "status": 400,
+  "iam.users.create.409_duplicate": {
+    "status": 409,
     "body": {
       "error": "Usuário 'novo.user' já existe."
     }
@@ -1295,8 +1247,8 @@
       }
     }
   },
-  "iam.users.update.400_unknown_user": {
-    "status": 400,
+  "iam.users.update.404_unknown_user": {
+    "status": 404,
     "body": {
       "error": "Usuário 'nao_existe' não encontrado."
     }
@@ -1390,7 +1342,7 @@
     }
   },
   "iam.users.reset.unknown_user": {
-    "status": 400,
+    "status": 404,
     "body": {
       "error": "Usuário 'nao_existe' não encontrado."
     }
@@ -1536,7 +1488,7 @@
     }
   },
   "iam.roles.create.duplicate": {
-    "status": 400,
+    "status": 409,
     "body": {
       "error": "Role 'role_teste' já existe."
     }
@@ -1597,7 +1549,7 @@
     }
   },
   "iam.roles.update.unknown_role": {
-    "status": 400,
+    "status": 404,
     "body": {
       "error": "Role 'nao_existe' não encontrada."
     }

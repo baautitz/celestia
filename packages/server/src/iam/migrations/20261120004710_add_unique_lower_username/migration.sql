@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "users_username_lower_key" ON "iam"."users" (lower("username"));
