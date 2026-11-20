@@ -11,11 +11,13 @@ import {
   CardDescription,
   CardContent,
 } from "@platform/ui/components/card";
-import { FieldGroup, Field, FieldLabel, FieldError } from "@platform/ui/components/field";
+import { FieldGroup } from "@platform/ui/components/field";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
 import { Input } from "@platform/ui/components/input";
 import { PasswordInput } from "@platform/ui/components/password-input";
 import { Button } from "@platform/ui/components/button";
 import { CenteredScreen, Stack } from "@platform/ui/components/layout";
+import { safeCertificateUrl } from "@/lib/certificate-url";
 import { useUi } from "@platform/ui/imperative/provider";
 
 const loginSchema = z.object({
@@ -30,11 +32,7 @@ export const LoginPage: React.FC = () => {
   const ui = useUi();
   const navigate = useNavigate();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({
+  const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "",
@@ -53,7 +51,12 @@ export const LoginPage: React.FC = () => {
       const { certificateUrl } = await login(values.username, values.password);
       if (certificateUrl) {
         // Quem exige certificado segue para a autoridade certificadora, onde o navegador o apresenta; o login termina no callback.
-        window.location.assign(certificateUrl);
+        const target = safeCertificateUrl(certificateUrl);
+        if (!target) {
+          ui.feedback.notify({ type: "error", title: "Endereço de verificação do certificado inválido." });
+          return;
+        }
+        window.location.assign(target);
         return;
       }
       ui.feedback.notify({ type: "success", title: "Login efetuado com sucesso!" });
@@ -73,42 +76,45 @@ export const LoginPage: React.FC = () => {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <FieldGroup>
-              <Field data-invalid={!!errors.username}>
-                <FieldLabel htmlFor="username">Usuário</FieldLabel>
-                <Input
-                  {...register("username")}
-                  id="username"
-                  autoFocus
-                  autoComplete="username"
-                  aria-invalid={!!errors.username}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <FieldGroup>
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Usuário</FormLabel>
+                      <FormControl>
+                        <Input {...field} autoFocus autoComplete="username" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-                {errors.username?.message && (
-                  <FieldError>{errors.username.message}</FieldError>
-                )}
-              </Field>
 
-              <Field data-invalid={!!errors.password}>
-                <FieldLabel htmlFor="password">Senha</FieldLabel>
-                <PasswordInput
-                  {...register("password")}
-                  id="password"
-                  autoComplete="current-password"
-                  aria-invalid={!!errors.password}
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Senha</FormLabel>
+                      <FormControl>
+                        <PasswordInput {...field} autoComplete="current-password" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-                {errors.password?.message && (
-                  <FieldError>{errors.password.message}</FieldError>
-                )}
-              </Field>
 
-              <Stack>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Autenticando..." : "Entrar"}
-                </Button>
-              </Stack>
-            </FieldGroup>
-          </form>
+                <Stack>
+                  <Button type="submit" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting ? "Autenticando..." : "Entrar"}
+                  </Button>
+                </Stack>
+              </FieldGroup>
+            </form>
+          </Form>
         </CardContent>
 
       </Card>
