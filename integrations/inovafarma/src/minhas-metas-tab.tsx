@@ -163,7 +163,7 @@ export function MinhasMetas({ periodos, lerAvaliacoes = false }: { periodos: Per
   const colunasLista: DataTableColumn<MinhaMeta>[] = colunas.map((c) =>
     c.key === "resultado" ? { ...c, render: (m: MinhaMeta) => (
       <Stack direction="row" gap="tight" align="center">
-        {resultado(m)}
+        {resultado(m) || "–"}
         {olho(m)}
       </Stack>
     ) } : c,
