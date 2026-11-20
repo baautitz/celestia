@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
+import { mesmoNome, NomeDuplicadoError } from "./erros-de-store.js";
 import type { DadosTipoMeta, TipoMeta } from "./tipos-meta.js";
 
 export interface TipoMetaStore {
   listar(): Promise<TipoMeta[]>;
   tipo(id: string): Promise<TipoMeta | null>;
+  /** Lança `NomeDuplicadoError` se já há um Tipo de Meta com o nome (sem diferenciar maiúsculas). */
   criar(dados: DadosTipoMeta): Promise<TipoMeta>;
-  /** Compare-and-set pela `version`; null se o Tipo de Meta mudou ou sumiu. */
+  /** Compare-and-set pela `version`; null se o Tipo de Meta mudou ou sumiu. Lança `NomeDuplicadoError` como `criar`. */
   atualizar(id: string, dados: DadosTipoMeta, expectedVersion: number): Promise<TipoMeta | null>;
 }
 
@@ -23,6 +25,7 @@ export class MemoryTipoMetaStore implements TipoMetaStore {
   }
 
   async criar(dados: DadosTipoMeta): Promise<TipoMeta> {
+    this.garantirNomeUnico(dados.nome);
     const agora = new Date().toISOString();
     const tipo = { ...dados, id: novoIdTipoMeta(), version: 1, criadoEm: agora, atualizadoEm: agora };
     this.tipos.set(tipo.id, tipo);
@@ -32,8 +35,13 @@ export class MemoryTipoMetaStore implements TipoMetaStore {
   async atualizar(id: string, dados: DadosTipoMeta, expectedVersion: number): Promise<TipoMeta | null> {
     const atual = this.tipos.get(id);
     if (!atual || atual.version !== expectedVersion) return null;
+    this.garantirNomeUnico(dados.nome, id);
     const atualizado = { ...atual, ...dados, version: atual.version + 1, atualizadoEm: new Date().toISOString() };
     this.tipos.set(id, atualizado);
     return atualizado;
+  }
+
+  private garantirNomeUnico(nome: string, id?: string): void {
+    if ([...this.tipos.values()].some((t) => t.id !== id && mesmoNome(t.nome, nome))) throw new NomeDuplicadoError();
   }
 }
