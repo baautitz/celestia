@@ -2020,25 +2020,63 @@
   "admin.erps.put.400_id": {
     "status": 400,
     "body": {
-      "error": "O id do ERP deve usar letras minúsculas, números e _ (ex.: inovafarma)."
+      "error": {
+        "issues": [
+          {
+            "path": [
+              "id"
+            ],
+            "message": "O id do ERP deve usar letras minúsculas, números e _ (ex.: inovafarma)."
+          }
+        ]
+      }
     }
   },
   "admin.erps.put.400_driver": {
     "status": 400,
     "body": {
-      "error": "ERP Driver 'oracle' não suportado."
+      "error": {
+        "issues": [
+          {
+            "path": [
+              "driver"
+            ],
+            "message": "ERP Driver 'oracle' não suportado."
+          }
+        ]
+      }
     }
   },
   "admin.erps.put.400_missing_secret": {
     "status": 400,
     "body": {
-      "error": "Senha é obrigatório."
+      "error": {
+        "issues": [
+          {
+            "path": [
+              "values",
+              "password"
+            ],
+            "message": "Senha é obrigatório."
+          }
+        ]
+      }
     }
   },
   "admin.erps.put.400_port": {
     "status": 400,
     "body": {
-      "error": "Porta fora do intervalo permitido."
+      "error": {
+        "issues": [
+          {
+            "path": [
+              "values",
+              "port"
+            ],
+            "message": "Porta fora do intervalo permitido."
+          }
+        ]
+      }
     }
   },
   "admin.erps.put.400_invalid_body": {
