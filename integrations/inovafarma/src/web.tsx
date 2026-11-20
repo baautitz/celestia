@@ -405,7 +405,7 @@ function FiltrosDrawer({ periods, visualizacoes, initial }: { periods: ClosingPe
   );
 }
 
-function VendasComissoesPage() {
+export function VendasComissoesPage() {
   const ui = useUi();
   const [periods, setPeriods] = useState<ClosingPeriod[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
@@ -422,36 +422,34 @@ function VendasComissoesPage() {
   // Carrega lista de períodos de fechamento e filiais
   useEffect(() => {
     async function initFilters() {
-      try {
-        const [periodsData, visualizacoesData] = await Promise.all([
-          apiFetch<ClosingPeriod[]>("/api/closing-periods").catch((err) => {
-            console.error("Erro ao buscar períodos:", err);
-            return [] as ClosingPeriod[];
+      const falhas: string[] = [];
+      const registrar = (assunto: string, err: unknown) => {
+        falhas.push(`${assunto}: ${err instanceof Error ? err.message : "erro desconhecido"}`);
+      };
+      // Os Períodos vêm de /api/closing-periods, que exige a Permission de ler o Fechamento: sem ela a falha aparece na tela, não some.
+      const [periodsData, visualizacoesData] = await Promise.all([
+        apiFetch<ClosingPeriod[]>("/api/closing-periods").catch((err: unknown) => {
+          registrar("Não foi possível carregar os Períodos de Fechamento", err);
+          return [] as ClosingPeriod[];
+        }),
+        apiFetch<{ visualizacoes: VisualizacaoDisponivel[] }>(`${API}/relatorios/vendas-colaborador/visualizacoes`)
+          .then((r) => r.visualizacoes)
+          .catch((err: unknown) => {
+            registrar("Não foi possível carregar as Visualizações", err);
+            return [] as VisualizacaoDisponivel[];
           }),
-          apiFetch<{ visualizacoes: VisualizacaoDisponivel[] }>(`${API}/relatorios/vendas-colaborador/visualizacoes`)
-            .then((r) => r.visualizacoes)
-            .catch((err) => {
-              console.error("Erro ao buscar visualizações:", err);
-              return [] as VisualizacaoDisponivel[];
-            }),
-        ]);
+      ]);
 
-        setPeriods(periodsData);
-        setVisualizacoes(visualizacoesData);
-        // A mais ampla que o Usuário tem; o servidor entrega em ordem Geral, Loja, Individual.
-        if (visualizacoesData[0]) setVisualizacao(visualizacoesData[0].id);
-        else setLoading(false);
+      if (falhas.length > 0) setError(falhas.join(" "));
+      setPeriods(periodsData);
+      setVisualizacoes(visualizacoesData);
+      // A mais ampla que o Usuário tem; o servidor entrega em ordem Geral, Loja, Individual.
+      if (visualizacoesData[0]) setVisualizacao(visualizacoesData[0].id);
+      else setLoading(false);
 
-        if (periodsData.length > 0) {
-          const initial = periodsData.find((p) => p.status === "open") || periodsData[0];
-          if (initial) setSelectedPeriodId((prev) => prev || initial.id);
-        } else {
-          setLoading(false);
-        }
-      } catch (err: unknown) {
-        console.error("Falha ao inicializar filtros do InovaFarma:", err);
-        setLoading(false);
-      }
+      const initial = periodsData.find((p) => p.status === "open") ?? periodsData[0];
+      if (initial) setSelectedPeriodId((prev) => prev || initial.id);
+      else setLoading(false);
     }
     void initFilters();
   }, []);
@@ -616,7 +614,7 @@ function VendasComissoesPage() {
       </Show>
 
       {/* Alerta se não houver períodos */}
-      {periods.length === 0 && !loading && (
+      {periods.length === 0 && !loading && !error && (
         <Alert>
           <AlertCircle />
           <AlertTitle>Nenhum Período de Fechamento cadastrado na plataforma.</AlertTitle>
