@@ -79,9 +79,9 @@ export interface OpcoesBaixasDaLoja {
  * congelamento de partida), só dos produtos dos Itens, e roda o motor. Lança se o ERP falhar.
  */
 export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: readonly ItemPreVencido[], { base = null, ate, correcoes }: OpcoesBaixasDaLoja = {}): Promise<ResultadoBaixas<VendaDaLoja>> {
-  const paraMotor = itens.map((i) => ({ id: i.id, produtoId: i.produtoId, validade: i.validade, quantidade: i.quantidade, incluidoEm: horaDoErp(i.incluidoEm) }));
+  const paraMotor = itens.map((i) => ({ id: i.id, produtoId: i.produtoId, validade: i.validade, quantidade: i.quantidade, abrangenciaEm: horaDoErp(i.abrangenciaEm) }));
   const congelado = base ? { ate: base.ate, restante: restanteCongelado(itens, base) } : null;
-  const inclusao = paraMotor.map((i) => i.incluidoEm).sort()[0];
+  const inclusao = paraMotor.map((i) => i.abrangenciaEm).sort()[0];
   if (inclusao === undefined) return calcularBaixas({ itens: [], vendas: [] });
 
   const dataInicio = congelado && congelado.ate > inclusao ? congelado.ate : inclusao;

@@ -36,13 +36,13 @@ export const preVencidosItens = inovafarmaSchema.table(
     /** Mês e ano da validade, `AAAA-MM`. */
     validade: text("validade").notNull(),
     quantidade: integer("quantidade").notNull(),
-    /** Só as vendas a partir da data de inclusão gastam o Item. */
-    incluidoEm: timestamp("incluido_em").notNull(),
+    /** Só as vendas a partir da data de abrangência gastam o Item. */
+    abrangenciaEm: timestamp("abrangencia_em").notNull(),
     version: integer("version").notNull().default(1),
     criadoEm: timestamp("criado_em").notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
   },
-  (t) => [index("pre_vencidos_itens_loja_idx").on(t.codigoLoja, t.incluidoEm)],
+  (t) => [index("pre_vencidos_itens_loja_idx").on(t.codigoLoja, t.abrangenciaEm)],
 );
 
 export const avaliacoes = inovafarmaSchema.table(

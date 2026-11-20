@@ -2,7 +2,7 @@
  * Motor de Baixas de Pré-vencido: função pura, sem I/O. Recebe o Estoque de uma Loja e as vendas do ERP feitas nela
  * e devolve as Baixas por venda e o Restante de cada Item.
  *
- * Datas (`incluidoEm` e `data`) vêm no mesmo formato comparável como texto, a hora do ERP `AAAA-MM-DD HH:MM:SS`.
+ * Datas (`abrangenciaEm` e `data`) vêm no mesmo formato comparável como texto, a hora do ERP `AAAA-MM-DD HH:MM:SS`.
  */
 
 export interface ItemParaBaixa {
@@ -13,7 +13,7 @@ export interface ItemParaBaixa {
   validade: string;
   quantidade: number;
   /** Só as vendas a partir desta data gastam o Item. */
-  incluidoEm: string;
+  abrangenciaEm: string;
 }
 
 /** Uma linha de venda do ERP: uma venda e um produto. */
@@ -73,7 +73,7 @@ export interface ResultadoBaixas<V extends VendaParaBaixa = VendaParaBaixa> {
 export const chaveDaLinha = (venda: Pick<VendaParaBaixa, "vendaId" | "produtoId">) => `${venda.vendaId}|${venda.produtoId}`;
 
 /** Ordem em que a prateleira entrega: validade mais próxima, depois o Item incluído antes. */
-const ordemDeSaida = (a: ItemParaBaixa, b: ItemParaBaixa) => a.validade.localeCompare(b.validade) || a.incluidoEm.localeCompare(b.incluidoEm) || a.id.localeCompare(b.id);
+const ordemDeSaida = (a: ItemParaBaixa, b: ItemParaBaixa) => a.validade.localeCompare(b.validade) || a.abrangenciaEm.localeCompare(b.abrangenciaEm) || a.id.localeCompare(b.id);
 
 export function calcularBaixas<V extends VendaParaBaixa>({ itens, vendas, congelado, correcoes = {} }: EntradaBaixas<V>): ResultadoBaixas<V> {
   const restante: Record<string, number> = Object.fromEntries(itens.map((i) => [i.id, congelado?.restante[i.id] ?? i.quantidade]));
@@ -93,7 +93,7 @@ export function calcularBaixas<V extends VendaParaBaixa>({ itens, vendas, congel
     for (const item of porProduto.get(venda.produtoId) ?? []) {
       if (falta <= 0) break;
       const disponivel = restante[item.id] ?? 0;
-      if (item.incluidoEm > venda.data || disponivel <= 0) continue;
+      if (item.abrangenciaEm > venda.data || disponivel <= 0) continue;
       const gasto = Math.min(falta, disponivel);
       restante[item.id] = disponivel - gasto;
       falta -= gasto;

@@ -1,0 +1,1 @@
+ALTER TABLE "inovafarma"."pre_vencidos_itens" RENAME COLUMN "incluido_em" TO "abrangencia_em";

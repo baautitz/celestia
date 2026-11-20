@@ -123,17 +123,17 @@ async function boot() {
   return { req, incluir, listar, periodoId };
 }
 
-type Item = { id: string; version: number; nomeProduto: string; quantidade: number; restante: number; validade: string; incluidoEm: string; [k: string]: unknown };
+type Item = { id: string; version: number; nomeProduto: string; quantidade: number; restante: number; validade: string; abrangenciaEm: string; [k: string]: unknown };
 
 describe("Estoque de Pré-vencidos", () => {
-  it("inclui Itens e lista os da Loja com produto, validade, quantidade e data de inclusão", async () => {
+  it("inclui Itens e lista os da Loja com produto, validade, quantidade e data de abrangência", async () => {
     const { incluir, listar } = await boot();
     const antes = Date.now();
     const res = await incluir("ana");
     expect(res.status).toBe(201);
     const [item] = await listar("ana");
     expect(item).toMatchObject({ nomeProduto: PRODUTO.nome, codigoBarra: PRODUTO.codigoBarra, codigoLoja: 1, quantidade: 3, restante: 3, validade: "2027-06", version: 1 });
-    expect(Date.parse(defined(item, "the listed item").incluidoEm)).toBeGreaterThanOrEqual(antes - 1000);
+    expect(Date.parse(defined(item, "the listed item").abrangenciaEm)).toBeGreaterThanOrEqual(antes - 1000);
   });
 
   it("inclui o mesmo produto e validade de novo como outro Item", async () => {
@@ -426,9 +426,9 @@ describe("Congelamento das Baixas no fechamento do Closing Period", () => {
 });
 
 describe("Inclusão retroativa de Item", () => {
-  it("com a Permission de Baixas, inclui com data de inclusão retroativa e as vendas a partir dela geram Baixas", async () => {
+  it("com a Permission de Baixas, inclui com data de abrangência retroativa e as vendas a partir dela geram Baixas", async () => {
     const { incluir, listar, req, periodoId } = await boot();
-    const res = await incluir("rui", { quantidade: 5, incluidoEm: dia(-5) });
+    const res = await incluir("rui", { quantidade: 5, abrangenciaEm: dia(-5) });
     expect(res.status).toBe(201);
     vendas = [venda(1, -6, 1), venda(2, -3, 2)];
     expect((await listar("rui")).map((i) => i.restante)).toEqual([3]);
@@ -438,57 +438,57 @@ describe("Inclusão retroativa de Item", () => {
 
   it("não retroage antes do início do Closing Period aberto nem para o futuro", async () => {
     const { incluir } = await boot();
-    expect((await incluir("rui", { incluidoEm: dia(-6) })).status).toBe(400);
-    expect((await incluir("rui", { incluidoEm: dia(2) })).status).toBe(400);
-    expect((await incluir("rui", { incluidoEm: "03/11/2026" })).status).toBe(400);
+    expect((await incluir("rui", { abrangenciaEm: dia(-6) })).status).toBe(400);
+    expect((await incluir("rui", { abrangenciaEm: dia(2) })).status).toBe(400);
+    expect((await incluir("rui", { abrangenciaEm: "03/11/2026" })).status).toBe(400);
   });
 
   it("retroage até o início do Período aberto mais antigo, mesmo que ele já tenha terminado", async () => {
     const { incluir, req, periodoId } = await boot();
     expect((await req("adm", "POST", "/api/closing-periods", { name: "Anterior", startDate: dia(-20), endDate: dia(-6) })).status).toBe(201);
     expect((await req("adm", "POST", `/api/closing-periods/${periodoId}/close`)).status).toBe(200);
-    expect((await incluir("rui", { incluidoEm: dia(-15) })).status).toBe(201);
-    expect((await incluir("rui", { incluidoEm: dia(-21) })).status).toBe(400);
+    expect((await incluir("rui", { abrangenciaEm: dia(-15) })).status).toBe(201);
+    expect((await incluir("rui", { abrangenciaEm: dia(-21) })).status).toBe(400);
     const contexto = await (await req("rui", "GET", "/api/m/inovafarma/pre-vencidos/contexto")).json();
     expect(contexto.inclusaoRetroativa).toEqual({ inicio: dia(-20), hoje: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
   });
 
   it("recusa com o corpo de validação da plataforma o dia que não existe no calendário, em vez de falhar com 500", async () => {
     const { incluir, listar } = await boot();
-    for (const incluidoEm of ["2027-02-31", "2027-13-01", "2027-04-00"]) {
-      const res = await incluir("rui", { incluidoEm });
+    for (const abrangenciaEm of ["2027-02-31", "2027-13-01", "2027-04-00"]) {
+      const res = await incluir("rui", { abrangenciaEm });
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: { issues: [{ path: ["incluidoEm"], message: "Informe a data de inclusão (AAAA-MM-DD)." }] } });
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["abrangenciaEm"], message: "Informe a data de abrangência (AAAA-MM-DD)." }] } });
     }
     expect(await listar("rui")).toEqual([]);
   });
 
   it("o relógio fixo decide os limites: hoje é o último dia e o início do Período aberto, o primeiro", async () => {
     const { incluir } = await boot();
-    expect((await incluir("rui", { incluidoEm: "2027-04-15" })).status).toBe(201);
-    expect((await incluir("rui", { incluidoEm: "2027-04-16" })).status).toBe(400);
-    expect((await incluir("rui", { incluidoEm: "2027-04-10" })).status).toBe(201);
-    expect((await incluir("rui", { incluidoEm: "2027-04-09" })).status).toBe(400);
+    expect((await incluir("rui", { abrangenciaEm: "2027-04-15" })).status).toBe(201);
+    expect((await incluir("rui", { abrangenciaEm: "2027-04-16" })).status).toBe(400);
+    expect((await incluir("rui", { abrangenciaEm: "2027-04-10" })).status).toBe(201);
+    expect((await incluir("rui", { abrangenciaEm: "2027-04-09" })).status).toBe(400);
   });
 
   it("sem a Permission de Baixas, a data retroativa é recusada", async () => {
     const { incluir, listar } = await boot();
-    expect((await incluir("ana", { incluidoEm: dia(-1) })).status).toBe(403);
+    expect((await incluir("ana", { abrangenciaEm: dia(-1) })).status).toBe(403);
     expect(await listar("ana")).toEqual([]);
   });
 
-  it("com a Permission de Baixas, ajusta a data de inclusão de um Item na edição, com as mesmas regras e no Audit Log", async () => {
+  it("com a Permission de Baixas, ajusta a data de abrangência de um Item na edição, com as mesmas regras e no Audit Log", async () => {
     const { incluir, listar, req } = await boot();
     const criado = (await (await incluir("rui", { quantidade: 5 })).json()) as Item;
     const editar = (who: "rui" | "ana", body: Record<string, unknown>) => req(who, "PUT", `/api/m/inovafarma/pre-vencidos/estoque/itens/${criado.id}`, { quantidade: 5, validade: "2027-06", ...body });
-    expect((await editar("ana", { incluidoEm: dia(-2), version: 1 })).status).toBe(403);
-    expect((await editar("rui", { incluidoEm: dia(-6), version: 1 })).status).toBe(400);
-    expect((await editar("rui", { incluidoEm: dia(2), version: 1 })).status).toBe(400);
-    expect((await editar("rui", { incluidoEm: dia(-5), version: 1 })).status).toBe(200);
+    expect((await editar("ana", { abrangenciaEm: dia(-2), version: 1 })).status).toBe(403);
+    expect((await editar("rui", { abrangenciaEm: dia(-6), version: 1 })).status).toBe(400);
+    expect((await editar("rui", { abrangenciaEm: dia(2), version: 1 })).status).toBe(400);
+    expect((await editar("rui", { abrangenciaEm: dia(-5), version: 1 })).status).toBe(200);
     vendas = [venda(1, -4, 2)];
     expect((await listar("rui")).map((i) => i.restante)).toEqual([3]);
     const eventos = (await (await req("auditor", "GET", "/api/audit?plugin=inovafarma")).json()) as { action: string; summary: string }[];
-    expect(eventos.find((e) => e.action === "item_pre_vencido_update")?.summary).toContain("Data de inclusão de");
+    expect(eventos.find((e) => e.action === "item_pre_vencido_update")?.summary).toContain("Data de abrangência de");
   });
 });
 

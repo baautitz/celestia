@@ -298,15 +298,15 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         codigoBarra: "7891234567895",
         validade: "2027-06",
         quantidade: 3,
-        incluidoEm: "2027-04-10T13:00:00.000Z",
+        abrangenciaEm: "2027-04-10T13:00:00.000Z",
       };
 
       it("cria, lista pela Loja na ordem de inclusão, edita e exclui com a version", async () => {
         const store = new PostgresEstoquePreVencidoStore(db);
-        const depois = await store.criar({ ...novo, incluidoEm: "2027-04-11T09:00:00.000Z" });
+        const depois = await store.criar({ ...novo, abrangenciaEm: "2027-04-11T09:00:00.000Z" });
         const criado = await store.criar(novo);
         await store.criar({ ...novo, codigoLoja: 2 });
-        expect(criado).toMatchObject({ version: 1, quantidade: 3, codigoProduto: 987654, incluidoEm: "2027-04-10T13:00:00.000Z" });
+        expect(criado).toMatchObject({ version: 1, quantidade: 3, codigoProduto: 987654, abrangenciaEm: "2027-04-10T13:00:00.000Z" });
         expect((await store.listar(1)).map((i) => i.id)).toEqual([criado.id, depois.id]);
         expect(await store.lojas()).toEqual([1, 2]);
 

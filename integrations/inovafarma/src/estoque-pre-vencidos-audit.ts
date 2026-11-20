@@ -15,9 +15,9 @@ const Atributos = z.object({
   codigoBarra: z.string().nullable(),
   quantidade: z.number().int(),
   validade: z.string(),
-  incluidoEm: z.string(),
-  /** `incluidoEm` só quando a edição mudou a data de inclusão. */
-  anterior: z.object({ quantidade: z.number().int(), validade: z.string(), incluidoEm: z.string().optional() }).nullable(),
+  abrangenciaEm: z.string(),
+  /** `abrangenciaEm` só quando a edição mudou a data de abrangência. */
+  anterior: z.object({ quantidade: z.number().int(), validade: z.string(), abrangenciaEm: z.string().optional() }).nullable(),
 });
 export type AtributosItemPreVencido = z.infer<typeof Atributos>;
 
@@ -33,7 +33,7 @@ export function declareItemPreVencidoAudit(audit: AuditService): void {
     ...base,
     action: ITEM_PRE_VENCIDO_ACTIONS.editar,
     summary: (a) =>
-      `Alterou o Item de Pré-vencido "${a.nomeProduto}" da ${loja(a)} de ${a.anterior?.quantidade} un. (validade ${a.anterior?.validade}) para ${a.quantidade} un. (validade ${a.validade}).${a.anterior?.incluidoEm ? ` Data de inclusão de ${diaBr(a.anterior.incluidoEm)} para ${diaBr(a.incluidoEm)}.` : ""}`,
+      `Alterou o Item de Pré-vencido "${a.nomeProduto}" da ${loja(a)} de ${a.anterior?.quantidade} un. (validade ${a.anterior?.validade}) para ${a.quantidade} un. (validade ${a.validade}).${a.anterior?.abrangenciaEm ? ` Data de abrangência de ${diaBr(a.anterior.abrangenciaEm)} para ${diaBr(a.abrangenciaEm)}.` : ""}`,
   });
   audit.declareAction({ ...base, action: ITEM_PRE_VENCIDO_ACTIONS.excluir, summary: (a) => `Excluiu ${descricao(a)}.` });
 }

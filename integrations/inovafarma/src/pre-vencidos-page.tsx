@@ -24,7 +24,7 @@ interface Contexto {
   lojas: LojaOpcao[];
   /** Visualizações das Baixas, da mais ampla para a mais restrita. */
   visualizacoes: VisualizacaoDasBaixas[];
-  /** Só para quem gere as Baixas: os limites da data de inclusão retroativa, calculados pelo servidor. */
+  /** Só para quem gere as Baixas: os limites da data de abrangência retroativa, calculados pelo servidor. */
   inclusaoRetroativa?: InclusaoRetroativa;
 }
 

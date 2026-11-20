@@ -12,18 +12,18 @@ export interface ItemPreVencido {
   /** Mês e ano da validade, `AAAA-MM`. */
   validade: string;
   quantidade: number;
-  /** Data de inclusão (ISO): só as vendas a partir dela gastam o Item. */
-  incluidoEm: string;
+  /** Data de abrangência (ISO): só as vendas a partir dela gastam o Item. */
+  abrangenciaEm: string;
   version: number;
   criadoEm: string;
   atualizadoEm: string;
 }
 
-/** O que a edição muda; `incluidoEm` (ISO) só quando a data de inclusão é ajustada. */
+/** O que a edição muda; `abrangenciaEm` (ISO) só quando a data de abrangência é ajustada. */
 export interface EdicaoItemPreVencido {
   quantidade: number;
   validade: string;
-  incluidoEm?: string;
+  abrangenciaEm?: string;
 }
 
 export type NovoItemPreVencido = Omit<ItemPreVencido, "id" | "version" | "criadoEm" | "atualizadoEm">;
@@ -43,8 +43,8 @@ export interface EstoquePreVencidoStore {
 
 export const novoIdItem = (): string => `ipv_${randomUUID()}`;
 
-/** Ordem de inclusão: a data de inclusão e, entre iguais, a criação. */
-export const porInclusao = (a: ItemPreVencido, b: ItemPreVencido) => a.incluidoEm.localeCompare(b.incluidoEm) || a.criadoEm.localeCompare(b.criadoEm) || a.id.localeCompare(b.id);
+/** Ordem de abrangência: a data de abrangência e, entre iguais, a criação. */
+export const porAbrangencia = (a: ItemPreVencido, b: ItemPreVencido) => a.abrangenciaEm.localeCompare(b.abrangenciaEm) || a.criadoEm.localeCompare(b.criadoEm) || a.id.localeCompare(b.id);
 
 export class MemoryEstoquePreVencidoStore implements EstoquePreVencidoStore {
   private readonly itens = new Map<string, ItemPreVencido>();
@@ -57,7 +57,7 @@ export class MemoryEstoquePreVencidoStore implements EstoquePreVencidoStore {
   }
 
   async listar(codigoLoja: number): Promise<ItemPreVencido[]> {
-    return [...this.itens.values()].filter((i) => i.codigoLoja === codigoLoja).sort(porInclusao);
+    return [...this.itens.values()].filter((i) => i.codigoLoja === codigoLoja).sort(porAbrangencia);
   }
 
   async lojas(): Promise<number[]> {
