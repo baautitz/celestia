@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { returned } from "../db/returned.js";
 import { erps } from "./schema.js";
 import type { ErpInput, ErpRecord, ErpStore } from "./erp-store.js";
 
@@ -28,7 +29,7 @@ export class PostgresErpStore implements ErpStore {
       .values(input)
       .onConflictDoUpdate({ target: erps.id, set: { ...input, updatedAt: new Date() } })
       .returning();
-    return toRecord(row!);
+    return toRecord(returned(row));
   }
 
   async delete(id: string): Promise<void> {

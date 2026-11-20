@@ -4,6 +4,7 @@ import { TestUserStore } from "./helpers/fixtures.js";
 import { createPlatform } from "../src/index.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import type { ErpClient } from "../src/erp/erp-client.js";
+import { defined } from "./helpers/defined.js";
 
 const ESTOQUE = "inovafarma:pre-vencidos-estoque:manage";
 const BAIXAS = "inovafarma:pre-vencidos-baixas:manage";
@@ -117,7 +118,7 @@ describe("Estoque de Pré-vencidos", () => {
     expect(res.status).toBe(201);
     const [item] = await listar("ana");
     expect(item).toMatchObject({ nomeProduto: PRODUTO.nome, codigoBarra: PRODUTO.codigoBarra, codigoLoja: 1, quantidade: 3, restante: 3, validade: "2027-06", version: 1 });
-    expect(Date.parse(item!.incluidoEm)).toBeGreaterThanOrEqual(antes - 1000);
+    expect(Date.parse(defined(item, "the listed item").incluidoEm)).toBeGreaterThanOrEqual(antes - 1000);
   });
 
   it("inclui o mesmo produto e validade de novo como outro Item", async () => {
@@ -227,7 +228,7 @@ describe("Baixas de Pré-vencido", () => {
       [7, "ANA SOUZA", 3, [[1, 2], [4, 1]]],
       [30, "RUI SEM VINCULO", 1, [[2, 1]]],
     ]);
-    expect(grupos[0]!.vendas[0]).toMatchObject({ nomeProduto: PRODUTO.nome, data: `${dia(1)} 12:00:00` });
+    expect(defined(defined(grupos[0], "the first group").vendas[0], "the first sale")).toMatchObject({ nomeProduto: PRODUTO.nome, data: `${dia(1)} 12:00:00` });
     expect(JSON.stringify(grupos)).not.toContain(String(CODIGO_PRODUTO_SECRETO));
   });
 
@@ -424,7 +425,7 @@ describe("Correção de Baixa", () => {
     expect(await res.json()).toMatchObject({ quantidade: 1, motivo: "Uma unidade não era Pré-vencido", version: 1 });
     const grupos = await baixas();
     expect(resumo(grupos)).toEqual([[7, [[1, 1]]], [8, [[2, 2]]]]);
-    expect(grupos[0]!.vendas[0]!.correcao).toMatchObject({ quantidade: 1, motivo: "Uma unidade não era Pré-vencido" });
+    expect(defined(defined(grupos[0], "the first group").vendas[0], "the first sale").correcao).toMatchObject({ quantidade: 1, motivo: "Uma unidade não era Pré-vencido" });
     expect(await listar("ana")).toEqual([]);
   });
 
@@ -491,7 +492,7 @@ describe("Correção de Baixa", () => {
     expect((await req("adm", "POST", `/api/closing-periods/${periodoId}/close`)).status).toBe(200);
     const grupos = await baixas();
     expect(resumo(grupos)).toEqual([[7, [[1, 1]]], [8, [[2, 2]]]]);
-    expect(grupos[0]!.vendas[0]!.correcao).toMatchObject({ motivo: "Uma unidade não era Pré-vencido" });
+    expect(defined(defined(grupos[0], "the first group").vendas[0], "the first sale").correcao).toMatchObject({ motivo: "Uma unidade não era Pré-vencido" });
   });
 });
 

@@ -4,6 +4,7 @@ import { TestUserStore } from "./helpers/fixtures.js";
 import { createPlatform } from "../src/index.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import type { ErpClient } from "../src/erp/erp-client.js";
+import { defined } from "./helpers/defined.js";
 
 const LOJA = "inovafarma:furo-estoque-loja:manage";
 const GERAL = "inovafarma:furo-estoque-geral:manage";
@@ -67,7 +68,7 @@ async function boot() {
   expect((await req("adm", "PUT", "/api/m/inovafarma/colaboradores/9/vinculo", { usuarioId: "gil", lojas: [1], version: 0 })).status).toBe(200);
   const abril = (await (await req("adm", "POST", "/api/closing-periods", { name: "Abril", startDate: "2027-04-01", endDate: "2027-04-30" })).json()) as { id: string };
   const contexto = (await (await req("dir", "GET", "/api/m/inovafarma/furo-estoque/contexto")).json()) as { motivos: { id: string; nome: string; version: number }[] };
-  const motivo = contexto.motivos.find((m) => m.nome === "Vencido")!;
+  const motivo = defined(contexto.motivos.find((m) => m.nome === "Vencido"), "the \"Vencido\" reason");
   const justificar = (who: keyof typeof h, body: Record<string, unknown> = {}) =>
     req(who, "POST", "/api/m/inovafarma/furo-estoque/justificativas", { periodoId: abril.id, codigoMovimento: 100, motivoId: motivo.id, observacao: "Vencidos do mês", ...body });
   const ajustes = async (who: keyof typeof h) => (await req(who, "GET", `/api/m/inovafarma/furo-estoque/ajustes?periodoId=${abril.id}`)).json() as Promise<Ajuste[]>;
@@ -94,7 +95,7 @@ describe("Furo de Estoque", () => {
     expect((await justificar("gil", { codigoMovimento: 200 })).status).toBe(403);
     expect((await justificar("ana")).status).toBe(403);
     expect((await justificar("gil")).status).toBe(201);
-    expect((await ajustes("gil"))[0]!.justificativa).toMatchObject({ motivo: "Vencido", justificadoPor: "gil" });
+    expect(defined((await ajustes("gil"))[0], "the first adjustment of gil").justificativa).toMatchObject({ motivo: "Vencido", justificadoPor: "gil" });
   });
 
   it("um Ajuste tem uma só Justificativa e o Ajuste precisa existir no período", async () => {
@@ -113,7 +114,7 @@ describe("Furo de Estoque", () => {
 
     expect((await req("adm", "POST", `/api/closing-periods/${abril.id}/close`, { version: 1 })).status).toBe(200);
     expect((await req("dir", "DELETE", `${url}?version=2`)).status).toBe(409);
-    expect((await ajustes("dir"))[0]!.justificativa).not.toBeNull();
+    expect(defined((await ajustes("dir"))[0], "the first adjustment of dir").justificativa).not.toBeNull();
   });
 
   it("Motivos: só a Permission geral cadastra; nome único; inativo não pode ser escolhido", async () => {

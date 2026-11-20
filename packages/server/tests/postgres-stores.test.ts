@@ -19,6 +19,7 @@ import { PostgresAvaliacaoStore } from "../../../integrations/inovafarma/src/pos
 import { PostgresFuroEstoqueStore } from "../../../integrations/inovafarma/src/postgres-furo-estoque-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
+import { defined } from "./helpers/defined.js";
 
 const plan = migrationPlan(createPlatform().modules);
 
@@ -210,7 +211,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       it("rebaixamentos concorrentes: exatamente um passa, sempre sobra um admin ativo", async () => {
         const store = new PostgresUserStore(db);
         const [a, b] = await seed(store, 2);
-        const results = await Promise.allSettled([store.updateUser(a!, { isAdmin: false }), store.updateUser(b!, { isAdmin: false })]);
+        const results = await Promise.allSettled([store.updateUser(defined(a, "seeded admin a"), { isAdmin: false }), store.updateUser(defined(b, "seeded admin b"), { isAdmin: false })]);
         expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
         const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
         expect(rejected.reason).toBeInstanceOf(LastAdminError);
@@ -222,9 +223,9 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         const store = new PostgresUserStore(db);
         const [a, b, c] = await seed(store, 3);
         await Promise.allSettled([
-          store.updateUser(a!, { isAdmin: false }),
-          store.updateUser(b!, { status: "inactive" }),
-          store.deleteUser(c!),
+          store.updateUser(defined(a, "seeded admin a"), { isAdmin: false }),
+          store.updateUser(defined(b, "seeded admin b"), { status: "inactive" }),
+          store.deleteUser(defined(c, "seeded admin c")),
         ]);
         const admins = (await store.listUsers()).filter((u) => u.isAdmin && u.status === "active");
         expect(admins).toHaveLength(1);
@@ -234,7 +235,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         const store = new PostgresUserStore(db);
         const [a] = await seed(store, 1);
         const p = await store.createUser({ fullname: "Promovido", username: "promovido", password: "Abcdef1!", roleId: "r1" });
-        const results = await Promise.allSettled([store.updateUser(p.id, { isAdmin: true }), store.updateUser(a!, { isAdmin: false })]);
+        const results = await Promise.allSettled([store.updateUser(p.id, { isAdmin: true }), store.updateUser(defined(a, "seeded admin a"), { isAdmin: false })]);
         const admins = (await store.listUsers()).filter((u) => u.isAdmin && u.status === "active");
         expect(admins.length).toBeGreaterThanOrEqual(1);
         expect(results.some((r) => r.status === "fulfilled")).toBe(true);
@@ -360,10 +361,10 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         expect(await store.justificar(nova)).toBeNull();
         expect(await store.listarJustificativas("p1")).toHaveLength(1);
 
-        expect(await store.atualizarJustificativa(criada!.id, { motivoId: "mot_troca", observacao: "x" }, 99)).toBeNull();
-        expect(await store.atualizarJustificativa(criada!.id, { motivoId: "mot_troca", observacao: "x" }, 1)).toMatchObject({ motivoId: "mot_troca", version: 2 });
-        expect(await store.excluirJustificativa(criada!.id, 1)).toBe(false);
-        expect(await store.excluirJustificativa(criada!.id, 2)).toBe(true);
+        expect(await store.atualizarJustificativa(defined(criada, "the created justification").id, { motivoId: "mot_troca", observacao: "x" }, 99)).toBeNull();
+        expect(await store.atualizarJustificativa(defined(criada, "the created justification").id, { motivoId: "mot_troca", observacao: "x" }, 1)).toMatchObject({ motivoId: "mot_troca", version: 2 });
+        expect(await store.excluirJustificativa(defined(criada, "the created justification").id, 1)).toBe(false);
+        expect(await store.excluirJustificativa(defined(criada, "the created justification").id, 2)).toBe(true);
       });
     });
 

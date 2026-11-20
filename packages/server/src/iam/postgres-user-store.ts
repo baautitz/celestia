@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, count, eq, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CreateUserInput, Role, UpdateUserInput, User } from "@platform/shared";
+import { returned } from "../db/returned.js";
 import { roles, userPreferences, users } from "./schema.js";
 import { PasswordService } from "./password-service.js";
 import { pruneOrphans } from "@platform/core/permissions";
@@ -94,7 +95,7 @@ export class PostgresUserStore implements UserStore {
         allowWithoutCertificate: input.allowWithoutCertificate ?? false,
       })
       .returning();
-    return toUser(row!);
+    return toUser(returned(row));
   }
 
   async updateUser(id: string, input: UpdateUserInput): Promise<User> {
@@ -125,7 +126,7 @@ export class PostgresUserStore implements UserStore {
         })
         .where(eq(users.id, id))
         .returning();
-      return toUser(row!);
+      return toUser(returned(row));
     });
   }
 
@@ -206,7 +207,7 @@ export class PostgresUserStore implements UserStore {
   async createRole(role: Role): Promise<Role> {
     if (await this.getRole(role.id)) throw new Error(`Role '${role.id}' já existe.`);
     const [row] = await this.db.insert(roles).values(role).returning();
-    return toRole(row!);
+    return toRole(returned(row));
   }
 
   async updateRole(id: string, input: Partial<Role>): Promise<Role> {
@@ -222,12 +223,13 @@ export class PostgresUserStore implements UserStore {
       })
       .where(eq(roles.id, id))
       .returning();
-    return toRole(row!);
+    return toRole(returned(row));
   }
 
   async deleteRole(id: string): Promise<void> {
     const [linked] = await this.db.select({ total: count() }).from(users).where(eq(users.roleId, id));
-    if (linked!.total > 0) {
+    if (linked === undefined) throw new Error("A contagem de usuários vinculados não retornou.");
+    if (linked.total > 0) {
       throw new Error(`Não é possível excluir o grupo '${id}' pois existem usuários vinculados a ele.`);
     }
     await this.db.delete(roles).where(eq(roles.id, id));

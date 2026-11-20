@@ -23,7 +23,8 @@ export function encryptSecret(plain: string): string {
 
 export function decryptSecret(payload: string): string {
   const [iv, tag, data] = payload.split(".").map((p) => Buffer.from(p, "base64"));
-  const decipher = createDecipheriv("aes-128-gcm", getKey(), iv!);
-  decipher.setAuthTag(tag!);
-  return Buffer.concat([decipher.update(data!), decipher.final()]).toString("utf8");
+  if (!iv || !tag || !data) throw new Error("Segredo criptografado em formato inválido.");
+  const decipher = createDecipheriv("aes-128-gcm", getKey(), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
 }

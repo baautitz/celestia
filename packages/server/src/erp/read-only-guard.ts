@@ -18,6 +18,6 @@ export function assertReadOnlyQuery(sqlText: string): void {
   }
   const forbidden = code.match(FORBIDDEN);
   if (forbidden) {
-    throw new Error(`Comando não permitido em fonte somente leitura: ${forbidden[1]!.toUpperCase()}.`);
+    throw new Error(`Comando não permitido em fonte somente leitura: ${(forbidden[1] ?? forbidden[0]).toUpperCase()}.`);
   }
 }
