@@ -290,7 +290,7 @@ describe("tratamento de erros do servidor", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: "carlos.admin", password: TEST_PASSWORD }),
     });
-    const token = ((await login.json()) as { access_token: string }).access_token;
+    const token = ((await login.json()) as { accessToken: string }).accessToken;
 
     const missing = await app.request("/api/nao-existe");
     expect(missing.status).toBe(404);
