@@ -13,6 +13,8 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 RUN pnpm --filter "@platform/server..." --filter "@platform/web..." run build
 # O tsc não copia os .sql: cada Module procura as migrations ao lado do próprio código compilado.
 RUN cd packages/server/src && find . -type d -name migrations -exec cp -r --parents {} ../dist \;
+# Source maps e declaration maps nao vao para a imagem de producao.
+RUN find packages/server/dist packages/web/dist -name '*.map' -delete
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
   pnpm --filter @platform/server deploy --legacy --prod /deploy --store-dir $PNPM_STORE_DIR
 
