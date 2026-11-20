@@ -78,7 +78,7 @@ describe("IAMDevicesPage", () => {
     URL.revokeObjectURL = vi.fn();
     api.iam.issueDevice.mockResolvedValue({ device: { ...active, id: "d3", name: "Caixa 2" }, pfx: "AAEC", password: "SenhaDoPfx-123" });
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Novo Dispositivo" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Novo Dispositivo" }))[0]);
 
     fireEvent.change(await screen.findByLabelText("Nome do Dispositivo"), { target: { value: "Caixa 2" } });
     fireEvent.click(screen.getByRole("button", { name: "Emitir certificado" }));
@@ -95,7 +95,7 @@ describe("IAMDevicesPage", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     api.iam.issueDevice.mockResolvedValue({ device: { ...active, id: "d3", name: "Caixa 2" }, pfx: "AAEC", password: "SenhaDoPfx-123" });
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Novo Dispositivo" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Novo Dispositivo" }))[0]);
     fireEvent.change(await screen.findByLabelText("Nome do Dispositivo"), { target: { value: "Caixa 2" } });
     fireEvent.click(screen.getByRole("button", { name: "Emitir certificado" }));
 
@@ -106,7 +106,7 @@ describe("IAMDevicesPage", () => {
 
   it("pede o nome antes de emitir", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Novo Dispositivo" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Novo Dispositivo" }))[0]);
     await screen.findByLabelText("Nome do Dispositivo");
     fireEvent.click(screen.getByRole("button", { name: "Emitir certificado" }));
     expect(await screen.findByText("Informe o nome do Dispositivo.")).toBeTruthy();
