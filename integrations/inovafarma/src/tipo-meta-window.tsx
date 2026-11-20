@@ -61,11 +61,11 @@ const baseInicial = (indicador: IndicadorId, unidadeLista: UnidadeLista): Indica
 
 const schema = z.object({
   nome: z.string().trim().min(1, "Informe o nome do Tipo de Meta.").max(80, "O nome deve ter no máximo 80 caracteres."),
-  indicador: z.string() as z.ZodType<IndicadorId>,
+  indicador: z.string() as z.ZodType<IndicadorId, IndicadorId>,
   semAlvo: z.boolean(),
-  exibicao: z.string() as z.ZodType<Exibicao>,
+  exibicao: z.string() as z.ZodType<Exibicao, Exibicao>,
   mostrarPremio: z.boolean(),
-  regraTipo: z.string() as z.ZodType<TipoRegra>,
+  regraTipo: z.string() as z.ZodType<TipoRegra, TipoRegra>,
   /** Em R$ (o MoneyInput trabalha em reais). */
   valor: z.number(),
   gatilho: z.string(),
@@ -74,7 +74,7 @@ const schema = z.object({
   faixas: z.array(z.object({ atingimento: z.string(), valor: z.number(), percentual: z.string() })),
   percentual: z.string(),
   /** Vazio enquanto o gestor não escolhe a base do Percentual. */
-  indicadorBase: z.string() as z.ZodType<IndicadorId | "">,
+  indicadorBase: z.string() as z.ZodType<IndicadorId | "", IndicadorId | "">,
   soSeAtingir: z.boolean(),
   /** R$ em reais quando o Indicador é em R$; senão, o número digitado. */
   alvoPadrao: z.union([z.number(), z.string()]),

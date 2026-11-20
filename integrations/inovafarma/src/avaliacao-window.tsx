@@ -53,7 +53,7 @@ const schema = z.object({
   codigoColaborador: z.string().min(1, "Selecione o Colaborador."),
   codigoLoja: z.string().min(1, "Selecione a Loja."),
   descricao: z.string().trim().min(1, "Informe a descrição.").max(MAX_DESCRICAO, `A descrição deve ter no máximo ${MAX_DESCRICAO} caracteres.`),
-  valor: z.number({ invalid_type_error: "Informe o valor descontado.", required_error: "Informe o valor descontado." }).min(0),
+  valor: z.number({ error: "Informe o valor descontado." }).min(0),
 });
 type Valores = z.input<typeof schema>;
 
