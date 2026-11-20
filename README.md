@@ -68,6 +68,13 @@ docker build -f services/ca/Dockerfile -t celestia-ca .        # autoridade cert
 
 Ao subir, cada imagem aplica as próprias migrations, e a `celestia-ca` cria a CA se o volume em `/data/ca` estiver vazio. Faça backup da `ca.key`: sem ela, é preciso emitir todos os Dispositivos de novo.
 
+Detalhes de produção:
+
+- **Variáveis:** use [.env.hono.example](.env.hono.example) (serviço `celestia`) e [.env.ca.example](.env.ca.example) (serviço `celestia-ca`). As imagens já definem `NODE_ENV=production`, `PORT`/`WEB_ROOT` (API) e `CA_PORT`/`DEVICE_CA_*` (CA).
+- **Migrations:** `packages/server/start.sh` e `services/ca/start.sh` aplicam as migrations a cada subida do container; qualquer falha impede o serviço de subir.
+- **Imagem enxuta:** as imagens não levam source maps (`*.map` são apagados no estágio de build).
+- **Postgres:** o `docker-compose.yml` publica o Postgres só em `127.0.0.1` (padrão `${POSTGRES_PORT:-5432}`), para desenvolvimento. Em produção o banco é um serviço à parte, não exposto à internet.
+
 Variáveis e passo a passo de instalação: [Imagens Docker](docs/conventions/device-certificates.md#imagens-docker).
 
 ## IAM e permissões

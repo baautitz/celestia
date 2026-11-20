@@ -4,6 +4,8 @@
 
 A suíte inteira (`pnpm test`, que o hook de pré-push também roda) fica para **o final**, uma vez. Durante o trabalho rode só o arquivo ou o fluxo afetado: `pnpm exec vitest run <arquivo>`. O Vitest limita os processos a 4 (`maxWorkers` em `vitest.config.ts`) para não saturar a CPU; sob carga, os testes de UI estouram o tempo.
 
+O hook `.githooks/pre-push` roda `pnpm check` (`check:ui`, `check:plugins`, lint, build e a suíte inteira): esse push é a execução única da suíte do fluxo, então não rode `pnpm test` à mão antes dele nem repita o push. O hook `.githooks/pre-commit` só roda `check:ui`, `check:plugins` e o lint dos arquivos em stage, e só quando há `.ts`, `.tsx` ou `.mjs` em stage. Não há variável de ambiente para pular os hooks.
+
 ## Componente (jsdom) — `pnpm test`
 
 Vitest roda tudo em um comando. Testes de componente ficam ao lado do código (`*.test.tsx`) e declaram `// @vitest-environment jsdom` na primeira linha. Usam `@testing-library/react` e consultas por papel/rótulo (`getByRole`, `getByLabel`). Cobrem hoje o formulário dinâmico (`DynamicFormFields`) e o host de janelas (`UiProvider`/`WindowHost`).
