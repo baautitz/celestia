@@ -1,6 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { randomBytes } from "node:crypto";
 import { createPlatformApp } from "../src/index.js";
+import { createLogger } from "../src/logger.js";
+import { AuditLog } from "../src/audit/audit-log.js";
+import { MemoryAuditStore } from "../src/audit/audit-store.js";
+import type { ErpClientFactory } from "../src/erp/erp-factory.js";
+import type { ErpClientRegistry } from "../src/erp/erp-client.js";
 import { MemoryErpStore } from "../src/erp/erp-store.js";
 import { assertReadOnlyQuery } from "../src/erp/read-only-guard.js";
 import { decryptSecret } from "../src/erp/secret-box.js";
@@ -84,23 +89,39 @@ describe("ERPs (/api/admin/erps)", () => {
       body: payload ? JSON.stringify(payload) : undefined,
     });
 
+  let auditLog: AuditLog;
+  let registry: ErpClientRegistry;
+  let factory: ErpClientFactory;
+
+  const fake: ErpClient = {
+    query: async () => [],
+    healthCheck: async () => true,
+    close: async () => {
+      closed.push("closed");
+    },
+  };
+
   beforeEach(() => {
-    process.env.ERP_ENCRYPTION_KEY = randomBytes(16).toString("hex");
+    vi.stubEnv("ERP_ENCRYPTION_KEY", randomBytes(16).toString("hex"));
     erpStore = new MemoryErpStore();
+    auditLog = new AuditLog(new MemoryAuditStore());
+    registry = {};
     closed.length = 0;
-    const fake: ErpClient = {
-      query: async () => [],
-      healthCheck: async () => true,
-      close: async () => {
-        closed.push("closed");
-      },
-    };
+    factory = () => fake;
     app = createPlatformApp({
       userStore: createSeededUserStore(),
       erpStore,
-      clientFactory: () => fake,
+      erpClients: registry,
+      auditLog,
+      clientFactory: (record) => factory(record),
     });
   });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const entriesOf = () => auditLog.list({});
 
   it("salva com a senha cifrada e nunca a devolve", async () => {
     const token = await tokenOf("carlos.admin");
@@ -169,5 +190,123 @@ describe("ERPs (/api/admin/erps)", () => {
     const token = await tokenOf("joao.silva");
     expect((await send("PUT", "/api/admin/erps/inovafarma", token, body)).status).toBe(403);
     expect((await send("GET", "/api/admin/erps", token)).status).toBe(403);
+  });
+
+  it("registra salvar, testar e remover no Audit Log sem segredos nem valores do formulário", async () => {
+    const token = await tokenOf("carlos.admin");
+    await send("PUT", "/api/admin/erps/inovafarma", token, body);
+    await send("PUT", "/api/admin/erps/inovafarma", token, body);
+    await send("POST", "/api/admin/erps/inovafarma/test", token);
+    await send("DELETE", "/api/admin/erps/inovafarma", token);
+
+    const entries = (await entriesOf()).filter((e) => e.plugin === "erp");
+    expect(entries.map((e) => e.action).sort()).toEqual(["delete", "save", "save", "test"]);
+    expect(entries.map((e) => e.attributes).filter((a) => "created" in a).map((a) => a.created).sort()).toEqual([false, true]);
+    expect(entries.every((e) => e.targetType === "erp" && e.targetId === "inovafarma" && e.actorName)).toBe(true);
+    expect(JSON.stringify(entries)).not.toMatch(/Seg@1234|password|"host"|"db"|ro"/);
+    expect(entries.find((e) => e.action === "test")!.attributes).toMatchObject({ ok: true });
+  });
+
+  it("não grava nada no Audit Log quando a requisição é recusada", async () => {
+    const token = await tokenOf("carlos.admin");
+    await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, driver: "oracle" });
+    await send("DELETE", "/api/admin/erps/inexistente", token);
+    expect((await entriesOf()).filter((e) => e.plugin === "erp")).toEqual([]);
+  });
+
+  it("mantém o ERP e o cliente antigo quando a fábrica do cliente novo falha", async () => {
+    const token = await tokenOf("carlos.admin");
+    await send("PUT", "/api/admin/erps/inovafarma", token, body);
+    const before = await erpStore.get("inovafarma");
+    const old = registry.inovafarma;
+    factory = () => {
+      throw new Error("config inválida");
+    };
+
+    const res = await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, values: { ...values, host: "outro" } });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { issues: [{ path: ["values"], message: "config inválida" }] } });
+    expect(await erpStore.get("inovafarma")).toEqual(before);
+    expect(registry.inovafarma).toBe(old);
+    expect(closed).toHaveLength(0);
+  });
+
+  it("não resolve ids como membros do protótipo (constructor, toString)", async () => {
+    const token = await tokenOf("carlos.admin");
+    for (const id of ["constructor", "toString", "hasOwnProperty"]) {
+      expect((await send("POST", `/api/admin/erps/${id}/test`, token)).status).toBe(404);
+      expect((await send("DELETE", `/api/admin/erps/${id}`, token)).status).toBe(404);
+    }
+    expect(await send("PUT", "/api/admin/erps/constructor", token, body).then((r) => r.status)).toBe(200);
+    expect(Object.hasOwn(registry, "constructor")).toBe(true);
+  });
+
+  it("recusa com ValidationErrorBody: id inválido, driver desconhecido, campo ausente e tipo errado", async () => {
+    const token = await tokenOf("carlos.admin");
+    const issues = async (res: Response) => ((await res.json()) as { error: { issues: { path: (string | number)[]; message: string }[] } }).error.issues;
+
+    const badId = await send("PUT", "/api/admin/erps/Inova-Farma", token, body);
+    expect(badId.status).toBe(400);
+    expect((await issues(badId))[0]!.path).toEqual(["id"]);
+
+    const badDriver = await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, driver: "oracle" });
+    expect(badDriver.status).toBe(400);
+    expect((await issues(badDriver))[0]).toMatchObject({ path: ["driver"], message: "ERP Driver 'oracle' não suportado." });
+
+    const { password: _p, ...semSenha } = values;
+    const missing = await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, values: semSenha });
+    expect(missing.status).toBe(400);
+    expect((await issues(missing))[0]).toMatchObject({ path: ["values", "password"] });
+
+    const wrongType = await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, values: { ...values, host: 42, trustServerCertificate: "sim" } });
+    expect(wrongType.status).toBe(400);
+    expect((await issues(wrongType)).map((i) => i.path.join(".")).sort()).toEqual(["values.host", "values.trustServerCertificate"]);
+
+    const range = await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, values: { ...values, port: 99999 } });
+    expect((await issues(range))[0]!.path).toEqual(["values", "port"]);
+  });
+});
+
+describe("tratamento de erros do servidor", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("responde 404 e 500 em JSON, sem vazar o detalhe da falha", async () => {
+    vi.stubEnv("ERP_ENCRYPTION_KEY", randomBytes(16).toString("hex"));
+    const logged: unknown[] = [];
+    const store = new MemoryErpStore();
+    store.list = async () => {
+      throw new Error("detalhe interno com Seg@1234");
+    };
+    const app = createPlatformApp({
+      userStore: createSeededUserStore(),
+      erpStore: store,
+      logger: createLogger({ level: "error", destination: { write: (line: string) => void logged.push(line) } }),
+    });
+    const login = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "carlos.admin", password: TEST_PASSWORD }),
+    });
+    const token = ((await login.json()) as { access_token: string }).access_token;
+
+    const missing = await app.request("/api/nao-existe");
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({ error: "Rota não encontrada." });
+
+    const failing = await app.request("/api/admin/erps", { headers: { Authorization: `Bearer ${token}` } });
+    expect(failing.status).toBe(500);
+    expect(await failing.json()).toEqual({ error: "Erro interno do servidor." });
+    expect(logged.join("")).toContain("detalhe interno");
+  });
+});
+
+describe("logger", () => {
+  it("redige segredos dos registros", () => {
+    const lines: string[] = [];
+    const logger = createLogger({ level: "info", destination: { write: (line: string) => void lines.push(line) } });
+    logger.info({ password: "Seg@1234", secrets: { password: "x" }, req: { headers: { authorization: "Bearer abc" } } }, "teste");
+    expect(lines.join("")).not.toMatch(/Seg@1234|Bearer abc|"x"/);
   });
 });
