@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import type { DiscardRequest, FocusTarget } from "../contracts/windows.ts"
+import { defined } from "../test/defined.ts"
 import { WindowController } from "./controller.ts"
 
 const flush = () => new Promise<void>((r) => setImmediate(r))
@@ -19,9 +20,9 @@ describe("WindowController", () => {
   it("só a janela do topo resolve; promise liquida uma vez", async () => {
     const { c } = setup()
     const first = c.open({})
-    const firstId = c.snapshot().activeId!
+    const firstId = defined(c.snapshot().activeId, "the active window id")
     const second = c.open({})
-    const secondId = c.snapshot().activeId!
+    const secondId = defined(c.snapshot().activeId, "the active window id")
     expect(secondId).not.toBe(firstId)
 
     c.resolve(firstId, "x")
@@ -41,7 +42,7 @@ describe("WindowController", () => {
   it("dirty check é lazy, não republica e bloqueia fechamento duplicado", async () => {
     const { c, focus, confirmDiscard, releases } = setup()
     c.open({}, { focus })
-    const id = c.snapshot().activeId!
+    const id = defined(c.snapshot().activeId, "the active window id")
     const listener = vi.fn()
     c.subscribe(listener)
     const dirty = vi.fn(() => true)
@@ -64,7 +65,7 @@ describe("WindowController", () => {
   it("descartar confirmado fecha com 'discarded' e restaura foco", async () => {
     const { c, focus, releases } = setup(true)
     const p = c.open({}, { focus })
-    const id = c.snapshot().activeId!
+    const id = defined(c.snapshot().activeId, "the active window id")
     c.setDirtyCheck(id, () => true)
     c.requestDismiss(id, "cancel")
     releases[0]()
@@ -76,7 +77,7 @@ describe("WindowController", () => {
   it("sem dirty check fecha direto", async () => {
     const { c, confirmDiscard } = setup()
     const p = c.open({})
-    c.requestDismiss(c.snapshot().activeId!, "outside")
+    c.requestDismiss(defined(c.snapshot().activeId, "the active window id"), "outside")
     expect(await p).toEqual({ status: "cancelled", reason: "outside" })
     expect(confirmDiscard).not.toHaveBeenCalled()
   })
@@ -87,7 +88,7 @@ describe("WindowController", () => {
     const b = c.open({})
     // "unmounted" nunca restaura foco, nem via dismiss no topo
     const e = c.open({})
-    c.dismiss(c.snapshot().activeId!, "unmounted")
+    c.dismiss(defined(c.snapshot().activeId, "the active window id"), "unmounted")
     expect(await e).toEqual({ status: "cancelled", reason: "unmounted" })
     c.dismissAll()
     expect(await a).toEqual({ status: "cancelled", reason: "unmounted" })

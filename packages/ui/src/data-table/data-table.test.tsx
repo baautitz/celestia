@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DataTable } from "./data-table";
+import { defined } from "../test/defined";
 
 type Row = { id: string; name: string };
 const rows: Row[] = [{ id: "1", name: "Alfa" }];
@@ -63,7 +64,7 @@ describe.each([
     setViewport(width);
     render(
       <DataTable
-        columns={[{ ...columns[0]!, searchable: true }]}
+        columns={[{ ...defined(columns[0], "the first column"), searchable: true }]}
         rows={[...rows, { id: "2", name: "Beta" }]}
         getRowId={(r) => r.id}
         search={{}}
@@ -84,14 +85,14 @@ describe.each([
     setViewport(width);
     render(
       <DataTable
-        columns={[{ ...columns[0]!, searchable: true }]}
+        columns={[{ ...defined(columns[0], "the first column"), searchable: true }]}
         rows={[...rows, { id: "2", name: "Beta" }]}
         getRowId={(r) => r.id}
         search={{}}
         renderExpanded={(r) => <span>Detalhe de {r.name}</span>}
       />,
     );
-    await userEvent.click((await screen.findAllByRole("button", { name: "Expandir linha" }))[0]!);
+    await userEvent.click(defined((await screen.findAllByRole("button", { name: "Expandir linha" }))[0], "the button"));
     fireEvent.change(screen.getByPlaceholderText("Buscar..."), { target: { value: "a" } });
     expect(screen.getByText("Detalhe de Alfa")).toBeTruthy();
     expect(screen.queryByText("Detalhe de Beta")).toBeNull();
@@ -123,11 +124,11 @@ describe.each([
         renderExpanded={(r) => <span>Detalhe de {r.name}</span>}
       />,
     );
-    await userEvent.click((await screen.findAllByRole("button", { name: /Expandir todas/ }))[0]!);
+    await userEvent.click(defined((await screen.findAllByRole("button", { name: /Expandir todas/ }))[0], "the button"));
     expect(screen.getByText("Detalhe de Alfa")).toBeTruthy();
     expect(screen.getByText("Detalhe de Beta")).toBeTruthy();
 
-    await userEvent.click(screen.getAllByRole("button", { name: /Recolher todas/ })[0]!);
+    await userEvent.click(defined(screen.getAllByRole("button", { name: /Recolher todas/ })[0], "the button"));
     expect(screen.queryByText("Detalhe de Alfa")).toBeNull();
     expect(screen.queryByText("Detalhe de Beta")).toBeNull();
   });
@@ -142,8 +143,8 @@ describe.each([
         renderExpanded={(r) => <span>Detalhe de {r.name}</span>}
       />,
     );
-    await userEvent.click((await screen.findAllByRole("button", { name: "Expandir linha" }))[0]!);
-    await userEvent.click(screen.getAllByRole("button", { name: /Expandir todas/ })[0]!);
+    await userEvent.click(defined((await screen.findAllByRole("button", { name: "Expandir linha" }))[0], "the button"));
+    await userEvent.click(defined(screen.getAllByRole("button", { name: /Expandir todas/ })[0], "the button"));
     expect(screen.getByText("Detalhe de Alfa")).toBeTruthy();
     expect(screen.getByText("Detalhe de Beta")).toBeTruthy();
   });
@@ -158,7 +159,7 @@ describe("busca", () => {
     { id: "4", name: "Dispositivo do balcão" },
   ];
   const itemColumns = [{ key: "name", label: "Nome", sortable: true, searchable: true, value: (r: Item) => r.name }];
-  const names = () => screen.getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell")[0]!.textContent);
+  const names = () => screen.getAllByRole("row").slice(1).map((r) => defined(within(r).getAllByRole("cell")[0], "the first cell").textContent);
 
   it("busca por palavras, sem acento e com um erro, da mais relevante à menos", async () => {
     setViewport(1280);
@@ -186,7 +187,7 @@ describe("tooltip do cabeçalho", () => {
     setViewport(1280);
     render(
       <DataTable
-        columns={[{ ...columns[0]!, tooltip: "Nome do registro." }]}
+        columns={[{ ...defined(columns[0], "the first column"), tooltip: "Nome do registro." }]}
         rows={rows}
         getRowId={(r) => r.id}
       />,
@@ -202,7 +203,7 @@ describe("ordenação do cabeçalho", () => {
     render(
       <DataTable
         columns={[
-          { ...columns[0]!, sortable: true, firstSort },
+          { ...defined(columns[0], "the first column"), sortable: true, firstSort },
           { key: "id", label: "Cód.", sortable: true, value: (r: Row) => r.id },
         ]}
         rows={rows}
@@ -285,7 +286,7 @@ describe("impressão", () => {
     within(printedTable())
       .getAllByRole("row")
       .slice(1)
-      .map((r) => within(r).getAllByRole("cell")[0]!.textContent);
+      .map((r) => defined(within(r).getAllByRole("cell")[0], "the first cell").textContent);
 
   it("imprime a coluna com o printValue", async () => {
     setViewport(1280);
@@ -594,7 +595,7 @@ describe("totalizador", () => {
   it("mostra a linha Total com os valores formatados pela coluna e deixa as demais em branco", () => {
     setViewport(1280);
     render(<DataTable columns={totalColumns} rows={sellers} getRowId={(r) => r.id} totals={{ valor: 150 }} />);
-    const footerRow = within(screen.getByRole("table")).getAllByRole("row").at(-1)!;
+    const footerRow = defined(within(screen.getByRole("table")).getAllByRole("row").at(-1), "the last row");
     const cells = within(footerRow).getAllByRole("cell");
     expect(cells.map((c) => c.textContent?.replace(/\u00a0/g, " "))).toEqual(["Total", "", "R$ 150,00"]);
   });
@@ -605,7 +606,7 @@ describe("totalizador", () => {
     const totals = vi.fn((filtered: Seller[]) => ({ valor: filtered.reduce((sum, r) => sum + r.valor, 0) }));
     render(
       <DataTable
-        columns={[{ ...totalColumns[0]!, searchable: true }, ...totalColumns.slice(1)]}
+        columns={[{ ...defined(totalColumns[0], "the first column"), searchable: true }, ...totalColumns.slice(1)]}
         rows={many}
         getRowId={(r) => r.id}
         search={{ placeholder: "Buscar" }}
@@ -613,11 +614,11 @@ describe("totalizador", () => {
         totals={totals}
       />,
     );
-    const lastCells = () => within(within(screen.getByRole("table")).getAllByRole("row").at(-1)!).getAllByRole("cell");
-    expect(lastCells().at(-1)!.textContent?.replace(/\u00a0/g, " ")).toBe("R$ 50,00");
+    const lastCells = () => within(defined(within(screen.getByRole("table")).getAllByRole("row").at(-1), "the last row")).getAllByRole("cell");
+    expect(defined(lastCells().at(-1), "the last cell").textContent?.replace(/\u00a0/g, " ")).toBe("R$ 50,00");
 
     await userEvent.type(screen.getByPlaceholderText("Buscar"), "Ana");
-    expect(lastCells().at(-1)!.textContent?.replace(/\u00a0/g, " ")).toBe("R$ 40,00");
+    expect(defined(lastCells().at(-1), "the last cell").textContent?.replace(/\u00a0/g, " ")).toBe("R$ 40,00");
     expect(totals).toHaveBeenLastCalledWith(many.slice(0, 4));
   });
 
@@ -638,7 +639,7 @@ describe("totalizador", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
     const printed = screen.getByRole("table", { name: "Vendas" });
-    const cells = within(within(printed).getAllByRole("row").at(-1)!).getAllByRole("cell");
+    const cells = within(defined(within(printed).getAllByRole("row").at(-1), "the last row")).getAllByRole("cell");
     expect(cells.map((c) => c.textContent?.replace(/\u00a0/g, " "))).toEqual(["Total", "", "R$ 150,00"]);
   });
 
@@ -669,7 +670,7 @@ describe("totalizador", () => {
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Imprimir" }));
-    const cells = within(within(screen.getByRole("table", { name: "Vendas" })).getAllByRole("row").at(-1)!).getAllByRole("cell");
+    const cells = within(defined(within(screen.getByRole("table", { name: "Vendas" })).getAllByRole("row").at(-1), "the last row")).getAllByRole("cell");
     expect(cells.map((c) => c.textContent)).toEqual(["Total", "5", ""]);
   });
 
@@ -738,8 +739,8 @@ describe("linha selecionada", () => {
   it("destaca a linha clicada, troca ao clicar em outra e desmarca ao clicar de novo", async () => {
     setViewport(1280);
     render(<DataTable columns={columns} rows={data} getRowId={(r) => r.id} />);
-    const alfa = screen.getByText("Alfa").closest("tr")!;
-    const beta = screen.getByText("Beta").closest("tr")!;
+    const alfa = defined(screen.getByText("Alfa").closest("tr"), "the Alfa row");
+    const beta = defined(screen.getByText("Beta").closest("tr"), "the Beta row");
 
     await userEvent.click(alfa);
     expect(alfa.getAttribute("aria-selected")).toBe("true");
@@ -760,7 +761,7 @@ describe("linha selecionada", () => {
         <DataTable columns={columns} rows={data} getRowId={(r) => r.id} />
       </>,
     );
-    const alfa = screen.getByText("Alfa").closest("tr")!;
+    const alfa = defined(screen.getByText("Alfa").closest("tr"), "the Alfa row");
     await userEvent.click(alfa);
     expect(alfa.getAttribute("aria-selected")).toBe("true");
     await userEvent.click(screen.getByText("Fora"));
@@ -778,7 +779,7 @@ describe("linha selecionada", () => {
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Editar Alfa" }));
-    expect(screen.getByText("Alfa").closest("tr")!.getAttribute("aria-selected")).toBe("false");
+    expect(defined(screen.getByText("Alfa").closest("tr"), "the Alfa row").getAttribute("aria-selected")).toBe("false");
   });
 });
 
@@ -809,9 +810,9 @@ describe("tabela aninhada no celular", () => {
       />,
     );
     const interno = await screen.findByText("Interno");
-    const item = interno.closest("[data-slot=card]")!;
+    const item = defined(interno.closest("[data-slot=card]"), "the inner card");
     expect(item.className).not.toContain("ring-0");
-    const tabela = item.parentElement!.closest("[data-slot=card]")!;
+    const tabela = defined(item.parentElement?.closest("[data-slot=card]"), "the outer card");
     expect(tabela.className).toContain("ring-0");
     expect(tabela.className).toContain("overflow-visible");
   });
@@ -850,18 +851,18 @@ describe("DataTable arrowNavigation", () => {
     expect(document.activeElement).toBe(screen.getByLabelText("A Bia"));
     // A linha do campo com foco fica destacada, como se tivesse sido clicada.
     expect(screen.getByLabelText("A Bia").closest("tr")?.getAttribute("data-state")).toBe("selected");
-    fireEvent.keyDown(document.activeElement!, { key: "ArrowUp" });
+    fireEvent.keyDown(defined(document.activeElement, "the focused element"), { key: "ArrowUp" });
     expect(document.activeElement).toBe(a1);
     // ← e → sempre trocam de célula, mesmo com o cursor no meio do texto.
     a1.setSelectionRange(1, 1);
     fireEvent.keyDown(a1, { key: "ArrowRight" });
     expect(document.activeElement).toBe(screen.getByLabelText("B Ana"));
-    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    fireEvent.keyDown(defined(document.activeElement, "the focused element"), { key: "ArrowLeft" });
     expect(document.activeElement).toBe(a1);
     // Ao ganhar o foco, o valor fica todo selecionado: digitar substitui.
     expect([a1.selectionStart, a1.selectionEnd]).toEqual([0, 2]);
     fireEvent.keyDown(a1, { key: "ArrowRight" });
-    fireEvent.keyDown(document.activeElement!, { key: "Enter" });
+    fireEvent.keyDown(defined(document.activeElement, "the focused element"), { key: "Enter" });
     expect(document.activeElement).toBe(screen.getByLabelText("B Bia"));
   });
 });
