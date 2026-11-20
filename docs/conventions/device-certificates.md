@@ -25,13 +25,14 @@ O login tem dois passos:
 | CA | `CA_PORT` | Porta (padrão 3001). |
 | CA | `CA_PUBLIC_URL` | Endereço público da CA, com mTLS (`https://acesso.<domínio>`). Obrigatório em produção; em dev, `http://acesso.localhost:3001`. |
 | CA | `APP_CALLBACK_URL` | Callback do app (`https://app.<domínio>/login/certificado`). Obrigatório em produção; em dev, `http://localhost:5173/login/certificado`. |
-| CA | `CA_CERT_SOURCE` | `header` (produção) ou `mock` (só desenvolvimento). |
+| CA | `NODE_ENV` | `development` ou `test` (escritos assim) liberam `mock` e os endereços locais. Ausente ou com qualquer outro valor (inclusive erro de digitação) vale como produção. |
+| CA | `CA_CERT_SOURCE` | `header` (produção) ou `mock` (só com `NODE_ENV=development` ou `test`). |
 | CA | `CA_PROXY_SECRET` | Fonte `header`: segredo (mín. 32 caracteres) que o Traefik acrescenta; sem ele o certificado repassado é ignorado. |
 | CA | `CA_CERT_HEADER`, `CA_PROXY_SECRET_HEADER` | Opcionais: nomes dos headers (padrão `x-forwarded-tls-client-cert` e `x-celestia-proxy-secret`). |
 | CA | `CA_MOCK_DEVICE` | Fonte `mock`: nome de um Dispositivo ativo a simular; sem ele, ninguém apresenta certificado. |
 | CA | `DEVICE_CA_CERT_FILE`, `DEVICE_CA_KEY_FILE` | A CA que assina os Dispositivos (`pnpm create-ca`). Obrigatórios em produção; pela metade é erro em qualquer ambiente. |
 
-Em produção a CA só sobe com `CA_CERT_SOURCE=header` e a configuração completa (falha fechada), e o backend só sobe com a chave em comum e `CA_URL`. `mock` é recusado em produção.
+A CA falha fechada: só `NODE_ENV=development` ou `test` explícitos são tratados como desenvolvimento; sem eles (ou com `NODE_ENV=prod`, `staging` etc.) ela exige `CA_CERT_SOURCE=header` e a configuração completa para subir, e o backend só sobe com a chave em comum e `CA_URL`. `mock` é recusado fora de `development` e `test`.
 
 ## Produção com Traefik (fonte `header`)
 
@@ -75,11 +76,12 @@ Se o volume da CA for perdido, o boot cria **outra** CA e os Dispositivos antigo
 
 ## Desenvolvimento
 
-`pnpm dev` sobe o backend, a CA e o Vite juntos. No `.env`, `CA_SHARED_SECRET` é obrigatório.
+`pnpm dev` sobe o backend, a CA e o Vite juntos. No `.env`, `CA_SHARED_SECRET` é obrigatório e `NODE_ENV=development` precisa estar definido (já vem no `.env.dev.example`): sem ele a CA se comporta como em produção e recusa o `mock`.
 
 **Dia a dia: simulado.** No `.env`:
 
 ```
+NODE_ENV=development
 CA_CERT_SOURCE=mock
 CA_MOCK_DEVICE=Caixa 1     # nome de um Dispositivo ativo; sem ele, ninguém apresenta certificado
 ```
@@ -119,4 +121,4 @@ pnpm create-ca            # usa DEVICE_CA_CERT_FILE e DEVICE_CA_KEY_FILE; --name
 
 Windows e macOS: duplo clique (importar como **não exportável**). Android: Segurança > Certificado de VPN e apps. iOS: baixar o arquivo e instalar em Ajustes > Perfil baixado, digitando a senha.
 
-> A cifra do `.pfx` (AES-256, MAC SHA-256) foi verificada com o OpenSSL 3.5. Ainda precisa ser conferida num aparelho real de cada sistema (em especial iOS e macOS). Se algum recusar, o recuo é para 3DES/SHA-1.
+> O `.pfx` usa deliberadamente o formato legado do PKCS#12 (PBE-SHA1-3DES com MAC HMAC-SHA1), o único que o Windows (crypt32/certmgr) importa em todas as versões; o AES-256 com MAC PBKDF2 era recusado por ele. É uma troca consciente de força criptográfica por compatibilidade: o arquivo só existe na resposta da emissão e a senha tem 18 bytes aleatórios. Não migre para AES sem testar o Windows.

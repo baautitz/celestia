@@ -50,14 +50,30 @@ describe("em produção (falha fechado)", () => {
   });
 });
 
+describe("ambiente (falha fechado)", () => {
+  const bare = { CA_SHARED_SECRET: shared };
+
+  it.each([undefined, "", "prod", "Production", "staging", "developement"])("NODE_ENV=%j vale como produção: sem mock e sem endereços locais", (nodeEnv) => {
+    const env = { ...bare, NODE_ENV: nodeEnv };
+    expect(() => loadCaConfig(env, read)).toThrow(/CA_PUBLIC_URL/);
+    expect(() => loadCaConfig({ ...env, ...urls }, read)).toThrow(/CA dos Dispositivos é obrigatória/);
+    expect(() => loadCaConfig({ ...env, ...urls, ...ca }, read)).toThrow(/CA_CERT_SOURCE=header/);
+    expect(() => loadCaConfig({ ...env, ...urls, ...ca, CA_CERT_SOURCE: "mock", CA_MOCK_DEVICE: "Caixa 1" }, read)).toThrow(/não existe em produção/);
+  });
+
+  it.each(["development", "test"])("NODE_ENV=%s libera a simulação", (nodeEnv) => {
+    expect(loadCaConfig({ ...bare, NODE_ENV: nodeEnv, CA_CERT_SOURCE: "mock", CA_MOCK_DEVICE: "Caixa 1" }, read)).toMatchObject({ source: "mock" });
+  });
+});
+
 describe("fonte header", () => {
   it("exige o segredo do proxy até fora de produção: sem ele o header seria aceito de qualquer um", () => {
-    expect(() => loadCaConfig({ CA_SHARED_SECRET: shared, CA_CERT_SOURCE: "header" }, read)).toThrow(/CA_PROXY_SECRET/);
-    expect(() => loadCaConfig({ CA_SHARED_SECRET: shared, CA_CERT_SOURCE: "header", CA_PROXY_SECRET: "curto" }, read)).toThrow(/32/);
+    expect(() => loadCaConfig({ NODE_ENV: "development", CA_SHARED_SECRET: shared, CA_CERT_SOURCE: "header" }, read)).toThrow(/CA_PROXY_SECRET/);
+    expect(() => loadCaConfig({ NODE_ENV: "development", CA_SHARED_SECRET: shared, CA_CERT_SOURCE: "header", CA_PROXY_SECRET: "curto" }, read)).toThrow(/32/);
   });
 
   it("fora de produção a CA é opcional, mas pela metade é erro", () => {
-    const dev = { CA_SHARED_SECRET: shared, CA_CERT_SOURCE: "header", CA_PROXY_SECRET: proxySecret };
+    const dev = { NODE_ENV: "development", CA_SHARED_SECRET: shared, CA_CERT_SOURCE: "header", CA_PROXY_SECRET: proxySecret };
     expect(loadCaConfig(dev, read).authority).toBeUndefined();
     expect(() => loadCaConfig({ ...dev, DEVICE_CA_CERT_FILE: "ca.crt" }, read)).toThrow(/DEVICE_CA_KEY_FILE/);
   });
@@ -69,7 +85,7 @@ describe("fonte header", () => {
 });
 
 describe("desenvolvimento", () => {
-  const dev = { CA_SHARED_SECRET: shared };
+  const dev = { NODE_ENV: "development", CA_SHARED_SECRET: shared };
 
   it("usa endereços locais por padrão", () => {
     expect(loadCaConfig(dev, read)).toMatchObject({ port: 3001, publicUrl: "http://acesso.localhost:3001", callbackUrl: "http://localhost:5173/login/certificado" });
