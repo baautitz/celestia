@@ -1,5 +1,5 @@
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -97,6 +97,24 @@ const createSchema = z
   });
 type CreateFormValues = z.infer<typeof createSchema>;
 
+const MONTH_NAMES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+/** Nome sugerido: "<Mês>/<Ano>" da Data Final. */
+export const suggestPeriodName = (_start: Date, end: Date) => `${MONTH_NAMES[end.getMonth()]}/${end.getFullYear()}`;
+
 const CreatePeriodSheet: React.FC = () => {
   const { resolve } = useWindow<true>();
   const { feedback } = useUi();
@@ -105,6 +123,15 @@ const CreatePeriodSheet: React.FC = () => {
     resolver: zodResolver(createSchema),
     defaultValues: { name: "" },
   });
+  const nameEdited = useRef(false);
+  const startDate = form.watch("startDate");
+  const endDate = form.watch("endDate");
+
+  useEffect(() => {
+    if (nameEdited.current || !startDate || !endDate) return;
+    form.setValue("name", suggestPeriodName(startDate, endDate), { shouldValidate: form.formState.isSubmitted });
+  }, [startDate, endDate, form]);
+
   const onSubmit = async (v: CreateFormValues) => {
     try {
       setSaving(true);
@@ -162,6 +189,10 @@ const CreatePeriodSheet: React.FC = () => {
                     <Input
                       {...field}
                       placeholder="Ex.: Outubro/2026"
+                      onChange={(e) => {
+                        nameEdited.current = true;
+                        field.onChange(e);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
