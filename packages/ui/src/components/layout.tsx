@@ -120,7 +120,7 @@ function Stack({
 }
 
 interface GridProps extends Omit<React.ComponentProps<"div">, "className" | "style"> {
-  /** `2` = duas colunas fixas; `split` = uma coluna abaixo de `lg` e duas a partir dele; `cards` = 1/2/4 colunas responsivas;
+  /** `2` = duas colunas fixas; `split` = uma coluna abaixo de `lg` e duas a partir dele; `cards` = 1/2/3/4 colunas responsivas;
    * `masonry` = como `split`, mas cada bloco segue logo abaixo do anterior na coluna, sem alinhar linhas (blocos de alturas diferentes). */
   columns: 2 | "split" | "cards" | "masonry"
   gap?: Gap
@@ -134,7 +134,7 @@ function Grid({ columns, gap = "section", ...props }: GridProps) {
     <div
       className={cn(
         "grid",
-        columns === 2 ? "grid-cols-2" : columns === "split" ? "grid-cols-1 @4xl:grid-cols-2" : "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-4",
+        columns === 2 ? "grid-cols-2" : columns === "split" ? "grid-cols-1 @4xl:grid-cols-2" : "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4",
         gaps[gap]
       )}
       {...props}
@@ -291,14 +291,14 @@ function KpiCard({
       <CardContent>
         <Stack gap="tight">
           <Stack direction="row" align="center" justify="between" gap="section">
-            <Stack gap="tight" grow>
+            <Stack gap="tight">
               <Text variant="caption" tone="muted" weight="medium">
                 {label}
               </Text>
               {loading ? (
                 <Skeleton className="h-8 w-32" />
               ) : (
-                <Text id={`${descricao}-valor`} variant="kpi" tone={highlight ? "success" : "default"} breakAll>
+                <Text id={`${descricao}-valor`} variant="kpi" tone={highlight ? "success" : "default"}>
                   {value}
                 </Text>
               )}
