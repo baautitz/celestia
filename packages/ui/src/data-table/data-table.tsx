@@ -960,7 +960,7 @@ export function DataTable<TRow>({
   return (
     <Card className={cn(scroll === "page" && "overflow-clip", nested && "overflow-visible py-0 ring-0 bg-transparent", className)}>
       {(heading || description || search || print) && (
-        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <CardHeader className="flex flex-col gap-4 @2xl:flex-row @2xl:items-center @2xl:justify-between">
           <div>
             {heading && (
               <CardTitle className="text-base font-semibold">

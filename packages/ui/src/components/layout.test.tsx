@@ -75,15 +75,15 @@ describe("KpiCard com tendência", () => {
 });
 
 describe("primitivos de layout enxutos", () => {
-  it("Show nomeia o breakpoint real (lg)", () => {
+  it("Show nomeia o breakpoint real, pela largura do container (@4xl)", () => {
     render(
       <>
         <Show on="lgUp"><span>acima</span></Show>
         <Show on="belowLg"><span>abaixo</span></Show>
       </>,
     );
-    expect(screen.getByText("acima").parentElement?.className).toContain("hidden lg:contents");
-    expect(screen.getByText("abaixo").parentElement?.className).toContain("contents lg:hidden");
+    expect(screen.getByText("acima").parentElement?.className).toContain("hidden @4xl:contents");
+    expect(screen.getByText("abaixo").parentElement?.className).toContain("contents @4xl:hidden");
   });
 
   it("surface=card já traz borda e padding do card", () => {
