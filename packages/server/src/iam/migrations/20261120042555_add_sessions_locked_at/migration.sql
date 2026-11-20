@@ -1,0 +1,1 @@
+ALTER TABLE "iam"."sessions" ADD COLUMN "locked_at" bigint;

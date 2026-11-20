@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, boolean, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 /** Schema Postgres do Module `iam`. */
 export const iamSchema = pgSchema("iam");
@@ -45,4 +45,23 @@ export const userPreferences = iamSchema.table(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.key] })],
+);
+
+/** Refresh token opaco: guarda só o hash (SHA-256); o token em claro vive apenas no cookie do navegador. */
+export const sessions = iamSchema.table(
+  "sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    userSessionVersion: integer("user_session_version").notNull(),
+    deviceId: text("device_id"),
+    familyId: text("family_id").notNull(),
+    issuedAt: bigint("issued_at", { mode: "number" }).notNull(),
+    expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
+    usedAt: bigint("used_at", { mode: "number" }),
+    lockedAt: bigint("locked_at", { mode: "number" }),
+  },
+  (t) => [index("sessions_family_idx").on(t.familyId), index("sessions_expires_idx").on(t.expiresAt)],
 );
