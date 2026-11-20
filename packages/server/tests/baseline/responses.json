@@ -118,6 +118,7 @@
           "inovafarma:avaliacoes-geral:manage",
           "inovafarma:furo-estoque-loja:manage",
           "inovafarma:furo-estoque-geral:manage",
+          "inovafarma:colunas-desempenho:manage",
           "inovafarma:tipos-meta:manage",
           "inovafarma:metas:manage",
           "inovafarma:metas-geral:view",
@@ -278,6 +279,7 @@
         "inovafarma:avaliacoes-geral:manage",
         "inovafarma:furo-estoque-loja:manage",
         "inovafarma:furo-estoque-geral:manage",
+        "inovafarma:colunas-desempenho:manage",
         "inovafarma:tipos-meta:manage",
         "inovafarma:metas:manage",
         "inovafarma:metas-geral:view",
@@ -548,6 +550,13 @@
             "label": "Furo de Estoque: Justificar todas e gerenciar Motivos",
             "description": "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:colunas-desempenho:manage",
+            "label": "Desempenho de Vendas: Gerenciar colunas",
+            "description": "Permite criar, alterar e remover as colunas personalizadas do Desempenho de Vendas (o que cada uma soma: Produtos, Grupos, Seções e Laboratórios).",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar as colunas do Desempenho de Vendas.",
             "module": "inovafarma"
           },
           {
@@ -851,6 +860,13 @@
             "label": "Furo de Estoque: Justificar todas e gerenciar Motivos",
             "description": "Permite ver e justificar os Ajustes de Estoque de todas as Lojas e cadastrar os Motivos do Ajuste.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para justificar os Ajustes de Estoque de todas as Lojas.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:colunas-desempenho:manage",
+            "label": "Desempenho de Vendas: Gerenciar colunas",
+            "description": "Permite criar, alterar e remover as colunas personalizadas do Desempenho de Vendas (o que cada uma soma: Produtos, Grupos, Seções e Laboratórios).",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerenciar as colunas do Desempenho de Vendas.",
             "module": "inovafarma"
           },
           {
