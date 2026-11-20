@@ -49,6 +49,12 @@ export interface InclusaoRetroativa {
 /** Dia `AAAA-MM-DD` escolhido no calendário. */
 const diaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/** `AAAA-MM-DD` como data local, meia-noite. */
+const paraData = (dia: string) => {
+  const [a, m, d] = dia.split("-").map(Number);
+  return new Date(a ?? 0, (m ?? 1) - 1, d ?? 1);
+};
+
 const esquema = (retroativa: InclusaoRetroativa | undefined) =>
   z
     .object({
@@ -93,13 +99,15 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroativa, onSalvo }: 
       produtoId: item?.produtoId ?? "",
       quantidade: item ? String(item.quantidade) : "",
       validade: item?.validade ?? "",
-      abrangenciaEm: comData && item ? new Date(item.abrangenciaEm) : undefined,
+      // Pré-preenchida: na inclusão, hoje; na edição, a data que o Item já tem.
+      abrangenciaEm: !comData ? undefined : item ? new Date(item.abrangenciaEm) : paraData(retroativa.hoje),
     },
   });
 
   const onSubmit = async (valores: Valores) => {
     // Só vai a data que mudou: sem ela, a inclusão fica agora (ou como estava, na edição).
-    const dia = comData && valores.abrangenciaEm ? diaLocal(valores.abrangenciaEm) : undefined;
+    // Hoje na inclusão é "agora": só vai ao servidor uma data diferente dela.
+    const dia = comData && valores.abrangenciaEm && !(!item && diaLocal(valores.abrangenciaEm) === retroativa?.hoje) ? diaLocal(valores.abrangenciaEm) : undefined;
     const corpo = { quantidade: Number(valores.quantidade), validade: valores.validade, ...(dia && dia !== diaIncluido ? { abrangenciaEm: dia } : {}) };
     try {
       const salvo = item
@@ -186,7 +194,7 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroativa, onSalvo }: 
                       <DatePicker value={field.value} onChange={field.onChange} />
                     </FormControl>
                     <FormDescription>
-                      {item ? "" : "Em branco, agora. "}Pode retroagir até {dataBr(retroativa.inicio)}, para que as vendas desde então gerem Baixas.
+                      Pode retroagir até {dataBr(retroativa.inicio)}, para que as vendas desde então gerem Baixas.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
