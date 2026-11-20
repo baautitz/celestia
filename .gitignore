@@ -31,3 +31,6 @@ coverage/
 # Playwright
 test-results/
 playwright-report/
+
+# Worktrees de agentes
+.claude/worktrees/
