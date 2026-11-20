@@ -7,7 +7,7 @@ import { defineModule, type ModuleDef } from "@platform/core/module";
 import type { ClosingPeriodRecord } from "@platform/shared";
 import { getAuthenticatedUser, requirePermission } from "../iam/middleware.js";
 import { CLOSING_PERIOD_PERMISSIONS } from "./closing-period-permissions.js";
-import type { ClosingPeriodStore } from "./closing-period-store.js";
+import { PeriodOverlapError, rangesOverlap, type ClosingPeriodStore } from "./closing-period-store.js";
 import type { AuditLog } from "../audit/audit-log.js";
 import { CLOSING_PERIOD_PLUGIN, CLOSING_PERIOD_TARGET, declareClosingPeriodAudit } from "./closing-period-audit.js";
 
@@ -43,14 +43,12 @@ const EditRangeSchema = z
     path: ["endDate"],
   });
 
+/** O pré-check não viu o conflito, mas o banco recusou (outra requisição gravou no meio): a regra vale no armazenamento. */
+const OVERLAP_RACE = "A faixa informada coincide com a de outro Período de Fechamento. Uma data pertence a no máximo um Período de Fechamento.";
 const CONCURRENT_CHANGE = "O período foi alterado por outra pessoa. Recarregue e tente novamente.";
 
 /** O período mudou entre a leitura e a gravação (compare-and-set falhou). */
 class ConcurrentChangeError extends Error {}
-
-/** Duas faixas inclusivas compartilham ao menos uma data. */
-const overlaps = (a: { startDate: string; endDate: string }, b: { startDate: string; endDate: string }): boolean =>
-  a.startDate <= b.endDate && b.startDate <= a.endDate;
 
 /**
  * Plugin `closing_period`: Closing Periods em /api/closing-periods.
@@ -131,11 +129,19 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
         const period = await store.get(c.req.param("id"));
         if (!period) return c.json({ error: NOT_FOUND }, 404);
         if (period.status !== "open") return c.json({ error: "Só é possível cancelar um período aberto. Reabra o período antes." }, 409);
-        const ran = await events.run(
-          "closing_period.cancel",
-          { actorId: getAuthenticatedUser(c).sub, ...detail(period) },
-          () => store.delete(period.id),
-        );
+        let ran;
+        try {
+          ran = await events.run(
+            "closing_period.cancel",
+            { actorId: getAuthenticatedUser(c).sub, ...detail(period) },
+            async () => {
+              if (!(await store.deleteIfCurrent(period.id, period.version, "open"))) throw new ConcurrentChangeError();
+            },
+          );
+        } catch (err) {
+          if (err instanceof ConcurrentChangeError) return c.json({ error: CONCURRENT_CHANGE }, 409);
+          throw err;
+        }
         if (ran.cancelled) return c.json({ error: ran.reason }, 409);
         await audit(c, "cancel", period);
         return c.json({ success: true });
@@ -153,7 +159,7 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
           if (current.status !== "open") {
             return c.json({ error: "A faixa de um Período de Fechamento fechado não pode ser editada. Reabra-o antes." }, 409);
           }
-          const clash = (await store.list()).find((p) => p.id !== current.id && overlaps(p, body));
+          const clash = (await store.list()).find((p) => p.id !== current.id && rangesOverlap(p, body));
           if (clash) {
             return c.json(
               { error: `A nova faixa coincide com "${clash.name}" (${clash.startDate} a ${clash.endDate}). Uma data pertence a no máximo um Período de Fechamento.` },
@@ -167,8 +173,13 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
             version: body.version + 1,
             updatedAt: new Date().toISOString(),
           };
-          if (!(await store.updateIfCurrent(next, body.version))) {
-            return c.json({ error: CONCURRENT_CHANGE }, 409);
+          try {
+            if (!(await store.updateIfCurrent(next, body.version))) {
+              return c.json({ error: CONCURRENT_CHANGE }, 409);
+            }
+          } catch (err) {
+            if (err instanceof PeriodOverlapError) return c.json({ error: OVERLAP_RACE }, 400);
+            throw err;
           }
           await audit(c, "update_range", current, {
             from: { startDate: current.startDate, endDate: current.endDate },
@@ -185,7 +196,7 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
         zValidator("json", CreateSchema),
         async (c) => {
           const body = c.req.valid("json");
-          const clash = (await store.list()).find((p) => overlaps(p, body));
+          const clash = (await store.list()).find((p) => rangesOverlap(p, body));
           if (clash) {
             return c.json(
               { error: `O período informado coincide com "${clash.name}" (${clash.startDate} a ${clash.endDate}). Uma data pertence a no máximo um Período de Fechamento.` },
@@ -203,7 +214,12 @@ export function createClosingPeriodModule({ store, auditLog, auth }: ClosingPeri
             createdAt: now,
             updatedAt: now,
           };
-          await store.save(period);
+          try {
+            await store.save(period);
+          } catch (err) {
+            if (err instanceof PeriodOverlapError) return c.json({ error: OVERLAP_RACE }, 400);
+            throw err;
+          }
           await audit(c, "create", period);
           return c.json(period, 201);
         },
