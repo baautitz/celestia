@@ -88,7 +88,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   beforeAll(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(T0);
-    process.env.ERP_ENCRYPTION_KEY = Buffer.alloc(16, 7).toString("hex");
+    vi.stubEnv("ERP_ENCRYPTION_KEY", Buffer.alloc(16, 7).toString("hex"));
     await fresh();
     const login = async (username: string): Promise<string> => {
       const res = await app.request("/api/auth/login", {
@@ -106,6 +106,7 @@ describe("baseline HTTP (congelado antes da refatoração em módulos)", () => {
   afterAll(() => {
     if (updating) writeFileSync(FILE, JSON.stringify(results, null, 2) + "\n");
     vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 
   describe("auth", () => {

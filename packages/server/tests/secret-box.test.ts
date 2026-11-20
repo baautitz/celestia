@@ -1,10 +1,14 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { randomBytes } from "node:crypto";
 import { assertEncryptionKey, decryptSecret, encryptSecret } from "../src/erp/secret-box.js";
 
 describe("secret-box (AES-128-GCM)", () => {
   beforeEach(() => {
-    process.env.ERP_ENCRYPTION_KEY = randomBytes(16).toString("hex");
+    vi.stubEnv("ERP_ENCRYPTION_KEY", randomBytes(16).toString("hex"));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("cifra e decifra, sem repetir o texto cifrado", () => {
@@ -16,24 +20,24 @@ describe("secret-box (AES-128-GCM)", () => {
 
   it("falha com a chave errada ou texto adulterado", () => {
     const a = encryptSecret("segredo");
-    process.env.ERP_ENCRYPTION_KEY = randomBytes(16).toString("hex");
+    vi.stubEnv("ERP_ENCRYPTION_KEY", randomBytes(16).toString("hex"));
     expect(() => decryptSecret(a)).toThrow();
   });
 
   it("recusa chave inválida", () => {
-    process.env.ERP_ENCRYPTION_KEY = "curta";
+    vi.stubEnv("ERP_ENCRYPTION_KEY", "curta");
     expect(() => encryptSecret("x")).toThrow(/16 bytes/);
   });
 
   it("recusa chave de 16 bytes em base64", () => {
-    process.env.ERP_ENCRYPTION_KEY = randomBytes(16).toString("base64");
+    vi.stubEnv("ERP_ENCRYPTION_KEY", randomBytes(16).toString("base64"));
     expect(() => assertEncryptionKey()).toThrow(/16 bytes/);
   });
 
   it("assertEncryptionKey recusa chave ausente ou inválida", () => {
-    delete process.env.ERP_ENCRYPTION_KEY;
+    vi.stubEnv("ERP_ENCRYPTION_KEY", undefined);
     expect(() => assertEncryptionKey()).toThrow(/16 bytes/);
-    process.env.ERP_ENCRYPTION_KEY = "ab".repeat(32);
+    vi.stubEnv("ERP_ENCRYPTION_KEY", "ab".repeat(32));
     expect(() => assertEncryptionKey()).toThrow(/16 bytes/);
   });
 });
