@@ -1,7 +1,9 @@
 import { lazy, useState, useEffect, useCallback, useMemo, type ComponentType, type ReactNode } from "react";
-import { TrendingUp, RefreshCw, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch, Target } from "lucide-react";
+import { TrendingUp, RefreshCw, Eye, Store, Users, DollarSign, Award, AlertCircle, MoreHorizontal, Package, Pill, Plus, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch, Target } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
+import { HeaderActions } from "@platform/ui/context/header-actions";
 import { Badge } from "@platform/ui/components/badge";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Grid, KpiCard, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
@@ -12,6 +14,8 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import type { Trend } from "@platform/ui/components/trend";
+import { abrirColuna, ColunasDesempenhoWindow } from "./colunas-desempenho-window";
+import { MEDIDA_LABEL, MEDIDAS_COLUNA, type ColunaDesempenho, type MedidaColuna } from "./colunas-desempenho";
 import { ColaboradoresPendentesBadge } from "./colaboradores-badge";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { SeletorPeriodo, usePeriodoSelecionado } from "./periodo-selecionado";
@@ -45,22 +49,28 @@ const VISUALIZACAO_LABEL: Record<Visualizacao, string> = { geral: "Geral", loja:
 
 const SEM_VISUALIZACAO = "Seu perfil não possui nenhuma visualização disponível.";
 
-type Categoria = "vitaminas" | "genericos" | "similares" | "incentivos" | "totalFoco";
-type CategoriaTotais = Record<Categoria, { quantidade: number; valor: number }>;
+/** Uma coluna personalizada do Desempenho de Vendas, com as medidas dela (R$ em reais); o servidor decide quais existem. */
+interface ColunaMedidas {
+  id: string;
+  nome: string;
+  /** As medidas que a coluna mostra, escolhidas por quem a criou. */
+  mostra: MedidaColuna[];
+  quantidade: number;
+  valor: number;
+  cmv: number;
+  cmvPercent: number;
+  ticketMedio: number;
+  participacaoPercent: number;
+}
 
-/** Categorias de produto exibidas com Qtde e Valor; os IDs ficam fixos no servidor do Plugin. */
-const CATEGORIAS: { key: Categoria; label: string; tooltip: string }[] = [
-  { key: "vitaminas", label: "Vitaminas", tooltip: "Itens do grupo de produto VITAMINAS (44)." },
-  { key: "genericos", label: "Genéricos", tooltip: "Itens da seção de produto GENERICOS (261)." },
-  { key: "similares", label: "Similares", tooltip: "Itens da seção de produto SIMILARES (271)." },
-  { key: "incentivos", label: "Incentivos", tooltip: "Itens da seção de produto INCENTIVOS (281)." },
-  {
-    key: "totalFoco",
-    label: "Total Foco",
-    tooltip:
-      "Itens de Vitaminas, Genéricos, Similares ou Incentivos, contados uma vez: uma Vitamina que também é de Similares ou Incentivos não entra em dobro, por isso pode ficar abaixo da soma das colunas.",
-  },
-];
+const FORMATO_TREND: Record<MedidaColuna, Trend["format"]> = { quantidade: "number", valor: "currency", participacaoPercent: "percent", cmv: "currency", cmvPercent: "percent", ticketMedio: "currency" };
+
+/** O que o cartão de uma coluna mostra em destaque: o valor vendido; sem ele, a primeira medida que a coluna escolheu. */
+function destaqueDoCartao(c: ColunaMedidas): { medida: MedidaColuna; texto: string } {
+  const medida = c.mostra.includes("valor") ? "valor" : (MEDIDAS_COLUNA.find((m) => c.mostra.includes(m)) ?? "valor");
+  const v = c[medida];
+  return { medida, texto: medida === "valor" || medida === "cmv" || medida === "ticketMedio" ? formatCurrency(v) : medida === "quantidade" ? formatNumber(v) : formatPercent(v) };
+}
 
 interface ColaboradorItem {
   codigoColaborador: number;
@@ -75,7 +85,7 @@ interface ColaboradorItem {
   ticketMedio: number;
   participacaoPercent: number;
   cadastroPercent: number;
-  categorias: CategoriaTotais;
+  colunas: ColunaMedidas[];
 }
 
 interface ResumoVendas {
@@ -88,7 +98,7 @@ interface ResumoVendas {
   cmvPercentGeral: number;
   cadastroPercentGeral: number;
   totalColaboradores: number;
-  categorias: CategoriaTotais;
+  colunas: ColunaMedidas[];
 }
 
 interface RelatorioVendas {
@@ -257,36 +267,53 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
     firstSort: "desc",
     cellClassName: "text-right font-mono",
   },
-  ...CATEGORIAS.flatMap(({ key, label, tooltip }): DataTableColumn<ColaboradorItem>[] => [
-    {
-      key: `${key}-quantidade`,
-      label: "Qtde",
-      group: label,
-      tooltip: `${tooltip} Unidades vendidas.`,
-      value: (r) => r.categorias[key].quantidade,
-      render: (r) => (r.categorias[key].quantidade === 0 ? "-" : formatNumber(r.categorias[key].quantidade)),
-      format: "number",
-      sortable: true,
-      firstSort: "desc",
-      cellClassName: "text-right font-mono",
-    },
-    {
-      key: `${key}-valor`,
-      label: "Valor (R$)",
-      group: label,
-      tooltip: `${tooltip} Valor líquido vendido.`,
-      value: (r) => r.categorias[key].valor,
-      render: (r) => (r.categorias[key].valor === 0 ? "-" : formatDecimal(r.categorias[key].valor)),
-      format: "decimal",
-      sortable: true,
-      firstSort: "desc",
-      cellClassName: "text-right font-mono",
-    },
-  ]),
 ];
 
+/** As medidas de uma coluna personalizada, na ordem da tabela. */
+const FORMATO_MEDIDA: Record<MedidaColuna, "number" | "decimal" | "percent"> = {
+  quantidade: "number",
+  valor: "decimal",
+  participacaoPercent: "percent",
+  cmv: "decimal",
+  cmvPercent: "percent",
+  ticketMedio: "decimal",
+};
+const DICA_MEDIDA: Record<MedidaColuna, string> = {
+  quantidade: "unidades vendidas.",
+  valor: "valor líquido vendido.",
+  participacaoPercent: "participação no Total Líquido geral.",
+  cmv: "custo das mercadorias vendidas da coluna.",
+  cmvPercent: "CMV dividido pelo valor vendido.",
+  ticketMedio: "valor por venda com item da coluna.",
+};
+
+/** Colunas da tabela de uma coluna personalizada: as medidas que ela escolheu, agrupadas pelo nome dela. */
+function colunasPersonalizadas(colunas: ColunaMedidas[]): DataTableColumn<ColaboradorItem>[] {
+  const medida = (r: ColaboradorItem, id: string) => r.colunas.find((c) => c.id === id);
+  return colunas.flatMap(({ id, nome, mostra }): DataTableColumn<ColaboradorItem>[] =>
+    MEDIDAS_COLUNA.filter((m) => mostra.includes(m)).map((key) => {
+      const format = FORMATO_MEDIDA[key];
+      return {
+        key: `${id}-${key}`,
+        label: MEDIDA_LABEL[key],
+        group: nome,
+        tooltip: `${nome}: ${DICA_MEDIDA[key]}`,
+        value: (r) => medida(r, id)?.[key] ?? 0,
+        render: (r) => {
+          const v = medida(r, id)?.[key] ?? 0;
+          return v === 0 ? "-" : format === "number" ? formatNumber(v) : format === "percent" ? formatPercent(v) : formatDecimal(v);
+        },
+        format,
+        sortable: true,
+        firstSort: "desc",
+        cellClassName: "text-right font-mono",
+      };
+    }),
+  );
+}
+
 /** Colunas que cada Cartão de resumo do Desempenho de Vendas liga ou desliga na tabela. */
-const COLUNAS_DO_CARTAO: Record<string, readonly string[]> = {
+const COLUNAS_FIXAS_DO_CARTAO: Record<string, readonly string[]> = {
   vendas: ["quantidadeVendas"],
   bruto: ["totalBruto"],
   descontos: ["totalDesconto"],
@@ -296,20 +323,21 @@ const COLUNAS_DO_CARTAO: Record<string, readonly string[]> = {
   cmvPercent: ["cmvPercent"],
   ticket: ["ticketMedio"],
   cadastros: ["cadastroPercent"],
-  ...Object.fromEntries(CATEGORIAS.map(({ key }) => [key, [`${key}-quantidade`, `${key}-valor`]])),
 };
+const COLUNAS_PERSONALIZADAS_DO_CARTAO = (colunas: ColunaMedidas[]): Record<string, readonly string[]> =>
+  Object.fromEntries(colunas.map((c) => [c.id, c.mostra.map((m) => `${c.id}-${m}`)]));
 type CartaoColuna = string;
-const CARTOES: CartaoColuna[] = Object.keys(COLUNAS_DO_CARTAO);
-const CARTOES_KEY = "inovafarma:vendas:cartoes";
+const CARTOES_KEY = "inovafarma:vendas:cartoes-ocultos";
 
-function lerCartoes(): CartaoColuna[] {
+/** Os Cartões que o Usuário desligou: uma coluna nova começa ligada. */
+function lerOcultos(): CartaoColuna[] {
   try {
     const salvo: unknown = JSON.parse(localStorage.getItem(CARTOES_KEY) ?? "null");
-    if (Array.isArray(salvo)) return CARTOES.filter((c) => salvo.includes(c));
+    if (Array.isArray(salvo)) return salvo.filter((c): c is string => typeof c === "string");
   } catch {
     // sem armazenamento ou valor inválido: todas as colunas
   }
-  return CARTOES;
+  return [];
 }
 
 interface Filtros {
@@ -423,18 +451,20 @@ export function VendasComissoesPage() {
   const [resumo, setResumo] = useState<ResumoVendas | null>(null);
   const [colaboradores, setColaboradores] = useState<ColaboradorItem[]>([]);
   const [anterior, setAnterior] = useState<Anterior | null>(null);
+  const [podeGerenciarColunas, setPodeGerenciarColunas] = useState(false);
 
   // Carrega lista de períodos de fechamento e filiais
   useEffect(() => {
     async function initFilters() {
       // Períodos e Visualizações vêm da mesma rota, que não exige a Permission de ler o Fechamento: se falhar, a falha aparece na tela, não some.
-      const contexto = await apiFetch<{ periodos: ClosingPeriod[]; visualizacoes: VisualizacaoDisponivel[] }>(`${API}/relatorios/vendas-colaborador/visualizacoes`).catch((err: unknown) => {
+      const contexto = await apiFetch<{ periodos: ClosingPeriod[]; visualizacoes: VisualizacaoDisponivel[]; podeGerenciarColunas?: boolean }>(`${API}/relatorios/vendas-colaborador/visualizacoes`).catch((err: unknown) => {
         setError(`Não foi possível carregar os Períodos de Fechamento e as Visualizações: ${err instanceof Error ? err.message : "erro desconhecido"}`);
         return { periodos: [] as ClosingPeriod[], visualizacoes: [] as VisualizacaoDisponivel[] };
       });
       const { periodos, visualizacoes: visualizacoesData } = contexto;
 
       setPeriods(periodos);
+      setPodeGerenciarColunas(Boolean(contexto.podeGerenciarColunas));
       setVisualizacoes(visualizacoesData);
       // A mais ampla que o Usuário tem; o servidor entrega em ordem Geral, Loja, Individual.
       if (visualizacoesData[0]) setVisualizacao(visualizacoesData[0].id);
@@ -517,35 +547,46 @@ export function VendasComissoesPage() {
     if (result.status === "confirmed") applyFiltros(result.value);
   };
 
-  const tableColumns = useMemo(() => withComparison(columns, anterior), [anterior]);
+  const colunasDoResumo = resumo?.colunas ?? [];
+  const tableColumns = useMemo(() => withComparison([...columns, ...colunasPersonalizadas(colunasDoResumo)], anterior), [anterior, colunasDoResumo]);
 
-  const [cartoes, setCartoes] = useState<CartaoColuna[]>(lerCartoes);
-  const alternarCartao = (c: CartaoColuna) =>
-    setCartoes((atual) => {
-      const proximo = CARTOES.filter((x) => (x === c ? !atual.includes(x) : atual.includes(x)));
-      try {
-        localStorage.setItem(CARTOES_KEY, JSON.stringify(proximo));
-      } catch {
-        // a escolha vale só nesta sessão
-      }
-      return proximo;
-    });
-  const definirCartoes = (proximo: CartaoColuna[]) => {
-    setCartoes(proximo);
+  const colunasDoCartao = useMemo(() => ({ ...COLUNAS_FIXAS_DO_CARTAO, ...COLUNAS_PERSONALIZADAS_DO_CARTAO(colunasDoResumo) }), [colunasDoResumo]);
+  const CARTOES = Object.keys(colunasDoCartao);
+  const [ocultos, setOcultos] = useState<CartaoColuna[]>(lerOcultos);
+  const cartoes = CARTOES.filter((c) => !ocultos.includes(c));
+  const definirOcultos = (proximo: CartaoColuna[]) => {
+    setOcultos(proximo);
     try {
       localStorage.setItem(CARTOES_KEY, JSON.stringify(proximo));
     } catch {
       // a escolha vale só nesta sessão
     }
   };
+  const alternarCartao = (c: CartaoColuna) => definirOcultos(ocultos.includes(c) ? ocultos.filter((x) => x !== c) : [...ocultos, c]);
+  const definirCartoes = (proximo: CartaoColuna[]) => definirOcultos(CARTOES.filter((c) => !proximo.includes(c)));
   const colunasVisiveis = useMemo(
     () => [
-      ...tableColumns.filter((c) => !CARTOES.some((k) => COLUNAS_DO_CARTAO[k]?.includes(c.key))).map((c) => c.key),
-      ...cartoes.flatMap((k) => COLUNAS_DO_CARTAO[k] ?? []),
+      ...tableColumns.filter((c) => !Object.values(colunasDoCartao).some((cols) => cols.includes(c.key))).map((c) => c.key),
+      ...cartoes.flatMap((k) => colunasDoCartao[k] ?? []),
     ],
-    [tableColumns, cartoes],
+    [tableColumns, cartoes, colunasDoCartao],
   );
   const cartao = (c: CartaoColuna) => ({ selected: cartoes.includes(c), onSelect: () => alternarCartao(c) });
+
+  const gerenciarColunas = async () => {
+    await ui.windows.open<true>({
+      surface: "dialog",
+      size: "large",
+      title: "Colunas do Desempenho de Vendas",
+      description: "O que cada coluna soma. Um produto que está em mais de uma entrada conta uma vez.",
+      content: () => <ColunasDesempenhoWindow />,
+    });
+    void fetchRelatorio();
+  };
+  const adicionarColuna = async () => {
+    const todas = await apiFetch<ColunaDesempenho[]>(`${API}/colunas-desempenho`).catch(() => [] as ColunaDesempenho[]);
+    if (await abrirColuna(ui.windows, todas)) void fetchRelatorio();
+  };
 
   const trend = (
     pick: (r: ResumoVendas) => number,
@@ -568,6 +609,39 @@ export function VendasComissoesPage() {
 
   return (
     <Stack gap="section">
+      {podeGerenciarColunas && (
+        <HeaderActions>
+          <Show on="lgUp">
+            <Stack direction="row" align="center" gap="field">
+              <Button variant="outline" onClick={() => void gerenciarColunas()}>
+                <SlidersHorizontal />
+                Colunas
+              </Button>
+              <Button onClick={() => void adicionarColuna()}>
+                <Plus />
+                Adicionar coluna
+              </Button>
+            </Stack>
+          </Show>
+          <Show on="belowLg">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="Mais ações" />}>
+                <MoreHorizontal />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => void adicionarColuna()}>
+                  <Plus />
+                  Adicionar coluna
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void gerenciarColunas()}>
+                  <SlidersHorizontal />
+                  Colunas
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </Show>
+        </HeaderActions>
+      )}
       <SeletorPeriodo periodos={periods} valor={selectedPeriodId} onChange={setSelectedPeriodId} />
       {/* Barra de Filtros (desktop) */}
       <Show on="lgUp">
@@ -749,19 +823,22 @@ export function VendasComissoesPage() {
           icon={<Users />}
           tone="info"
         />
-        {CATEGORIAS.map(({ key, label }) => (
-          <KpiCard
-            key={key}
-            loading={loading}
-            {...cartao(key)}
-            label={label}
-            trend={trend((r) => r.categorias[key].valor, "currency")}
-            value={formatCurrency(resumo?.categorias[key].valor)}
-            hint={resumo ? `${formatNumber(resumo.categorias[key].quantidade)} un` : "-"}
-            icon={<Pill />}
-            tone="primary"
-          />
-        ))}
+        {colunasDoResumo.map((c) => {
+          const { medida, texto } = destaqueDoCartao(c);
+          return (
+            <KpiCard
+              key={c.id}
+              loading={loading}
+              {...cartao(c.id)}
+              label={c.nome}
+              trend={trend((r) => r.colunas.find((x) => x.id === c.id)?.[medida] ?? 0, FORMATO_TREND[medida])}
+              value={texto}
+              hint={medida === "quantidade" ? MEDIDA_LABEL[medida] : `${formatNumber(c.quantidade)} un`}
+              icon={<Pill />}
+              tone="primary"
+            />
+          );
+        })}
       </Grid>
 
       {/* Tabela de Colaboradores */}
