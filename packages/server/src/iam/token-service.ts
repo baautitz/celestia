@@ -1,6 +1,6 @@
 import { sign, verify } from "hono/jwt";
-import type { JWTAccessPayload, JWTRefreshPayload, User, Role } from "@platform/shared";
-import { randomBytes, randomUUID } from "node:crypto";
+import type { JWTAccessPayload, User, Role } from "@platform/shared";
+import { randomBytes } from "node:crypto";
 
 const MIN_SECRET_LENGTH = 32;
 let ephemeralSecret: string | undefined;
@@ -29,23 +29,20 @@ export interface TokenServiceConfig {
   /**
    * Default: 300 (5 min). Access tokens são stateless e NÃO são revogáveis: após logout, reset de senha,
    * desativação, exclusão ou troca de Role o access token vigente segue válido até expirar (janela máxima de
-   * 5 minutos). Só os refresh tokens são revogados (versão de sessão do usuário).
+   * 5 minutos). Só os refresh tokens (opacos, ver `SessionService`) são revogados.
    */
   accessTtlSeconds?: number;
-  refreshTtlSeconds?: number; // Default: 604800 (7 dias)
 }
 
 export class TokenService {
   private secret: string;
   private accessTtl: number;
-  private refreshTtl: number;
   /** Validade do token do Desafio de Certificado: a mesma do desafio na CA. */
   static readonly LOGIN_CHALLENGE_TTL_SECONDS = 300;
 
   constructor(config?: TokenServiceConfig) {
     this.secret = resolveSecret(config?.jwtSecret);
     this.accessTtl = config?.accessTtlSeconds ?? 300; // 5 minutos
-    this.refreshTtl = config?.refreshTtlSeconds ?? 7 * 24 * 3600; // 7 dias
   }
 
   /** Validade do Access Token em segundos: o que o cliente recebe em `expiresIn`. */
@@ -69,27 +66,6 @@ export class TokenService {
       permissions: role?.permissions || [],
       ...(user.isAdmin ? { isAdmin: true } : {}),
       ...(device ? { deviceId: device.id, deviceName: device.name } : {}),
-      iat: now,
-      exp,
-    };
-
-    const token = await sign({ ...payload }, this.secret);
-    return { token, payload };
-  }
-
-  /**
-   * Gera o Refresh Token (JWT de 7 dias).
-   */
-  async generateRefreshToken(user: User, deviceId?: string): Promise<{ token: string; payload: JWTRefreshPayload }> {
-    const now = Math.floor(Date.now() / 1000);
-    const exp = now + this.refreshTtl;
-
-    const payload: JWTRefreshPayload = {
-      sub: user.id,
-      tokenId: randomUUID(),
-      type: "refresh",
-      ver: user.sessionVersion ?? 0,
-      ...(deviceId ? { deviceId } : {}),
       iat: now,
       exp,
     };
@@ -139,25 +115,6 @@ export class TokenService {
       permissions,
       ...(claims.isAdmin === true ? { isAdmin: true } : {}),
       ...(typeof claims.deviceId === "string" && typeof claims.deviceName === "string" ? { deviceId: claims.deviceId, deviceName: claims.deviceName } : {}),
-      iat: claims.iat,
-      exp: claims.exp,
-    };
-  }
-
-  /**
-   * Valida e decodifica o Refresh Token.
-   */
-  async verifyRefreshToken(token: string): Promise<JWTRefreshPayload> {
-    const claims = await verify(token, this.secret, "HS256");
-    if (typeof claims.sub !== "string" || !claims.sub || claims.type !== "refresh" || typeof claims.ver !== "number" || typeof claims.tokenId !== "string") {
-      throw new Error("Token de renovação inválido.");
-    }
-    return {
-      sub: claims.sub,
-      tokenId: claims.tokenId,
-      type: "refresh",
-      ver: claims.ver,
-      ...(typeof claims.deviceId === "string" ? { deviceId: claims.deviceId } : {}),
       iat: claims.iat,
       exp: claims.exp,
     };

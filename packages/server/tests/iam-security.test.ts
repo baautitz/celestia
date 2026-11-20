@@ -21,7 +21,7 @@ interface AuthBody {
   user: { username: string; role: string; permissions: string[] };
 }
 
-describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () => {
+describe("Segurança & IAM Permission-First (JWT 5m + Refresh opaco + RBAC)", () => {
   let app: ReturnType<typeof createPlatformApp>;
   let userStore: MemoryUserStore;
   let tokenService: TokenService;
@@ -31,7 +31,6 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
     tokenService = new TokenService({
       jwtSecret: "test-secret-key-iam-12345-0123456789",
       accessTtlSeconds: 300, // 5 min
-      refreshTtlSeconds: 7 * 24 * 3600, // 7 dias
     });
 
     app = createPlatformApp({
@@ -63,7 +62,7 @@ describe("Segurança & IAM Permission-First (JWT 5m + Refresh 7d + RBAC)", () =>
 
   // ─── 2. AUTENTICAÇÃO, ACCESS TOKEN (5M) & REFRESH TOKEN (7D) ───────────────
   describe("2. Fluxo de Autenticação e Sessões JWT", () => {
-    it("deve autenticar com sucesso e emitir Access Token (5m) e Refresh Token (7d)", async () => {
+    it("deve autenticar com sucesso e emitir Access Token (5m) e Refresh Token (opaco)", async () => {
       const res = await app.request("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

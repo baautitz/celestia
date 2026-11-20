@@ -11,6 +11,7 @@
     "body": {
       "accessToken": "<token>",
       "expiresIn": 300,
+      "idleSeconds": 1800,
       "user": {
         "sub": "usr_1001",
         "username": "carlos.admin",
@@ -42,7 +43,7 @@
         "exp": 1773144300
       }
     },
-    "cookie": "refresh_token=<token>; Max-Age=604800; Path=/api/auth; HttpOnly; SameSite=Lax"
+    "cookie": "refresh_token=<token>; Path=/api/auth; HttpOnly; SameSite=Lax"
   },
   "auth.login.bad_password": {
     "status": 401,
@@ -76,6 +77,7 @@
     "body": {
       "accessToken": "<token>",
       "expiresIn": 300,
+      "idleSeconds": 1800,
       "user": {
         "sub": "usr_<uuid>",
         "username": "root.admin",
@@ -130,7 +132,7 @@
         "exp": 1773144300
       }
     },
-    "cookie": "refresh_token=<token>; Max-Age=604800; Path=/api/auth; HttpOnly; SameSite=Lax"
+    "cookie": "refresh_token=<token>; Path=/api/auth; HttpOnly; SameSite=Lax"
   },
   "auth.refresh.body": {
     "status": 401,
@@ -143,6 +145,7 @@
     "body": {
       "accessToken": "<token>",
       "expiresIn": 300,
+      "idleSeconds": 1800,
       "user": {
         "sub": "usr_1001",
         "username": "carlos.admin",
@@ -174,7 +177,7 @@
         "exp": 1773144300
       }
     },
-    "cookie": "refresh_token=<token>; Max-Age=604800; Path=/api/auth; HttpOnly; SameSite=Lax"
+    "cookie": "refresh_token=<token>; Path=/api/auth; HttpOnly; SameSite=Lax"
   },
   "auth.refresh.missing": {
     "status": 401,

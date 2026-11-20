@@ -49,21 +49,6 @@ export interface JWTAccessPayload {
 }
 
 /**
- * Payload do Refresh Token (JWT - 7 dias).
- */
-export interface JWTRefreshPayload {
-  sub: string;
-  tokenId: string;
-  type: "refresh";
-  /** Versão de sessão do usuário na emissão; o refresh só vale enquanto for igual à atual. */
-  ver: number;
-  /** Dispositivo cujo certificado abriu a sessão; ausente quando o Usuário entra sem certificado. */
-  deviceId?: string;
-  iat?: number;
-  exp?: number;
-}
-
-/**
  * Resposta de sucesso de autenticação (login e renovação). O refresh token NÃO faz parte dela: viaja só no cookie
  * HttpOnly `refresh_token`, fora do alcance de JavaScript.
  */
@@ -72,6 +57,8 @@ export interface AuthTokens {
   accessToken: string;
   /** Validade do Access Token em segundos (padrão 300, 5 minutos). */
   expiresIn: number;
+  /** Segundos de inatividade a partir dos quais o cliente bloqueia a tela e pede a senha (política do servidor). */
+  idleSeconds: number;
   /** Claims do Access Token (com as permissões já expandidas para o Administrator). */
   user: JWTAccessPayload;
 }
