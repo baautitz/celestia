@@ -17,7 +17,7 @@ export function PeriodSelect({ periods, value, onChange }: { periods: PeriodOpti
   return (
     <HeaderToolbar>
       <Select value={value} onValueChange={(v) => v && onChange(v)}>
-        <SelectTrigger aria-label="Período de Fechamento">
+        <SelectTrigger aria-label="Período de Fechamento" fit>
           <SelectValue>{(id: string) => periods.find((p) => p.id === id)?.name ?? "Selecione"}</SelectValue>
         </SelectTrigger>
         <SelectContent>
