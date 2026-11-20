@@ -11,5 +11,5 @@
     "packages/server/src/**/*",
     "packages/server/tests/**/*"
   ],
-  "exclude": ["recipes", "node_modules", "packages/*/dist"]
+  "exclude": ["node_modules", "packages/*/dist"]
 }

@@ -21,6 +21,8 @@ A autoridade certificadora (`services/ca`, serviço à parte, não é um Module)
 
 As migrations só evoluem para a frente: uma migration já aplicada nunca é editada. Toda mudança de schema vira uma migration nova, com nome descritivo (p.ex. `<timestamp>_add_devices_and_certificate_exemption`). A primeira de cada Module cria as tabelas (`<timestamp>_create_<descricao>`).
 
+`drizzle-orm` e `drizzle-kit` ficam na `1.0.0-rc.4`, exata, porque o projeto está na linha 1.0. O dist-tag `latest` no npm ainda é a série 0.45 (0.45.4), que é anterior e voltar a ela seria um downgrade; só migre para a 1.0 estável quando ela sair, e reverifique com `npm view drizzle-orm dist-tags`. As demais versões exatas (`@biomejs/biome` 2.6.8, `node-forge` 1.4.3) são pins deliberados.
+
 Para gerar a migration de uma mudança a partir do `schema.ts` do Module (o `drizzle-kit` compara com o último `snapshot.json`):
 
 ```bash

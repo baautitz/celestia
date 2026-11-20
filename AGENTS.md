@@ -36,7 +36,9 @@ celestia/
 ├── services/     (@platform/ca)     certificate authority service: issues, revokes and reads Device certificates (schema `ca`, own process)
 ├── integrations/ Customer Plugins (e.g. integrations/inovafarma); boundary checked by `pnpm check:plugins`
 ├── docs/         adr/, conventions/ (database, ui, permissions, plugins, testing), agents/, security-audit.md
-└── scripts/      check-ui-boundaries.mjs, check-plugin-boundaries.mjs, test-db.mjs
+├── scripts/      check-ui-boundaries.mjs (+ .test.mjs), check-plugin-boundaries.mjs (+ .test.ts), ast.mjs (parser AST compartilhado), lint-rules.test.ts, setup-git-hooks.mjs (prepare), test-db.mjs
+├── tools/lint/   regras GritQL do Biome (no-double-assertion.grit)
+└── .githooks/    pre-commit (check:ui, check:plugins e lint do que está em stage) e pre-push (`pnpm check`)
 ```
 
 ---

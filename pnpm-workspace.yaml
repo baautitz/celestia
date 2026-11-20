@@ -3,5 +3,6 @@ packages:
   - integrations/*
   - services/*
 
+# esbuild (via tsx, drizzle-kit) is the only dependency whose install script is needed (it validates/links the platform binary).
 onlyBuiltDependencies:
   - esbuild

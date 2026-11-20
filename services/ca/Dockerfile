@@ -13,6 +13,8 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 RUN pnpm --filter "@platform/ca..." run build
 # O tsc não copia os .sql: a CA procura as migrations ao lado do próprio código compilado.
 RUN cp -r services/ca/src/migrations services/ca/dist/migrations
+# Source maps e declaration maps nao vao para a imagem de producao.
+RUN find services/ca/dist -name '*.map' -delete
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
   pnpm --filter @platform/ca deploy --legacy --prod /deploy --store-dir $PNPM_STORE_DIR
 

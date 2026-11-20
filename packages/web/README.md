@@ -1,21 +1,7 @@
-# React + TypeScript + Vite + shadcn/ui
+# @platform/web
 
-This is a template for a new Vite project with React, TypeScript, and shadcn/ui.
+SPA do Celestia (Vite, React 19, Tailwind CSS v4). Os primitivos de interface vêm de `@platform/ui`; para adicionar ou alterar componentes, janelas, tabelas e formulários, siga [docs/conventions/ui.md](../../docs/conventions/ui.md) (verificado por `pnpm check:ui`).
 
-## Adding components
-
-To add components to your app, run the following command:
-
-```bash
-npx shadcn@latest add button
-```
-
-This will place the ui components in the `src/components` directory.
-
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button"
-```
+- Módulos do SPA: `src/modules.ts`.
+- Dev: `pnpm dev:web` (a partir da raiz), proxy de `/api` para `API_PROXY_TARGET` (padrão `http://localhost:3000`).
+- Build: `pnpm --filter @platform/web build`.
