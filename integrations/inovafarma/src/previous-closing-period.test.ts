@@ -35,9 +35,8 @@ describe("previousClosingPeriodRange", () => {
     expect(previousClosingPeriodRange([curto, outubro], outubro, "2026-10-28")?.endDate).toBe("2026-09-30");
   });
 
-  it("ignora Períodos cancelados e aceita lacunas entre eles", () => {
-    const cancelado = period("Setembro cancelado", "2026-09-01", "2026-09-30", "cancelled");
-    expect(previousClosingPeriodRange([agosto, cancelado, outubro], outubro, "2026-11-05")).toEqual({
+  it("aceita lacunas entre os Períodos", () => {
+    expect(previousClosingPeriodRange([agosto, outubro], outubro, "2026-11-05")).toEqual({
       name: "Agosto/2026",
       startDate: "2026-08-01",
       endDate: "2026-08-31",

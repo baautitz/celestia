@@ -36,6 +36,8 @@ export class UsuarioJaVinculadoError extends Error {}
 export interface VinculoStore {
   list(): Promise<VinculoColaborador[]>;
   get(codigoColaborador: number): Promise<VinculoColaborador | null>;
+  /** O registro do Usuário (o `usuario_id` é único), desfeito ou não: não precisa varrer a lista. */
+  porUsuario(usuarioId: string): Promise<VinculoColaborador | null>;
   /** Cria ou altera de forma atômica; lança `VersaoDesatualizadaError` ou `UsuarioJaVinculadoError`. */
   gravar(input: GravarVinculo, expectedVersion: number): Promise<VinculoColaborador>;
   /** Esvazia o registro de forma atômica, incrementando a `version`; lança `VersaoDesatualizadaError`, também se não há registro. */
@@ -51,6 +53,10 @@ export class MemoryVinculoStore implements VinculoStore {
 
   async get(codigoColaborador: number): Promise<VinculoColaborador | null> {
     return this.vinculos.get(codigoColaborador) ?? null;
+  }
+
+  async porUsuario(usuarioId: string): Promise<VinculoColaborador | null> {
+    return [...this.vinculos.values()].find((v) => v.usuarioId === usuarioId) ?? null;
   }
 
   async gravar(input: GravarVinculo, expectedVersion: number): Promise<VinculoColaborador> {

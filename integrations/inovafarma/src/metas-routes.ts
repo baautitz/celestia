@@ -2,18 +2,17 @@ import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { colaboradorDasMinhasMetas, visualizacoesDasMetas } from "./acompanhamento-routes.js";
-import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { formatarValor } from "./indicadores.js";
 import { METAS_ACTIONS } from "./metas-audit.js";
-import { ator, ERP_INDISPONIVEL, META_DESATUALIZADA, PERIODO_NAO_ENCONTRADO, type AuthContext } from "./metas-comum.js";
+import { ator, CodigoEmTexto, ERP_INDISPONIVEL, META_DESATUALIZADA, PERIODO_NAO_ENCONTRADO, periodoAindaAberto, recusaDeValidacao, Version, versaoDaQuery, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import type { DadosMeta, Meta, MetaStore } from "./metas-store.js";
 import { alvoInicial, novaMeta, pendentes, usaAlvo, type ColaboradorAtivo } from "./montar-metas.js";
 import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
+import { lojasDoErp } from "./pre-vencidos-comum.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
 import { descreverPremio, indicadorDoTipo, RegraPremio, type TipoMeta } from "./tipos-meta.js";
 import { regraDoParticipante } from "./apuracao.js";
-import type { ErpQueryClient } from "./server.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
 import type { AuditService } from "./vinculo-audit.js";
 import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
@@ -22,7 +21,7 @@ export interface MetasRoutesDeps {
   routes: ModuleContext["routes"];
   permissions: Pick<ModuleContext["permissions"], "has">;
   auth: MiddlewareHandler;
-  erpClient: () => ErpQueryClient | undefined;
+  erpClient: () => ErpQuery | undefined;
   tipos: TipoMetaStore;
   metas: MetaStore;
   vinculos: VinculoStore;
@@ -39,7 +38,6 @@ const NAO_PARTICIPANTE = "O Colaborador não é Participante da Meta.";
 const NAO_ATIVO = "O Colaborador não está ativo no ERP.";
 const SEM_ALVO = "Esta Meta não tem Alvo por Participante.";
 
-const Version = z.number().int().min(1);
 const PremioParticipante = z.object({ version: Version, premio: RegraPremio.nullable() });
 const Alvo = z.number({ error: "Informe o Alvo." }).positive("O Alvo deve ser maior que zero.").max(1e12);
 const Nova = z.object({ periodoId: z.string().min(1), tipoId: z.string().min(1) });
@@ -57,17 +55,6 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
 
   const periodosOrdenados = async () => (await periods.list()).sort((a, b) => b.startDate.localeCompare(a.startDate));
 
-  const lojasDoErp = async () => {
-    const client = erpClient();
-    if (!client) return [];
-    try {
-      const rows = await client.query<{ codigoEmpresa: number; nome: string | null }>(LOJAS_SQL);
-      return rows.map((r) => ({ codigo: Number(r.codigoEmpresa), nome: (r.nome || "").trim() }));
-    } catch {
-      return [];
-    }
-  };
-
   /** Lojas confirmadas no Vínculo de cada Colaborador; sem Loja confirmada, ele só aparece em "Todas as Lojas". */
   const lojasConfirmadas = async () => new Map((await vinculos.list()).filter((v) => !vinculoDesfeito(v)).map((v) => [v.codigoColaborador, v.lojas]));
 
@@ -83,7 +70,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
       minhas: (await colaboradorDasMinhasMetas(c.get("user"), permissions.has, vinculos)) !== null,
     };
     if (!abas.tipos && !abas.montar && !abas.acompanhamento && !abas.minhas) return c.json({ error: SEM_METAS }, 403);
-    const lojas = abas.montar || abas.acompanhamento ? await lojasDoErp() : [];
+    const lojas = abas.montar || abas.acompanhamento ? await lojasDoErp(erpClient()) : [];
     // Visualizações do Acompanhamento: Geral filtra todas as Lojas; Loja, só as do Vínculo do Usuário.
     const visualizacoes = [
       ...(acompanhamento.geral ? [{ id: "geral" as const, lojas }] : []),
@@ -128,7 +115,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
   routes.post("/metas", auth, async (c: AuthContext) => {
     if (!pode(c)) return c.json({ error: manage.deniedMessage }, 403);
     const parsed = Nova.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const periodo = (await periods.list()).find((p) => p.id === parsed.data.periodoId);
     if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
     if (periodo.status !== "open") return c.json({ error: PERIODO_FECHADO }, 409);
@@ -149,15 +136,13 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     const tipo = meta && (await tipos.tipo(meta.tipoId));
     if (!meta || !tipo) return { recusa: c.json({ error: META_NAO_ENCONTRADA }, 404) } as const;
     const periodo = (await periods.list()).find((p) => p.id === meta.periodoId);
-    if (periodo?.status !== "open") return { recusa: c.json({ error: PERIODO_FECHADO }, 409) } as const;
+    if (!periodo) return { recusa: c.json({ error: PERIODO_NAO_ENCONTRADO }, 404) } as const;
+    if (periodo.status !== "open") return { recusa: c.json({ error: PERIODO_FECHADO }, 409) } as const;
     return { meta, tipo, periodo } as const;
   };
 
-  /**
-   * O Período pode fechar entre `alteravel` e a gravação (a Apuração congela no fechamento): confere de novo logo antes
-   * de gravar. O status é do Module `closing_period`, fora do store das Metas, então não entra na condição da gravação.
-   */
-  const aindaAberto = async (meta: Meta) => (await periods.list()).find((p) => p.id === meta.periodoId)?.status === "open";
+  // O Período pode fechar entre `alteravel` e a gravação: confere de novo logo antes de gravar.
+  const aindaAberto = (meta: Meta) => periodoAindaAberto(periods, meta.periodoId);
 
   const gravar = async (meta: Meta, dados: Partial<DadosMeta>, version: number) =>
     metas.atualizar(meta.id, { participantes: meta.participantes, excluidos: meta.excluidos, ...dados }, version);
@@ -168,11 +153,13 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     if ("recusa" in alteracao) return alteracao.recusa;
     const { meta, tipo, periodo } = alteracao;
     const parsed = Participacao.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const { version, participa } = parsed.data;
     if (parsed.data.alvo != null && !usaAlvo(tipo)) return c.json({ error: SEM_ALVO }, 400);
     if (meta.version !== version) return c.json(META_DESATUALIZADA, 409);
-    const codigo = Number(c.req.param("codigo"));
+    const lido = CodigoEmTexto.safeParse(c.req.param("codigo"));
+    if (!lido.success) return recusaDeValidacao(c, lido.error);
+    const codigo = lido.data;
     const atual = meta.participantes.find((p) => p.codigoColaborador === codigo);
     const indicador = indicadorDoTipo(tipo);
     const texto = (n: number | null) => (n === null ? "pendente" : formatarValor(indicador, n));
@@ -212,7 +199,7 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     const { meta, tipo, periodo } = alteracao;
     if (!usaAlvo(tipo)) return c.json({ error: SEM_ALVO }, 400);
     const parsed = Definicao.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const { version, codigos } = parsed.data;
     const marcados = meta.participantes.filter((p) => codigos.includes(p.codigoColaborador));
     if (marcados.length !== new Set(codigos).size) return c.json({ error: NAO_PARTICIPANTE }, 400);
@@ -235,13 +222,14 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     if ("recusa" in alteracao) return alteracao.recusa;
     const { meta, tipo, periodo } = alteracao;
     const parsed = PremioParticipante.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const { version, premio } = parsed.data;
     if (tipo.regra.tipo === "saldo") return c.json({ error: "Na Meta de Avaliações o Prêmio é o Saldo." }, 400);
     if (premio && premio.tipo !== tipo.regra.tipo) return c.json({ error: "O Prêmio do Participante segue o tipo de regra do Tipo de Meta." }, 400);
     if (meta.version !== version) return c.json(META_DESATUALIZADA, 409);
-    const codigo = Number(c.req.param("codigo"));
-    const atual = meta.participantes.find((p) => p.codigoColaborador === codigo);
+    const codigo = CodigoEmTexto.safeParse(c.req.param("codigo"));
+    if (!codigo.success) return recusaDeValidacao(c, codigo.error);
+    const atual = meta.participantes.find((p) => p.codigoColaborador === codigo.data);
     if (!atual) return c.json({ error: NAO_PARTICIPANTE }, 400);
     const descrever = (regra: RegraPremio) => descreverPremio({ ...tipo, regra });
     if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
@@ -262,10 +250,10 @@ export function registerMetasRoutes({ routes, permissions, auth, erpClient, tipo
     const alteracao = await alteravel(c);
     if ("recusa" in alteracao) return alteracao.recusa;
     const { meta, tipo, periodo } = alteracao;
-    const version = Number(c.req.query("version"));
-    if (!Number.isInteger(version)) return c.json({ error: "Informe a versão da Meta." }, 400);
+    const lida = versaoDaQuery(c);
+    if ("recusa" in lida) return lida.recusa;
     if (!(await aindaAberto(meta))) return c.json({ error: PERIODO_FECHADO }, 409);
-    if (!(await metas.excluir(meta.id, version))) return c.json(META_DESATUALIZADA, 409);
+    if (!(await metas.excluir(meta.id, lida.version))) return c.json(META_DESATUALIZADA, 409);
     await registrar(c, METAS_ACTIONS.excluir, meta, { tipo: tipo.nome, periodo: periodo.name, participantes: meta.participantes.length });
     return c.body(null, 204);
   });

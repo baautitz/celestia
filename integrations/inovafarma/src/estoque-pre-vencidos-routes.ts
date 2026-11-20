@@ -1,4 +1,4 @@
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
@@ -6,7 +6,7 @@ import { PRODUTO_SQL, type LinhaProduto } from "./produtos-erp.js";
 import { horaDoErp, inicioDoDiaNoErp } from "./baixas-da-loja.js";
 import { restanteDoEstoque, type BaixasDoPeriodoDeps } from "./baixas-do-periodo.js";
 import { dataBr } from "./datas.js";
-import { ERP_INDISPONIVEL, erroDoErp, SEM_CONEXAO } from "./metas-comum.js";
+import { ator, Codigo, CodigoEmTexto, DiaDoCalendario, ERP_INDISPONIVEL, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDaQuery, versaoDesatualizada, type AuthContext } from "./metas-comum.js";
 import { inclusaoRetroativa, lojasDoErp, recusaDeLoja } from "./pre-vencidos-comum.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
 import { ITEM_PRE_VENCIDO_ACTIONS, ITEM_PRE_VENCIDO_PLUGIN, ITEM_PRE_VENCIDO_TARGET, type AtributosItemPreVencido } from "./estoque-pre-vencidos-audit.js";
@@ -25,23 +25,23 @@ export interface EstoquePreVencidosRoutesDeps extends BaixasDoPeriodoDeps {
   audit: AuditService;
 }
 
-type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
-
-const VERSAO_DESATUALIZADA = { error: "O Item foi alterado por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
+const VERSAO_DESATUALIZADA = versaoDesatualizada("O Item foi alterado por outra pessoa. A lista foi recarregada.");
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const Validade = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe a validade como mês e ano (AAAA-MM).");
 const Quantidade = z.number({ error: "Informe a quantidade." }).int("Informe uma quantidade inteira.").min(1, "Informe uma quantidade maior que zero.").max(1_000_000);
-const DiaDeInclusao = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de inclusão (AAAA-MM-DD).");
+const DiaDeInclusao = DiaDoCalendario("Informe a data de inclusão (AAAA-MM-DD).");
 const Novo = z.object({
-  codigoLoja: z.number().int().min(1),
+  codigoLoja: Codigo,
   produtoId: z.string().regex(UUID, "Produto inválido."),
   quantidade: Quantidade,
   validade: Validade,
   /** Data de inclusão retroativa (`AAAA-MM-DD`, na hora do ERP); sem ela, agora. */
   incluidoEm: DiaDeInclusao.optional(),
 });
-const Edicao = z.object({ quantidade: Quantidade, validade: Validade, incluidoEm: DiaDeInclusao.optional(), version: z.number().int().min(1) });
+const Edicao = z.object({ quantidade: Quantidade, validade: Validade, incluidoEm: DiaDeInclusao.optional(), version: Version });
+
+const FiltroLoja = z.object({ codigoLoja: CodigoEmTexto });
 
 /** O que a API devolve: nunca o código do produto no ERP. */
 export const itemPublico = ({ codigoProduto: _codigoProduto, ...resto }: ItemPreVencido) => resto;
@@ -73,7 +73,6 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
   const nomeDaLoja = async (codigo: number) => (await lojasDoErp(erpClient())).find((l) => l.codigo === codigo)?.nome ?? "";
 
   const registrar = async (c: AuthContext, action: string, item: ItemPreVencido, anterior: AtributosItemPreVencido["anterior"] = null) => {
-    const user = c.get("user");
     const atributos: AtributosItemPreVencido = {
       codigoLoja: item.codigoLoja,
       nomeLoja: await nomeDaLoja(item.codigoLoja),
@@ -87,7 +86,7 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
     return audit.record({
       plugin: ITEM_PRE_VENCIDO_PLUGIN,
       action,
-      actor: { id: user?.sub ?? "", name: user?.fullname ?? "" },
+      actor: ator(c),
       target: { type: ITEM_PRE_VENCIDO_TARGET, id: item.id },
       attributes: atributos,
     });
@@ -97,8 +96,9 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
 
   routes.get("/pre-vencidos/estoque/itens", auth, async (c: AuthContext) => {
     if (!pode(c)) return c.json({ error: gerir.deniedMessage }, 403);
-    const codigoLoja = Number(c.req.query("codigoLoja"));
-    if (!Number.isInteger(codigoLoja) || codigoLoja < 1) return c.json({ error: "Parâmetro 'codigoLoja' é obrigatório." }, 400);
+    const loja = FiltroLoja.safeParse({ codigoLoja: c.req.query("codigoLoja") });
+    if (!loja.success) return recusaDeValidacao(c, loja.error);
+    const { codigoLoja } = loja.data;
     const recusa = await recusaLoja(c, codigoLoja);
     if (recusa) return recusa;
     const itens = await store.listar(codigoLoja);
@@ -116,7 +116,7 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
   routes.post("/pre-vencidos/estoque/itens", auth, async (c: AuthContext) => {
     if (!pode(c)) return c.json({ error: gerir.deniedMessage }, 403);
     const parsed = Novo.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const { codigoLoja, produtoId, quantidade, validade } = parsed.data;
     const recusa = await recusaLoja(c, codigoLoja);
     if (recusa) return recusa;
@@ -161,7 +161,7 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
     const alvo = await itemDaLoja(c);
     if ("recusa" in alvo) return alvo.recusa;
     const parsed = Edicao.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const { version, incluidoEm: dia, ...valores } = parsed.data;
     let incluidoEm: string | undefined;
     if (dia !== undefined) {
@@ -183,9 +183,9 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
   routes.delete("/pre-vencidos/estoque/itens/:id", auth, async (c: AuthContext) => {
     const alvo = await itemDaLoja(c);
     if ("recusa" in alvo) return alvo.recusa;
-    const version = Number(c.req.query("version"));
-    if (!Number.isInteger(version) || version < 1) return c.json({ error: "Parâmetro 'version' é obrigatório." }, 400);
-    if (!(await store.excluir(alvo.item.id, version))) return c.json(VERSAO_DESATUALIZADA, 409);
+    const lida = versaoDaQuery(c);
+    if ("recusa" in lida) return lida.recusa;
+    if (!(await store.excluir(alvo.item.id, lida.version))) return c.json(VERSAO_DESATUALIZADA, 409);
     await registrar(c, ITEM_PRE_VENCIDO_ACTIONS.excluir, alvo.item);
     return c.json({ success: true });
   });

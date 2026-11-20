@@ -422,32 +422,20 @@ export function VendasComissoesPage() {
   // Carrega lista de períodos de fechamento e filiais
   useEffect(() => {
     async function initFilters() {
-      const falhas: string[] = [];
-      const registrar = (assunto: string, err: unknown) => {
-        falhas.push(`${assunto}: ${err instanceof Error ? err.message : "erro desconhecido"}`);
-      };
-      // Os Períodos vêm de /api/closing-periods, que exige a Permission de ler o Fechamento: sem ela a falha aparece na tela, não some.
-      const [periodsData, visualizacoesData] = await Promise.all([
-        apiFetch<ClosingPeriod[]>("/api/closing-periods").catch((err: unknown) => {
-          registrar("Não foi possível carregar os Períodos de Fechamento", err);
-          return [] as ClosingPeriod[];
-        }),
-        apiFetch<{ visualizacoes: VisualizacaoDisponivel[] }>(`${API}/relatorios/vendas-colaborador/visualizacoes`)
-          .then((r) => r.visualizacoes)
-          .catch((err: unknown) => {
-            registrar("Não foi possível carregar as Visualizações", err);
-            return [] as VisualizacaoDisponivel[];
-          }),
-      ]);
+      // Períodos e Visualizações vêm da mesma rota, que não exige a Permission de ler o Fechamento: se falhar, a falha aparece na tela, não some.
+      const contexto = await apiFetch<{ periodos: ClosingPeriod[]; visualizacoes: VisualizacaoDisponivel[] }>(`${API}/relatorios/vendas-colaborador/visualizacoes`).catch((err: unknown) => {
+        setError(`Não foi possível carregar os Períodos de Fechamento e as Visualizações: ${err instanceof Error ? err.message : "erro desconhecido"}`);
+        return { periodos: [] as ClosingPeriod[], visualizacoes: [] as VisualizacaoDisponivel[] };
+      });
+      const { periodos, visualizacoes: visualizacoesData } = contexto;
 
-      if (falhas.length > 0) setError(falhas.join(" "));
-      setPeriods(periodsData);
+      setPeriods(periodos);
       setVisualizacoes(visualizacoesData);
       // A mais ampla que o Usuário tem; o servidor entrega em ordem Geral, Loja, Individual.
       if (visualizacoesData[0]) setVisualizacao(visualizacoesData[0].id);
       else setLoading(false);
 
-      const initial = periodsData.find((p) => p.status === "open") ?? periodsData[0];
+      const initial = periodos.find((p) => p.status === "open") ?? periodos[0];
       if (initial) setSelectedPeriodId((prev) => prev || initial.id);
       else setLoading(false);
     }
@@ -537,7 +525,7 @@ export function VendasComissoesPage() {
       ? { current: pick(resumo), previous: pick(anterior.resumo), label: anterior.label, format, favorable }
       : undefined;
 
-  if (visualizacoes?.length === 0) {
+  if (visualizacoes?.length === 0 && !error) {
     return (
       <Alert>
         <AlertCircle />

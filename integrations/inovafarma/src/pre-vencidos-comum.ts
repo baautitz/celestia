@@ -1,18 +1,14 @@
-import type { Context } from "hono";
 import type { ModuleContext } from "@platform/core/module";
-import { LOJAS_SQL } from "./colaboradores-routes.js";
 import { horaDoErp } from "./baixas-da-loja.js";
-import { vinculoDoUsuario, type ErpQuery } from "./metas-comum.js";
+import { vinculoDoUsuario, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
 import type { VinculoStore } from "./vinculo-store.js";
-import { VISUALIZACAO_PERMISSION_BAIXAS, visualizacoesDoUsuario, type VisualizacoesDoUsuario } from "./visualizacoes.js";
+import { VISUALIZACAO_PERMISSION_BAIXAS, visualizacoesDoUsuario, type Visualizacao, type VisualizacoesDoUsuario } from "./visualizacoes.js";
 
 /** O que as rotas do Estoque e das Baixas de Pré-vencido compartilham: as Lojas do Vínculo e a inclusão retroativa. */
 
 export const SEM_VINCULO = "Seu Usuário não está vinculado a um Colaborador. Peça o vínculo a quem administra os Colaboradores.";
 export const LOJA_FORA_DO_VINCULO = "A Loja informada não está vinculada ao seu Colaborador.";
-
-type AuthContext = Context<{ Variables: { user?: { sub?: string; permissions?: string[] } } }>;
 
 /** Lojas do Vínculo (não desfeito) do Usuário; null sem Vínculo. */
 export async function lojasDoVinculo(vinculos: VinculoStore, usuarioId: string | undefined): Promise<number[] | null> {
@@ -34,19 +30,42 @@ export const recusaDeLoja =
     return null;
   };
 
-/** Visualizações das Baixas que o Usuário tem: a Permission de cada uma e, para Loja e Individual, o Vínculo em vigor. */
-export async function visualizacoesDasBaixas(c: AuthContext, permissions: ModuleContext["permissions"], vinculos: VinculoStore): Promise<VisualizacoesDoUsuario> {
+/** Visualizações do Usuário: a Permission de cada uma (`permissoes`) e, para Loja e Individual, o Vínculo em vigor. */
+export async function visualizacoesDoContexto(
+  c: AuthContext,
+  permissions: ModuleContext["permissions"],
+  vinculos: VinculoStore,
+  permissoes: Readonly<Record<Visualizacao, string>>,
+): Promise<VisualizacoesDoUsuario> {
   const usuarioId = c.get("user")?.sub;
   const vinculo = usuarioId ? await vinculoDoUsuario(vinculos, usuarioId) : null;
-  return visualizacoesDoUsuario(c.get("user")?.permissions, vinculo, (p, k) => permissions.has(p, k), VISUALIZACAO_PERMISSION_BAIXAS);
+  return visualizacoesDoUsuario(c.get("user")?.permissions, vinculo, (p, k) => permissions.has(p, k), permissoes);
 }
 
+/** Visualizações das Baixas que o Usuário tem, com as regras do Desempenho de Vendas. */
+export const visualizacoesDasBaixas = (c: AuthContext, permissions: ModuleContext["permissions"], vinculos: VinculoStore) =>
+  visualizacoesDoContexto(c, permissions, vinculos, VISUALIZACAO_PERMISSION_BAIXAS);
+
+/** Lojas do ERP: o `Config` de cada filial com nome. */
+export const LOJAS_SQL = `
+  SELECT CodigoEmpresa AS codigoEmpresa, NomeFilial AS nome
+  FROM Config
+  WHERE NomeFilial IS NOT NULL AND LTRIM(RTRIM(NomeFilial)) <> ''
+  ORDER BY CodigoEmpresa
+`;
+
+export interface LojaOpcao {
+  codigo: number;
+  nome: string;
+}
+export type LinhaLoja = { codigoEmpresa: number; nome: string | null };
+export const paraLoja = (r: LinhaLoja): LojaOpcao => ({ codigo: Number(r.codigoEmpresa), nome: (r.nome || "").trim() });
+
 /** Lojas do ERP com o nome; vazio sem conexão ou com o ERP indisponível. */
-export async function lojasDoErp(client: ErpQuery | undefined): Promise<{ codigo: number; nome: string }[]> {
+export async function lojasDoErp(client: ErpQuery | undefined): Promise<LojaOpcao[]> {
   if (!client) return [];
   try {
-    const rows = await client.query<{ codigoEmpresa: number; nome: string | null }>(LOJAS_SQL);
-    return rows.map((r) => ({ codigo: Number(r.codigoEmpresa), nome: (r.nome || "").trim() }));
+    return (await client.query<LinhaLoja>(LOJAS_SQL)).map(paraLoja);
   } catch {
     return [];
   }

@@ -22,14 +22,24 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Desempenho de Vendas", () => {
-  it("avisa na tela quando o Usuário não pode ler os Períodos de Fechamento", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  it("lê os Períodos da rota do Desempenho, sem tocar em /api/closing-periods", async () => {
     apiFetch.mockImplementation(async (url: string) => {
-      if (url === "/api/closing-periods") throw new ApiError("Sem permissão", 403);
-      return { visualizacoes: [{ id: "geral", lojas: [] }] };
+      if (url.endsWith("/relatorios/vendas-colaborador/visualizacoes")) {
+        return { periodos: [{ id: "p1", name: "Outubro", startDate: "2026-10-01", endDate: "2026-10-31", status: "open" }], visualizacoes: [{ id: "geral", lojas: [] }] };
+      }
+      return { resumo: null, colaboradores: [] };
     });
     render(<UiProvider><VendasComissoesPage /></UiProvider>, { wrapper: MemoryRouter });
-    expect(await screen.findByText(/Não foi possível carregar os Períodos de Fechamento: Sem permissão/)).toBeDefined();
+    expect((await screen.findAllByText(/Outubro/)).length).toBeGreaterThan(0);
+    expect(apiFetch.mock.calls.map(([url]) => url)).not.toContain("/api/closing-periods");
+    expect(screen.queryByText(/Não foi possível carregar/)).toBeNull();
+  });
+
+  it("avisa na tela quando os Períodos e as Visualizações não carregam", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    apiFetch.mockRejectedValue(new ApiError("Sem permissão", 403));
+    render(<UiProvider><VendasComissoesPage /></UiProvider>, { wrapper: MemoryRouter });
+    expect(await screen.findByText(/Não foi possível carregar os Períodos de Fechamento e as Visualizações: Sem permissão/)).toBeDefined();
     expect(screen.queryByText("Nenhum Período de Fechamento cadastrado na plataforma.")).toBeNull();
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();

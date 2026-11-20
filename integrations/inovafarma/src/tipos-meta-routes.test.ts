@@ -130,6 +130,23 @@ describe("Tipos de Meta", () => {
     expect((await req("gil", "POST", "/metas/tipos", { ...cmv, nome: "cmv" })).status).toBe(409);
   });
 
+  it("responde 409 com a mensagem ao nome repetido, ao cadastrar e ao renomear para o de outro Tipo", async () => {
+    const { req } = boot();
+    const cmvCriado = (await (await req("gil", "POST", "/metas/tipos", cmv)).json()) as Tipo;
+    const ticket = (await (await req("gil", "POST", "/metas/tipos", { ...cmv, nome: "Ticket" })).json()) as Tipo;
+    const repetido = { error: "Já existe um Tipo de Meta com este nome." };
+    const cadastro = await req("gil", "POST", "/metas/tipos", { ...cmv, nome: "ticket" });
+    expect(cadastro.status).toBe(409);
+    expect(await cadastro.json()).toEqual(repetido);
+    const renomeio = await req("gil", "PUT", `/metas/tipos/${ticket.id}`, { ...cmv, nome: "cmv", version: ticket.version });
+    expect(renomeio.status).toBe(409);
+    expect(await renomeio.json()).toEqual(repetido);
+    // O próprio nome, com outra caixa, não é repetido.
+    const propria = await req("gil", "PUT", `/metas/tipos/${cmvCriado.id}`, { ...cmv, nome: "Cmv", version: cmvCriado.version });
+    expect(propria.status).toBe(200);
+    expect(await propria.json()).toMatchObject({ nome: "Cmv" });
+  });
+
   it("altera e desativa com controle de versão, sem trocar o Indicador", async () => {
     const { req, log } = boot();
     const criado = (await (await req("gil", "POST", "/metas/tipos", cmv)).json()) as Tipo;
@@ -234,9 +251,10 @@ describe("Tipo de Meta de Lista de Produtos", () => {
     const { req } = boot();
     const erro = async (corpo: unknown) => {
       const res = await req("gil", "POST", "/metas/tipos", corpo);
-      return [res.status, ((await res.json()) as { error: string }).error];
+      return [res.status, ((await res.json()) as { error: unknown }).error];
     };
-    expect(await erro({ ...lista, lista: { unidade: "unidades", entradas: [] } })).toEqual([400, "Adicione pelo menos uma entrada à Lista."]);
+    const listaVazia = { issues: [{ path: ["lista", "entradas"], message: "Adicione pelo menos uma entrada à Lista." }] };
+    expect(await erro({ ...lista, lista: { unidade: "unidades", entradas: [] } })).toEqual([400, listaVazia]);
     expect(await erro({ ...lista, lista: null })).toEqual([400, "Adicione pelo menos uma entrada à Lista."]);
     expect(await erro({ ...cmv, lista: lista.lista })).toEqual([400, "Só o Indicador Lista de Produtos tem Lista."]);
     expect((await erro({ ...lista, exibicao: "contagem" }))[0]).toBe(400);
@@ -297,7 +315,7 @@ describe("Tipo de Meta de Lista de Produtos", () => {
     ]) {
       const res = await req("gil", "POST", "/tipos-meta/lista/conferir", { entradas: [entrada] });
       expect(res.status).toBe(400);
-      expect(((await res.json()) as { error: string }).error).toBe("Uma entrada da Lista tem um identificador inválido.");
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["entradas", 0], message: "Uma entrada da Lista tem um identificador inválido." }] } });
     }
     expect(erp.consultas).toEqual([]);
   });

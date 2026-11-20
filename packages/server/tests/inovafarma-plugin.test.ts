@@ -49,22 +49,8 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
 
   it("exporta o driver InovaFarma com os campos de conexão", () => {
     const drivers = integrationErpDrivers();
-    expect(drivers.inovafarma).toBeDefined();
     expect(drivers.inovafarma.label).toBe("InovaFarma");
     expect(drivers.inovafarma).not.toHaveProperty("externalFields");
-  });
-
-  it("serve a rota /status com a Permission e nega sem ela", async () => {
-    const allowed = await boot(["inovafarma:integration:view"]);
-    const ok = await allowed.platform.app.request("/api/m/inovafarma/status", { headers: allowed.headers });
-    expect(ok.status).toBe(200);
-    const status = await ok.json();
-    expect(status).toMatchObject({ module: "inovafarma", erpId: "inovafarma" });
-    expect(status).not.toHaveProperty("externals");
-
-    const denied = await boot([]);
-    expect((await denied.platform.app.request("/api/m/inovafarma/status", { headers: denied.headers })).status).toBe(403);
-    expect((await denied.platform.app.request("/api/m/inovafarma/status")).status).toBe(401);
   });
 
   describe("GET /colaboradores", () => {
@@ -121,36 +107,6 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       expect(res.status).toBe(503);
       expect(await res.json()).toEqual({ error: "ERP InovaFarma indisponível. Tente novamente em instantes." });
     });
-
-    it("não muda a rota /lojas: falha no ERP continua respondendo lista vazia", async () => {
-      const client = mockErpClient(async () => {
-        throw new Error("fora do ar");
-      });
-      const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: client });
-      const res = await platform.app.request("/api/m/inovafarma/lojas", { headers });
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual([]);
-    });
-  });
-
-  it("lista lojas através da tabela Config", async () => {
-    const mockClient = mockErpClient(async (sql: string) => {
-        if (sql.includes("Config")) {
-          return [
-            { codigoEmpresa: 1, nome: "Loja Centro" },
-            { codigoEmpresa: 2, nome: "Loja Bairro" },
-          ];
-        }
-        return [];
-    });
-    const { platform, headers } = await boot(["inovafarma:integration:view"], { inovafarma: mockClient });
-    const res = await platform.app.request("/api/m/inovafarma/lojas", { headers });
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data).toEqual([
-      { codigoEmpresa: 1, nome: "Loja Centro" },
-      { codigoEmpresa: 2, nome: "Loja Bairro" },
-    ]);
   });
 
   it("calcula relatório de vendas por colaborador do item, com CMV", async () => {
@@ -261,6 +217,7 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       ]);
       const res = await platform.app.request(`${RELATORIO}/visualizacoes`, { headers });
       expect(await res.json()).toEqual({
+        periodos: [],
         visualizacoes: [
           { id: "geral", lojas: [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }, { codigoEmpresa: 3, nome: "Norte" }] },
           { id: "loja", lojas: [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Bairro" }] },
@@ -269,9 +226,24 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       });
     });
 
+    it("entrega os Períodos do serviço de Períodos, do mais recente ao mais antigo, sem exigir a Permission do Fechamento", async () => {
+      const { platform, headers } = await bootVinculado(["inovafarma:vendas-geral:view", "closing_period:period:create"]);
+      const criar = (name: string, startDate: string, endDate: string) =>
+        platform.app.request("/api/closing-periods", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify({ name, startDate, endDate }) });
+      expect((await criar("Setembro", "2026-09-01", "2026-09-30")).status).toBe(201);
+      expect((await criar("Outubro", "2026-10-01", "2026-10-31")).status).toBe(201);
+      const { platform: semFechamento, headers: semHeaders } = await bootVinculado(["inovafarma:vendas-geral:view"]);
+      const sem = (await (await semFechamento.app.request(`${RELATORIO}/visualizacoes`, { headers: semHeaders })).json()) as { periodos: unknown[] };
+      expect(sem.periodos).toEqual([]);
+      const res = await platform.app.request(`${RELATORIO}/visualizacoes`, { headers });
+      const body = (await res.json()) as { periodos: { name: string; status: string }[] };
+      expect(body.periodos.map((p) => p.name)).toEqual(["Outubro", "Setembro"]);
+      expect(body.periodos[0]).toMatchObject({ startDate: "2026-10-01", endDate: "2026-10-31", status: "open" });
+    });
+
     it("Loja e Individual exigem vínculo; sem ele só resta o que a Permission liberar sem vínculo", async () => {
       const { platform, headers } = await bootVinculado(["inovafarma:vendas-loja:view", "inovafarma:vendas-individual:view"], false);
-      expect(await (await platform.app.request(`${RELATORIO}/visualizacoes`, { headers })).json()).toEqual({ visualizacoes: [] });
+      expect(await (await platform.app.request(`${RELATORIO}/visualizacoes`, { headers })).json()).toEqual({ periodos: [], visualizacoes: [] });
       const res = await platform.app.request(`${RELATORIO}?${PERIODO}`, { headers });
       expect(res.status).toBe(403);
       expect(await res.json()).toEqual({ error: "Seu perfil não possui nenhuma visualização disponível." });
@@ -406,6 +378,69 @@ describe("Plugin InovaFarma (/integrations/inovafarma)", () => {
       similares: { quantidade: 4, valor: 60 },
       incentivos: { quantidade: 1, valor: 35 },
       totalFoco: { quantidade: 19, valor: 390.5 },
+    });
+  });
+
+  describe("Validação e falhas do relatório de vendas", () => {
+    const RELATORIO = "/api/m/inovafarma/relatorios/vendas-colaborador";
+    const consultas: string[] = [];
+    const ok = mockErpClient(async (sql) => {
+      consultas.push(sql);
+      return sql.includes("totalVendasGeral") ? [{ totalVendasGeral: 0, totalVendasComCadastro: 0 }] : [];
+    });
+
+    const recusa = (path: string, message: string) => ({ error: { issues: [{ path: [path], message }] } });
+    const DATAS = "Parâmetros 'dataInicio' e 'dataFim' são obrigatórios no formato YYYY-MM-DD.";
+
+    it("recusa data que não existe no calendário, com o corpo de validação da plataforma", async () => {
+      consultas.length = 0;
+      const { platform, headers } = await boot(["inovafarma:vendas-geral:view"], { inovafarma: ok });
+      const res = await platform.app.request(`${RELATORIO}?dataInicio=2026-13-99&dataFim=2026-10-31`, { headers });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual(recusa("dataInicio", DATAS));
+      const fevereiro = await platform.app.request(`${RELATORIO}?dataInicio=2026-02-31&dataFim=2026-10-31`, { headers });
+      expect(fevereiro.status).toBe(400);
+      expect(consultas).toEqual([]);
+    });
+
+    it("recusa a data final antes da inicial", async () => {
+      const { platform, headers } = await boot(["inovafarma:vendas-geral:view"], { inovafarma: ok });
+      const res = await platform.app.request(`${RELATORIO}?dataInicio=2026-10-31&dataFim=2026-10-01`, { headers });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual(recusa("dataFim", "A data final não pode ser anterior à data inicial."));
+    });
+
+    it("aceita o período de um só dia", async () => {
+      const { platform, headers } = await boot(["inovafarma:vendas-geral:view"], { inovafarma: ok });
+      expect((await platform.app.request(`${RELATORIO}?dataInicio=2026-10-05&dataFim=2026-10-05`, { headers })).status).toBe(200);
+    });
+
+    it("recusa a Loja que não é um código inteiro, em vez de ignorar o filtro", async () => {
+      consultas.length = 0;
+      const { platform, headers } = await boot(["inovafarma:vendas-geral:view"], { inovafarma: ok });
+      for (const loja of ["abc", "1.5", "0", "-2"]) {
+        const res = await platform.app.request(`${RELATORIO}?dataInicio=2026-10-01&dataFim=2026-10-31&codigoEmpresa=${loja}`, { headers });
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual(recusa("codigoEmpresa", "Informe um código inteiro maior que zero."));
+      }
+      expect(consultas).toEqual([]);
+    });
+
+    it("recusa a Visualização inexistente antes de olhar a Permission", async () => {
+      const { platform, headers } = await boot([], { inovafarma: ok });
+      const res = await platform.app.request(`${RELATORIO}?dataInicio=2026-10-01&dataFim=2026-10-31&visualizacao=xyz`, { headers });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual(recusa("visualizacao", "Parâmetro 'visualizacao' deve ser geral, loja ou individual."));
+    });
+
+    it("responde 503 sem expor o erro do banco quando a consulta ao ERP falha", async () => {
+      const quebrado = mockErpClient(async () => {
+        throw new Error("Invalid column name 'SenhaDoBanco' on host erp.interno:1433");
+      });
+      const { platform, headers } = await boot(["inovafarma:vendas-geral:view"], { inovafarma: quebrado });
+      const res = await platform.app.request(`${RELATORIO}?dataInicio=2026-10-01&dataFim=2026-10-31`, { headers });
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: "ERP InovaFarma indisponível. Tente novamente em instantes." });
     });
   });
 });

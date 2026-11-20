@@ -1,7 +1,9 @@
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
+import { ator, Codigo, CodigoEmTexto, ERP_INDISPONIVEL, recusaDeValidacao, SEM_CONEXAO, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
+import { LOJAS_SQL, paraLoja, type LinhaLoja, type LojaOpcao } from "./pre-vencidos-comum.js";
 import { VINCULO_ACTION, VINCULO_PLUGIN, VINCULO_TARGET, type AuditService } from "./vinculo-audit.js";
 import { sugerirUsuarios } from "./sugestao-usuario.js";
 import { UsuarioJaVinculadoError, VersaoDesatualizadaError, mesmasLojas, vinculoDesfeito, type VinculoColaborador, type VinculoStore } from "./vinculo-store.js";
@@ -15,10 +17,6 @@ export interface UsuarioResumo {
 }
 export interface UsersService {
   list(): Promise<UsuarioResumo[]>;
-}
-
-interface ErpQuery {
-  query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
 }
 
 interface ColaboradorErp {
@@ -39,17 +37,13 @@ export interface ColaboradoresRoutesDeps {
   audit: AuditService;
 }
 
-type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
-
-const SEM_CONEXAO = "Conexão com ERP InovaFarma não configurada ou inativa.";
-const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
 // Os dois conflitos pedem reações diferentes da tela, que decide pelo `code`.
-const VERSAO_DESATUALIZADA = { error: "O vínculo foi alterado por outra pessoa. A linha foi recarregada.", code: "versao_desatualizada" };
+const VERSAO_DESATUALIZADA = versaoDesatualizada("O vínculo foi alterado por outra pessoa. A linha foi recarregada.");
 const USUARIO_JA_VINCULADO = { error: "Este Usuário já está vinculado a outro Colaborador.", code: "usuario_ja_vinculado" };
 
-const MAX_INT = 2147483647;
-const Codigo = z.coerce.number().int().min(1).max(MAX_INT);
 const Gravacao = z.object({ usuarioId: z.string().min(1).nullable(), lojas: z.array(Codigo), version: z.number().int().min(0) });
+/** O código do Colaborador vem na rota; o resto, no corpo. */
+const Requisicao = Gravacao.extend({ codigo: CodigoEmTexto });
 
 // Ativo vem só de Funcionario.Ativo: DataDesligamento está preenchida em poucos inativos.
 export const COLABORADORES_SQL = `
@@ -58,21 +52,6 @@ export const COLABORADORES_SQL = `
   JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
   WHERE c.Eliminado = 0
 `;
-
-/** Mesma origem da rota /lojas; aqui a falha não é engolida, vira 503. */
-export const LOJAS_SQL = `
-  SELECT CodigoEmpresa AS codigoEmpresa, NomeFilial AS nome
-  FROM Config
-  WHERE NomeFilial IS NOT NULL AND LTRIM(RTRIM(NomeFilial)) <> ''
-  ORDER BY CodigoEmpresa
-`;
-
-interface LojaOpcao {
-  codigo: number;
-  nome: string;
-}
-type LinhaLoja = { codigoEmpresa: number; nome: string | null };
-const toLoja = (r: LinhaLoja): LojaOpcao => ({ codigo: Number(r.codigoEmpresa), nome: (r.nome || "").trim() });
 
 type LinhaErp = { codigoColaborador: number; nome: string | null; ativo: boolean | number | null; codigoEmpresa: number | null };
 const toColaborador = (r: LinhaErp): ColaboradorErp => ({
@@ -83,12 +62,12 @@ const toColaborador = (r: LinhaErp): ColaboradorErp => ({
 });
 
 /** Campos do vínculo em cada linha da tabela; um vínculo desfeito é Pendente, mas mantém a `version`. */
-function camposDoVinculo(vinculo: VinculoColaborador | null, usuarios: UsuarioResumo[]) {
+function camposDoVinculo(vinculo: VinculoColaborador | null, usuarios: ReadonlyMap<string, UsuarioResumo>) {
   const usuarioId = vinculo?.usuarioId ?? null;
   return {
     confirmado: vinculo !== null && !vinculoDesfeito(vinculo),
     usuarioId,
-    usuario: usuarios.find((u) => u.id === usuarioId) ?? null,
+    usuario: usuarioId === null ? null : (usuarios.get(usuarioId) ?? null),
     lojas: vinculo?.lojas ?? [],
     version: vinculo?.version ?? 0,
     // Só a listagem calcula sugestões; ao desfazer um vínculo a linha fica vazia até recarregar.
@@ -103,12 +82,12 @@ interface Aviso {
 }
 
 /** O que mudou fora da tela desde a gravação do vínculo; o vínculo é mantido e a pessoa decide o que fazer. */
-function avisosDoVinculo(vinculo: VinculoColaborador | null, colaborador: ColaboradorErp | undefined, usuarios: UsuarioResumo[], lojas: LojaOpcao[]): Aviso[] {
+function avisosDoVinculo(vinculo: VinculoColaborador | null, colaborador: ColaboradorErp | undefined, usuarios: ReadonlyMap<string, UsuarioResumo>, lojas: LojaOpcao[]): Aviso[] {
   if (!vinculo || vinculoDesfeito(vinculo)) return [];
   const avisos: Aviso[] = [];
   if (!colaborador) avisos.push({ tipo: "colaborador_nao_encontrado", mensagem: "Não encontrado no ERP" });
   else if (!colaborador.ativo) avisos.push({ tipo: "inativo_no_erp", mensagem: "Inativo no ERP" });
-  const usuario = usuarios.find((u) => u.id === vinculo.usuarioId);
+  const usuario = vinculo.usuarioId === null ? undefined : usuarios.get(vinculo.usuarioId);
   if (usuario && usuario.status !== "active") avisos.push({ tipo: "usuario_desativado", mensagem: "Usuário desativado" });
   for (const codigo of vinculo.lojas) {
     if (!lojas.some((l) => l.codigo === codigo)) avisos.push({ tipo: "loja_nao_encontrada", mensagem: `Loja não encontrada (cód. ${codigo})` });
@@ -150,12 +129,13 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     try {
       const [linhas, linhasLojas] = await Promise.all([client.query<LinhaErp>(`${COLABORADORES_SQL} ORDER BY c.Nome`), client.query<LinhaLoja>(LOJAS_SQL)]);
       colaboradores = linhas.map(toColaborador);
-      lojas = linhasLojas.map(toLoja);
+      lojas = linhasLojas.map(paraLoja);
     } catch {
       return c.json({ error: ERP_INDISPONIVEL }, 503);
     }
 
-    const [vinculos, usuarios] = await Promise.all([store.list(), users.list()]);
+    const [vinculos, listaUsuarios] = await Promise.all([store.list(), users.list()]);
+    const usuarios = new Map(listaUsuarios.map((u) => [u.id, u]));
     const porCodigo = new Map(vinculos.map((v) => [v.codigoColaborador, v]));
     const estaConfirmado = (codigo: number) => {
       const vinculo = porCodigo.get(codigo);
@@ -165,7 +145,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     const vinculados = new Set(vinculos.map((v) => v.usuarioId));
     // Só os ativos disputam a sugestão: um ex-funcionário homônimo não pode tirá-la de quem está ativo.
     const pendentes = colaboradores.filter((col) => col.ativo && !estaConfirmado(col.codigoColaborador));
-    const usuarioSugerido = sugerirUsuarios(pendentes, usuarios.filter((u) => u.status === "active" && !vinculados.has(u.id)));
+    const usuarioSugerido = sugerirUsuarios(pendentes, listaUsuarios.filter((u) => u.status === "active" && !vinculados.has(u.id)));
     const linhasDoErp = colaboradores.map((col) => {
       const { codigoLoja, ...dados } = col;
       const vinculo = porCodigo.get(col.codigoColaborador) ?? null;
@@ -191,7 +171,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
       colaboradores: todas,
       // A criação usa as rotas do IAM, que exigem as duas Permissions.
       podeCriarUsuario: permissions.has(permissoes, "system:users:create") && permissions.has(permissoes, "system:roles:read"),
-      usuarios: usuarios
+      usuarios: listaUsuarios
         .filter((u) => u.status === "active")
         .map(({ id, fullname, username }) => ({ id, fullname, username }))
         .sort((a, b) => a.fullname.localeCompare(b.fullname, "pt-BR")),
@@ -204,12 +184,11 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     const user = c.get("user");
     if (!permissions.has(user?.permissions, update.key)) return c.json({ error: update.deniedMessage }, 403);
 
-    const codigo = Codigo.safeParse(c.req.param("codigo"));
-    const body = Gravacao.safeParse(await c.req.json().catch(() => null));
-    if (!codigo.success || !body.success) return c.json({ error: "Dados do vínculo inválidos." }, 400);
-    const codigoColaborador = codigo.data;
-    const { usuarioId, version } = body.data;
-    const lojas = [...new Set(body.data.lojas)].sort((a, b) => a - b);
+    const corpo = await c.req.json().catch(() => null);
+    const requisicao = Requisicao.safeParse({ ...(typeof corpo === "object" ? corpo : null), codigo: c.req.param("codigo") });
+    if (!requisicao.success) return recusaDeValidacao(c, requisicao.error);
+    const { codigo: codigoColaborador, usuarioId, version } = requisicao.data;
+    const lojas = [...new Set(requisicao.data.lojas)].sort((a, b) => a - b);
     const vazio = usuarioId === null && lojas.length === 0;
 
     const client = erpClient();
@@ -222,7 +201,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
         client.query<LinhaLoja>(LOJAS_SQL),
       ]);
       colaborador = rows[0] && toColaborador(rows[0]);
-      lojasErp = linhasLojas.map(toLoja);
+      lojasErp = linhasLojas.map(paraLoja);
     } catch {
       return c.json({ error: ERP_INDISPONIVEL }, 503);
     }
@@ -232,7 +211,8 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     if (!colaborador && (!atual || vinculoDesfeito(atual) || !vazio)) return c.json({ error: "Colaborador não encontrado no ERP." }, 404);
     if ((atual?.version ?? 0) !== version) return c.json(VERSAO_DESATUALIZADA, 409);
 
-    const usuarios = await users.list();
+    const listaUsuarios = await users.list();
+    const usuarios = new Map(listaUsuarios.map((u) => [u.id, u]));
     const responder = (vinculo: VinculoColaborador | null) => c.json({ codigoColaborador, ...camposDoVinculo(vinculo, usuarios), avisos: avisosDoVinculo(vinculo, colaborador, usuarios, lojasErp) });
 
     // Sem mudança não é alteração: nada a gravar nem a auditar.
@@ -240,7 +220,7 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
     if ((atual?.usuarioId ?? null) === usuarioId && mesmasLojas(lojas, lojasAnteriores)) return responder(atual);
 
     // Um Usuário já gravado pode ter sido desativado e continua aceito; só um novo precisa estar ativo.
-    const novo = usuarios.find((u) => u.id === usuarioId);
+    const novo = usuarioId === null ? undefined : usuarios.get(usuarioId);
     if (usuarioId !== null && usuarioId !== atual?.usuarioId && novo?.status !== "active") return c.json({ error: "Usuário não encontrado ou inativo." }, 400);
 
     // Uma Loja já gravada pode ter saído do ERP e continua aceita; só uma nova precisa existir lá.
@@ -257,12 +237,12 @@ export function registerColaboradoresRoutes({ routes, permissions, auth, erpClie
       throw err;
     }
 
-    const auditado = (id: string | null | undefined) => (id ? { id, fullname: usuarios.find((u) => u.id === id)?.fullname ?? null } : null);
+    const auditado = (id: string | null | undefined) => (id ? { id, fullname: usuarios.get(id)?.fullname ?? null } : null);
     const lojasAuditadas = (codigos: number[]) => codigos.map((codigo) => ({ codigo, nome: lojasErp.find((l) => l.codigo === codigo)?.nome ?? null }));
     await audit.record({
       plugin: VINCULO_PLUGIN,
       action: VINCULO_ACTION,
-      actor: { id: user?.sub ?? "", name: user?.fullname ?? "" },
+      actor: ator(c),
       target: { type: VINCULO_TARGET, id: String(codigoColaborador) },
       attributes: {
         codigoColaborador,

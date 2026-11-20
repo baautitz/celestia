@@ -1,3 +1,7 @@
+import type { Context } from "hono";
+import { z } from "zod";
+import { recusaDeValidacao } from "./metas-comum.js";
+import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { VinculoColaborador } from "./vinculo-store.js";
 
 /** Escopo de um relatório de Plugin: cada Visualização tem a própria Permission e a própria query. */
@@ -49,4 +53,23 @@ export function visualizacoesDoUsuario(
     return true;
   });
   return { disponiveis, lojas, codigoColaborador };
+}
+
+const QueryVisualizacao = z.object({ visualizacao: z.enum(VISUALIZACOES, { error: "Parâmetro 'visualizacao' deve ser geral, loja ou individual." }).optional() });
+
+/**
+ * Visualização pedida na query (a mais ampla disponível, sem ela): 400 se não existe, 403 se o Usuário não tem nenhuma
+ * ou não tem a pedida; nunca cai para outra (fail-closed). `permissoes` diz a Permission de cada Visualização.
+ */
+export function visualizacaoPedida(c: Context, disponiveis: readonly Visualizacao[], permissoes: Readonly<Record<Visualizacao, string>>) {
+  const parsed = QueryVisualizacao.safeParse({ visualizacao: c.req.query("visualizacao") });
+  if (!parsed.success) return { recusa: recusaDeValidacao(c, parsed.error) } as const;
+  const [primeira] = disponiveis;
+  if (!primeira) return { recusa: c.json({ error: SEM_VISUALIZACAO }, 403) } as const;
+  const visualizacao = parsed.data.visualizacao ?? primeira;
+  if (!disponiveis.includes(visualizacao)) {
+    const item = INOVAFARMA_PERMISSIONS.items.find((i) => i.key === permissoes[visualizacao]);
+    return { recusa: c.json({ error: item?.deniedMessage ?? SEM_VISUALIZACAO }, 403) } as const;
+  }
+  return { visualizacao } as const;
 }

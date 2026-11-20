@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from "hono";
+import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { APURACAO_ACTIONS, APURACAO_PLUGIN, APURACAO_TARGET, type AtributosCongelamento } from "./apuracao-audit.js";
 import { apurarParticipante, totaisPorColaborador, type DadosColaborador } from "./apuracao.js";
@@ -7,7 +8,7 @@ import type { AvaliacaoStore } from "./avaliacoes-store.js";
 import { desempenhoSql } from "./desempenho-vendas.js";
 import type { IndicadorId } from "./indicadores.js";
 import { listaSql, type LinhaLista } from "./lista-produtos.js";
-import { ator, ERP_INDISPONIVEL, erroDoErp, PERIODO_NAO_ENCONTRADO, SEM_CONEXAO, vinculoDoUsuario, type AuthContext } from "./metas-comum.js";
+import { ator, CodigoEmTexto, ERP_INDISPONIVEL, erroDoErp, PERIODO_NAO_ENCONTRADO, recusaDeValidacao, SEM_CONEXAO, vinculoDoUsuario, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import type { MetaStore } from "./metas-store.js";
 import { metasDoPeriodo, metasVisiveis } from "./metas-do-periodo.js";
 import type { UsersService } from "./colaboradores-routes.js";
@@ -20,7 +21,7 @@ import type { BaixasCongeladasStore } from "./baixas-congeladas-store.js";
 import type { CorrecaoBaixaStore } from "./correcoes-baixa-store.js";
 import { descreverPremio, temLista, type TipoMeta } from "./tipos-meta.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
-import type { ErpQueryClient } from "./server.js";
+import { atorDoEvento, pendentesDoFechamento, periodoDoPayload } from "./pendentes-do-fechamento.js";
 import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
 import type { AuditService } from "./vinculo-audit.js";
 
@@ -29,7 +30,7 @@ export interface AcompanhamentoRoutesDeps {
   permissions: Pick<ModuleContext["permissions"], "has">;
   auth: MiddlewareHandler;
   events: Pick<ModuleContext["events"], "before" | "after">;
-  erpClient: () => ErpQueryClient | undefined;
+  erpClient: () => ErpQuery | undefined;
   tipos: TipoMetaStore;
   metas: MetaStore;
   vinculos: VinculoStore;
@@ -46,7 +47,12 @@ export interface AcompanhamentoRoutesDeps {
   users: UsersService;
 }
 
-export type VisualizacaoMetas = "geral" | "loja";
+/** Visualizações do Acompanhamento: o Geral e o por Loja (não há Individual: ele é a aba Minhas Metas). */
+const VISUALIZACOES_METAS = ["geral", "loja"] as const;
+const ConsultaAcompanhamento = z.object({
+  visualizacao: z.enum(VISUALIZACOES_METAS, { error: "Parâmetro 'visualizacao' deve ser geral ou loja." }).optional(),
+  codigoEmpresa: CodigoEmTexto.optional(),
+});
 
 const LOJA_FORA = "A Loja informada não está entre as Lojas do seu Colaborador.";
 const FECHAMENTO_SEM_APURACAO = "Não foi possível apurar as Metas do Período no ERP InovaFarma: o Período não pode ser fechado agora. Tente novamente em instantes.";
@@ -212,11 +218,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     return { periodoId: periodo.id, metas: apuradas, apuradoEm: new Date().toISOString() };
   }
 
-  const periodoDoEvento = async (payload: object) => (await periods.list()).find((p) => p.id === (payload as { periodId?: string }).periodId);
-  const atorDoEvento = async (payload: object) => {
-    const id = (payload as { actorId?: string }).actorId ?? "";
-    return { id, name: (await users.list()).find((u) => u.id === id)?.fullname ?? "" };
-  };
+  const periodoDoEvento = async (payload: object) => (await periods.list()).find((p) => p.id === periodoDoPayload(payload));
 
   /** Grava a Apuração de um Período fechado e registra no Audit Log: é o que fica valendo para os Prêmios. */
   async function congelar(apuracao: ApuracaoPeriodo, periodo: PeriodoResumo, origem: AtributosCongelamento["origem"], actor: { id: string; name: string }) {
@@ -238,8 +240,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
    * `before` apurou. Limitada: um fechamento recusado depois do `before` (ex.: conflito de versão) deixa a entrada,
    * que o próximo fechamento do mesmo Período substitui.
    */
-  const apuradasNoFechamento = new Map<string, ApuracaoPeriodo>();
-  const MAX_PENDENTES = 100;
+  const apuradasNoFechamento = pendentesDoFechamento<ApuracaoPeriodo>();
   events.before(
     "closing_period.close",
     async (ctx) => {
@@ -247,9 +248,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
       if (!periodo) return;
       try {
         const apuracao = await apurar({ ...periodo, status: "closed" });
-        apuradasNoFechamento.delete(periodo.id);
-        if (apuradasNoFechamento.size >= MAX_PENDENTES) apuradasNoFechamento.delete(apuradasNoFechamento.keys().next().value as string);
-        apuradasNoFechamento.set(periodo.id, apuracao);
+        apuradasNoFechamento.guardar(periodo.id, apuracao);
       } catch {
         ctx.cancel(FECHAMENTO_SEM_APURACAO);
       }
@@ -260,10 +259,9 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     "closing_period.close",
     async (payload) => {
       const periodo = await periodoDoEvento(payload);
-      const apuracao = periodo && apuradasNoFechamento.get(periodo.id);
+      const apuracao = periodo && apuradasNoFechamento.retirar(periodo.id);
       if (!periodo || !apuracao) return;
-      apuradasNoFechamento.delete(periodo.id);
-      await congelar(apuracao, periodo, "fechamento", await atorDoEvento(payload));
+      await congelar(apuracao, periodo, "fechamento", await atorDoEvento(users, payload));
     },
     { module: "inovafarma" },
   );
@@ -276,7 +274,7 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
       await audit.record({
         plugin: APURACAO_PLUGIN,
         action: APURACAO_ACTIONS.descartar,
-        actor: await atorDoEvento(payload),
+        actor: await atorDoEvento(users, payload),
         target: { type: APURACAO_TARGET, id: periodo.id },
         attributes: { periodo: periodo.name },
       });
@@ -342,22 +340,24 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
   });
 
   routes.get("/metas/acompanhamento", auth, async (c: AuthContext) => {
+    const consulta = ConsultaAcompanhamento.safeParse({ visualizacao: c.req.query("visualizacao"), codigoEmpresa: c.req.query("codigoEmpresa") || undefined });
+    if (!consulta.success) return recusaDeValidacao(c, consulta.error);
     const acesso = await visualizacoesDasMetas(c.get("user"), permissions.has, vinculos);
     if (!acesso.geral && !acesso.lojas) return c.json({ error: geralRef.deniedMessage }, 403);
-    const visualizacao = (c.req.query("visualizacao") ?? (acesso.geral ? "geral" : "loja")) as VisualizacaoMetas;
+    const visualizacao = consulta.data.visualizacao ?? (acesso.geral ? "geral" : "loja");
     if (visualizacao === "geral" && !acesso.geral) return c.json({ error: geralRef.deniedMessage }, 403);
-    if (visualizacao === "loja" && !acesso.lojas) return c.json({ error: lojaRef.deniedMessage }, 403);
-    if (visualizacao !== "geral" && visualizacao !== "loja") return c.json({ error: "Parâmetro 'visualizacao' deve ser geral ou loja." }, 400);
+    const loja = consulta.data.codigoEmpresa ?? null;
+    // Geral sem Loja: todos. Loja sem Loja escolhida: as Lojas do Vínculo do Usuário.
+    let lojasDoVinculo: number[] | null = null;
+    if (visualizacao === "loja") {
+      if (!acesso.lojas) return c.json({ error: lojaRef.deniedMessage }, 403);
+      if (loja !== null && !acesso.lojas.includes(loja)) return c.json({ error: LOJA_FORA }, 403);
+      lojasDoVinculo = acesso.lojas;
+    }
+    const filtro = loja !== null ? [loja] : lojasDoVinculo;
 
     const periodo = (await periods.list()).find((p) => p.id === c.req.query("periodoId"));
     if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
-    const pedida = c.req.query("codigoEmpresa");
-    const loja = pedida && Number.isInteger(Number(pedida)) ? Number(pedida) : null;
-    // Na Exibição por Loja o acesso por Loja foi checado acima: `lojas` nunca é nulo aqui.
-    const lojasDoUsuario = acesso.lojas ?? [];
-    if (visualizacao === "loja" && loja !== null && !lojasDoUsuario.includes(loja)) return c.json({ error: LOJA_FORA }, 403);
-    // Geral sem Loja: todos. Loja sem Loja escolhida: as Lojas do Vínculo do Usuário.
-    const filtro = loja !== null ? [loja] : visualizacao === "loja" ? lojasDoUsuario : null;
 
     let resultado: Awaited<ReturnType<typeof apuracaoDe>>;
     try {

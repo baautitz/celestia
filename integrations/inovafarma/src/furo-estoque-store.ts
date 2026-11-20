@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { mesmoNome, NomeDuplicadoError } from "./erros-de-store.js";
 
 /** Motivo do Ajuste: item da lista que classifica as Justificativas. Desativado, sai das opções mas segue nas Justificativas. */
 export interface MotivoAjuste {
@@ -31,8 +32,9 @@ export type EdicaoMotivo = Pick<MotivoAjuste, "nome" | "ativo">;
 
 export interface FuroEstoqueStore {
   listarMotivos(): Promise<MotivoAjuste[]>;
+  /** Lança `NomeDuplicadoError` se já há um Motivo com o nome (sem diferenciar maiúsculas). */
   criarMotivo(nome: string): Promise<MotivoAjuste>;
-  /** Compare-and-set pela `version`; null se o Motivo mudou ou sumiu. */
+  /** Compare-and-set pela `version`; null se o Motivo mudou ou sumiu. Lança `NomeDuplicadoError` como `criarMotivo`. */
   atualizarMotivo(id: string, valores: EdicaoMotivo, expectedVersion: number): Promise<MotivoAjuste | null>;
   listarJustificativas(periodoId: string): Promise<JustificativaAjuste[]>;
   justificativa(id: string): Promise<JustificativaAjuste | null>;
@@ -67,6 +69,7 @@ export class MemoryFuroEstoqueStore implements FuroEstoqueStore {
   }
 
   async criarMotivo(nome: string): Promise<MotivoAjuste> {
+    this.garantirNomeUnico(nome);
     const agora = new Date().toISOString();
     const motivo = { id: novoIdMotivo(), nome, ativo: true, version: 1, criadoEm: agora, atualizadoEm: agora };
     this.motivos.set(motivo.id, motivo);
@@ -76,9 +79,14 @@ export class MemoryFuroEstoqueStore implements FuroEstoqueStore {
   async atualizarMotivo(id: string, valores: EdicaoMotivo, expectedVersion: number): Promise<MotivoAjuste | null> {
     const atual = this.motivos.get(id);
     if (!atual || atual.version !== expectedVersion) return null;
+    this.garantirNomeUnico(valores.nome, id);
     const atualizado = { ...atual, ...valores, version: atual.version + 1, atualizadoEm: new Date().toISOString() };
     this.motivos.set(id, atualizado);
     return atualizado;
+  }
+
+  private garantirNomeUnico(nome: string, id?: string): void {
+    if ([...this.motivos.values()].some((m) => m.id !== id && mesmoNome(m.nome, nome))) throw new NomeDuplicadoError();
   }
 
   async listarJustificativas(periodoId: string): Promise<JustificativaAjuste[]> {
