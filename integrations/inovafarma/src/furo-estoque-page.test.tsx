@@ -41,6 +41,16 @@ afterEach(cleanup);
 const renderizar = () => render(<UiProvider><FuroEstoquePage /></UiProvider>, { wrapper: MemoryRouter });
 
 describe("Furo de Estoque", () => {
+  it("mostra o erro do contexto e carrega ao tentar novamente", async () => {
+    apiFetch.mockRejectedValueOnce(new Error("Servidor fora do ar"));
+    renderizar();
+    expect(await screen.findByText("Servidor fora do ar")).toBeDefined();
+    expect(screen.getByText("Não foi possível carregar o Furo de Estoque")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByRole("button", { name: "Justificar Ajuste 100" })).toBeDefined();
+    expect(screen.queryByText("Servidor fora do ar")).toBeNull();
+  });
+
   it("abre no Furo e soma só as saídas sem justificativa", async () => {
     renderizar();
     expect(await screen.findByRole("button", { name: "Justificar Ajuste 100" }, { timeout: 5000 })).toBeTruthy();

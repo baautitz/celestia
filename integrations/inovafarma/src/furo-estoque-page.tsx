@@ -15,9 +15,9 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatCurrency, formatNumber } from "@platform/ui/lib/format";
 import { BASE, JustificativaWindow, MotivoWindow, VerJustificativaWindow, type Justificativa, type Motivo } from "./furo-estoque-window";
-import type { Periodo } from "./periodos";
-import { periodoInicial, periodoLabel } from "./periodos";
+import { type Periodo, periodoInicial, periodoLabel } from "./periodos";
 import { useLatestFetch } from "./use-latest-fetch";
+import { FalhaAoCarregar, useContexto } from "./contexto";
 
 const TODAS = "todas";
 
@@ -396,18 +396,10 @@ function Motivos({ motivos, recarregar }: { motivos: Motivo[]; recarregar: () =>
 
 /** Tela Furo de Estoque: Ajustes de Estoque do InovaFarma por Período de Fechamento, com as Justificativas. */
 export function FuroEstoquePage() {
-  const { feedback } = useUi();
-  const [contexto, setContexto] = useState<Contexto | null>(null);
+  const { contexto, falha, carregar } = useContexto<Contexto>(`${BASE}/contexto`, "Erro ao carregar o Furo de Estoque.");
   const [aba, setAba] = useTabParam<"ajustes" | "motivos">(contexto ? ["ajustes", contexto.podeGerenciarMotivos && "motivos"] : []);
 
-  const carregar = useCallback(() => {
-    apiFetch<Contexto>(`${BASE}/contexto`)
-      .then(setContexto)
-      .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar o Furo de Estoque.")));
-  }, [feedback]);
-  useEffect(carregar, [carregar]);
-
-  if (!contexto) return null;
+  if (!contexto) return falha ? <FalhaAoCarregar titulo="Não foi possível carregar o Furo de Estoque" descricao={falha} onTentarNovamente={carregar} /> : null;
   return (
     <Stack gap="section">
       {contexto.podeGerenciarMotivos && (

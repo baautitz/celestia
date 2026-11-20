@@ -20,6 +20,7 @@ import { EXIBICAO_LABEL, indicadorDoTipo } from "./tipos-meta";
 import { BASE, TipoMetaWindow, type TipoMetaComPremio, type TipoMetaSalvo } from "./tipo-meta-window";
 import { API } from "./inovafarma-api";
 import { useLatestFetch } from "./use-latest-fetch";
+import { FalhaAoCarregar, useContexto } from "./contexto";
 
 /** Aba Tipos de Meta: cadastro dos Tipos com a prévia do Prêmio. */
 function TiposDeMeta() {
@@ -136,19 +137,13 @@ type Aba = keyof Contexto["abas"];
 
 /** Página Metas: construtor de Metas do InovaFarma, com as abas que a Permission libera. */
 export function MetasPage() {
-  const { feedback } = useUi();
-  const [contexto, setContexto] = useState<Contexto | null>(null);
+  const { contexto, falha, carregar } = useContexto<Contexto>(`${API}/metas/contexto`, "Erro ao abrir as Metas.");
   const [aba, setAba] = useTabParam<Aba>(
     contexto ? [contexto.abas.tipos && "tipos", contexto.abas.montar && "montar", contexto.abas.acompanhamento && "acompanhamento", contexto.abas.minhas && "minhas"] : [],
   );
 
-  useEffect(() => {
-    apiFetch<Contexto>(`${API}/metas/contexto`)
-      .then(setContexto)
-      .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao abrir as Metas.")));
-  }, [feedback]);
-
-  if (!contexto || !aba) return null;
+  if (!contexto) return falha ? <FalhaAoCarregar titulo="Não foi possível abrir as Metas" descricao={falha} onTentarNovamente={carregar} /> : null;
+  if (!aba) return null;
   return (
     <Stack gap="section">
       <Tabs value={aba} onValueChange={setAba}>

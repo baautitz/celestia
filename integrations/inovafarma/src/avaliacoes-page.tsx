@@ -13,10 +13,10 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { AvaliacaoWindow, type Avaliacao, type LojaOpcao } from "./avaliacao-window";
-import type { Periodo } from "./periodos";
 import { API } from "./inovafarma-api";
-import { periodoInicial, periodoLabel } from "./periodos";
+import { type Periodo, periodoInicial, periodoLabel } from "./periodos";
 import { useLatestFetch } from "./use-latest-fetch";
+import { FalhaAoCarregar, useContexto } from "./contexto";
 
 const BASE = `${API}/avaliacoes`;
 const TODAS = "todas";
@@ -303,17 +303,11 @@ function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
 
 /** Tela Avaliações: o Colaborador vê as que recebeu; o gestor lança e gerencia as da sua Loja. */
 export function AvaliacoesPage() {
-  const { feedback } = useUi();
-  const [contexto, setContexto] = useState<Contexto | null>(null);
+  const { contexto, falha, carregar } = useContexto<Contexto>(`${BASE}/contexto`, "Erro ao carregar as Avaliações.");
   const [aba, setAba] = useTabParam<"minhas" | "loja">(contexto ? [contexto.podeVer && "minhas", contexto.podeGerenciar && "loja"] : []);
 
-  useEffect(() => {
-    apiFetch<Contexto>(`${BASE}/contexto`)
-      .then(setContexto)
-      .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar as Avaliações.")));
-  }, [feedback]);
-
-  if (!contexto || !aba) return null;
+  if (!contexto) return falha ? <FalhaAoCarregar titulo="Não foi possível carregar as Avaliações" descricao={falha} onTentarNovamente={carregar} /> : null;
+  if (!aba) return null;
   return (
     <Stack gap="section">
       <Tabs value={aba} onValueChange={setAba}>
