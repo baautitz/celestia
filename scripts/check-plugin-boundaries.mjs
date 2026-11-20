@@ -1,8 +1,8 @@
-import ts from "@typescript/typescript6"
 import { readFileSync } from "node:fs"
 import { glob } from "node:fs/promises"
 import { dirname, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
+import { lineOf, parse, stringValue, walk } from "./ast.mjs"
 
 // Um Plugin (integrations/<nome>) só pode importar o Core (@platform/core), a UI (@platform/ui),
 // bibliotecas de terceiros e arquivos da própria pasta. Servidor e web ficam de fora.
@@ -15,7 +15,8 @@ for await (const rel of glob("integrations/*/**/*.{ts,tsx,mjs,js}", { cwd: root 
   const file = rel.split(sep).join("/")
   if (file.includes("/node_modules/") || file.includes("/dist/")) continue
   const pluginDir = resolve(root, file.split("/").slice(0, 2).join("/"))
-  const source = ts.createSourceFile(file, readFileSync(resolve(root, file), "utf8"), ts.ScriptTarget.Latest, true)
+  const code = readFileSync(resolve(root, file), "utf8")
+  const program = parse(file, code)
   const check = (node, name) => {
     let problem
     if (name.startsWith(".")) {
@@ -27,24 +28,17 @@ for await (const rel of glob("integrations/*/**/*.{ts,tsx,mjs,js}", { cwd: root 
       problem = `import de ${name} (alias do web)`
     }
     if (problem) {
-      const { line } = source.getLineAndCharacterOfPosition(node.getStart(source))
-      violations.push(`${file}:${line + 1} - ${problem}`)
+      violations.push(`${file}:${lineOf(code, node)} - ${problem}`)
     }
   }
-  const visit = (node) => {
-    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
-      check(node, node.moduleSpecifier.text)
-    } else if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments[0] &&
-      ts.isStringLiteralLike(node.arguments[0])
-    ) {
-      check(node, node.arguments[0].text)
+  walk(program, (node) => {
+    if (node.type === "ImportDeclaration" || node.type === "ExportAllDeclaration" || node.type === "ExportNamedDeclaration") {
+      if (node.source && typeof node.source.value === "string") check(node, node.source.value)
+    } else if (node.type === "ImportExpression") {
+      const name = stringValue(node.source)
+      if (name !== undefined) check(node, name)
     }
-    ts.forEachChild(node, visit)
-  }
-  visit(source)
+  })
 }
 
 if (violations.length) {
