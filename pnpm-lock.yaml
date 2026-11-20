@@ -171,6 +171,81 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@base-ui/react':
+      specifier: ^1.9.0
+      version: 1.9.0
+    '@hono/node-server':
+      specifier: ^2.0.0
+      version: 2.1.9
+    '@hono/zod-validator':
+      specifier: ^0.9.1
+      version: 0.9.1
+    '@hookform/resolvers':
+      specifier: ^7.0.0
+      version: 7.0.7
+    '@testing-library/react':
+      specifier: ^16.3.3
+      version: 16.3.3
+    '@types/node':
+      specifier: ^26.0.0
+      version: 26.6.6
+    '@types/pg':
+      specifier: ^8.23.1
+      version: 8.23.1
+    '@types/react':
+      specifier: ^19.3.0
+      version: 19.3.0
+    '@types/react-dom':
+      specifier: ^19.3.0
+      version: 19.3.0
+    drizzle-kit:
+      specifier: 1.0.0-rc.4
+      version: 1.0.0-rc.4
+    drizzle-orm:
+      specifier: 1.0.0-rc.4
+      version: 1.0.0-rc.4
+    hono:
+      specifier: ^4.13.19
+      version: 4.13.19
+    jsdom:
+      specifier: ^31.0.0
+      version: 31.0.1
+    lucide-react:
+      specifier: ^1.75.0
+      version: 1.75.0
+    pg:
+      specifier: ^8.23.1
+      version: 8.23.1
+    pino:
+      specifier: ^10.4.0
+      version: 10.4.0
+    react:
+      specifier: ^19.3.1
+      version: 19.3.1
+    react-dom:
+      specifier: ^19.3.1
+      version: 19.3.1
+    react-hook-form:
+      specifier: ^7.92.0
+      version: 7.92.0
+    react-router-dom:
+      specifier: ^7.0.0
+      version: 7.18.6
+    tsx:
+      specifier: ^4.23.15
+      version: 4.23.15
+    typescript:
+      specifier: ^7.0.2
+      version: 7.0.2
+    vitest:
+      specifier: ^5.1.1
+      version: 5.1.1
+    zod:
+      specifier: ^4.6.7
+      version: 4.6.7
+
 importers:
 
   .:
@@ -182,31 +257,31 @@ importers:
         specifier: ^10.4.2
         version: 10.4.2
       '@testing-library/react':
-        specifier: ^16.3.3
+        specifier: 'catalog:'
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@types/node':
-        specifier: ^26.0.0
+        specifier: 'catalog:'
         version: 26.6.6
       jsdom:
-        specifier: ^31.0.0
+        specifier: 'catalog:'
         version: 31.0.1(@noble/hashes@2.4.0)
       oxc-parser:
         specifier: ^0.159.0
         version: 0.159.0
       tsx:
-        specifier: ^4.23.15
+        specifier: 'catalog:'
         version: 4.23.15
       typescript:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
       vitest:
-        specifier: ^5.1.1
+        specifier: 'catalog:'
         version: 5.1.1(@types/node@26.6.6)(jsdom@31.0.1(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   integrations/inovafarma:
     dependencies:
       '@hookform/resolvers':
-        specifier: ^7.0.0
+        specifier: 'catalog:'
         version: 7.0.7(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.92.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@platform/core':
         specifier: workspace:*
@@ -215,63 +290,62 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       drizzle-orm:
-        specifier: 1.0.0-rc.4
+        specifier: 'catalog:'
         version: 1.0.0-rc.4(@types/mssql@12.3.0)(@types/pg@8.23.1)(mssql@12.7.15)(pg@8.23.1)(zod@4.6.7)
       hono:
-        specifier: ^4.13.19
+        specifier: 'catalog:'
         version: 4.13.19
       zod:
-        specifier: ^4.6.7
+        specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
       '@testing-library/react':
-        specifier: ^16.3.3
+        specifier: 'catalog:'
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@types/node':
-        specifier: ^26.0.0
+        specifier: 'catalog:'
         version: 26.6.6
       '@types/pg':
-        specifier: ^8.23.1
+        specifier: 'catalog:'
         version: 8.23.1
       '@types/react':
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0
       lucide-react:
-        specifier: ^1.75.0
+        specifier: 'catalog:'
         version: 1.75.0(@types/react@19.3.0)(react@19.3.1)
       react:
-        specifier: ^19.3.1
+        specifier: 'catalog:'
         version: 19.3.1
       react-dom:
-        specifier: ^19.3.1
+        specifier: 'catalog:'
         version: 19.3.1(react@19.3.1)
       react-hook-form:
-        specifier: ^7.92.0
+        specifier: 'catalog:'
         version: 7.92.0(@types/react@19.3.0)(react@19.3.1)
       react-router-dom:
-        specifier: ^7.0.0
+        specifier: 'catalog:'
         version: 7.18.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       typescript:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
       vitest:
-        specifier: ^5.1.1
+        specifier: 'catalog:'
         version: 5.1.1(@types/node@26.6.6)(jsdom@31.0.1(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/core:
-    dependencies:
-      hono:
-        specifier: ^4.13.19
-        version: 4.13.19
     devDependencies:
       drizzle-orm:
-        specifier: 1.0.0-rc.4
+        specifier: 'catalog:'
         version: 1.0.0-rc.4(@types/mssql@12.3.0)(@types/pg@8.23.1)(mssql@12.7.15)(pg@8.23.1)(zod@4.6.7)
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.19
       typescript:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
       vitest:
-        specifier: ^5.1.1
+        specifier: 'catalog:'
         version: 5.1.1(@types/node@26.6.6)(jsdom@31.0.1(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/e2e:
@@ -280,22 +354,22 @@ importers:
         specifier: ^1.65.1
         version: 1.65.1
       '@types/node':
-        specifier: ^26.0.0
+        specifier: 'catalog:'
         version: 26.6.6
       tsx:
-        specifier: ^4.23.15
+        specifier: 'catalog:'
         version: 4.23.15
       zod:
-        specifier: ^4.6.7
+        specifier: 'catalog:'
         version: 4.6.7
 
   packages/server:
     dependencies:
       '@hono/node-server':
-        specifier: ^2.0.0
+        specifier: 'catalog:'
         version: 2.1.9(hono@4.13.19)
       '@hono/zod-validator':
-        specifier: ^0.9.1
+        specifier: 'catalog:'
         version: 0.9.1(hono@4.13.19)(zod@4.6.7)
       '@integrations/inovafarma':
         specifier: workspace:*
@@ -310,41 +384,41 @@ importers:
         specifier: workspace:*
         version: link:../shared
       drizzle-orm:
-        specifier: 1.0.0-rc.4
+        specifier: 'catalog:'
         version: 1.0.0-rc.4(@types/mssql@12.3.0)(@types/pg@8.23.1)(mssql@12.7.15)(pg@8.23.1)(zod@4.6.7)
       hono:
-        specifier: ^4.13.19
+        specifier: 'catalog:'
         version: 4.13.19
       mssql:
         specifier: ^12.7.15
         version: 12.7.15
       pg:
-        specifier: ^8.23.1
+        specifier: 'catalog:'
         version: 8.23.1
       pino:
-        specifier: ^10.0.0
+        specifier: 'catalog:'
         version: 10.4.0
       zod:
-        specifier: ^4.6.7
+        specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
       '@types/mssql':
         specifier: ^12.3.0
         version: 12.3.0
       '@types/pg':
-        specifier: ^8.23.1
+        specifier: 'catalog:'
         version: 8.23.1
       drizzle-kit:
-        specifier: 1.0.0-rc.4
+        specifier: 'catalog:'
         version: 1.0.0-rc.4
       tsx:
-        specifier: ^4.23.15
+        specifier: 'catalog:'
         version: 4.23.15
       typescript:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
       vitest:
-        specifier: ^5.1.1
+        specifier: 'catalog:'
         version: 5.1.1(@types/node@26.6.6)(jsdom@31.0.1(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/shared:
@@ -353,17 +427,17 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.6.7
+        specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
       typescript:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
 
   packages/ui:
     dependencies:
       '@hookform/resolvers':
-        specifier: ^7.0.0
+        specifier: 'catalog:'
         version: 7.0.7(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.92.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@platform/shared':
         specifier: workspace:*
@@ -378,7 +452,7 @@ importers:
         specifier: ^4.1.0
         version: 4.4.0
       lucide-react:
-        specifier: ^1.75.0
+        specifier: 'catalog:'
         version: 1.75.0(@types/react@19.3.0)(react@19.3.1)
       next-themes:
         specifier: ^0.4.4
@@ -387,7 +461,7 @@ importers:
         specifier: ^10.0.2
         version: 10.0.2(@types/react@19.3.0)(react@19.3.1)
       react-hook-form:
-        specifier: ^7.92.0
+        specifier: 'catalog:'
         version: 7.92.0(@types/react@19.3.0)(react@19.3.1)
       react-is:
         specifier: ^19.3.1
@@ -402,38 +476,38 @@ importers:
         specifier: ^3.7.0
         version: 3.7.0
       zod:
-        specifier: ^4.6.7
+        specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
       '@base-ui/react':
-        specifier: ^1.9.0
+        specifier: 'catalog:'
         version: 1.9.0(@date-fns/tz@1.5.0)(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@testing-library/react':
-        specifier: ^16.3.3
+        specifier: 'catalog:'
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@testing-library/user-event':
         specifier: ^14.6.13
         version: 14.6.13(@testing-library/dom@10.4.2)
       '@types/react':
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0
       '@types/react-dom':
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.0)
       jsdom:
-        specifier: ^31.0.0
+        specifier: 'catalog:'
         version: 31.0.1(@noble/hashes@2.4.0)
       react:
-        specifier: ^19.3.1
+        specifier: 'catalog:'
         version: 19.3.1
       react-dom:
-        specifier: ^19.3.1
+        specifier: 'catalog:'
         version: 19.3.1(react@19.3.1)
       react-router-dom:
-        specifier: ^7.0.0
+        specifier: 'catalog:'
         version: 7.18.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       vitest:
-        specifier: ^5.1.1
+        specifier: 'catalog:'
         version: 5.1.1(@types/node@26.6.6)(jsdom@31.0.1(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/web:
@@ -449,43 +523,43 @@ importers:
         version: link:../ui
     devDependencies:
       '@base-ui/react':
-        specifier: ^1.9.0
+        specifier: 'catalog:'
         version: 1.9.0(@date-fns/tz@1.5.0)(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@fontsource-variable/inter':
         specifier: ^5.3.0
         version: 5.3.0
       '@hookform/resolvers':
-        specifier: ^7.0.0
+        specifier: 'catalog:'
         version: 7.0.7(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.92.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@tailwindcss/vite':
         specifier: ^4.3.5
         version: 4.3.5(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
       '@types/node':
-        specifier: ^26.0.0
+        specifier: 'catalog:'
         version: 26.6.6
       '@types/react':
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0
       '@types/react-dom':
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.0)
       '@vitejs/plugin-react':
         specifier: ^6.3.0
         version: 6.3.0(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
       lucide-react:
-        specifier: ^1.75.0
+        specifier: 'catalog:'
         version: 1.75.0(@types/react@19.3.0)(react@19.3.1)
       react:
-        specifier: ^19.3.1
+        specifier: 'catalog:'
         version: 19.3.1
       react-dom:
-        specifier: ^19.3.1
+        specifier: 'catalog:'
         version: 19.3.1(react@19.3.1)
       react-hook-form:
-        specifier: ^7.92.0
+        specifier: 'catalog:'
         version: 7.92.0(@types/react@19.3.0)(react@19.3.1)
       react-router-dom:
-        specifier: ^7.0.0
+        specifier: 'catalog:'
         version: 7.18.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       shadcn:
         specifier: ^4.23.0
@@ -497,22 +571,22 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
       typescript:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
       vite:
         specifier: ^8.3.8
         version: 8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)
       zod:
-        specifier: ^4.6.7
+        specifier: 'catalog:'
         version: 4.6.7
 
   services/ca:
     dependencies:
       '@hono/node-server':
-        specifier: ^2.0.0
+        specifier: 'catalog:'
         version: 2.1.9(hono@4.13.19)
       '@hono/zod-validator':
-        specifier: ^0.9.1
+        specifier: 'catalog:'
         version: 0.9.1(hono@4.13.19)(zod@4.6.7)
       '@platform/core':
         specifier: workspace:*
@@ -524,44 +598,44 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0
       drizzle-orm:
-        specifier: 1.0.0-rc.4
+        specifier: 'catalog:'
         version: 1.0.0-rc.4(@types/mssql@12.3.0)(@types/pg@8.23.1)(mssql@12.7.15)(pg@8.23.1)(zod@4.6.7)
       hono:
-        specifier: ^4.13.19
+        specifier: 'catalog:'
         version: 4.13.19
       node-forge:
         specifier: 1.4.3
         version: 1.4.3
       pg:
-        specifier: ^8.23.1
+        specifier: 'catalog:'
         version: 8.23.1
       pino:
-        specifier: ^10.4.0
+        specifier: 'catalog:'
         version: 10.4.0
       pkijs:
         specifier: ^4.0.1
         version: 4.0.1(asn1js@4.0.0)
       zod:
-        specifier: ^4.6.7
+        specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
       '@types/node-forge':
         specifier: ^1.3.14
         version: 1.3.14
       '@types/pg':
-        specifier: ^8.23.1
+        specifier: 'catalog:'
         version: 8.23.1
       drizzle-kit:
-        specifier: 1.0.0-rc.4
+        specifier: 'catalog:'
         version: 1.0.0-rc.4
       tsx:
-        specifier: ^4.23.15
+        specifier: 'catalog:'
         version: 4.23.15
       typescript:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
       vitest:
-        specifier: ^5.1.1
+        specifier: 'catalog:'
         version: 5.1.1(@types/node@26.6.6)(jsdom@31.0.1(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
 packages:

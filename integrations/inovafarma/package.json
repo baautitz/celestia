@@ -16,30 +16,30 @@
     "lint": "biome lint ."
   },
   "dependencies": {
-    "@hookform/resolvers": "^7.0.0",
+    "@hookform/resolvers": "catalog:",
     "@platform/core": "workspace:*",
     "@platform/ui": "workspace:*",
-    "drizzle-orm": "1.0.0-rc.4",
-    "hono": "^4.13.19",
-    "zod": "^4.6.7"
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@testing-library/react": "^16.3.3",
-    "@types/node": "^26.0.0",
-    "@types/pg": "^8.23.1",
-    "@types/react": "^19.3.0",
-    "lucide-react": "^1.75.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "react-hook-form": "^7.92.0",
-    "react-router-dom": "^7.0.0",
-    "typescript": "^7.0.2",
-    "vitest": "^5.1.1"
+    "@testing-library/react": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@types/react": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-router-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
-    "lucide-react": "^1.75.0",
-    "react": "^19.3.1",
-    "react-hook-form": "^7.92.0",
-    "react-router-dom": "^7.0.0"
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-router-dom": "catalog:"
   }
 }

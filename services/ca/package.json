@@ -15,26 +15,26 @@
     "lint": "biome lint ."
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.0",
-    "@hono/zod-validator": "^0.9.1",
+    "@hono/node-server": "catalog:",
+    "@hono/zod-validator": "catalog:",
     "@platform/core": "workspace:*",
     "@platform/shared": "workspace:*",
     "asn1js": "^4.0.0",
-    "drizzle-orm": "1.0.0-rc.4",
-    "hono": "^4.13.19",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
     "node-forge": "1.4.3",
-    "pg": "^8.23.1",
-    "pino": "^10.4.0",
+    "pg": "catalog:",
+    "pino": "catalog:",
     "pkijs": "^4.0.1",
-    "zod": "^4.6.7"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node-forge": "^1.3.14",
-    "@types/pg": "^8.23.1",
-    "drizzle-kit": "1.0.0-rc.4",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
-    "vitest": "^5.1.1"
+    "@types/pg": "catalog:",
+    "drizzle-kit": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=24"

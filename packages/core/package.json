@@ -47,15 +47,14 @@
     "test": "vitest run",
     "lint": "biome lint ."
   },
-  "dependencies": {
-    "hono": "^4.13.19"
-  },
   "peerDependencies": {
-    "drizzle-orm": "1.0.0-rc.4"
+    "hono": "catalog:",
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
-    "drizzle-orm": "1.0.0-rc.4",
-    "typescript": "^7.0.2",
-    "vitest": "^5.1.1"
+    "hono": "catalog:",
+    "drizzle-orm": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
