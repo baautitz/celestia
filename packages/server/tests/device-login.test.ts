@@ -5,7 +5,7 @@ import { AuditLog } from "../src/audit/audit-log.js";
 import { MemoryAuditStore } from "../src/audit/audit-store.js";
 import { upsertAdminUser } from "../src/cli/create-admin.js";
 import { DEFAULT_ADMIN_ROLE_ID } from "../src/iam/initial-roles.js";
-import { createSeededUserStore, TEST_PASSWORD, withAuth } from "./helpers/fixtures.js";
+import { createSeededUserStore, refreshTokenOf, TEST_PASSWORD, withAuth } from "./helpers/fixtures.js";
 import { createTestCertificateAuthority } from "./helpers/certificate-authority.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -23,8 +23,7 @@ async function setup(options: { auditLog?: AuditLog } = {}) {
   const post = (path: string, body: object, headers: Record<string, string> = {}) =>
     app.request(path, { method: "POST", headers: { ...JSON_HEADERS, ...headers }, body: JSON.stringify(body) });
   const login = (username: string, password = TEST_PASSWORD) => post("/api/auth/login", { username, password });
-  const refresh = (token: string) => post("/api/auth/refresh", { refresh_token: token });
-  const refreshTokenOf = async (res: Response) => ((await res.json()) as { refresh_token: string }).refresh_token;
+  const refresh = (token: string) => app.request("/api/auth/refresh", { method: "POST", headers: { Cookie: `refresh_token=${token}` } });
   /** O cookie do Desafio de Certificado que o login gravou no navegador, pronto para o header `Cookie`. */
   const challengeCookieOf = (res: Response) => ({ Cookie: (res.headers.get("set-cookie") ?? "").split(";")[0] ?? "" });
   /** Senha, depois o navegador apresenta `fingerprint` na CA, depois o callback troca o código no mesmo navegador. */
@@ -34,7 +33,7 @@ async function setup(options: { auditLog?: AuditLog } = {}) {
     const { challengeId, code } = await ca.followVerifyUrl(first.verifyUrl, fingerprint);
     return post("/api/auth/login/certificate", { challengeId, code }, challengeCookieOf(res));
   };
-  return { ca, device, comCert, userStore, auditLog: options.auditLog, app, login, refresh, refreshTokenOf, loginWithCertificate, challengeCookieOf, post };
+  return { ca, device, comCert, userStore, auditLog: options.auditLog, app, login, refresh, loginWithCertificate, challengeCookieOf, post };
 }
 
 describe("login por certificado de Dispositivo", () => {
@@ -104,12 +103,12 @@ describe("login por certificado de Dispositivo", () => {
   });
 
   it("quem tem a opção e apresenta o certificado entra pelo Dispositivo", async () => {
-    const { loginWithCertificate, device, refresh, refreshTokenOf } = await setup();
+    const { loginWithCertificate, device, refresh } = await setup();
     const res = await loginWithCertificate("sem.cert", device.fingerprint);
     expect(res.status).toBe(200);
     const body = (await res.clone().json()) as { user: { deviceId?: string; deviceName?: string } };
     expect(body.user).toMatchObject({ deviceId: device.id, deviceName: "Caixa 1" });
-    const renewed = (await (await refresh(await refreshTokenOf(res))).json()) as { user: { deviceId?: string } };
+    const renewed = (await (await refresh(refreshTokenOf(res))).json()) as { user: { deviceId?: string } };
     expect(renewed.user.deviceId).toBe(device.id);
   });
 
@@ -152,17 +151,17 @@ describe("login por certificado de Dispositivo", () => {
   });
 
   it("renova a sessão sem pedir o certificado de novo enquanto o Dispositivo estiver ativo", async () => {
-    const { loginWithCertificate, refresh, refreshTokenOf, device } = await setup();
-    const token = await refreshTokenOf(await loginWithCertificate("com.cert", device.fingerprint));
+    const { loginWithCertificate, refresh, device } = await setup();
+    const token = refreshTokenOf(await loginWithCertificate("com.cert", device.fingerprint));
 
     const renewed = await refresh(token);
     expect(renewed.status).toBe(200);
-    expect((await refresh(await refreshTokenOf(renewed))).status).toBe(200);
+    expect((await refresh(refreshTokenOf(renewed))).status).toBe(200);
   });
 
   it("recusa a renovação quando o Dispositivo da sessão foi revogado", async () => {
-    const { loginWithCertificate, refresh, refreshTokenOf, ca, device } = await setup();
-    const token = await refreshTokenOf(await loginWithCertificate("com.cert", device.fingerprint));
+    const { loginWithCertificate, refresh, ca, device } = await setup();
+    const token = refreshTokenOf(await loginWithCertificate("com.cert", device.fingerprint));
 
     await ca.client.revokeDevice(device.id, "admin-1");
 
@@ -170,8 +169,8 @@ describe("login por certificado de Dispositivo", () => {
   });
 
   it("recusa a renovação com 503, e não a renova às cegas, quando a CA está fora do ar", async () => {
-    const { loginWithCertificate, refresh, refreshTokenOf, ca, device } = await setup();
-    const token = await refreshTokenOf(await loginWithCertificate("com.cert", device.fingerprint));
+    const { loginWithCertificate, refresh, ca, device } = await setup();
+    const token = refreshTokenOf(await loginWithCertificate("com.cert", device.fingerprint));
 
     ca.setDown(true);
     const res = await refresh(token);
@@ -183,17 +182,17 @@ describe("login por certificado de Dispositivo", () => {
   });
 
   it("não prende a sessão de quem tem a opção a um Dispositivo", async () => {
-    const { login, refresh, refreshTokenOf, ca, device } = await setup();
+    const { login, refresh, ca, device } = await setup();
     ca.setDown(true);
-    const token = await refreshTokenOf(await login("sem.cert"));
+    const token = refreshTokenOf(await login("sem.cert"));
     ca.setDown(false);
     await ca.client.revokeDevice(device.id);
     expect((await refresh(token)).status).toBe(200);
   });
 
   it("quem tem a opção segue renovando sem o Dispositivo revogado, e com a CA fora do ar", async () => {
-    const { loginWithCertificate, refresh, refreshTokenOf, ca, device } = await setup();
-    const token = await refreshTokenOf(await loginWithCertificate("sem.cert", device.fingerprint));
+    const { loginWithCertificate, refresh, ca, device } = await setup();
+    const token = refreshTokenOf(await loginWithCertificate("sem.cert", device.fingerprint));
 
     ca.setDown(true);
     const down = await refresh(token);
@@ -201,7 +200,7 @@ describe("login por certificado de Dispositivo", () => {
     ca.setDown(false);
 
     await ca.client.revokeDevice(device.id);
-    const renewed = await refresh(await refreshTokenOf(down));
+    const renewed = await refresh(refreshTokenOf(down));
     expect(renewed.status).toBe(200);
     expect(((await renewed.json()) as { user: { deviceId?: string } }).user.deviceId).toBeUndefined();
   });
@@ -237,8 +236,8 @@ describe("acesso sem certificado: quem altera e o que acontece com as sessões",
     const user = await userStore.createUser({ fullname: "Sem Cert", username: "sem.cert", password: TEST_PASSWORD, roleId: "role_a", allowWithoutCertificate: true });
     const app = createPlatformApp({ userStore });
     const loginRes = await app.request("/api/auth/login", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ username: "sem.cert", password: TEST_PASSWORD }) });
-    const token = ((await loginRes.json()) as { refresh_token: string }).refresh_token;
-    const refresh = () => app.request("/api/auth/refresh", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ refresh_token: token }) });
+    const token = refreshTokenOf(loginRes);
+    const refresh = () => app.request("/api/auth/refresh", { method: "POST", headers: { Cookie: `refresh_token=${token}` } });
     expect((await refresh()).status).toBe(200);
 
     const res = await withAuth(app, "test.root").request(`/api/iam/users/${user.id}`, { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify({ allowWithoutCertificate: false }) });
@@ -325,10 +324,11 @@ describe("Audit Log do acesso por certificado", () => {
       await userStore.createRole({ id: "role_p", name: "P", description: "d", permissions: ["closing_period:period:create"] });
       await userStore.createUser({ fullname: "Quem Cria", username: "quem.cria", password: TEST_PASSWORD, roleId: "role_p", allowWithoutCertificate: false });
 
-      const entrou = (await (await loginWithCertificate("quem.cria", device.fingerprint)).json()) as { accessToken: string; refreshToken: string };
+      const entrouRes = await loginWithCertificate("quem.cria", device.fingerprint);
+      const entrou = (await entrouRes.clone().json()) as { accessToken: string };
       expect((await criarPeriodo(app, entrou.accessToken)).status).toBe(201);
 
-      const renovado = (await (await refresh(entrou.refreshToken)).json()) as { accessToken: string };
+      const renovado = (await (await refresh(refreshTokenOf(entrouRes))).json()) as { accessToken: string };
       await app.request("/api/closing-periods", { method: "POST", headers: { ...JSON_HEADERS, Authorization: `Bearer ${renovado.accessToken}` }, body: JSON.stringify({ name: "Nov/2026", startDate: "2026-11-01", endDate: "2026-11-30" }) });
 
       const entradas = await auditLog.list({ plugin: "closing_period" });
