@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calcularBaixas, chaveDaLinha, type ItemParaBaixa, type VendaParaBaixa } from "./baixas-pre-vencidos.js";
 
-const item = (id: string, quantidade: number, validade: string, incluidoEm = "2027-04-01 08:00:00", produtoId = "dipirona"): ItemParaBaixa => ({ id, produtoId, validade, quantidade, incluidoEm });
+const item = (id: string, quantidade: number, validade: string, abrangenciaEm = "2027-04-01 08:00:00", produtoId = "dipirona"): ItemParaBaixa => ({ id, produtoId, validade, quantidade, abrangenciaEm });
 const venda = (vendaId: number, data: string, quantidade: number, extra: Partial<VendaParaBaixa> = {}): VendaParaBaixa => ({
   vendaId,
   data,

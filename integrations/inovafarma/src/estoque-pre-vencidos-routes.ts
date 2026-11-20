@@ -30,16 +30,16 @@ const VERSAO_DESATUALIZADA = versaoDesatualizada("O Item foi alterado por outra 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const Validade = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe a validade como mês e ano (AAAA-MM).");
 const Quantidade = z.number({ error: "Informe a quantidade." }).int("Informe uma quantidade inteira.").min(1, "Informe uma quantidade maior que zero.").max(1_000_000);
-const DiaDeInclusao = DiaDoCalendario("Informe a data de inclusão (AAAA-MM-DD).");
+const DiaDeAbrangencia = DiaDoCalendario("Informe a data de abrangência (AAAA-MM-DD).");
 const Novo = z.object({
   codigoLoja: Codigo,
   produtoId: z.string().regex(UUID, "Produto inválido."),
   quantidade: Quantidade,
   validade: Validade,
-  /** Data de inclusão retroativa (`AAAA-MM-DD`, na hora do ERP); sem ela, agora. */
-  incluidoEm: DiaDeInclusao.optional(),
+  /** Data de abrangência retroativa (`AAAA-MM-DD`, na hora do ERP); sem ela, agora. */
+  abrangenciaEm: DiaDeAbrangencia.optional(),
 });
-const Edicao = z.object({ quantidade: Quantidade, validade: Validade, incluidoEm: DiaDeInclusao.optional(), version: Version });
+const Edicao = z.object({ quantidade: Quantidade, validade: Validade, abrangenciaEm: DiaDeAbrangencia.optional(), version: Version });
 
 const FiltroLoja = z.object({ codigoLoja: CodigoEmTexto });
 
@@ -56,18 +56,18 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
   /**
    * Instante de inclusão de um Item novo: agora, ou o início do dia retroativo pedido, que só quem gere as Baixas
    * informa e que vai até o início do Closing Period aberto (mesmo já terminado), nunca antes nem para o futuro. Na edição,
-   * `atual` é a data de inclusão de agora: um Item incluído antes do Período aberto já entrou num Período fechado e
+   * `atual` é a data de abrangência de agora: um Item incluído antes do Período aberto já entrou num Período fechado e
    * não muda de data.
    */
-  const inclusao = async (c: AuthContext, dia: string | undefined, atual?: string): Promise<{ incluidoEm: string } | { erro: string; status: 400 | 403 }> => {
-    if (dia === undefined) return { incluidoEm: new Date().toISOString() };
+  const inclusao = async (c: AuthContext, dia: string | undefined, atual?: string): Promise<{ abrangenciaEm: string } | { erro: string; status: 400 | 403 }> => {
+    if (dia === undefined) return { abrangenciaEm: new Date().toISOString() };
     if (!permissions.has(c.get("user")?.permissions, gerirBaixas.key)) return { erro: gerirBaixas.deniedMessage ?? "Acesso negado.", status: 403 };
     const limites = await inclusaoRetroativa(periods);
-    if (!limites) return { erro: "Não há Período aberto: a data de inclusão não pode retroagir.", status: 400 };
-    if (dia > limites.hoje) return { erro: "A data de inclusão não pode ser no futuro.", status: 400 };
-    if (atual !== undefined && horaDoErp(atual).slice(0, 10) < limites.inicio) return { erro: "O Item foi incluído antes do Período aberto: a data de inclusão dele não muda mais.", status: 400 };
-    if (dia < limites.inicio) return { erro: `A data de inclusão não pode ser antes do início do Período aberto (${dataBr(limites.inicio)}).`, status: 400 };
-    return { incluidoEm: inicioDoDiaNoErp(dia) };
+    if (!limites) return { erro: "Não há Período aberto: a data de abrangência não pode retroagir.", status: 400 };
+    if (dia > limites.hoje) return { erro: "A data de abrangência não pode ser no futuro.", status: 400 };
+    if (atual !== undefined && horaDoErp(atual).slice(0, 10) < limites.inicio) return { erro: "O Item foi incluído antes do Período aberto: a data de abrangência dele não muda mais.", status: 400 };
+    if (dia < limites.inicio) return { erro: `A data de abrangência não pode ser antes do início do Período aberto (${dataBr(limites.inicio)}).`, status: 400 };
+    return { abrangenciaEm: inicioDoDiaNoErp(dia) };
   };
 
   const nomeDaLoja = async (codigo: number) => (await lojasDoErp(erpClient())).find((l) => l.codigo === codigo)?.nome ?? "";
@@ -80,7 +80,7 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
       codigoBarra: item.codigoBarra,
       quantidade: item.quantidade,
       validade: item.validade,
-      incluidoEm: item.incluidoEm,
+      abrangenciaEm: item.abrangenciaEm,
       anterior,
     };
     return audit.record({
@@ -120,7 +120,7 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
     const { codigoLoja, produtoId, quantidade, validade } = parsed.data;
     const recusa = await recusaLoja(c, codigoLoja);
     if (recusa) return recusa;
-    const quando = await inclusao(c, parsed.data.incluidoEm);
+    const quando = await inclusao(c, parsed.data.abrangenciaEm);
     if ("erro" in quando) return c.json({ error: quando.erro }, quando.status);
 
     const client = erpClient();
@@ -141,7 +141,7 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
       codigoBarra: produto.codigoBarra,
       validade,
       quantidade,
-      incluidoEm: quando.incluidoEm,
+      abrangenciaEm: quando.abrangenciaEm,
     });
     await registrar(c, ITEM_PRE_VENCIDO_ACTIONS.criar, criado);
     // Recém-incluído: nenhuma venda o gastou ainda, salvo na inclusão retroativa, que a recarga da lista mostra.
@@ -162,19 +162,19 @@ export function registerEstoquePreVencidosRoutes({ routes, permissions, auth, vi
     if ("recusa" in alvo) return alvo.recusa;
     const parsed = Edicao.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return recusaDeValidacao(c, parsed.error);
-    const { version, incluidoEm: dia, ...valores } = parsed.data;
-    let incluidoEm: string | undefined;
+    const { version, abrangenciaEm: dia, ...valores } = parsed.data;
+    let abrangenciaEm: string | undefined;
     if (dia !== undefined) {
-      const quando = await inclusao(c, dia, alvo.item.incluidoEm);
+      const quando = await inclusao(c, dia, alvo.item.abrangenciaEm);
       if ("erro" in quando) return c.json({ error: quando.erro }, quando.status);
-      incluidoEm = quando.incluidoEm;
+      abrangenciaEm = quando.abrangenciaEm;
     }
-    const atualizado = await store.atualizar(alvo.item.id, incluidoEm === undefined ? valores : { ...valores, incluidoEm }, version);
+    const atualizado = await store.atualizar(alvo.item.id, abrangenciaEm === undefined ? valores : { ...valores, abrangenciaEm }, version);
     if (!atualizado) return c.json(VERSAO_DESATUALIZADA, 409);
     await registrar(c, ITEM_PRE_VENCIDO_ACTIONS.editar, atualizado, {
       quantidade: alvo.item.quantidade,
       validade: alvo.item.validade,
-      ...(incluidoEm === undefined ? {} : { incluidoEm: alvo.item.incluidoEm }),
+      ...(abrangenciaEm === undefined ? {} : { abrangenciaEm: alvo.item.abrangenciaEm }),
     });
     // Sem `restante`: depende das vendas do ERP; a tela recarrega a lista.
     return c.json(itemPublico(atualizado));

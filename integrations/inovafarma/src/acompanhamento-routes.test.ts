@@ -373,7 +373,7 @@ describe("Acompanhamento de Pré-vencidos vendidos", () => {
     codigoBarra: "789",
     validade: "2027-06",
     quantidade,
-    incluidoEm: "2027-04-01T12:00:00.000Z",
+    abrangenciaEm: "2027-04-01T12:00:00.000Z",
   });
   const venda = (codigoLoja: number, vendaId: number, data: string, codigoColaborador: number, quantidade: number, cancelada = false) => ({
     codigoLoja,

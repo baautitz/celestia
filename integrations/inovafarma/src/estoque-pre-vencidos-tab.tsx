@@ -21,7 +21,7 @@ const BASE = `${API}/pre-vencidos`;
 
 /**
  * Aba Estoque: os Itens de Pré-vencido de uma Loja do Vínculo, com inclusão, edição e exclusão em janela.
- * `retroativa`, só para quem gere as Baixas: os limites da data de inclusão retroativa que o servidor calculou.
+ * `retroativa`, só para quem gere as Baixas: os limites da data de abrangência retroativa que o servidor calculou.
  */
 export function EstoquePreVencidosTab({ lojas, retroativa }: { lojas: LojaOpcao[]; retroativa?: InclusaoRetroativa }) {
   const { feedback, windows } = useUi();
@@ -53,22 +53,24 @@ export function EstoquePreVencidosTab({ lojas, retroativa }: { lojas: LojaOpcao[
   if (lojas.length === 0) return <SemLojas />;
 
   const abrir = async (item?: ItemPreVencido) => {
+    // O Item salvo já aparece na tabela; a recarga confirma com o servidor.
+    const mostrar = (salvo: ItemSalvo) => {
+      if (String(salvo.codigoLoja) === loja) {
+        // A edição volta sem o Restante, que depende das vendas: fica o anterior até a recarga.
+        setItens((atuais) =>
+          atuais.some((i) => i.id === salvo.id) ? atuais.map((i) => (i.id === salvo.id ? { ...i, ...salvo } : i)) : [...atuais, { ...salvo, restante: salvo.restante ?? salvo.quantidade }],
+        );
+      }
+    };
     const resultado = await windows.open<ItemSalvo>({
       surface: "dialog",
       size: "small",
       title: item ? "Editar Item" : "Incluir Item",
       description: item ? item.nomeProduto : "Inclua um Pré-vencido que está na prateleira da Loja.",
-      content: () => <ItemPreVencidoWindow codigoLoja={Number(loja)} item={item} retroativa={retroativa} />,
+      content: () => <ItemPreVencidoWindow codigoLoja={Number(loja)} item={item} retroativa={retroativa} onSalvo={mostrar} />,
     });
-    if (resultado.status !== "confirmed") return;
-    // O Item salvo já aparece na tabela; a recarga confirma com o servidor.
-    const salvo = resultado.value;
-    if (String(salvo.codigoLoja) === loja) {
-      // A edição volta sem o Restante, que depende das vendas: fica o anterior até a recarga.
-      setItens((atuais) =>
-        atuais.some((i) => i.id === salvo.id) ? atuais.map((i) => (i.id === salvo.id ? { ...i, ...salvo } : i)) : [...atuais, { ...salvo, restante: salvo.restante ?? salvo.quantidade }],
-      );
-    }
+    if (resultado.status === "confirmed") mostrar(resultado.value);
+    // Com "Adicionar mais" a janela pode fechar sem confirmar depois de salvar Itens: a recarga cobre os dois casos.
     void carregar();
   };
 
@@ -95,7 +97,7 @@ export function EstoquePreVencidosTab({ lojas, retroativa }: { lojas: LojaOpcao[
     { key: "validade", centered: true, label: "Validade", value: (i) => i.validade, render: (i) => dataBr(i.validade), sortable: true },
     { key: "quantidade", label: "Quantidade", value: (i) => i.quantidade, format: "number", sortable: true },
     { key: "restante", label: "Restante", value: (i) => i.restante, format: "number", sortable: true },
-    { key: "incluidoEm", centered: true, label: "Incluído em", value: (i) => i.incluidoEm, render: (i) => formatDate(i.incluidoEm), sortable: true },
+    { key: "abrangenciaEm", centered: true, label: "Data de abrangência", value: (i) => i.abrangenciaEm, render: (i) => formatDate(i.abrangenciaEm), sortable: true },
   ];
 
   return (

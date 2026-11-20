@@ -8,7 +8,7 @@ type Row = typeof preVencidosItens.$inferSelect;
 
 const toRecord = (row: Row): ItemPreVencido => ({
   ...row,
-  incluidoEm: row.incluidoEm.toISOString(),
+  abrangenciaEm: row.abrangenciaEm.toISOString(),
   criadoEm: row.criadoEm.toISOString(),
   atualizadoEm: row.atualizadoEm.toISOString(),
 });
@@ -19,14 +19,14 @@ export class PostgresEstoquePreVencidoStore implements EstoquePreVencidoStore {
   async criar(novo: NovoItemPreVencido): Promise<ItemPreVencido> {
     const [row] = await this.db
       .insert(preVencidosItens)
-      .values({ ...novo, id: novoIdItem(), incluidoEm: new Date(novo.incluidoEm) })
+      .values({ ...novo, id: novoIdItem(), abrangenciaEm: new Date(novo.abrangenciaEm) })
       .returning();
     return toRecord(returned(row));
   }
 
   async listar(codigoLoja: number): Promise<ItemPreVencido[]> {
     const t = preVencidosItens;
-    return (await this.db.select().from(t).where(eq(t.codigoLoja, codigoLoja)).orderBy(asc(t.incluidoEm), asc(t.criadoEm), asc(t.id))).map(toRecord);
+    return (await this.db.select().from(t).where(eq(t.codigoLoja, codigoLoja)).orderBy(asc(t.abrangenciaEm), asc(t.criadoEm), asc(t.id))).map(toRecord);
   }
 
   async lojas(): Promise<number[]> {
@@ -43,7 +43,7 @@ export class PostgresEstoquePreVencidoStore implements EstoquePreVencidoStore {
     const t = preVencidosItens;
     const [row] = await this.db
       .update(t)
-      .set({ ...valores, incluidoEm: valores.incluidoEm === undefined ? undefined : new Date(valores.incluidoEm), version: expectedVersion + 1, atualizadoEm: new Date() })
+      .set({ ...valores, abrangenciaEm: valores.abrangenciaEm === undefined ? undefined : new Date(valores.abrangenciaEm), version: expectedVersion + 1, atualizadoEm: new Date() })
       .where(and(eq(t.id, id), eq(t.version, expectedVersion)))
       .returning();
     return row ? toRecord(row) : null;

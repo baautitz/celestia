@@ -39,7 +39,7 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
   },
   "pre-vencidos-baixas:manage": {
     label: "Pré-vencidos: Gerir as Baixas",
-    description: "Permite fazer Correções de Baixa nas Lojas do Colaborador vinculado ao Usuário e incluir Itens com data de inclusão retroativa. Ver as Baixas depende das Visualizações.",
+    description: "Permite fazer Correções de Baixa nas Lojas do Colaborador vinculado ao Usuário e incluir Itens com data de abrangência retroativa. Ver as Baixas depende das Visualizações.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para gerir as Baixas de Pré-vencidos.",
   },
   "pre-vencidos-baixas-geral:view": {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { PreVencidosPage } from "./pre-vencidos-page";
@@ -20,7 +20,7 @@ const item = (extra: Record<string, unknown> = {}) => ({
   validade: "2027-06",
   quantidade: 3,
   restante: 3,
-  incluidoEm: "2027-04-10T13:00:00.000Z",
+  abrangenciaEm: "2027-04-10T13:00:00.000Z",
   version: 1,
   ...extra,
 });
@@ -85,7 +85,7 @@ const renderizar = () =>
   );
 
 describe("aba Estoque", () => {
-  it("lista os Itens da Loja do Vínculo com validade, quantidade e data de inclusão", async () => {
+  it("lista os Itens da Loja do Vínculo com validade, quantidade e data de abrangência", async () => {
     renderizar();
     await screen.findByRole("tab", { name: "Estoque" });
     expect(screen.getByRole("combobox", { name: "Loja" }).textContent).toContain("Centro");
@@ -137,15 +137,15 @@ describe("aba Estoque", () => {
     expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ quantidade: 7, validade: "2027-06", version: 1 });
   });
 
-  it("sem a Permission de Baixas, a janela de inclusão não tem data de inclusão", async () => {
+  it("sem a Permission de Baixas, a janela de inclusão não tem data de abrangência", async () => {
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
     fireEvent.click(screen.getByRole("button", { name: "Incluir Item" }));
     await screen.findByLabelText("Quantidade");
-    expect(screen.queryByText("Data de inclusão")).toBeNull();
+    expect(within(screen.getByRole("dialog")).queryByText("Data de abrangência")).toBeNull();
   });
 
-  it("com a Permission de Baixas, inclui com data de inclusão retroativa até o início do Closing Period aberto", async () => {
+  it("com a Permission de Baixas, inclui com data de abrangência retroativa até o início do Closing Period aberto", async () => {
     contexto = { ...contextoEstoque, podeBaixas: true, inclusaoRetroativa: { inicio: dia(-5), hoje: dia(0) }, periodos: [{ id: "p1", name: "Atual", startDate: dia(-5), endDate: dia(10), status: "open" }] };
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
@@ -155,7 +155,7 @@ describe("aba Estoque", () => {
     await waitFor(() => expect(campo.value).toContain("DIPIRONA 500MG"));
     fireEvent.change(screen.getByLabelText("Quantidade"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("mm/aaaa"), { target: { value: "082027" } });
-    screen.getByText("Data de inclusão");
+    within(screen.getByRole("dialog")).getByText("Data de abrangência");
     const data = screen.getByPlaceholderText("dd/mm/aaaa");
 
     fireEvent.change(data, { target: { value: ddmmaaaa(dia(-6)) } });
@@ -167,12 +167,12 @@ describe("aba Estoque", () => {
     fireEvent.click(screen.getByRole("button", { name: "Incluir" }));
     await waitFor(() => expect(apiFetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "POST");
-    expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ codigoLoja: 1, produtoId: "guid-1", quantidade: 5, validade: "2027-08", incluidoEm: dia(-5) });
+    expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ codigoLoja: 1, produtoId: "guid-1", quantidade: 5, validade: "2027-08", abrangenciaEm: dia(-5) });
   });
 
-  it("com a Permission de Baixas, ajusta a data de inclusão na edição e só envia a data se ela mudou", async () => {
+  it("com a Permission de Baixas, ajusta a data de abrangência na edição e só envia a data se ela mudou", async () => {
     contexto = { ...contextoEstoque, podeBaixas: true, inclusaoRetroativa: { inicio: dia(-5), hoje: dia(0) }, periodos: [{ id: "p1", name: "Atual", startDate: dia(-5), endDate: dia(10), status: "open" }] };
-    itens = [item({ incluidoEm: new Date().toISOString() })];
+    itens = [item({ abrangenciaEm: new Date().toISOString() })];
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
     fireEvent.click(screen.getByRole("button", { name: "Editar DIPIRONA 500MG" }));
@@ -182,6 +182,6 @@ describe("aba Estoque", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(apiFetch.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true));
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "PUT");
-    expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ quantidade: 3, validade: "2027-06", incluidoEm: dia(-3), version: 1 });
+    expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ quantidade: 3, validade: "2027-06", abrangenciaEm: dia(-3), version: 1 });
   });
 });

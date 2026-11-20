@@ -71,7 +71,7 @@ export async function lojasDoErp(client: ErpQuery | undefined): Promise<LojaOpca
   }
 }
 
-/** Até onde a data de inclusão de um Item pode ir, em dias `AAAA-MM-DD` na hora do ERP. */
+/** Até onde a data de abrangência de um Item pode ir, em dias `AAAA-MM-DD` na hora do ERP. */
 export interface InclusaoRetroativa {
   /** Início do Closing Period aberto (o mais antigo, se houver vários), mesmo que ele já tenha terminado. */
   inicio: string;
