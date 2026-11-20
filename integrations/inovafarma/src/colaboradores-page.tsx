@@ -519,6 +519,10 @@ export function ColaboradoresPage() {
         emptyMessage="Nenhum Colaborador encontrado."
         striped
         bordered
+        highlightRow={(c) => {
+          const edicao = edicoes[c.codigoColaborador];
+          return edicao !== undefined && mudou(edicao, c);
+        }}
       />
     </Stack>
   );

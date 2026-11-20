@@ -215,6 +215,8 @@ export interface DataTableProps<TRow> {
   print?: DataTablePrintOptions<TRow>;
   /** Alterna o fundo das linhas, na tela e na impressão, para guiar a leitura de tabelas largas. */
   striped?: boolean;
+  /** Destaca a linha com um tom âmbar suave (ex.: alteração ainda não gravada). A seleção por clique vence o destaque. */
+  highlightRow?: (row: TRow) => boolean;
   /** `key` da última coluna presa à esquerda na rolagem horizontal; ela e as anteriores ficam fixas. Não afeta a impressão. */
   frozenUntil?: string;
   /** Setas movem o foco entre os campos de valor das células, como numa planilha (↑/↓ e Enter trocam de linha); chaves e botões ficam fora. */
@@ -238,6 +240,9 @@ const FROZEN_HEAD_CLASS =
   "bg-[color-mix(in_oklab,var(--muted)_40%,var(--background))]";
 const FROZEN_CELL_CLASS =
   "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--primary)_5%,var(--background))] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--primary)_15%,var(--background))]!";
+/** Linha destacada: o âmbar vale também nas células fixas, que têm fundo opaco próprio. */
+const HIGHLIGHT_ROW_CLASS = "data-[highlight=true]:bg-amber-500/10";
+const FROZEN_HIGHLIGHT_CELL_CLASS = "group-data-[highlight=true]/row:bg-[color-mix(in_oklab,var(--color-amber-500)_10%,var(--background))]";
 const FROZEN_STRIPED_CELL_CLASS =
   "group-even/row:bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))]";
 /** Linha clicada: destaque que vence o zebrado e o hover. */
@@ -475,6 +480,7 @@ export function DataTable<TRow>({
   className,
   print,
   striped = false,
+  highlightRow,
   frozenUntil,
   arrowNavigation = false,
   totals,
@@ -631,7 +637,7 @@ export function DataTable<TRow>({
     cn(
       head
         ? FROZEN_HEAD_CLASS
-        : cn(FROZEN_CELL_CLASS, striped && FROZEN_STRIPED_CELL_CLASS),
+        : cn(FROZEN_CELL_CLASS, striped && FROZEN_STRIPED_CELL_CLASS, FROZEN_HIGHLIGHT_CELL_CLASS),
     );
   /** Linha inferior do cabeçalho de colunas, que dobra como borda direita na última coluna fixa. */
   const headerEdgeClass = (key: string) =>
@@ -1205,11 +1211,12 @@ export function DataTable<TRow>({
                       return (
                         <MemoRow
                           key={id}
-                          deps={[row, selected, expanded, columns, frozenUntil, frozenLeft, striped, rowActions, renderExpanded, getRowId]}
+                          deps={[row, selected, expanded, columns, frozenUntil, frozenLeft, striped, rowActions, renderExpanded, getRowId, highlightRow?.(row)]}
                           render={() => (
                         <React.Fragment>
                           <TableRow
                             data-row-id={id}
+                            data-highlight={highlightRow?.(row) ? "true" : undefined}
                             data-state={selected ? "selected" : undefined}
                             aria-selected={selected}
                             onClick={(e) => {
@@ -1226,6 +1233,7 @@ export function DataTable<TRow>({
                               "group/row transition-none hover:bg-primary/5",
                               renderExpanded && "cursor-pointer",
                               striped && "even:bg-muted/20",
+                              HIGHLIGHT_ROW_CLASS,
                               SELECTED_ROW_CLASS,
                             )}
                           >

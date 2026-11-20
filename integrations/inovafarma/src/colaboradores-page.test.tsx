@@ -438,6 +438,15 @@ describe("ColaboradoresPage", () => {
       expect(apiFetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ body: JSON.stringify({ usuarioId: "ana", lojas: [2], version: 0 }) }));
     });
 
+    it("destaca a linha com alteração pendente, e só ela", async () => {
+      apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      expect(row.getAttribute("data-highlight")).toBeNull();
+      fireEvent.click(within(row).getByRole("button", { name: "Aceitar a sugestão de ANA SOUZA" }));
+      await waitFor(() => expect(row.getAttribute("data-highlight")).toBe("true"));
+    });
+
     it("Aceitar sugestões põe todas as linhas sugeridas no Salvar", async () => {
       apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
       render(<ColaboradoresPage />);
