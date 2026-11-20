@@ -1,5 +1,5 @@
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -97,6 +97,24 @@ const createSchema = z
   });
 type CreateFormValues = z.infer<typeof createSchema>;
 
+const MONTH_NAMES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+/** Nome sugerido: "<Mês>/<Ano>" da Data Final. */
+export const suggestPeriodName = (_start: Date, end: Date) => `${MONTH_NAMES[end.getMonth()]}/${end.getFullYear()}`;
+
 const CreatePeriodSheet: React.FC = () => {
   const { resolve } = useWindow<true>();
   const { feedback } = useUi();
@@ -105,6 +123,14 @@ const CreatePeriodSheet: React.FC = () => {
     resolver: zodResolver(createSchema),
     defaultValues: { name: "" },
   });
+  const nameEdited = useRef(false);
+  const startDate = form.watch("startDate");
+  const endDate = form.watch("endDate");
+
+  useEffect(() => {
+    if (nameEdited.current || !startDate || !endDate) return;
+    form.setValue("name", suggestPeriodName(startDate, endDate), { shouldValidate: form.formState.isSubmitted });
+  }, [startDate, endDate, form]);
 
   const onSubmit = async (v: CreateFormValues) => {
     try {
@@ -129,19 +155,6 @@ const CreatePeriodSheet: React.FC = () => {
           <FieldGroup>
             <FormField
               control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome do Período</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Ex.: Outubro/2026" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="startDate"
               render={({ field }) => (
                 <FormItem>
@@ -161,6 +174,26 @@ const CreatePeriodSheet: React.FC = () => {
                   <FormLabel>Data Final</FormLabel>
                   <FormControl>
                     <DatePicker value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome do Período</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="Ex.: Outubro/2026"
+                      onChange={(e) => {
+                        nameEdited.current = true;
+                        field.onChange(e);
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
