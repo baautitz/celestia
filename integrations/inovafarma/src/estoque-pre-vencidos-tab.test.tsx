@@ -37,6 +37,9 @@ const dia = (dias: number) => {
 const ddmmaaaa = (iso: string) => iso.split("-").reverse().join("");
 
 beforeEach(() => {
+  // Só o relógio: os timers reais seguem, para o waitFor do Testing Library.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2027-04-15T12:00:00"));
   itens = [item()];
   contexto = contextoEstoque;
   Object.defineProperty(window, "matchMedia", {
@@ -63,7 +66,10 @@ beforeEach(() => {
     return itens;
   });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 /** Destino das ações do cabeçalho, que no app é o shell. */
 const HeaderSlot = () => <>{useHeaderActions().actions}</>;
