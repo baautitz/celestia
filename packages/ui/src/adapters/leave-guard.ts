@@ -2,12 +2,36 @@ import { useEffect, useRef } from "react"
 import { useBlocker } from "react-router-dom"
 import { useUi } from "../imperative/provider.tsx"
 
-/** Pergunta da tela com alterações pendentes; só uma tela está montada por vez. */
-let perguntar: (() => Promise<boolean>) | null = null
+/** Uma tela com alterações pendentes: pergunta se pode descartá-las e é avisada quando o usuário descarta. */
+interface Guard {
+  ask: () => Promise<boolean>
+  release: () => void
+}
 
-/** Para saídas que encerram a tela sem passar pelo roteador antes, como encerrar a sessão. */
+/** Telas guardadas no momento, da mais antiga à mais recente; cada uma entra e sai só com o próprio efeito. */
+const guards: Guard[] = []
+/** Pergunta aberta: chamadas simultâneas (roteador e encerrar sessão) compartilham a mesma resposta. */
+let asking: Promise<boolean> | null = null
+
+/**
+ * Para saídas que encerram a tela sem passar pelo roteador antes, como encerrar a sessão.
+ * Pergunta uma vez (a tela mais recente fala por todas); descartar libera todas as telas guardadas.
+ */
 export function confirmLeave(): Promise<boolean> {
-  return perguntar ? perguntar() : Promise.resolve(true)
+  const top = guards[guards.length - 1]
+  if (!top) return Promise.resolve(true)
+  if (asking) return asking
+  const snapshot = [...guards]
+  asking = top
+    .ask()
+    .then((descartar) => {
+      if (descartar) for (const guard of snapshot) guard.release()
+      return descartar
+    })
+    .finally(() => {
+      asking = null
+    })
+  return asking
 }
 
 /**
@@ -25,21 +49,26 @@ export function useLeaveGuard(pending: boolean): void {
 
   useEffect(() => {
     if (!pending) return
-    const pergunta = async () => {
-      const descartar = await windows.confirm({
-        title: "Descartar alterações?",
-        description: "Existem alterações não salvas. Deseja descartá-las?",
-        confirmLabel: "Descartar",
-        destructive: true,
-      })
-      liberada.current = descartar
-      return descartar
+    // Armar de novo (novas alterações depois de um descarte) volta a pedir confirmação.
+    liberada.current = false
+    const guard: Guard = {
+      ask: () =>
+        windows.confirm({
+          title: "Descartar alterações?",
+          description: "Existem alterações não salvas. Deseja descartá-las?",
+          confirmLabel: "Descartar",
+          destructive: true,
+        }),
+      release: () => {
+        liberada.current = true
+      },
     }
     const avisarNavegador = (event: BeforeUnloadEvent) => event.preventDefault()
-    perguntar = pergunta
+    guards.push(guard)
     window.addEventListener("beforeunload", avisarNavegador)
     return () => {
-      perguntar = null
+      const index = guards.indexOf(guard)
+      if (index !== -1) guards.splice(index, 1)
       window.removeEventListener("beforeunload", avisarNavegador)
     }
   }, [pending, windows])

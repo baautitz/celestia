@@ -1,4 +1,4 @@
-import { ApiError } from "@platform/ui/lib/api";
+import { parseApiBody, parseApiError } from "@platform/ui/lib/api";
 import type {
   JWTAccessPayload,
   AuthTokens,
@@ -15,7 +15,6 @@ import type {
   AuditLogFilter,
   Device,
   IssuedDevice,
-  ValidationErrorBody,
 } from "@platform/shared";
 
 class ApiClient {
@@ -71,18 +70,9 @@ class ApiClient {
       }
     }
 
-    if (!response.ok) {
-      const errBody: ValidationErrorBody | { error?: string; code?: string } =
-        await response.json().catch(() => ({ error: response.statusText }));
-      // Recusa de validação chega como `ValidationErrorBody`; qualquer outra falha como { error: "mensagem" }.
-      const detail =
-        typeof errBody.error === "string"
-          ? errBody.error
-          : errBody.error?.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-      throw new ApiError(detail || `Erro HTTP ${response.status}`, response.status, "code" in errBody ? errBody.code : undefined);
-    }
+    if (!response.ok) throw await parseApiError(response);
 
-    return response.json() as Promise<T>;
+    return parseApiBody<T>(response);
   }
 
   private async silentRefresh(): Promise<string | null> {
@@ -93,6 +83,7 @@ class ApiClient {
     this.refreshPromise = (async () => {
       // O token de quando a renovação começou: se mudar enquanto ela espera, um login terminou no meio do caminho.
       const tokenAtStart = this.accessToken;
+      // Falha de rede não prova que a sessão acabou: o erro sobe e o token fica para a próxima tentativa.
       try {
         const res = await fetch("/api/auth/refresh", {
           method: "POST",
@@ -117,9 +108,6 @@ class ApiClient {
         const token = data.accessToken || data.access_token || null;
         this.setAccessToken(token);
         return token;
-      } catch {
-        this.setAccessToken(null);
-        return null;
       } finally {
         this.refreshPromise = null;
       }
@@ -160,8 +148,11 @@ class ApiClient {
     },
 
     logout: async (): Promise<void> => {
-      await this.request("/api/auth/logout", { method: "POST" });
-      this.setAccessToken(null);
+      try {
+        await this.request("/api/auth/logout", { method: "POST" });
+      } finally {
+        this.setAccessToken(null);
+      }
     },
   };
 

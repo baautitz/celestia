@@ -4,6 +4,8 @@ import { confirmLeave } from "@platform/ui/adapters/leave-guard";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useHeaderActions } from "@/context/HeaderActionsContext";
+import { isEntryActive } from "@/lib/nav-match";
+import { useUi } from "@platform/ui/imperative/provider";
 import {
   SidebarProvider,
   Sidebar,
@@ -89,17 +91,23 @@ export const AppLayout: React.FC = () => {
   const { actions, backTo } = useHeaderActions();
   const location = useLocation();
   const navigate = useNavigate();
+  const ui = useUi();
 
 
   const handleLogout = async () => {
     if (!(await confirmLeave())) return;
-    await logout();
+    try {
+      await logout();
+    } catch (err: unknown) {
+      // O cliente já esqueceu a sessão: avisa da falha no servidor, mas sai do mesmo jeito.
+      ui.feedback.notify({ type: "error", title: err instanceof Error ? err.message : "Falha ao encerrar a sessão no servidor." });
+    }
     navigate("/login");
   };
 
   const sections = menuSections(hasPermission);
   const entries = sections.flatMap((s) => s.entries);
-  const current = entries.find((e) => location.pathname.startsWith(e.path));
+  const current = entries.find((e) => isEntryActive(location.pathname, e.path));
   const pageTitle = current ? (current.title ?? current.label) : "Painel de Controle";
 
   return (
@@ -131,7 +139,7 @@ export const AppLayout: React.FC = () => {
                 {section.entries.map((entry) => (
                   <SidebarMenuItem key={entry.id}>
                     <SidebarMenuButton
-                      isActive={location.pathname.startsWith(entry.path)}
+                      isActive={isEntryActive(location.pathname, entry.path)}
                       tooltip={entry.label}
                       render={<Link to={entry.path} />}
                     >

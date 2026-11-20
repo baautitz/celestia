@@ -22,6 +22,33 @@ describe("respostas de erro", () => {
   });
 });
 
+describe("corpo das respostas", () => {
+  it("monta a mensagem de uma recusa de validação a partir dos issues", async () => {
+    fetchMock.mockImplementation(async () => json(400, { error: { issues: [{ path: ["user", "name"], message: "obrigatório" }] } }));
+    await expect(api.request("/api/x")).rejects.toMatchObject({ message: "user.name: obrigatório", status: 400 });
+  });
+
+  it("cai no texto do status quando `error` é um objeto sem issues", async () => {
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ error: { foo: 1 } }), { status: 422, statusText: "Unprocessable" }));
+    await expect(api.request("/api/x")).rejects.toMatchObject({ message: "Unprocessable", status: 422 });
+  });
+
+  it("aceita resposta de sucesso sem corpo (204)", async () => {
+    fetchMock.mockImplementation(async () => new Response(null, { status: 204 }));
+    await expect(api.request("/api/x", { method: "DELETE" })).resolves.toBeUndefined();
+  });
+});
+
+describe("logout", () => {
+  it("limpa o token mesmo quando a requisição falha", async () => {
+    fetchMock.mockImplementation(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    await expect(api.auth.logout()).rejects.toThrow();
+    expect(api.getAccessToken()).toBeNull();
+  });
+});
+
 describe("sessão encerrada pelo servidor", () => {
   it("avisa quando a renovação é recusada (ex.: o Dispositivo foi revogado)", async () => {
     const expired = vi.fn();
@@ -70,9 +97,10 @@ describe("sessão encerrada pelo servidor", () => {
       return json(401, { error: "expirou" });
     });
 
-    await expect(api.iam.listDevices()).rejects.toThrow();
+    await expect(api.iam.listDevices()).rejects.toThrow("Failed to fetch");
 
     expect(expired).not.toHaveBeenCalled();
+    expect(api.getAccessToken()).toBe("expirado");
   });
 
   it("uma renovação recusada que chega depois de um login não apaga a sessão nova", async () => {

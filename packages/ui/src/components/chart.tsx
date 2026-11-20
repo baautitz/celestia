@@ -83,12 +83,19 @@ function ChartContainer({
   )
 }
 
+// Id, chave e cor entram num <style> via dangerouslySetInnerHTML: só formatos conhecidos passam.
+const SAFE_IDENT = /^[\w-]+$/
+const SAFE_COLOR =
+  /^(#[\da-f]{3,8}|(?:rgba?|hsla?|oklch|oklab|hwb|lab|lch)\([\d\s.,%/a-z-]*\)|var\(--[\w-]+(?:,\s*[\w\s#.,%-]+)?\)|[a-z]+)$/i
+
+const isSafeColor = (color: string) => SAFE_COLOR.test(color.trim())
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
-    ([, config]) => config.theme ?? config.color
+    ([key, config]) => SAFE_IDENT.test(key) && (config.theme ?? config.color)
   )
 
-  if (!colorConfig.length) {
+  if (!SAFE_IDENT.test(id) || !colorConfig.length) {
     return null
   }
 
@@ -104,7 +111,9 @@ ${colorConfig
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ??
       itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+    return color && isSafeColor(color)
+      ? `  --color-${key}: ${color};`
+      : null
   })
   .join("\n")}
 }
