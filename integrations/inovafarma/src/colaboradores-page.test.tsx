@@ -28,7 +28,7 @@ function render(tela: ReactElement) {
     { path: "/", element: <HeaderActionsProvider><Link to="/outra">Ir para outra tela</Link><CabecalhoSlot />{tela}</HeaderActionsProvider> },
     { path: "/outra", element: "Outra tela" },
   ]);
-  return renderTela(<RouterProvider router={router} future={{ v7_startTransition: true }} />);
+  return renderTela(<RouterProvider router={router} />);
 }
 
 const pendente = { confirmado: false, usuarioId: null, usuario: null, lojas: [] as number[], version: 0, avisos: [] as { tipo: string; mensagem: string }[], sugestao: null };
