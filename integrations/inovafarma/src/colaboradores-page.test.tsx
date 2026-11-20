@@ -465,7 +465,7 @@ describe("ColaboradoresPage", () => {
       apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
       render(<ColaboradoresPage />);
       await linha("ANA SOUZA");
-      fireEvent.click(screen.getByRole("button", { name: "Aceitar sugestões (1)" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Aceitar sugestões (1)" }));
       await waitFor(() => expect(salvarTudo().textContent).toBe("Salvar (1)"));
       expect(screen.queryByRole("button", { name: /^Aceitar sugestões/ })).toBeNull();
     });
