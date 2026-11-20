@@ -62,25 +62,27 @@ function AvaliacoesDoColaboradorWindow({ periodoId, codigoColaborador, acesso }:
 }
 
 /** Olho que abre as Avaliações do Colaborador; só aparece para quem já pode lê-las. */
-export function OlhoAvaliacoes({ periodoId, codigoColaborador, nome, acesso }: { periodoId: string; codigoColaborador: number; nome: string; acesso: AcessoAvaliacoes | null }) {
+export function OlhoAvaliacoes({ periodoId, codigoColaborador, nome, acesso, rotulo }: { periodoId: string; codigoColaborador: number; nome: string; acesso: AcessoAvaliacoes | null; rotulo?: string }) {
   const { windows } = useUi();
   if (!acesso) return null;
-  return (
-    <Button
-      size="icon"
-      variant="ghost"
-      aria-label={`Ver as Avaliações de ${nome}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        void windows.open({
-          surface: "dialog",
-          size: "large",
-          title: "Avaliações",
-          description: `${nome} · descontadas do valor inicial da Meta de Avaliações.`,
-          content: () => <AvaliacoesDoColaboradorWindow periodoId={periodoId} codigoColaborador={codigoColaborador} acesso={acesso} />,
-        });
-      }}
-    >
+  const abrir = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    void windows.open({
+      surface: "dialog",
+      size: "large",
+      title: "Avaliações",
+      description: `${nome} · descontadas do valor inicial da Meta de Avaliações.`,
+      content: () => <AvaliacoesDoColaboradorWindow periodoId={periodoId} codigoColaborador={codigoColaborador} acesso={acesso} />,
+    });
+  };
+  const aria = `Ver as Avaliações de ${nome}`;
+  return rotulo ? (
+    <Button size="default" variant="outline" aria-label={aria} onClick={abrir}>
+      <Eye />
+      {rotulo}
+    </Button>
+  ) : (
+    <Button size="icon" variant="ghost" aria-label={aria} onClick={abrir}>
       <Eye />
     </Button>
   );

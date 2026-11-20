@@ -159,11 +159,11 @@ export function MinhasMetas({ periodos, lerAvaliacoes = false }: { periodos: Per
 
   // Na Meta de Avaliações, o olho abre as Avaliações recebidas (só com a Permission de vê-las).
   const olho = (m: MinhaMeta) =>
-    lerAvaliacoes && m.indicador === "avaliacoes" ? <OlhoAvaliacoes periodoId={periodoId} codigoColaborador={0} nome="você" acesso="minhas" /> : null;
+    lerAvaliacoes && m.indicador === "avaliacoes" ? <OlhoAvaliacoes periodoId={periodoId} codigoColaborador={0} nome="você" acesso="minhas" rotulo="Ver Avaliações" /> : null;
   const colunasLista: DataTableColumn<MinhaMeta>[] = colunas.map((c) =>
     c.key === "resultado" ? { ...c, render: (m: MinhaMeta) => (
       <Stack direction="row" gap="tight" align="center">
-        {resultado(m) || "–"}
+        {resultado(m) || (olho(m) ? null : "–")}
         {olho(m)}
       </Stack>
     ) } : c,
