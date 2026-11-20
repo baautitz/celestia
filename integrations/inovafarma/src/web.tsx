@@ -318,8 +318,6 @@ interface Filtros {
   visualizacao: Visualizacao;
 }
 
-const _periodLabel = (p: ClosingPeriod) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})`;
-
 const lojaLabel = (lojas: Loja[], loja: string, visualizacao: Visualizacao = "geral") =>
   loja === "all" ? (visualizacao === "loja" ? "Todas as minhas Lojas" : "Todas as Filiais") : lojas.find((l) => String(l.codigoEmpresa) === loja)?.nome || `Filial ${loja}`;
 
