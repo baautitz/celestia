@@ -266,7 +266,8 @@ const NestedTableContext = createContext(false);
 const HEAD_FOLLOWS_SCROLL =
   typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("animation-timeline: --x");
 const HEAD_TIMELINE = "--celestia-table-x";
-const HEAD_SCROLL_KEYFRAMES = `@keyframes celestia-head-x{to{transform:translateX(calc(var(--head-max,0px)*-1))}}`;
+// Com colunas fixas, a animação roda célula a célula nas não fixas (as fixas ficam paradas), em vez de na tabela inteira.
+const HEAD_SCROLL_KEYFRAMES = `@keyframes celestia-head-x{to{transform:translateX(calc(var(--head-max,0px)*-1))}}[data-head-frozen] th:not([style*="sticky"]){animation:celestia-head-x linear both;animation-timeline:${HEAD_TIMELINE}}`;
 
 const PAGE_STICKY_HEAD_CLASS = "top-(--table-sticky-top,0px)";
 
@@ -297,7 +298,10 @@ function GroupHeaderRow({
   trailing = 0,
   frozenKeys = [],
   frozenHead,
+  force = false,
 }: {
+  /** Renderiza a linha mesmo sem grupos nestas colunas (a outra metade do cabeçalho tem). */
+  force?: boolean;
   columns: { key: string; group?: string }[];
   leading?: number;
   trailing?: number;
@@ -309,7 +313,7 @@ function GroupHeaderRow({
     lastKey: string,
   ) => { style?: React.CSSProperties; className?: string | false };
 }) {
-  if (!columns.some((c) => c.group)) return null;
+  if (!force && !columns.some((c) => c.group)) return null;
   const boundaries = groupBoundaryKeys(columns);
   const spans: {
     key: string;
@@ -598,6 +602,7 @@ export function DataTable<TRow>({
   const frozenKeys = columns.slice(0, frozenCount).map((c) => c.key);
   const lastFrozenKey = frozenKeys[frozenKeys.length - 1];
   const frozenSignature = frozenKeys.join("|");
+  const frozenCells = frozenCount > 0 ? frozenCount + (renderExpanded ? 1 : 0) : 0;
 
   // Cada coluna fixa fica à esquerda da soma das larguras das fixas anteriores (e do botão de expandir).
   // biome-ignore lint/correctness/useExhaustiveDependencies: `rows` não é lido no efeito, mas linhas novas podem mudar as larguras das colunas fixas.
@@ -874,12 +879,15 @@ export function DataTable<TRow>({
   );
 
   // `measure`: só as células do cabeçalho real medem as colunas fixas; a cópia grudada não.
-  const headerRows = (measure: boolean) => (
+  const partColumns = (part: "all" | "frozen" | "rest") =>
+    part === "frozen" ? columns.slice(0, frozenCount) : part === "rest" ? columns.slice(frozenCount) : columns;
+  const headerRows = (measure: boolean, part: "all" | "frozen" | "rest" = "all") => (
     <>
                   <GroupHeaderRow
-                    columns={columns}
-                    leading={renderExpanded ? 1 : 0}
-                    trailing={hasActions ? 1 : 0}
+                    columns={partColumns(part)}
+                    force={part !== "all" && columns.some((c) => c.group)}
+                    leading={renderExpanded && part !== "rest" ? 1 : 0}
+                    trailing={hasActions && part !== "frozen" ? 1 : 0}
                     frozenKeys={frozenKeys}
                     frozenHead={(firstKey, lastKey) => ({
                       style: frozenStyle(firstKey, true),
@@ -890,7 +898,7 @@ export function DataTable<TRow>({
                     })}
                   />
                   <TableRow className="bg-muted/40 border-b-0!">
-                    {renderExpanded && (
+                    {renderExpanded && part !== "rest" && (
                       <TableHead
                         ref={measure ? setHeadRef(EXPAND_KEY) : undefined}
                         style={frozenStyle(EXPAND_KEY, true)}
@@ -903,7 +911,7 @@ export function DataTable<TRow>({
                         {!printing && toggleAllButton(false)}
                       </TableHead>
                     )}
-                    {columns.map((col) => (
+                    {partColumns(part).map((col) => (
                       <TableHead
                         key={col.key}
                         ref={measure ? setHeadRef(col.key) : undefined}
@@ -913,7 +921,7 @@ export function DataTable<TRow>({
                           isNumericColumn(col) && "text-right",
                           isCenteredColumn(col) && "text-center",
                           hasFixedWidth(col) && FIXED_COLUMN_WIDTH_CLASS,
-                          boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                          boundaries.has(col.key) && !(part === "rest" && col.key === columns[frozenCount]?.key) && GROUP_BOUNDARY_CLASS,
                           frozenClass(col.key, true),
                           headerEdgeClass(col.key),
                         )}
@@ -950,7 +958,7 @@ export function DataTable<TRow>({
                         )}
                       </TableHead>
                     ))}
-                    {hasActions && (
+                    {hasActions && part !== "frozen" && (
                       <TableHead
                         className={cn(actionsHeadClassName, HEADER_EDGE_CLASS)}
                       >
@@ -1115,28 +1123,42 @@ export function DataTable<TRow>({
                 <div
                   ref={stickyHeadRef}
                   aria-hidden
-                  className="sticky top-(--table-sticky-top,0px) z-10 overflow-hidden bg-background"
+                  className="sticky top-(--table-sticky-top,0px) z-10 flex overflow-hidden bg-background"
                 >
-                  <table
-                    className="caption-bottom text-xs table-fixed"
-                    style={
-                      HEAD_FOLLOWS_SCROLL
-                        ? ({
-                            width: wide.tableWidth,
-                            "--head-max": `${wide.maxScroll}px`,
-                            animation: "celestia-head-x linear both",
-                            animationTimeline: HEAD_TIMELINE,
-                          } as React.CSSProperties)
-                        : { width: wide.tableWidth }
-                    }
-                  >
-                    <colgroup>
-                      {wide.columnWidths.map((w, idx) => (
-                        <col key={idx} style={{ width: w }} />
-                      ))}
-                    </colgroup>
-                    <TableHeader className="static">{headerRows(false)}</TableHeader>
-                  </table>
+                  {frozenCount > 0 && (
+                    <div className="z-20 shrink-0 bg-background">
+                      <table className="caption-bottom text-xs table-fixed" style={{ width: wide.columnWidths.slice(0, frozenCells).reduce((a, w) => a + w, 0) }}>
+                        <colgroup>
+                          {wide.columnWidths.slice(0, frozenCells).map((w, idx) => (
+                            <col key={idx} style={{ width: w }} />
+                          ))}
+                        </colgroup>
+                        <TableHeader className="static">{headerRows(false, "frozen")}</TableHeader>
+                      </table>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <table
+                      className="caption-bottom text-xs table-fixed"
+                      style={
+                        HEAD_FOLLOWS_SCROLL
+                          ? ({
+                              width: wide.columnWidths.slice(frozenCells).reduce((a, w) => a + w, 0),
+                              "--head-max": `${wide.maxScroll}px`,
+                              animation: "celestia-head-x linear both",
+                              animationTimeline: HEAD_TIMELINE,
+                            } as React.CSSProperties)
+                          : { width: wide.columnWidths.slice(frozenCells).reduce((a, w) => a + w, 0) }
+                      }
+                    >
+                      <colgroup>
+                        {wide.columnWidths.slice(frozenCells).map((w, idx) => (
+                          <col key={idx} style={{ width: w }} />
+                        ))}
+                      </colgroup>
+                      <TableHeader className="static">{headerRows(false, frozenCount > 0 ? "rest" : "all")}</TableHeader>
+                    </table>
+                  </div>
                 </div>
               )}
               <Table
