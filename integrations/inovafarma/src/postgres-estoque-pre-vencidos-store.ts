@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { preVencidosItens } from "./schema.js";
 import { novoIdItem, type EdicaoItemPreVencido, type EstoquePreVencidoStore, type ItemPreVencido, type NovoItemPreVencido } from "./estoque-pre-vencidos-store.js";
+import { returned } from "./returned.js";
 
 type Row = typeof preVencidosItens.$inferSelect;
 
@@ -20,7 +21,7 @@ export class PostgresEstoquePreVencidoStore implements EstoquePreVencidoStore {
       .insert(preVencidosItens)
       .values({ ...novo, id: novoIdItem(), incluidoEm: new Date(novo.incluidoEm) })
       .returning();
-    return toRecord(row!);
+    return toRecord(returned(row));
   }
 
   async listar(codigoLoja: number): Promise<ItemPreVencido[]> {

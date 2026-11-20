@@ -8,6 +8,7 @@ import type { DadosTipoMeta } from "./tipos-meta";
 import { MemoryVinculoStore } from "./vinculo-store";
 import type { PeriodoResumo } from "./pre-vencidos-routes";
 import type { AuditService } from "./vinculo-audit";
+import { defined } from "./test/defined";
 
 const MANAGE = "inovafarma:metas:manage";
 
@@ -47,7 +48,7 @@ async function boot() {
   const log: string[] = [];
   const audit: AuditService = {
     declareAction: (def) => void resumos.set(def.action, def.summary as (a: never) => string),
-    record: async (input) => void log.push(resumos.get(input.action)!(input.attributes as never)),
+    record: async (input) => void log.push(defined(resumos.get(input.action), "the audit summary")(input.attributes as never)),
   };
   declareMetasAudit(audit);
   const auth: MiddlewareHandler = async (c, next) => {
@@ -205,7 +206,7 @@ describe("Montar Metas", () => {
     await json<Meta>("gil", "POST", "/metas", { periodoId: "abril", tipoId: inativo.id });
     await tipos.atualizar(inativo.id, { ...cmv, nome: "Antigo", ativo: false }, 1);
     // ANA sai do ERP; DANI entra.
-    erp[0]!.ativo = false;
+    defined(erp[0], "the first ERP Colaborador").ativo = false;
     erp.push({ codigoColaborador: 4, nome: "DANI", ativo: true, codigoEmpresa: 10 });
 
     const maio = await json<Montagem>("gil", "GET", "/metas?periodoId=maio");
@@ -237,7 +238,7 @@ describe("Montar Metas", () => {
     await json<Meta>("gil", "POST", "/metas", { periodoId: "abril", tipoId: tipo.id });
     const marco = await json<Montagem>("gil", "GET", "/metas?periodoId=marco");
     expect(marco).toMatchObject({ somenteLeitura: true, copiadoDe: null, metas: [] });
-    const fechada = (await metas.criar({ periodoId: "marco", tipoId: tipo.id, participantes: [], excluidos: [] }))!;
+    const fechada = defined((await metas.criar({ periodoId: "marco", tipoId: tipo.id, participantes: [], excluidos: [] })), "the created Meta");
     expect((await req("gil", "PUT", `/metas/${fechada.id}/participantes/1`, { version: 1, participa: true })).status).toBe(409);
     expect((await req("gil", "POST", `/metas/${fechada.id}/definir-alvo`, { version: 1, codigos: [1], alvo: 1 })).status).toBe(409);
   });

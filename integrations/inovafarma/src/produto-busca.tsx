@@ -51,9 +51,10 @@ export function ProdutoBusca({ url, id, onChange }: Props) {
         .then((achados) => {
           if (!atual) return;
           setProdutos(achados);
-          if (achados.length === 1) {
-            escolher(achados[0]!);
-            setBusca(rotulo(achados[0]!));
+          const unico = achados.length === 1 ? achados[0] : undefined;
+          if (unico) {
+            escolher(unico);
+            setBusca(rotulo(unico));
           } else if (escolhido) escolher(null);
         })
         .catch((err: unknown) => {

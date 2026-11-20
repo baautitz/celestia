@@ -11,6 +11,7 @@ import type { PeriodoResumo } from "./pre-vencidos-routes";
 import { MemoryTipoMetaStore } from "./tipos-meta-store";
 import type { DadosTipoMeta } from "./tipos-meta";
 import { MemoryVinculoStore } from "./vinculo-store";
+import { defined } from "./test/defined";
 
 const GERAL = "inovafarma:metas-geral:view";
 const LOJA = "inovafarma:metas-loja:view";
@@ -204,12 +205,12 @@ describe("Acompanhamento das Metas", () => {
     vendas.set(1, { totalLiquido: 1000, totalCmv: 500, quantidadeVendas: 10 });
     const fechada = await ver("gil");
     expect(fechada.congelada).toBe(true);
-    expect(fechada.linhas[0]!.premioCentavos).toBe(10000);
+    expect(defined(fechada.linhas[0], "the first row").premioCentavos).toBe(10000);
 
     await evento("closing_period.reopen", "open");
     const reaberta = await ver("gil");
     expect(reaberta.congelada).toBe(false);
-    expect(reaberta.linhas[0]!.premioCentavos).toBe(0);
+    expect(defined(reaberta.linhas[0], "the first row").premioCentavos).toBe(0);
   });
 
   it("recusa o fechamento com o ERP indisponível, sem gravar Apuração", async () => {
@@ -247,25 +248,25 @@ describe("Período anterior", () => {
     const { periodos, app, metas, tipos, minhas } = await boot();
     periodos.push({ id: "abril", name: "Abril", startDate: "2027-04-01", endDate: "2027-04-30", status: "open" });
     periodos.push({ id: "junho", name: "Junho", startDate: "2027-06-01", endDate: "2027-06-30", status: "open" });
-    const [tipo] = await tipos.listar();
-    await metas.criar({ periodoId: "junho", tipoId: tipo!.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 28 }], excluidos: [] });
+    const tipo = defined((await tipos.listar())[0], "the first Tipo de Meta");
+    await metas.criar({ periodoId: "junho", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 28 }], excluidos: [] });
     const r = await app.request("/metas/anterior?periodoId=junho", { headers: { "x-user": "mon" } });
     expect(r.status).toBe(200);
     const anterior = (await r.json()) as { periodo: { name: string }; metas: { tipoId: string; participantes: { codigoColaborador: number; alvo: number; realizado: number }[] }[] };
     expect(anterior.periodo.name).toBe("Maio");
-    expect(anterior.metas[0]!.tipoId).toBe(tipo!.id);
-    expect(anterior.metas[0]!.participantes.map((p) => [p.codigoColaborador, p.alvo, p.realizado])).toEqual([
+    expect(defined(anterior.metas[0], "the first Meta").tipoId).toBe(tipo.id);
+    expect(defined(anterior.metas[0], "the first Meta").participantes.map((p) => [p.codigoColaborador, p.alvo, p.realizado])).toEqual([
       [1, 30, 25],
       [2, 30, 40],
     ]);
     expect((await app.request("/metas/anterior?periodoId=junho", { headers: { "x-user": "gil" } })).status).toBe(403);
     // O Acompanhamento traz o Período anterior em cada linha.
     const acompanhamento = (await (await app.request("/metas/acompanhamento?periodoId=junho", { headers: { "x-user": "gil" } })).json()) as { linhas: { anterior?: { alvo: number; realizado: number } }[] };
-    expect(acompanhamento.linhas[0]!.anterior).toMatchObject({ alvo: 30, realizado: 25 });
+    expect(defined(acompanhamento.linhas[0], "the first row").anterior).toMatchObject({ alvo: 30, realizado: 25 });
     // Minhas Metas também traz a mesma Meta no Período anterior, cortada pela Exibição.
     const minha = (await (await minhas("ana", "junho")).json()) as { periodoAnterior: { name: string }; metas: { anterior?: unknown }[] };
     expect(minha.periodoAnterior.name).toBe("Maio");
-    expect(minha.metas[0]!.anterior).toBeDefined();
+    expect(defined(minha.metas[0], "the first Meta").anterior).toBeDefined();
   });
 });
 
@@ -306,8 +307,8 @@ describe("Acompanhamento da Lista de Produtos", () => {
     });
     await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: null }], excluidos: [] });
     listaVendas.push({ codigoColaborador: 1, quantidade: 12, valor: 1500.5 });
-    const [linha] = (await ver("gil")).linhas.filter((l) => l.tipo.nome === "Comissão Mix");
-    expect([linha!.atingimento, linha!.premioCentavos, linha!.resultado]).toEqual([null, 3001, "Lista de Produtos R$ 1.500,50"]);
+    const linha = defined((await ver("gil")).linhas.filter((l) => l.tipo.nome === "Comissão Mix")[0], "the Comissão Mix row");
+    expect([linha.atingimento, linha.premioCentavos, linha.resultado]).toEqual([null, 3001, "Lista de Produtos R$ 1.500,50"]);
   });
 
   it("em R$ com Alvo, o % Atingido é sobre o valor vendido", async () => {
@@ -315,8 +316,8 @@ describe("Acompanhamento da Lista de Produtos", () => {
     const tipo = await tipos.criar({ ...lista, nome: "Mix R$", alvoPadrao: 100000, lista: { unidade: "reais", entradas } });
     await metas.criar({ periodoId: "maio", tipoId: tipo.id, participantes: [{ codigoColaborador: 1, nome: "ANA", alvo: 100000 }], excluidos: [] });
     listaVendas.push({ codigoColaborador: 1, quantidade: 3, valor: 1500 });
-    const [linha] = (await ver("gil")).linhas.filter((l) => l.tipo.nome === "Mix R$");
-    expect([linha!.atingimento, linha!.premioCentavos]).toEqual([150, 10000]);
+    const linha = defined((await ver("gil")).linhas.filter((l) => l.tipo.nome === "Mix R$")[0], "the Mix R$ row");
+    expect([linha.atingimento, linha.premioCentavos]).toEqual([150, 10000]);
   });
 
   it("em Minhas Metas, mostra o Progresso e as entradas da Lista por tipo e depois por nome", async () => {

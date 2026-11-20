@@ -16,7 +16,8 @@ function candidatoClaro(nome: string, usuarios: { id: string; nomes: string[] }[
   const nomes = nomesDe(nome);
   const identicos = usuarios.filter((u) => nomes.length >= 2 && u.nomes.join(" ") === nomes.join(" "));
   const candidatos = identicos.length > 0 ? identicos : usuarios.filter((u) => compativel(nomes, u.nomes));
-  return candidatos.length === 1 ? candidatos[0]!.id : null;
+  const [unico] = candidatos;
+  return candidatos.length === 1 && unico ? unico.id : null;
 }
 
 /**

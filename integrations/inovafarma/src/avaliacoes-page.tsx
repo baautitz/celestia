@@ -145,7 +145,7 @@ function MinhasAvaliacoes({ contexto }: { contexto: Contexto }) {
 function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
   const { feedback, windows } = useUi();
   const [periodoId, setPeriodoId] = useState(periodoInicial(contexto.periodos));
-  const [loja, setLoja] = useState(contexto.todasAsLojas || contexto.lojasGerenciadas.length !== 1 ? TODAS : String(contexto.lojasGerenciadas[0]!.codigo));
+  const [loja, setLoja] = useState(contexto.todasAsLojas || contexto.lojasGerenciadas.length !== 1 ? TODAS : String(contexto.lojasGerenciadas[0]?.codigo ?? TODAS));
   const consulta = new URLSearchParams({ periodoId });
   if (loja !== TODAS) consulta.set("codigoLoja", loja);
   const { avaliacoes, carregando, carregar } = useAvaliacoes(periodoId ? `${BASE}?${consulta}` : null);
@@ -153,13 +153,19 @@ function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
   const linhas = useMemo<LinhaColaborador[]>(() => {
     const porColaborador = new Map<number, Avaliacao[]>();
     for (const a of avaliacoes) porColaborador.set(a.codigoColaborador, [...(porColaborador.get(a.codigoColaborador) ?? []), a]);
-    return [...porColaborador.values()].map((lista) => ({
-      codigoColaborador: lista[0]!.codigoColaborador,
-      nomeColaborador: lista[0]!.nomeColaborador,
-      quantidade: lista.length,
-      total: somar(lista),
-      avaliacoes: lista,
-    }));
+    return [...porColaborador.values()].flatMap((lista) => {
+      const primeira = lista[0];
+      if (!primeira) return [];
+      return [
+        {
+          codigoColaborador: primeira.codigoColaborador,
+          nomeColaborador: primeira.nomeColaborador,
+          quantidade: lista.length,
+          total: somar(lista),
+          avaliacoes: lista,
+        },
+      ];
+    });
   }, [avaliacoes]);
 
   if (!contexto.todasAsLojas && contexto.lojasGerenciadas.length === 0) {

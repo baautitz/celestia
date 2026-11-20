@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
+import { defined } from "./test/defined";
 
 const categoria = (quantidade: number, valor: number) => ({ quantidade, valor });
 const resumo = {
@@ -39,7 +40,7 @@ describe("colaboradoresTotals", () => {
   });
 
   it("não soma colunas de percentual, ticket médio nem participação", () => {
-    const totals = colaboradoresTotals(resumo)!;
+    const totals = defined(colaboradoresTotals(resumo), "the totals");
     for (const key of ["cmvPercent", "ticketMedio", "participacaoPercent", "cadastroPercent"]) expect(key in totals).toBe(false);
   });
 
@@ -52,7 +53,7 @@ describe("colaboradoresTotalsCompare", () => {
   const anterior = { label: "Setembro/2026", resumo: { ...resumo, totalBrutoGeral: 800, totalDescontoGeral: 120 } };
 
   it("compara cada total com o do Período anterior, com a direção favorável da coluna", () => {
-    const compare = colaboradoresTotalsCompare(anterior, { totalDesconto: "down" })!;
+    const compare = defined(colaboradoresTotalsCompare(anterior, { totalDesconto: "down" }), "the comparison");
     expect(compare.totalBruto).toEqual({ previous: 800, label: "Setembro/2026", favorable: undefined });
     expect(compare.totalDesconto).toEqual({ previous: 120, label: "Setembro/2026", favorable: "down" });
     expect(compare["vitaminas-valor"]?.previous).toBe(100);

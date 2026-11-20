@@ -77,7 +77,7 @@ const somaAbsoluta = (ajustes: Ajuste[]) => ajustes.reduce((n, a) => n + Math.ab
 function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: Motivo[] }) {
   const { feedback, windows } = useUi();
   const [periodoId, setPeriodoId] = useState(periodoInicial(contexto.periodos));
-  const [loja, setLoja] = useState(contexto.todasAsLojas || contexto.lojasGerenciadas.length !== 1 ? TODAS : String(contexto.lojasGerenciadas[0]!.codigo));
+  const [loja, setLoja] = useState(contexto.todasAsLojas || contexto.lojasGerenciadas.length !== 1 ? TODAS : String(contexto.lojasGerenciadas[0]?.codigo ?? TODAS));
   const [grupo, setGrupo] = useState<Grupo | null>("furo");
   const [ajustes, setAjustes] = useState<Ajuste[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -148,13 +148,14 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
   };
 
   const verJustificativa = async (ajuste: Ajuste) => {
-    if (!ajuste.justificativa) return;
+    const { justificativa } = ajuste;
+    if (!justificativa) return;
     await windows.open({
       surface: "dialog",
       size: "small",
       title: "Justificativa",
       description: `Ajuste ${ajuste.codigoMovimento} · ${nomeLoja(ajuste.codigoLoja)} · ${formatCurrency(ajuste.totalCusto)}`,
-      content: () => <VerJustificativaWindow justificativa={ajuste.justificativa!} />,
+      content: () => <VerJustificativaWindow justificativa={justificativa} />,
     });
   };
 

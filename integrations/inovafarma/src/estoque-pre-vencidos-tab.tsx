@@ -23,7 +23,7 @@ const BASE = "/api/m/inovafarma/pre-vencidos";
  */
 export function EstoquePreVencidosTab({ lojas, retroativa }: { lojas: LojaOpcao[]; retroativa?: InclusaoRetroativa }) {
   const { feedback, windows } = useUi();
-  const [loja, setLoja] = useState(lojas.length > 0 ? String(lojas[0]!.codigo) : "");
+  const [loja, setLoja] = useState(String(lojas[0]?.codigo ?? ""));
   const [zerados, setZerados] = useState(false);
   const [itens, setItens] = useState<ItemPreVencido[]>([]);
   const [carregando, setCarregando] = useState(false);

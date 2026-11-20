@@ -31,7 +31,10 @@ export const novaMeta = (periodoId: string, tipo: TipoMeta, ativos: ColaboradorA
  */
 export function copiarMeta(origem: Meta, periodoId: string, tipo: TipoMeta, ativos: ColaboradorAtivo[]) {
   const ativo = new Map(ativos.map((c) => [c.codigoColaborador, c]));
-  const ficam = origem.participantes.filter((p) => ativo.has(p.codigoColaborador)).map((p) => ({ ...p, nome: ativo.get(p.codigoColaborador)!.nome }));
+  const ficam = origem.participantes.flatMap((p) => {
+    const colaborador = ativo.get(p.codigoColaborador);
+    return colaborador ? [{ ...p, nome: colaborador.nome }] : [];
+  });
   const sairam = origem.participantes.filter((p) => !ativo.has(p.codigoColaborador));
   const excluidos = origem.excluidos.filter((c) => ativo.has(c));
   const conhecidos = new Set([...ficam.map((p) => p.codigoColaborador), ...excluidos]);

@@ -6,6 +6,7 @@ import { MemoryMetaStore } from "./metas-store";
 import { declareTiposMetaAudit } from "./tipos-meta-audit";
 import type { PeriodoResumo } from "./pre-vencidos-routes";
 import type { AuditService } from "./vinculo-audit";
+import { defined } from "./test/defined";
 
 const MANAGE = "inovafarma:tipos-meta:manage";
 
@@ -81,7 +82,7 @@ function boot() {
   const log: string[] = [];
   const audit: AuditService = {
     declareAction: (def) => void resumos.set(def.action, def.summary as (a: never) => string),
-    record: async (input) => void log.push(resumos.get(input.action)!(input.attributes as never)),
+    record: async (input) => void log.push(defined(resumos.get(input.action), "the audit summary")(input.attributes as never)),
   };
   declareTiposMetaAudit(audit);
   // O Usuário vem do cabeçalho: "gil" gerencia os Tipos de Meta, "ana" não.
@@ -147,7 +148,7 @@ describe("Tipos de Meta", () => {
       { codigoColaborador: 1, nome: "ANA", alvo: 28 },
       { codigoColaborador: 2, nome: "BIA", alvo: null },
     ];
-    const abril = (await metas.criar({ periodoId: "abril", tipoId: criado.id, participantes, excluidos: [] }))!;
+    const abril = defined((await metas.criar({ periodoId: "abril", tipoId: criado.id, participantes, excluidos: [] })), "the created Meta");
     await metas.criar({ periodoId: "marco", tipoId: criado.id, participantes, excluidos: [] });
 
     const aplicacao = (await (await req("gil", "GET", `/metas/tipos/${criado.id}/aplicacao`)).json()) as { periodos: { id: string; metaId: string; participantes: unknown[] }[] };
@@ -155,10 +156,10 @@ describe("Tipos de Meta", () => {
 
     const aplicar = (metaId: string, version: number) => req("gil", "POST", `/metas/tipos/${criado.id}/aplicar-alvo-padrao`, { aplicacoes: [{ metaId, version, codigos: [2] }] });
     expect((await aplicar(abril.id, abril.version)).status).toBe(200);
-    const [atualizada] = await metas.listar(["abril"]);
-    expect(atualizada!.participantes.map((p) => p.alvo)).toEqual([28, 30]);
+    const atualizada = defined((await metas.listar(["abril"]))[0], "the April Meta");
+    expect(atualizada.participantes.map((p) => p.alvo)).toEqual([28, 30]);
     expect((await aplicar(abril.id, abril.version)).status).toBe(409);
-    const marco = (await metas.listar(["marco"]))[0]!;
+    const marco = defined((await metas.listar(["marco"]))[0], "the March Meta");
     expect((await aplicar(marco.id, marco.version)).status).toBe(409);
     expect(log.at(-1)).toBe('Aplicou o Alvo padrão 30% do Tipo de Meta "CMV" a 1 Participante no período "Abril": BIA.');
   });
@@ -305,10 +306,10 @@ describe("Tipo de Meta de Lista de Produtos", () => {
     const { req, metas } = boot();
     const criado = (await (await req("gil", "POST", "/metas/tipos", lista)).json()) as Tipo;
     const emReais = { ...lista, alvoPadrao: null, lista: { ...lista.lista, unidade: "reais" } };
-    expect(((await (await req("gil", "GET", "/metas/tipos")).json()) as { temMetas: boolean }[])[0]!.temMetas).toBe(false);
+    expect(((await (await req("gil", "GET", "/metas/tipos")).json()) as { temMetas: boolean }[])[0]?.temMetas).toBe(false);
 
     await metas.criar({ periodoId: "marco", tipoId: criado.id, participantes: [], excluidos: [] });
-    expect(((await (await req("gil", "GET", "/metas/tipos")).json()) as { temMetas: boolean }[])[0]!.temMetas).toBe(true);
+    expect(((await (await req("gil", "GET", "/metas/tipos")).json()) as { temMetas: boolean }[])[0]?.temMetas).toBe(true);
     const recusa = await req("gil", "PUT", `/metas/tipos/${criado.id}`, { ...emReais, version: 1 });
     expect(recusa.status).toBe(400);
     expect(((await recusa.json()) as { error: string }).error).toMatch(/a unidade não muda/);

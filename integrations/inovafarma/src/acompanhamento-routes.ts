@@ -353,9 +353,11 @@ export function registerAcompanhamentoRoutes(deps: AcompanhamentoRoutesDeps): vo
     if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
     const pedida = c.req.query("codigoEmpresa");
     const loja = pedida && Number.isInteger(Number(pedida)) ? Number(pedida) : null;
-    if (visualizacao === "loja" && loja !== null && !acesso.lojas!.includes(loja)) return c.json({ error: LOJA_FORA }, 403);
+    // Na Exibição por Loja o acesso por Loja foi checado acima: `lojas` nunca é nulo aqui.
+    const lojasDoUsuario = acesso.lojas ?? [];
+    if (visualizacao === "loja" && loja !== null && !lojasDoUsuario.includes(loja)) return c.json({ error: LOJA_FORA }, 403);
     // Geral sem Loja: todos. Loja sem Loja escolhida: as Lojas do Vínculo do Usuário.
-    const filtro = loja !== null ? [loja] : visualizacao === "loja" ? acesso.lojas! : null;
+    const filtro = loja !== null ? [loja] : visualizacao === "loja" ? lojasDoUsuario : null;
 
     let resultado: Awaited<ReturnType<typeof apuracaoDe>>;
     try {

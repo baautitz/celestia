@@ -62,9 +62,15 @@ const colunas: DataTableColumn<MinhaMeta>[] = [
   { key: "premio", label: "Prêmio", value: (m) => (m.premioCentavos === undefined ? null : m.premioCentavos / 100), format: "currency" },
 ];
 
+const coluna = (indice: number): DataTableColumn<MinhaMeta> => {
+  const achada = colunas[indice];
+  if (!achada) throw new Error(`Coluna ${indice} não definida em Minhas Metas.`);
+  return achada;
+};
+
 /** Visualização Tabela: cada Meta com rótulo e valor; em cima o Período anterior, embaixo o atual. */
 const colunasTabela = (olho: (m: MinhaMeta) => React.ReactNode): DataTableColumn<MinhaMeta>[] => [
-  colunas[0]!,
+  coluna(0),
   {
     key: "valores",
     label: "Metas",
@@ -102,7 +108,7 @@ const colunasTabela = (olho: (m: MinhaMeta) => React.ReactNode): DataTableColumn
     ),
     cellClassName: "min-w-md",
   },
-  { ...colunas[2]!, divider: true },
+  { ...coluna(2), divider: true },
 ];
 
 const colunasBaixa: DataTableColumn<MinhaBaixa>[] = [
