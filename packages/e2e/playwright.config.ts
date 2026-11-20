@@ -29,7 +29,7 @@ export default defineConfig({
       env: {
         E2E_API_PORT: String(API_PORT),
         E2E_WEB_PORT: String(WEB_PORT),
-        // Chave AES-256 descartavel, so para os testes (cifra a senha da conexao).
+        // Chave descartavel de 16 bytes (32 caracteres hex), so para os testes (cifra a senha da conexao).
         ERP_ENCRYPTION_KEY: Buffer.alloc(16, 7).toString("hex"),
       },
       // Estado em memoria: sempre um backend novo, para os testes serem repetiveis.
@@ -40,7 +40,9 @@ export default defineConfig({
       command: `pnpm --filter @platform/web exec vite --port ${WEB_PORT} --strictPort`,
       url: `http://localhost:${WEB_PORT}`,
       env: { API_PROXY_TARGET: `http://localhost:${API_PORT}` },
-      reuseExistingServer: !process.env.CI,
+      // Nunca reaproveita um Vite que ja esteja na porta: ele poderia apontar para outro backend ou ter codigo velho.
+      // Com --strictPort, porta ocupada falha com mensagem clara.
+      reuseExistingServer: false,
       timeout: 60_000,
     },
   ],

@@ -44,7 +44,8 @@ await store.setAdmin("usr_e2e_admin", true);
 
 const port = Number(process.env.E2E_API_PORT) || 3100;
 // Autoridade certificadora só em memória. Atende por HTTP de verdade (a leitura do certificado redireciona o navegador)
-// e o backend a chama direto, sem rede. A leitura apresenta o Dispositivo CERT_DEVICE_NAME, como o proxy faria.
+// e o backend a chama direto, sem rede. A leitura apresenta o Dispositivo ativo chamado CERT_DEVICE_NAME, como o proxy
+// faria; quem emite esse Dispositivo são os próprios testes (provisionCertificateDevice), cada um com o seu.
 const sharedSecret = "chave-em-comum-do-e2e-com-mais-de-32-caracteres";
 const caPort = Number(process.env.E2E_CA_PORT) || 3101;
 const webPort = Number(process.env.E2E_WEB_PORT) || 5174;
@@ -62,7 +63,6 @@ const certificateAuthority = new HttpCertificateAuthorityClient({
   secret: sharedSecret,
   fetch: (input, init) => Promise.resolve(caApp.request(String(input), init)),
 });
-await certificateAuthority.issueDevice({ name: CERT_DEVICE_NAME });
 serve({ fetch: caApp.fetch, port: caPort });
 serve({ fetch: createPlatformApp({ userStore: store, certificateAuthority }).fetch, port });
 console.log(`Backend E2E em http://localhost:${port} (autoridade certificadora em http://localhost:${caPort})`);
