@@ -1,6 +1,7 @@
 {
   "name": "celestia-root",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@10.18.2",
   "workspaces": [
     "integrations/*",
