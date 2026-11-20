@@ -5,6 +5,10 @@ import { defineModule, type ModuleDef } from "@platform/core/module";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { createInovafarmaDriver } from "./driver.js";
 import { registerColaboradoresRoutes, type UsersService } from "./colaboradores-routes.js";
+import { declareColunasDesempenhoAudit } from "./colunas-desempenho-audit.js";
+import { registerColunasDesempenhoRoutes } from "./colunas-desempenho-routes.js";
+import { MemoryColunaDesempenhoStore } from "./colunas-desempenho-store.js";
+import { PostgresColunaDesempenhoStore } from "./postgres-colunas-desempenho-store.js";
 import { registerDesempenhoRoutes } from "./desempenho-routes.js";
 import type { ErpQuery } from "./metas-comum.js";
 import { PostgresVinculoStore } from "./postgres-vinculo-store.js";
@@ -82,6 +86,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declareAvaliacaoAudit(audit);
       declareFuroEstoqueAudit(audit);
       declareTiposMetaAudit(audit);
+      declareColunasDesempenhoAudit(audit);
       declareMetasAudit(audit);
       declareApuracaoAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
@@ -156,7 +161,9 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         audit,
         users,
       });
-      registerDesempenhoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], vinculos: store, periods });
+      const colunasDesempenho = db ? new PostgresColunaDesempenhoStore(db) : new MemoryColunaDesempenhoStore();
+      registerColunasDesempenhoRoutes({ routes, permissions, auth, store: colunasDesempenho, audit });
+      registerDesempenhoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], vinculos: store, periods, colunas: colunasDesempenho });
     },
   });
 }

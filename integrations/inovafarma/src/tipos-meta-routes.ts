@@ -65,6 +65,9 @@ const valores = (t: TipoMeta): ValoresTipo => {
 export function registerTiposMetaRoutes({ routes, permissions, auth, erpClient, store, metas, periods, audit }: TiposMetaRoutesDeps): void {
   const manage = INOVAFARMA_PERMISSIONS.ref("tipos-meta:manage");
   const pode = (c: AuthContext) => permissions.has(c.get("user")?.permissions, manage.key);
+  // A busca e a conferência das entradas também servem à montagem das colunas do Desempenho de Vendas.
+  const colunas = INOVAFARMA_PERMISSIONS.ref("colunas-desempenho:manage");
+  const podeBuscar = (c: AuthContext) => pode(c) || permissions.has(c.get("user")?.permissions, colunas.key);
 
   const registrar = (c: AuthContext, action: string, tipo: TipoMeta, anterior: TipoMeta | null = null) =>
     audit.record({
@@ -133,7 +136,7 @@ export function registerTiposMetaRoutes({ routes, permissions, auth, erpClient, 
 
   // Busca de entradas da Lista de Produtos no ERP, só no tipo escolhido.
   routes.get("/tipos-meta/lista/busca", auth, async (c: AuthContext) => {
-    if (!pode(c)) return c.json({ error: manage.deniedMessage }, 403);
+    if (!podeBuscar(c)) return c.json({ error: manage.deniedMessage }, 403);
     const parsedTipo = TipoBusca.safeParse(c.req.query("tipo"));
     if (!parsedTipo.success) return recusaDeValidacao(c, parsedTipo.error);
     const tipo = parsedTipo.data;
@@ -151,7 +154,7 @@ export function registerTiposMetaRoutes({ routes, permissions, auth, erpClient, 
 
   // Quais entradas da Lista ainda existem no ERP: as outras aparecem com o aviso "não encontrado no ERP".
   routes.post("/tipos-meta/lista/conferir", auth, async (c: AuthContext) => {
-    if (!pode(c)) return c.json({ error: manage.deniedMessage }, 403);
+    if (!podeBuscar(c)) return c.json({ error: manage.deniedMessage }, 403);
     const parsed = Conferencia.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const consulta = conferirSql(parsed.data.entradas);

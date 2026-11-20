@@ -1,41 +1,16 @@
-/**
- * Categorias de produto somadas no Desempenho de Vendas (Qtde em unidades e Valor líquido).
- * IDs fixos da base do cliente: Vitaminas por Produto_Grupo; as demais por Produto_Sessao.
- * `filtro` entra literal no SQL: é constante, nunca entrada do usuário.
- */
-const CATEGORIAS_FOCO = {
-  vitaminas: { coluna: "Vitaminas", filtro: "p.CodigoGrupo = 44" },
-  genericos: { coluna: "Genericos", filtro: "p.CodigoSessao = 261" },
-  similares: { coluna: "Similares", filtro: "p.CodigoSessao = 271" },
-  incentivos: { coluna: "Incentivos", filtro: "p.CodigoSessao = 281" },
-} as const;
+import type { ColunaDesempenho } from "./colunas-desempenho.js";
+import { COLUNA_DO_PRODUTO, idsPorTipo } from "./lista-produtos.js";
+
 
 /**
- * Total Foco: itens de qualquer categoria, contados uma vez. Uma Vitamina pode estar na seção de
- * Similares ou Incentivos, então somar as colunas contaria o item em dobro; o OR no SQL evita isso.
+ * Condição SQL da coluna sobre `p` (Produto): as entradas dela e as das colunas da união, por `OR`. Os ids vão por
+ * parâmetro (`col<posição>_…`), nunca no SQL; sem nenhuma entrada, não casa com nada.
  */
-export const CATEGORIAS = {
-  ...CATEGORIAS_FOCO,
-  totalFoco: {
-    coluna: "TotalFoco",
-    filtro: `(${Object.values(CATEGORIAS_FOCO)
-      .map((c) => c.filtro)
-      .join(" OR ")})`,
-  },
-} as const;
-
-export type Categoria = keyof typeof CATEGORIAS;
-export type CategoriaColuna = (typeof CATEGORIAS)[Categoria]["coluna"];
-export type CategoriaTotal = { quantidade: number; valor: number };
-export type CategoriaTotais = Record<Categoria, CategoriaTotal>;
-
-export const porCategoria = (fn: (categoria: Categoria) => CategoriaTotal): CategoriaTotais => ({
-  vitaminas: fn("vitaminas"),
-  genericos: fn("genericos"),
-  similares: fn("similares"),
-  incentivos: fn("incentivos"),
-  totalFoco: fn("totalFoco"),
-});
+export function condicaoDaColuna(coluna: Pick<ColunaDesempenho, "entradas" | "uniao">, todas: readonly ColunaDesempenho[], posicao: number, params: Record<string, unknown>): string {
+  const entradas = [...coluna.entradas, ...coluna.uniao.flatMap((id) => todas.find((c) => c.id === id)?.entradas ?? [])];
+  const condicoes = idsPorTipo(entradas, params, `col${posicao}_`).map(([tipo, nomes]) => `${COLUNA_DO_PRODUTO[tipo]} IN (${nomes})`);
+  return condicoes.length ? `(${condicoes.join(" OR ")})` : "1 = 0";
+}
 
 // Como no relatório oficial do InovaFarma: vendas sem caixa aberto (CodigoAbertura nulo) ficam fora,
 // a Taxa de Entrega (Produto_Inventario_Grupo 3) não conta como venda,
@@ -65,10 +40,21 @@ export const vendasFromWhere = (filtro: string) => `
 
 /**
  * SQL do Desempenho de Vendas por Colaborador e do total de vendas. `filtroEmpresa` é montado pelo servidor
- * com parâmetros (`@dataInicio`, `@dataFim` e os do filtro), nunca com entrada do usuário.
+ * com parâmetros (`@dataInicio`, `@dataFim` e os do filtro), nunca com entrada do usuário. Os ids das `colunas` personalizadas
+ * vêm em `params`, para somar aos do filtro.
  */
-export function desempenhoSql(filtroEmpresa: string) {
+export function desempenhoSql(filtroEmpresa: string, colunas: readonly ColunaDesempenho[] = []) {
   const fromWhere = vendasFromWhere(filtroEmpresa);
+  // Colunas personalizadas: `colQtd<i>`, `colValor<i>`, `colCmv<i>` e `colVendas<i>` (vendas distintas com item da coluna) na ordem de `colunas`; os ids das entradas vão em `params`.
+  const params: Record<string, unknown> = {};
+  const personalizadas = colunas.map((coluna, i) => {
+    const condicao = condicaoDaColuna(coluna, colunas, i, params);
+    return `,
+      CAST(SUM(CASE WHEN ${condicao} THEN vp.Quantidade END) AS float) AS colQtd${i},
+      CAST(SUM(CASE WHEN ${condicao} THEN vp.Total END) AS float) AS colValor${i},
+      CAST(SUM(CASE WHEN ${condicao} THEN vp.Quantidade * vp.PrecoCusto END) AS float) AS colCmv${i},
+      COUNT(DISTINCT CASE WHEN ${condicao} THEN vp.CodigoVenda END) AS colVendas${i}`;
+  });
 
   const sql = `
     SELECT
@@ -79,11 +65,7 @@ export function desempenhoSql(filtroEmpresa: string) {
       CAST(SUM(vp.TotalDesconto) AS float) AS totalDesconto,
       CAST(SUM(vp.Total + ${REEMBOLSO_PBM}) AS float) AS totalLiquido,
       CAST(SUM(vp.Quantidade * vp.PrecoCusto) AS float) AS totalCmv,
-      COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN vp.CodigoVenda END) AS vendasComCadastro,
-      ${Object.values(CATEGORIAS).map(({ coluna, filtro }) => {
-        return `CAST(SUM(CASE WHEN ${filtro} THEN vp.Quantidade END) AS float) AS qtd${coluna},
-      CAST(SUM(CASE WHEN ${filtro} THEN vp.Total END) AS float) AS valor${coluna}`;
-      }).join(",\n            ")}
+      COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN vp.CodigoVenda END) AS vendasComCadastro${personalizadas.join("")}
     ${fromWhere}
     GROUP BY vp.CodigoFuncionario, c.Nome
     ORDER BY totalLiquido DESC
@@ -97,5 +79,5 @@ export function desempenhoSql(filtroEmpresa: string) {
       COUNT(DISTINCT CASE WHEN v.CodigoCadastro <> 0 THEN v.CodigoVenda END) AS totalVendasComCadastro
     ${fromWhere}
   `;
-  return { sql, sqlTotalVendas };
+  return { sql, sqlTotalVendas, params };
 }

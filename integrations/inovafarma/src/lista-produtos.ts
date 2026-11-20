@@ -3,7 +3,7 @@ import { buscaProdutosSql, LIMITE_BUSCA } from "./produtos-erp.js";
 import { TIPOS_ENTRADA, type EntradaLista, type ListaTipo, type TipoEntrada } from "./tipos-meta.js";
 
 /** Como cada tipo de entrada casa com o produto vendido no ERP: a coluna de `Produto` comparada com o id da entrada. */
-const COLUNA_DO_PRODUTO: Record<TipoEntrada, string> = {
+export const COLUNA_DO_PRODUTO: Record<TipoEntrada, string> = {
   produto: "CONVERT(varchar(36), p.rowguid)",
   grupo: "p.CodigoGrupo",
   secao: "p.CodigoSessao",
@@ -12,19 +12,19 @@ const COLUNA_DO_PRODUTO: Record<TipoEntrada, string> = {
 };
 
 /** O valor do parâmetro: o rowguid em texto no Produto, o código numérico nos demais. */
-const parametro = (tipo: TipoEntrada, id: string): string | number => (tipo === "produto" ? id : Number(id));
+export const parametro = (tipo: TipoEntrada, id: string): string | number => (tipo === "produto" ? id : Number(id));
 
 /**
  * Os ids das entradas por parâmetro, nunca no SQL: para cada tipo com entradas, grava `@produto0`, `@produto1`… em
  * `params` e devolve o tipo com a lista dos nomes ("@produto0, @produto1").
  */
-function idsPorTipo(entradas: Pick<EntradaLista, "tipo" | "id">[], params: Record<string, unknown>): [TipoEntrada, string][] {
+export function idsPorTipo(entradas: Pick<EntradaLista, "tipo" | "id">[], params: Record<string, unknown>, prefixo = ""): [TipoEntrada, string][] {
   return TIPOS_ENTRADA.flatMap((tipo) => {
     const ids = entradas.filter((e) => e.tipo === tipo).map((e) => e.id);
     if (ids.length === 0) return [];
     const nomes = ids.map((id, i) => {
-      params[`${tipo}${i}`] = parametro(tipo, id);
-      return `@${tipo}${i}`;
+      params[`${prefixo}${tipo}${i}`] = parametro(tipo, id);
+      return `@${prefixo}${tipo}${i}`;
     });
     return [[tipo, nomes.join(", ")]];
   });

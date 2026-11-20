@@ -4,7 +4,8 @@ import type { IndicadorId } from "./indicadores.js";
 import type { MetaApurada } from "./apuracao-store.js";
 import type { BaixaDoPeriodo } from "./baixas-do-periodo.js";
 import type { ItemCongelado } from "./baixas-congeladas-store.js";
-import type { Exibicao, ListaTipo, RegraPremio } from "./tipos-meta.js";
+import type { MedidaColuna } from "./colunas-desempenho.js";
+import type { EntradaLista, Exibicao, ListaTipo, RegraPremio } from "./tipos-meta.js";
 
 /** Um schema Postgres por Module. */
 export const inovafarmaSchema = pgSchema("inovafarma");
@@ -124,6 +125,26 @@ export const tiposMeta = inovafarmaSchema.table(
     atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("tipos_meta_nome_unique").on(sql`lower(${t.nome})`)],
+);
+
+/** Colunas do Desempenho de Vendas que o cliente monta: o que soma (entradas e/ou união de outras colunas), sem contar um produto duas vezes. */
+export const colunasDesempenho = inovafarmaSchema.table(
+  "colunas_desempenho",
+  {
+    id: text("id").primaryKey(),
+    nome: text("nome").notNull(),
+    ordem: integer("ordem").notNull(),
+    /** Entradas validadas por `EntradaLista`: ids do ERP, sem FK. */
+    entradas: jsonb("entradas").$type<EntradaLista[]>().notNull().default(sql`'[]'::jsonb`),
+    /** Ids de outras colunas cujas entradas esta também soma (ex.: Total Foco), unidas por OR. */
+    uniao: jsonb("uniao").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    /** O que a coluna mostra na tabela (`MEDIDAS_COLUNA`). */
+    medidas: jsonb("medidas").$type<MedidaColuna[]>().notNull().default(sql`'["quantidade","valor","participacaoPercent","cmvPercent","ticketMedio"]'::jsonb`),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("colunas_desempenho_nome_unique").on(sql`lower(${t.nome})`)],
 );
 
 export const metas = inovafarmaSchema.table(
