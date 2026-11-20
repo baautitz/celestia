@@ -4,6 +4,9 @@ import { createContext, useContext, useState, useEffect } from "react";
 interface HeaderActionsContextType {
   actions: React.ReactNode | null;
   setActions: (actions: React.ReactNode | null) => void;
+  /** Controles de contexto da página (ex.: um seletor), exibidos na barra antes das ações. */
+  toolbar: React.ReactNode | null;
+  setToolbar: (toolbar: React.ReactNode | null) => void;
   /** Destino da seta de voltar exibida ao lado do botão da sidebar. */
   backTo: string | null;
   setBackTo: (to: string | null) => void;
@@ -13,10 +16,11 @@ const HeaderActionsContext = createContext<HeaderActionsContextType | undefined>
 
 export const HeaderActionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [actions, setActions] = useState<React.ReactNode | null>(null);
+  const [toolbar, setToolbar] = useState<React.ReactNode | null>(null);
   const [backTo, setBackTo] = useState<string | null>(null);
 
   return (
-    <HeaderActionsContext.Provider value={{ actions, setActions, backTo, setBackTo }}>
+    <HeaderActionsContext.Provider value={{ actions, setActions, toolbar, setToolbar, backTo, setBackTo }}>
       {children}
     </HeaderActionsContext.Provider>
   );
@@ -39,6 +43,20 @@ export const HeaderActions: React.FC<{ children: React.ReactNode }> = ({ childre
       setActions(null);
     };
   }, [children, setActions]);
+
+  return null;
+};
+
+/** Coloca controles de contexto na barra global (antes das ações) enquanto a página estiver montada. */
+export const HeaderToolbar: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { setToolbar } = useHeaderActions();
+
+  useEffect(() => {
+    setToolbar(children);
+    return () => {
+      setToolbar(null);
+    };
+  }, [children, setToolbar]);
 
   return null;
 };
