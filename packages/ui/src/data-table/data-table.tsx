@@ -531,11 +531,21 @@ export function DataTable<TRow>({
     if (!isWide || !head || !table || typeof ResizeObserver === "undefined") return;
     const measure = () => {
       const cells = Array.from(head.querySelectorAll<HTMLElement>("tr:last-child > th"));
-      setWideLayout({
+      const next = {
         tableWidth: table.offsetWidth,
         columnWidths: cells.map((c) => c.getBoundingClientRect().width),
         headHeight: head.offsetHeight,
-      });
+      };
+      // Mesmas medidas: mantém o objeto, senão a cópia do cabeçalho redesenha e volta o `scrollLeft` no meio da rolagem.
+      setWideLayout((prev) =>
+        prev &&
+        prev.tableWidth === next.tableWidth &&
+        prev.headHeight === next.headHeight &&
+        prev.columnWidths.length === next.columnWidths.length &&
+        prev.columnWidths.every((w, i) => w === next.columnWidths[i])
+          ? prev
+          : next,
+      );
     };
     measure();
     const observer = new ResizeObserver(measure);
