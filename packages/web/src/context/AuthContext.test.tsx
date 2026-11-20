@@ -2,7 +2,7 @@
 import React from "react";
 import { Button } from "@platform/ui/components/button";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Text } from "@platform/ui/components/layout";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { api } from "@/lib/api-client";
@@ -84,8 +84,10 @@ describe("AuthProvider", () => {
   it("o login que termina enquanto a restauração da sessão ainda falha não é desfeito", async () => {
     let failRestore!: () => void;
     let restoring = true;
+    let meCalls = 0;
     vi.stubGlobal("fetch", async (path: string) => {
       if (path === "/api/auth/me") {
+        meCalls += 1;
         if (!restoring) return json(200, me); // repetida com o token do login
         // A restauração do início da página: ainda sem token, falha só depois do login.
         restoring = false;
@@ -107,8 +109,35 @@ describe("AuthProvider", () => {
     await screen.findByText("voltou");
     failRestore();
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await waitFor(() => expect(screen.getByText("logado")).toBeTruthy());
+    // A restauração termina repetindo a leitura com o token novo; só então vale conferir que o login ficou.
+    await waitFor(() => expect(meCalls).toBe(2));
+    await act(async () => {});
     expect(screen.getByText("logado")).toBeTruthy();
+  });
+
+  it("mantém estáveis as funções do contexto entre renderizações", async () => {
+    vi.stubGlobal("fetch", async () => json(401, { error: "sem sessão" }));
+    const seen: Array<ReturnType<typeof useAuth>> = [];
+    function Capture() {
+      const auth = useAuth();
+      seen.push(auth);
+      return <Text>{auth.isLoading ? "carregando" : "pronto"}</Text>;
+    }
+    const { rerender } = render(
+      <AuthProvider>
+        <Capture />
+      </AuthProvider>,
+    );
+    await screen.findByText("pronto");
+    rerender(
+      <AuthProvider>
+        <Capture />
+      </AuthProvider>,
+    );
+    const [first, last] = [seen[seen.length - 2], seen[seen.length - 1]];
+    expect(last?.login).toBe(first?.login);
+    expect(last?.loginWithCertificate).toBe(first?.loginWithCertificate);
+    expect(last?.logout).toBe(first?.logout);
+    expect(last?.hasPermission).toBe(first?.hasPermission);
   });
 });

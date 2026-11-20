@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthTokens, JWTAccessPayload } from "@platform/shared";
 import { api } from "@/lib/api-client";
 
@@ -25,7 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Conta os logins concluídos: uma restauração de sessão que começou antes de um login não pode desfazê-lo ao falhar.
   const signIns = useRef(0);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     const startedAt = signIns.current;
     try {
       const res = await api.auth.me();
@@ -35,11 +35,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    refreshUser();
-  }, []);
+    void refreshUser();
+  }, [refreshUser]);
 
   // O servidor recusou renovar a sessão (ex.: o Dispositivo foi revogado): sai do cliente em vez de ficar "logado" com erro.
   useEffect(() => {
@@ -47,63 +47,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => api.onSessionExpired(null);
   }, []);
 
-  const signIn = async (tokens: AuthTokens) => {
-    signIns.current += 1;
-    if (tokens.user) {
-      setUser(tokens.user);
-    } else {
-      await refreshUser();
-    }
-  };
+  const signIn = useCallback(
+    async (tokens: AuthTokens) => {
+      signIns.current += 1;
+      if (tokens.user) {
+        setUser(tokens.user);
+      } else {
+        await refreshUser();
+      }
+    },
+    [refreshUser],
+  );
 
-  const login = async (username: string, password: string) => {
-    const result = await api.auth.login(username, password);
-    if ("certificateRequired" in result) return { certificateUrl: result.verifyUrl };
-    await signIn(result);
-    return {};
-  };
+  const login = useCallback(
+    async (username: string, password: string) => {
+      const result = await api.auth.login(username, password);
+      if ("certificateRequired" in result) return { certificateUrl: result.verifyUrl };
+      await signIn(result);
+      return {};
+    },
+    [signIn],
+  );
 
-  const loginWithCertificate = async (challengeId: string, code?: string) => {
-    await signIn(await api.auth.loginWithCertificate(challengeId, code));
-  };
+  const loginWithCertificate = useCallback(
+    async (challengeId: string, code?: string) => {
+      await signIn(await api.auth.loginWithCertificate(challengeId, code));
+    },
+    [signIn],
+  );
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await api.auth.logout();
     } finally {
       setUser(null);
     }
-  };
+  }, []);
 
-  const hasPermission = (permission: string): boolean => {
-    if (!user || !user.permissions) return false;
-    // Permissão universal de admin se configurada, ou correspondência exata
-    return user.permissions.includes(permission) || user.permissions.includes("*");
-  };
-
-  const hasAnyPermission = (...permissions: string[]): boolean => {
-    if (!user || !user.permissions) return false;
-    if (user.permissions.includes("*")) return true;
-    return permissions.some((p) => user.permissions.includes(p));
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        loginWithCertificate,
-        logout,
-        hasPermission,
-        hasAnyPermission,
-        refreshUser,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const hasPermission = useCallback(
+    (permission: string): boolean => {
+      if (!user || !user.permissions) return false;
+      // Permissão universal de admin se configurada, ou correspondência exata
+      return user.permissions.includes(permission) || user.permissions.includes("*");
+    },
+    [user],
   );
+
+  const hasAnyPermission = useCallback(
+    (...permissions: string[]): boolean => {
+      if (!user || !user.permissions) return false;
+      if (user.permissions.includes("*")) return true;
+      return permissions.some((p) => user.permissions.includes(p));
+    },
+    [user],
+  );
+
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user,
+      isAuthenticated: !!user,
+      isLoading,
+      login,
+      loginWithCertificate,
+      logout,
+      hasPermission,
+      hasAnyPermission,
+      refreshUser,
+    }),
+    [user, isLoading, login, loginWithCertificate, logout, hasPermission, hasAnyPermission, refreshUser],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
