@@ -23,14 +23,16 @@ export function createAuthMiddleware(
       return c.json({ error: "Não autenticado: token de acesso não fornecido." }, 401);
     }
 
+    let payload: JWTAccessPayload;
     try {
-      const payload = await tokenService.verifyAccessToken(token);
-      c.set("user", transform(payload));
-      const device = payload.deviceId && payload.deviceName ? { id: payload.deviceId, name: payload.deviceName } : undefined;
-      await runWithDevice(device, next);
+      payload = await tokenService.verifyAccessToken(token);
     } catch {
       return c.json({ error: "Falha na autenticação: token expirado ou inválido." }, 401);
     }
+    c.set("user", transform(payload));
+    const device = payload.deviceId && payload.deviceName ? { id: payload.deviceId, name: payload.deviceName } : undefined;
+    // Fora do try: um erro dos handlers seguintes não pode virar 401.
+    await runWithDevice(device, next);
   };
 }
 
@@ -52,6 +54,16 @@ export function requirePermission(...requiredPermissions: string[]): MiddlewareH
       );
     }
 
+    await next();
+  };
+}
+
+/** Só Administrador passa; `message` diz ao chamador o que ele não pode fazer. Mesmo formato de 403 do `requirePermission`. */
+export function requireAdmin(message = "Acesso negado: somente administradores."): MiddlewareHandler {
+  return async (c: Context, next) => {
+    const user = c.get("user") as JWTAccessPayload | undefined;
+    if (!user) return c.json({ error: "Acesso negado: usuário não autenticado." }, 401);
+    if (!user.isAdmin) return c.json({ error: message }, 403);
     await next();
   };
 }
