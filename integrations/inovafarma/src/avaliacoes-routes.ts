@@ -49,7 +49,7 @@ const NAO_ENCONTRADA = "Avaliação não encontrada.";
 const LOJA_FORA = "A Loja informada não está entre as Lojas que você gerencia.";
 
 const Descricao = z.string().trim().min(1, "Informe a descrição.").max(500, "A descrição deve ter no máximo 500 caracteres.");
-const Valor = z.number({ invalid_type_error: "Informe o valor descontado." }).min(0, "O valor descontado não pode ser negativo.").max(1_000_000, "Valor descontado muito alto.");
+const Valor = z.number({ error: "Informe o valor descontado." }).min(0, "O valor descontado não pode ser negativo.").max(1_000_000, "Valor descontado muito alto.");
 const Nova = z.object({ periodoId: z.string().min(1), codigoColaborador: z.number().int().min(1), codigoLoja: z.number().int().min(1), descricao: Descricao, valor: Valor });
 const Edicao = z.object({ descricao: Descricao, valor: Valor, version: z.number().int().min(1) });
 

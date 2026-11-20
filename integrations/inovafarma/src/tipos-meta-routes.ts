@@ -44,7 +44,7 @@ const Aplicacao = z.object({
 
 const ID_INVALIDO = "Uma entrada da Lista tem um identificador inválido.";
 const Conferencia = z.object({ entradas: z.array(EntradaLista.pick({ tipo: true, id: true }).refine(idValido, ID_INVALIDO)).max(500) });
-const TipoBusca = z.enum(TIPOS_ENTRADA, { errorMap: () => ({ message: "Tipo de entrada da Lista inválido." }) });
+const TipoBusca = z.enum(TIPOS_ENTRADA, { error: "Tipo de entrada da Lista inválido." });
 
 const comPremio = (t: TipoMeta, temMetas = false) => ({ ...t, premio: descreverPremio(t), temMetas });
 

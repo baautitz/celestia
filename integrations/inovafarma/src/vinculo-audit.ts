@@ -46,7 +46,7 @@ function resumo({ codigoColaborador, nomeColaborador, anterior, novo }: Atributo
 
 /** Forma do serviço `log` do Module `audit`; o Plugin não importa `@platform/server` (ADR 0002). */
 export interface AuditService {
-  declareAction<S extends z.ZodTypeAny>(def: { plugin: string; action: string; schemaVersion: number; schema: S; summary(attributes: z.infer<S>): string }): void;
+  declareAction<S extends z.ZodType<Record<string, unknown>>>(def: { plugin: string; action: string; schemaVersion: number; schema: S; summary(attributes: z.infer<S>): string }): void;
   record(input: { plugin: string; action: string; actor: { id: string; name: string }; target: { type: string; id: string }; attributes: unknown }): Promise<unknown>;
 }
 

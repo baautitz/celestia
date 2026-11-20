@@ -31,7 +31,7 @@ const VERSAO_DESATUALIZADA = { error: "O Item foi alterado por outra pessoa. A l
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const Validade = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe a validade como mês e ano (AAAA-MM).");
-const Quantidade = z.number({ invalid_type_error: "Informe a quantidade." }).int("Informe uma quantidade inteira.").min(1, "Informe uma quantidade maior que zero.").max(1_000_000);
+const Quantidade = z.number({ error: "Informe a quantidade." }).int("Informe uma quantidade inteira.").min(1, "Informe uma quantidade maior que zero.").max(1_000_000);
 const DiaDeInclusao = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de inclusão (AAAA-MM-DD).");
 const Novo = z.object({
   codigoLoja: z.number().int().min(1),

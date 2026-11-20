@@ -34,8 +34,8 @@ export interface BaixasDoColaborador {
 const SO_PERIODO_ABERTO = "Só se corrige Baixa no Período aberto.";
 const CORRECAO_EXISTENTE = { error: "A venda já tem Correção de Baixa: altere a que existe.", code: "correcao_existente" };
 const CORRECAO_DESATUALIZADA = { error: "A Correção de Baixa foi alterada por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
-const Motivo = z.string({ invalid_type_error: "Informe o motivo." }).trim().min(1, "Informe o motivo da Correção.").max(500, "O motivo tem no máximo 500 caracteres.");
-const QuantidadeCorrigida = z.number({ invalid_type_error: "Informe a quantidade." }).int("Informe uma quantidade inteira.").min(0, "A quantidade corrigida não pode ser negativa.");
+const Motivo = z.string({ error: "Informe o motivo." }).trim().min(1, "Informe o motivo da Correção.").max(500, "O motivo tem no máximo 500 caracteres.");
+const QuantidadeCorrigida = z.number({ error: "Informe a quantidade." }).int("Informe uma quantidade inteira.").min(0, "A quantidade corrigida não pode ser negativa.");
 const NovaCorrecao = z.object({
   codigoLoja: z.number().int().min(1),
   periodoId: z.string().min(1),

@@ -41,7 +41,7 @@ const SEM_ALVO = "Esta Meta não tem Alvo por Participante.";
 
 const Version = z.number().int().min(1);
 const PremioParticipante = z.object({ version: Version, premio: RegraPremio.nullable() });
-const Alvo = z.number({ invalid_type_error: "Informe o Alvo." }).positive("O Alvo deve ser maior que zero.").max(1e12);
+const Alvo = z.number({ error: "Informe o Alvo." }).positive("O Alvo deve ser maior que zero.").max(1e12);
 const Nova = z.object({ periodoId: z.string().min(1), tipoId: z.string().min(1) });
 const Participacao = z.object({ version: Version, participa: z.boolean(), alvo: Alvo.nullable().optional() });
 const Definicao = z.object({ version: Version, codigos: z.array(z.number().int()).min(1, "Escolha ao menos um Participante."), alvo: Alvo });
