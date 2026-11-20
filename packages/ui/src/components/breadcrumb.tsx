@@ -1,4 +1,4 @@
-import * as React from "react"
+import type * as React from "react"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 
@@ -61,6 +61,8 @@ function BreadcrumbLink({
 
 function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
   return (
+    // biome-ignore lint/a11y/useFocusableInteractive: WAI-ARIA breadcrumb pattern: the current page is a disabled link and must not receive focus.
+    // biome-ignore lint/a11y/useSemanticElements: the current page has no href, so an <a> would be wrong; aria-disabled/current mark it.
     <span
       data-slot="breadcrumb-page"
       role="link"

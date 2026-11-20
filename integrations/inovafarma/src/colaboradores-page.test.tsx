@@ -7,6 +7,7 @@ import { confirmLeave } from "@platform/ui/adapters/leave-guard";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { ApiError } from "@platform/ui/lib/api";
 import { ColaboradoresPage } from "./colaboradores-page";
+import { defined } from "./test/defined";
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
@@ -380,8 +381,8 @@ describe("ColaboradoresPage", () => {
       colaboradores: [{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...pendente, sugestao }],
     });
     const campoUsuario = (row: HTMLElement) => within(row).getByRole("combobox", { name: /^Usuário de / }) as HTMLInputElement;
-    const seloUsuario = (row: HTMLElement) => within(within(row).getAllByRole("cell")[2]!).queryByText("Sugestão");
-    const seloLojas = (row: HTMLElement) => within(within(row).getAllByRole("cell")[3]!).queryByText("Sugestão");
+    const seloUsuario = (row: HTMLElement) => within(defined(within(row).getAllByRole("cell")[2], "the user cell")).queryByText("Sugestão");
+    const seloLojas = (row: HTMLElement) => within(defined(within(row).getAllByRole("cell")[3], "the stores cell")).queryByText("Sugestão");
 
     it("pré-preenche Usuário e Loja com o selo Sugestão, sem gravar ao carregar", async () => {
       apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
@@ -505,7 +506,7 @@ describe("ColaboradoresPage", () => {
       apiFetch.mockResolvedValueOnce(comAvisos(avisos, { lojas: [98, 99] }));
       render(<ColaboradoresPage />);
       const row = await linha("ANA SOUZA");
-      const status = within(row).getAllByRole("cell")[4]!;
+      const status = defined(within(row).getAllByRole("cell")[4], "the status cell");
       expect(within(status).getByText("Loja não encontrada (cód. 98)")).toBeTruthy();
       expect(within(status).getByText("Loja não encontrada (cód. 99)")).toBeTruthy();
     });

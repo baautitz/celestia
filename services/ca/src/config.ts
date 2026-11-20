@@ -46,9 +46,12 @@ function loadAuthority(env: Env, read: ReadFile): CertificateAuthorityMaterial |
   const absent = CA_VARS.filter((name) => !env[name]);
   if (absent.length === CA_VARS.length) return undefined;
   if (absent.length > 0) throw new Error(`Configuração incompleta: defina também ${absent.join(", ")}.`);
+  const certificateFile = env.DEVICE_CA_CERT_FILE;
+  const privateKeyFile = env.DEVICE_CA_KEY_FILE;
+  if (!certificateFile || !privateKeyFile) throw new Error("Configuração incompleta: defina DEVICE_CA_CERT_FILE e DEVICE_CA_KEY_FILE.");
   return {
-    certificatePem: readOrExplain(env.DEVICE_CA_CERT_FILE!, read).toString("utf8"),
-    privateKeyPem: readOrExplain(env.DEVICE_CA_KEY_FILE!, read).toString("utf8"),
+    certificatePem: readOrExplain(certificateFile, read).toString("utf8"),
+    privateKeyPem: readOrExplain(privateKeyFile, read).toString("utf8"),
   };
 }
 

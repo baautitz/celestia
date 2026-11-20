@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthTokens, JWTAccessPayload } from "@platform/shared";
 import { api } from "@/lib/api-client";
 
@@ -86,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasPermission = useCallback(
     (permission: string): boolean => {
-      if (!user || !user.permissions) return false;
+      if (!user?.permissions) return false;
       // Permissão universal de admin se configurada, ou correspondência exata
       return user.permissions.includes(permission) || user.permissions.includes("*");
     },
@@ -95,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasAnyPermission = useCallback(
     (...permissions: string[]): boolean => {
-      if (!user || !user.permissions) return false;
+      if (!user?.permissions) return false;
       if (user.permissions.includes("*")) return true;
       return permissions.some((p) => user.permissions.includes(p));
     },

@@ -12,7 +12,7 @@ import { createErpModule } from "./erp/erp-module.js";
 import { composeModules, migrationPlan, type ModuleEntry } from "./boot/compose.js";
 import { assertMigrationsUpToDate } from "@platform/core/migrations";
 import { PermissionRegistry } from "@platform/core/permissions";
-import { LoginRateLimiter } from "./iam/login-rate-limiter.js";
+import type { LoginRateLimiter } from "./iam/login-rate-limiter.js";
 import { createIamModule } from "./iam/iam-module.js";
 import { AuditLog } from "./audit/audit-log.js";
 import { MemoryAuditStore } from "./audit/audit-store.js";

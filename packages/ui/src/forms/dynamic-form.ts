@@ -117,7 +117,7 @@ export function normalizeDynamicFormValues(
 
     if (field.type === "multi_select") {
       result[field.name] = Array.isArray(val)
-        ? val.map((v) => (typeof v === "string" && !isNaN(Number(v)) && v !== "" ? Number(v) : v))
+        ? val.map((v) => (typeof v === "string" && !Number.isNaN(Number(v)) && v !== "" ? Number(v) : v))
         : [];
     } else {
       result[field.name] = val;

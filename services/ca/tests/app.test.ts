@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createCaApp } from "../src/app.js";
+import { defined } from "./helpers/defined.js";
 import { DeviceCertificateAuthority } from "../src/authority.js";
 import { MemoryDeviceStore } from "../src/device-store.js";
 
@@ -110,10 +111,10 @@ describe("desafio de login e leitura do certificado", () => {
 
     const verify = await app.request(`/verify?challenge=${challengeId}`, { headers: { "x-test-fingerprint": device.fingerprint.toUpperCase() } });
     expect(verify.status).toBe(302);
-    const location = new URL(verify.headers.get("location")!);
+    const location = new URL(defined(verify.headers.get("location"), "the callback location"));
     expect(`${location.origin}${location.pathname}`).toBe(CALLBACK);
     expect(location.searchParams.get("challenge")).toBe(challengeId);
-    const code = location.searchParams.get("code")!;
+    const code = defined(location.searchParams.get("code"), "the callback code");
     expect(code).toBeTruthy();
     expect(location.search).not.toContain(device.fingerprint);
 
@@ -132,7 +133,7 @@ describe("desafio de login e leitura do certificado", () => {
       const { challengeId } = await open(call);
       const verify = await app.request(`/verify?challenge=${challengeId}`, { headers: fingerprint ? { "x-test-fingerprint": fingerprint } : {} });
       expect(verify.status).toBe(302);
-      const location = new URL(verify.headers.get("location")!);
+      const location = new URL(defined(verify.headers.get("location"), "the callback location"));
       expect(location.searchParams.get("code")).toBeNull();
       const denied = await exchange(call, challengeId);
       expect(denied.status).toBe(403);
@@ -145,7 +146,7 @@ describe("desafio de login e leitura do certificado", () => {
     const { device } = await issue();
     const { challengeId } = await open(call);
     const verify = await app.request(`/verify?challenge=${challengeId}`, { headers: { "x-test-fingerprint": device.fingerprint } });
-    const code = new URL(verify.headers.get("location")!).searchParams.get("code")!;
+    const code = defined(new URL(defined(verify.headers.get("location"), "the callback location")).searchParams.get("code"), "the callback code");
     await call(`/devices/${device.id}/revoke`, {});
     expect((await exchange(call, challengeId, code)).status).toBe(403);
   });
@@ -154,7 +155,7 @@ describe("desafio de login e leitura do certificado", () => {
     const { app } = setup();
     const verify = await app.request("/verify?challenge=https://evil.example&callback=https://evil.example");
     expect(verify.status).toBe(302);
-    const location = new URL(verify.headers.get("location")!);
+    const location = new URL(defined(verify.headers.get("location"), "the callback location"));
     expect(location.origin).toBe("https://app.exemplo.com");
     expect(location.searchParams.get("code")).toBeNull();
   });

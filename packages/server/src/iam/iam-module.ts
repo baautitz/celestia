@@ -322,7 +322,9 @@ export function createIamModule({
           const [namespace, resource] = item.key.split(":");
           // Module declarado agrupa; o namespace "system" não é um Module, então usa o recurso.
           const group = namespace === "system" ? (resource ?? "general") : (item.module ?? namespace);
-          (grouped[group] ??= []).push({ ...item, module: group });
+          const bucket = grouped[group] ?? [];
+          grouped[group] = bucket;
+          bucket.push({ ...item, module: group });
         }
         return c.json({ system: grouped });
       });

@@ -149,7 +149,7 @@ export function pickVariant<V extends { when: PermissionSpec }>(
   userPermissions: readonly string[] | undefined,
 ): V | undefined {
   if (variants.length === 0) throw new Error("Nenhuma variante de permissão informada.");
-  variants.forEach((v) => requireKey(v.when));
+  for (const v of variants) requireKey(v.when);
   return variants.find((v) => hasPerm(userPermissions, keyOf(v.when)));
 }
 
@@ -157,7 +157,7 @@ export function byPermission<C extends PermissionContext, A extends unknown[], R
   variants: readonly Variant<C, A, R>[],
 ): (ctx: C, ...args: A) => R {
   if (variants.length === 0) throw new Error("Nenhuma variante de permissão informada.");
-  variants.forEach((v) => requireKey(v.when));
+  for (const v of variants) requireKey(v.when);
   return (ctx, ...args) => {
     const v = pickVariant(variants, ctx?.user?.permissions);
     if (!v) throw new ForbiddenError(

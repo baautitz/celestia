@@ -38,7 +38,7 @@ describe("loadModules", () => {
       [mod("a"), mod("a")],
     ]) {
       let called = false;
-      const spy = mods.map((m) => ({ ...m, register: () => void (called = true) }));
+      const spy = mods.map((m) => ({ ...m, register: () => { called = true; } }));
       await expect(loadModules(new Hono(), spy, { logger: quiet })).rejects.toThrow();
       expect(called).toBe(false);
     }
@@ -132,7 +132,9 @@ describe("loadModules", () => {
       [
         mod("bad", [], (c) => {
           c.events.before("x", (ctx) => ctx.cancel("veto"));
-          c.events.after("x", () => void (afterRan = true));
+          c.events.after("x", () => {
+            afterRan = true;
+          });
           c.services.expose("s", 1);
           throw new Error("boom");
         }),

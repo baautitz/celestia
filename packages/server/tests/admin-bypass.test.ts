@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createPlatformApp } from "../src/index.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { TEST_PASSWORD, TestUserStore } from "./helpers/fixtures.js";
+import { defined } from "./helpers/defined.js";
 
 describe("Flag isAdmin (bypass de permissões)", () => {
   let app: ReturnType<typeof createPlatformApp>;
@@ -70,7 +71,7 @@ describe("Flag isAdmin (bypass de permissões)", () => {
       body: JSON.stringify({ fullname: "Novo", username: "novo", password: "Senha@1234", roleId: "role_vazio", isAdmin: true }),
     });
     expect([200, 201]).toContain(created.status);
-    expect((await store.findByUsername("novo"))!.isAdmin).toBeFalsy();
+    expect(defined(await store.findByUsername("novo"), "await store.findByUsername('novo')").isAdmin).toBeFalsy();
   });
 
   it("só um administrador altera isAdmin, e ninguém se rebaixa", async () => {
@@ -80,15 +81,15 @@ describe("Flag isAdmin (bypass de permissões)", () => {
     // Quem tem system:users:update mas não é admin não consegue conceder.
     const gestor = await login("gestor");
     expect((await put(gestor.access_token, "u2", true)).status).toBe(403);
-    expect((await store.findById("u2"))!.isAdmin).toBeFalsy();
+    expect(defined(await store.findById("u2"), "await store.findById('u2')").isAdmin).toBeFalsy();
 
     const admin = await login("chefe");
     expect((await put(admin.access_token, "u2", true)).status).toBe(200);
-    expect((await store.findById("u2"))!.isAdmin).toBe(true);
+    expect(defined(await store.findById("u2"), "await store.findById('u2')").isAdmin).toBe(true);
     expect((await put(admin.access_token, "u2", false)).status).toBe(200);
-    expect((await store.findById("u2"))!.isAdmin).toBeFalsy();
+    expect(defined(await store.findById("u2"), "await store.findById('u2')").isAdmin).toBeFalsy();
 
     expect((await put(admin.access_token, "u1", false)).status).toBe(400);
-    expect((await store.findById("u1"))!.isAdmin).toBe(true);
+    expect(defined(await store.findById("u1"), "await store.findById('u1')").isAdmin).toBe(true);
   });
 });

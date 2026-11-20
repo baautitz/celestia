@@ -38,7 +38,7 @@ export function createForwardedCertificateReader({
     const value = c.req.header(certificateHeader);
     if (!value) return undefined;
     try {
-      const leaf = decodeURIComponent(value).split(",")[0]!.trim();
+      const leaf = (decodeURIComponent(value).split(",")[0] ?? "").trim();
       const der = Buffer.from(leaf, "base64");
       // Garante que é um certificado de verdade antes de confiar no hash.
       const cert = new X509Certificate(der);

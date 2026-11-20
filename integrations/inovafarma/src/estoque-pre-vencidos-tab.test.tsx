@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { PreVencidosPage } from "./pre-vencidos-page";
+import { defined } from "./test/defined";
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
@@ -114,7 +115,7 @@ describe("aba Estoque", () => {
     fireEvent.click(screen.getByRole("button", { name: "Incluir" }));
     expect(await screen.findByRole("cell", { name: "08/2027" })).toBeTruthy();
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "POST");
-    expect(JSON.parse(envio![1].body)).toEqual({ codigoLoja: 1, produtoId: "guid-1", quantidade: 5, validade: "2027-08" });
+    expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ codigoLoja: 1, produtoId: "guid-1", quantidade: 5, validade: "2027-08" });
   });
 
   it("edita quantidade e validade com a version do Item", async () => {
@@ -126,8 +127,8 @@ describe("aba Estoque", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(apiFetch.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true));
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "PUT");
-    expect(envio![0]).toContain("/pre-vencidos/estoque/itens/ipv_1");
-    expect(JSON.parse(envio![1].body)).toEqual({ quantidade: 7, validade: "2027-06", version: 1 });
+    expect(defined(envio, "the call")[0]).toContain("/pre-vencidos/estoque/itens/ipv_1");
+    expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ quantidade: 7, validade: "2027-06", version: 1 });
   });
 
   it("sem a Permission de Baixas, a janela de inclusão não tem data de inclusão", async () => {
@@ -160,7 +161,7 @@ describe("aba Estoque", () => {
     fireEvent.click(screen.getByRole("button", { name: "Incluir" }));
     await waitFor(() => expect(apiFetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "POST");
-    expect(JSON.parse(envio![1].body)).toEqual({ codigoLoja: 1, produtoId: "guid-1", quantidade: 5, validade: "2027-08", incluidoEm: dia(-5) });
+    expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ codigoLoja: 1, produtoId: "guid-1", quantidade: 5, validade: "2027-08", incluidoEm: dia(-5) });
   });
 
   it("com a Permission de Baixas, ajusta a data de inclusão na edição e só envia a data se ela mudou", async () => {
@@ -175,6 +176,6 @@ describe("aba Estoque", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(apiFetch.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(true));
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "PUT");
-    expect(JSON.parse(envio![1].body)).toEqual({ quantidade: 3, validade: "2027-06", incluidoEm: dia(-3), version: 1 });
+    expect(JSON.parse(defined(envio, "the call")[1].body)).toEqual({ quantidade: 3, validade: "2027-06", incluidoEm: dia(-3), version: 1 });
   });
 });

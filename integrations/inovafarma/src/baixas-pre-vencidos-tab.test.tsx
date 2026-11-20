@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider } from "@platform/ui/context/header-actions";
 import { PreVencidosPage } from "./pre-vencidos-page";
+import { defined } from "./test/defined";
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
@@ -118,14 +119,14 @@ describe("aba Baixas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Corrigir" }));
     await waitFor(() => expect(apiFetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
     const envio = apiFetch.mock.calls.find(([, init]) => init?.method === "POST");
-    expect(envio![0]).toContain("/pre-vencidos/baixas/correcoes");
-    expect(JSON.parse(envio![1].body)).toEqual({ codigoLoja: 1, periodoId: "p-abril", vendaId: 501, produtoId: "guid-1", quantidade: 1, motivo: "Uma não era" });
+    expect(defined(envio, "the POST call")[0]).toContain("/pre-vencidos/baixas/correcoes");
+    expect(JSON.parse(defined(envio, "the POST call")[1].body)).toEqual({ codigoLoja: 1, periodoId: "p-abril", vendaId: 501, produtoId: "guid-1", quantidade: 1, motivo: "Uma não era" });
     // A lista volta do servidor depois de salvar.
     await waitFor(() => expect(apiFetch.mock.calls.filter(([url]) => String(url).includes("/pre-vencidos/baixas?")).length).toBeGreaterThan(1));
   });
 
   it("mostra a Correção e o motivo, e desfaz a Correção pela version", async () => {
-    const corrigidos = [{ ...grupos[0]!, vendas: [{ ...grupos[0]!.vendas[0]!, quantidade: 1, correcao: { id: "cbx_1", quantidade: 1, motivo: "Uma não era", autorNome: "Gil", version: 2 } }] }];
+    const corrigidos = [{ ...defined(grupos[0], "the first group"), vendas: [{ ...defined(defined(grupos[0], "the first group").vendas[0], "the first sale"), quantidade: 1, correcao: { id: "cbx_1", quantidade: 1, motivo: "Uma não era", autorNome: "Gil", version: 2 } }] }];
     apiFetch.mockImplementation(async (url: string) => (url.endsWith("/contexto") ? contexto() : corrigidos));
     renderizar();
     await screen.findByRole("cell", { name: "ANA SOUZA" });
@@ -138,7 +139,7 @@ describe("aba Baixas", () => {
 
   it("abre na Visualização mais ampla, com Todas as Filiais, e só corrige vendas das Lojas do Vínculo", async () => {
     const ctx = contexto({ visualizacoes: [{ id: "geral", lojas: [{ codigo: 1, nome: "Centro" }, { codigo: 2, nome: "Bairro" }] }, { id: "loja", lojas: [{ codigo: 1, nome: "Centro" }] }] });
-    const deOutraLoja = [{ ...grupos[0]!, vendas: [{ ...grupos[0]!.vendas[0]!, codigoLoja: 2 }, grupos[0]!.vendas[1]!] }];
+    const deOutraLoja = [{ ...defined(grupos[0], "the first group"), vendas: [{ ...defined(defined(grupos[0], "the first group").vendas[0], "the first sale"), codigoLoja: 2 }, defined(defined(grupos[0], "the first group").vendas[1], "the second sale")] }];
     apiFetch.mockImplementation(async (url: string) => (url.endsWith("/contexto") ? ctx : deOutraLoja));
     renderizar();
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/pre-vencidos/baixas?visualizacao=geral&periodoId=p-abril")));

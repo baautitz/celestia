@@ -7,6 +7,7 @@ import { loadModules } from "@platform/core/loader";
 import { createClosingPeriodModule } from "../src/closing-period/closing-period-module.js";
 import { MemoryClosingPeriodStore } from "../src/closing-period/closing-period-store.js";
 import { authHeader, createSeededUserStore } from "./helpers/fixtures.js";
+import { defined } from "./helpers/defined.js";
 
 // Seam: a API HTTP do Plugin Closing Period, montada por createPlatformApp.
 describe("Closing Period (Período de Fechamento)", () => {
@@ -272,7 +273,7 @@ describe("Closing Period: veto por handler before", () => {
     ["closing_period.cancel", "DELETE", "/api/closing-periods/p1", "open"],
   ])("um before em %s veta a ação e responde 409 com o motivo", async (event, method, path, initial) => {
     const { app, store, result } = await boot();
-    const p = (await store.get("p1"))!;
+    const p = defined(await store.get("p1"), "await store.get('p1')");
     await store.save({ ...p, status: initial as "open" | "closed" });
     result.events.before(event, (ctx) => ctx.cancel("há dados dependentes"));
     const res = await app.request(path, { method });

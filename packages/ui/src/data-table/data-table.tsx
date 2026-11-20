@@ -498,6 +498,7 @@ export function DataTable<TRow>({
   // O cabeçalho só gruda na página enquanto a tabela cabe na largura: larga demais, o contêiner rola na horizontal.
   const [fitsWidth, setFitsWidth] = useState(true);
   const pageScroll = scroll === "page" && fitsWidth;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `isMobile` não é lido no efeito, mas a troca de layout exige medir a tabela de novo.
   useLayoutEffect(() => {
     const container = containerRef.current;
     const table = container?.firstElementChild as HTMLElement | null;
@@ -523,6 +524,7 @@ export function DataTable<TRow>({
   } | null>(null);
   const isWide = scroll === "page" && !fitsWidth && !isMobile && !nested;
   const wide = isWide ? wideLayout : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `columns` não é lido no efeito, mas colunas novas mudam as larguras que o efeito mede.
   useLayoutEffect(() => {
     const head = headRef.current;
     const table = head?.parentElement;
@@ -547,6 +549,7 @@ export function DataTable<TRow>({
       if (el && el !== e.currentTarget && el.scrollLeft !== left) el.scrollLeft = left;
     }
   };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `wide` não é lido no efeito, mas a cópia do cabeçalho nova precisa partir da rolagem atual.
   useLayoutEffect(() => {
     // Ao montar a cópia (ou trocar as larguras), ela parte da posição lateral atual da tabela.
     const left = containerRef.current?.scrollLeft ?? 0;
@@ -566,6 +569,7 @@ export function DataTable<TRow>({
   const frozenSignature = frozenKeys.join("|");
 
   // Cada coluna fixa fica à esquerda da soma das larguras das fixas anteriores (e do botão de expandir).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rows` não é lido no efeito, mas linhas novas podem mudar as larguras das colunas fixas.
   useLayoutEffect(() => {
     const measure = () => {
       let left = headRefs.current.get(EXPAND_KEY)?.offsetWidth ?? 0;
@@ -582,7 +586,7 @@ export function DataTable<TRow>({
     measure();
     if (!frozenSignature || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
-    headRefs.current.forEach((el) => observer.observe(el));
+    for (const el of headRefs.current.values()) observer.observe(el);
     return () => observer.disconnect();
   }, [frozenSignature, rows]);
 
@@ -1062,6 +1066,7 @@ export function DataTable<TRow>({
           </div>
         ) : (
           <>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: keyboard/focus delegation container for arrow navigation across the real inputs inside the rows. */}
             <div className={bordered ? "border border-border" : undefined} data-arrow-root={arrowNavigation ? "" : undefined}
               onKeyDown={arrowNavigation ? handleArrowNavigation : undefined}
               onFocus={

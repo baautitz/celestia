@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
+import { useLatest } from "./use-latest";
 
 const path = (key: string) => `/api/iam/preferences/${encodeURIComponent(key)}`;
 
@@ -12,20 +13,22 @@ export function usePreference<T>(key: string, defaultValue: T, accept?: (value: 
   const [value, setValue] = useState<T>(defaultValue);
   // Escolhido antes de a leitura voltar: a escolha vale, não o que estava salvo.
   const chosen = useRef(false);
+  // `accept` costuma ser uma função nova a cada render: lido pela ref, só a chave dispara a leitura.
+  const acceptRef = useLatest(accept);
   useEffect(() => {
     let alive = true;
     chosen.current = false;
     apiFetch<{ value: unknown }>(path(key))
       .then((r) => {
         if (!alive || chosen.current || r.value === null || r.value === undefined) return;
-        if (!accept || accept(r.value)) setValue(r.value as T);
+        const accepts = acceptRef.current;
+        if (!accepts || accepts(r.value)) setValue(r.value as T);
       })
       .catch(() => undefined);
     return () => {
       alive = false;
     };
-    // `accept` costuma ser uma função nova a cada render: só a chave dispara a leitura.
-  }, [key]);
+  }, [key, acceptRef]);
   const update = useCallback(
     (next: T) => {
       chosen.current = true;

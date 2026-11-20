@@ -8,6 +8,7 @@ import { AuditLog } from "../src/audit/audit-log.js";
 import { MemoryAuditStore } from "../src/audit/audit-store.js";
 import { createTestCertificateAuthority } from "./helpers/certificate-authority.js";
 import { authHeader, createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
+import { defined } from "./helpers/defined.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -122,7 +123,7 @@ describe("Dispositivos (/api/iam/devices)", () => {
 
     const entries = (await auditLog.list({ plugin: "iam" })).filter((e) => e.action !== "login_without_certificate");
     expect(entries.map((e) => e.action).sort()).toEqual(["issue_device", "revoke_device"]);
-    const issueEntry = entries.find((e) => e.action === "issue_device")!;
+    const issueEntry = defined(entries.find((e) => e.action === "issue_device"), "the issue_device entry");
     expect(issueEntry).toMatchObject({ actorName: "Gestor de Dispositivos", targetType: "device", targetId: created.device.id });
     expect(issueEntry.summary).toBe('Emitiu o certificado do Dispositivo "Caixa 1".');
     const serialized = JSON.stringify(entries);

@@ -505,7 +505,7 @@ function VendasComissoesPage() {
     if (selectedPeriodId) {
       void fetchRelatorio();
     }
-  }, [selectedPeriodId, selectedLoja, visualizacao, fetchRelatorio]);
+  }, [selectedPeriodId, fetchRelatorio]);
 
   const lojas = visualizacoes?.find((v) => v.id === visualizacao)?.lojas ?? [];
   // Individual não filtra por Loja: o rótulo mostra o escopo da Visualização.

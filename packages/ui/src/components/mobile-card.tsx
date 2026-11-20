@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Card, CardContent, CardFooter } from "./card";
 import { Separator } from "./separator";
 import { cn } from "../lib/utils";
@@ -67,11 +67,9 @@ export const MobileCard: React.FC<MobileCardProps> = ({
       </CardContent>
 
       {actions && (
-        <>
-          <CardFooter className="justify-end py-1">
+        <CardFooter className="justify-end py-1">
             {actions}
           </CardFooter>
-        </>
       )}
     </Card>
   );

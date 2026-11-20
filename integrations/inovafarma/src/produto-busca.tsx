@@ -37,6 +37,7 @@ export function ProdutoBusca({ url, id, onChange }: Props) {
     onChange(produto);
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a busca deve rodar só quando o texto muda; `escolhido`, `escolher` e `feedback` mudam a cada render e reiniciariam a consulta (e `escolher(null)` a repetiria em laço).
   useEffect(() => {
     const termo = busca.trim();
     if (escolhido && busca === rotulo(escolhido)) return;
@@ -50,9 +51,10 @@ export function ProdutoBusca({ url, id, onChange }: Props) {
         .then((achados) => {
           if (!atual) return;
           setProdutos(achados);
-          if (achados.length === 1) {
-            escolher(achados[0]!);
-            setBusca(rotulo(achados[0]!));
+          const unico = achados.length === 1 ? achados[0] : undefined;
+          if (unico) {
+            escolher(unico);
+            setBusca(rotulo(unico));
           } else if (escolhido) escolher(null);
         })
         .catch((err: unknown) => {
@@ -63,7 +65,6 @@ export function ProdutoBusca({ url, id, onChange }: Props) {
       atual = false;
       clearTimeout(espera);
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `escolher` e `feedback` não mudam o resultado da busca.
   }, [busca]);
 
   return (

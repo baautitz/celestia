@@ -20,7 +20,7 @@ test("emite um Dispositivo, mostra a senha do certificado e o revoga", async ({ 
   await expect(issued.getByText(/A senha aparece só agora/)).toBeVisible();
   await issued.getByRole("button", { name: "Copiar senha" }).click();
   await expect(page.getByText("Senha copiada com sucesso.")).toBeVisible();
-  const shown = await issued.locator("[data-slot=text], span, p").filter({ hasText: /^[A-Za-z0-9_-]{20,}$/ }).first().innerText();
+  const shown = await issued.locator("[data-slot=text], span, p").filter({ hasText: /^[A-Za-z0-9_-]{20,}$/ }).first().textContent();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(shown);
   const download = page.waitForEvent("download");
   await issued.getByRole("button", { name: "Baixar certificado" }).click();

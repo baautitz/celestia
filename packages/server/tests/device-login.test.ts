@@ -26,7 +26,7 @@ async function setup(options: { auditLog?: AuditLog } = {}) {
   const refresh = (token: string) => post("/api/auth/refresh", { refresh_token: token });
   const refreshTokenOf = async (res: Response) => ((await res.json()) as { refresh_token: string }).refresh_token;
   /** O cookie do Desafio de Certificado que o login gravou no navegador, pronto para o header `Cookie`. */
-  const challengeCookieOf = (res: Response) => ({ Cookie: (res.headers.get("set-cookie") ?? "").split(";")[0]! });
+  const challengeCookieOf = (res: Response) => ({ Cookie: (res.headers.get("set-cookie") ?? "").split(";")[0] ?? "" });
   /** Senha, depois o navegador apresenta `fingerprint` na CA, depois o callback troca o código no mesmo navegador. */
   const loginWithCertificate = async (username: string, fingerprint?: string) => {
     const res = await login(username);

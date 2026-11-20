@@ -95,7 +95,7 @@ for await (const rel of glob("{packages/*/src/**/*.{ts,tsx},integrations/**/*.{t
 }
 
 if (violations.length) {
-  console.error("Fronteira da UI violada:\n" + violations.sort().join("\n"))
+  console.error(`Fronteira da UI violada:\n${violations.sort().join("\n")}`)
   process.exitCode = 1
 } else {
   console.log("Fronteiras da UI verificadas sem violacoes.")

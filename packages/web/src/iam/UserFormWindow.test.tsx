@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { UiProvider, useUi } from "@platform/ui/imperative/provider";
 import { Button } from "@platform/ui/components/button";
 import { usersWebService } from "./UserFormWindow";
+import { defined } from "@/test/defined";
 
 const api = vi.hoisted(() => ({ iam: { listRoles: vi.fn(), createUser: vi.fn(), getPasswordPolicy: vi.fn() } }));
 vi.mock("@/lib/api-client", () => ({ api }));
@@ -47,7 +48,7 @@ describe("serviço iam:users", () => {
     expect(((await screen.findByLabelText("Nome de Usuário")) as HTMLInputElement).value).toBe("ana_souza");
     expect((screen.getByLabelText("Nome Completo") as HTMLInputElement).value).toBe("ANA SOUZA");
     // A lista de requisitos vem da política do IAM e fica verde conforme a senha cumpre cada regra.
-    const requisito = async (label: string) => (await screen.findByText(label)).closest("[role=listitem]")!.getAttribute("data-ok");
+    const requisito = async (label: string) => defined((await screen.findByText(label)).closest("[role=listitem]"), `the list item of "${label}"`).getAttribute("data-ok");
     fireEvent.change(screen.getByLabelText("Senha Inicial"), { target: { value: "abc" } });
     expect(await requisito("8 caracteres")).toBe("false");
     expect(await requisito("1 especial")).toBe("false");

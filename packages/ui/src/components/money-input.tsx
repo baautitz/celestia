@@ -33,7 +33,7 @@ function toDisplayString(
 ): string {
   if (val === undefined || val === null || val === "") return "";
   const num = typeof val === "number" ? val : Number(val);
-  if (isNaN(num)) return "";
+  if (Number.isNaN(num)) return "";
   const isNegative = allowNegative && num < 0;
   const absFormatted = formatMoney(Math.abs(num), precision, prefix);
   return isNegative ? `-${absFormatted}` : absFormatted;
@@ -66,10 +66,10 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
     };
 
     // Valor monetário preenche da direita para a esquerda: o cursor fica sempre no final.
-    const moveCaretToEnd = () => {
+    const moveCaretToEnd = React.useCallback(() => {
       const el = innerRef.current;
       if (el) el.setSelectionRange(el.value.length, el.value.length);
-    };
+    }, []);
 
     const initialVal = value !== undefined ? value : defaultValue;
     const [displayValue, setDisplayValue] = React.useState(() =>
@@ -82,9 +82,10 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
       }
     }, [value, precision, prefix, allowNegative]);
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `displayValue` não é lido no efeito, mas a cada texto novo o cursor volta ao final.
     React.useLayoutEffect(() => {
       if (document.activeElement === innerRef.current) moveCaretToEnd();
-    }, [displayValue]);
+    }, [displayValue, moveCaretToEnd]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
@@ -101,7 +102,7 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         return;
       }
 
-      const numericVal = (Number(digits) / Math.pow(10, precision)) * (isNegative ? -1 : 1);
+      const numericVal = (Number(digits) / 10 ** precision) * (isNegative ? -1 : 1);
       const absFormatted = formatMoney(Math.abs(numericVal), precision, prefix);
       const formatted = isNegative ? `-${absFormatted}` : absFormatted;
 

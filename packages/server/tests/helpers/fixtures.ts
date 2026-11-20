@@ -3,6 +3,7 @@ import { CLOSING_PERIOD_PERMISSIONS } from "../../src/closing-period/closing-per
 import { PasswordService } from "../../src/iam/password-service.js";
 import { SYSTEM_PERMISSIONS } from "../../src/iam/system-permissions.js";
 import { MemoryUserStore } from "../../src/iam/user-store.js";
+import { defined } from "./defined.js";
 
 /**
  * Store dos testes: Usuários nascem com acesso sem certificado, porque a maioria dos testes faz login só com senha.
@@ -91,10 +92,10 @@ export async function authHeader(
   if (body.access_token) return { Authorization: `Bearer ${body.access_token}` };
   // Com a CA no ar todo login passa pelo Desafio de Certificado: volta dele sem certificado, como quem tem a opção de
   // acesso sem certificado e não apresentou um.
-  const challengeId = new URL(body.verifyUrl!).searchParams.get("challenge");
+  const challengeId = new URL(defined(body.verifyUrl, "verifyUrl")).searchParams.get("challenge");
   const done = await app.request("/api/auth/login/certificate", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Cookie: (res.headers.get("set-cookie") ?? "").split(";")[0]! },
+    headers: { "Content-Type": "application/json", Cookie: (res.headers.get("set-cookie") ?? "").split(";")[0] ?? "" },
     body: JSON.stringify({ challengeId }),
   });
   const { access_token } = (await done.json()) as { access_token: string };

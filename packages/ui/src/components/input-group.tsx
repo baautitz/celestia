@@ -1,4 +1,4 @@
-import * as React from "react"
+import type * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "../lib/utils"
@@ -8,6 +8,7 @@ import { Textarea } from "./textarea"
 
 function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: a <fieldset> would break the input group layout; role="group" gives the same semantics.
     <div
       data-slot="input-group"
       role="group"
@@ -47,6 +48,8 @@ function InputGroupAddon({
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the click only forwards focus to the input, which is already keyboard-reachable.
+    // biome-ignore lint/a11y/useSemanticElements: a <fieldset> would break the addon layout; role="group" gives the same semantics.
     <div
       role="group"
       data-slot="input-group-addon"
