@@ -20,3 +20,7 @@ playwright-report/
 
 # Worktrees de agentes
 .claude/worktrees/
+
+# Agent skills installed by pnpm
+.agents/skills/
+.claude/skills/
