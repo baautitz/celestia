@@ -347,7 +347,7 @@ function BrandMark({ children }: { children: React.ReactNode }) {
 function AppHeader(props: Omit<React.ComponentProps<"header">, "className" | "style">) {
   return (
     <header
-      className="sticky top-0 z-50 flex h-14 shrink-0 items-center border-b border-border/50 bg-background/95 px-3 backdrop-blur supports-backdrop-filter:bg-background/60 md:px-6"
+      className="@container sticky top-0 z-50 flex h-14 shrink-0 items-center border-b border-border/50 bg-background/95 px-3 backdrop-blur supports-backdrop-filter:bg-background/60 md:px-6"
       {...props}
     />
   )
