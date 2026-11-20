@@ -23,7 +23,7 @@ const CabecalhoSlot = () => <>{useHeaderActions().actions}</>;
 /** Monta a tela num roteador de dados, com um link para outra tela, como no app. */
 function render(tela: ReactElement) {
   // O roteador de dados cria um Request com o AbortSignal do jsdom, que o Request do Node recusa.
-  vi.stubGlobal("Request", class { constructor(readonly url: string, init?: RequestInit) { Object.assign(this, init); } });
+  vi.stubGlobal("Request", class { method = "GET"; constructor(readonly url: string, init?: RequestInit) { Object.assign(this, init); } });
   const router = createMemoryRouter([
     { path: "/", element: <HeaderActionsProvider><Link to="/outra">Ir para outra tela</Link><CabecalhoSlot />{tela}</HeaderActionsProvider> },
     { path: "/outra", element: "Outra tela" },
