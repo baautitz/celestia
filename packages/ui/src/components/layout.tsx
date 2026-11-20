@@ -42,10 +42,10 @@ const paddings = {
 } as const
 const aligns = { start: "items-start", center: "items-center", end: "items-end" } as const
 const justifies = { center: "justify-center", end: "justify-end", between: "justify-between" } as const
-/** `lgUp`: a partir do breakpoint `lg` (1024px); `belowLg`: abaixo dele. */
+/** `lgUp`: a partir de 56rem de largura do container (a área de conteúdo, não a tela); `belowLg`: abaixo dela. */
 const visibility = {
-  lgUp: "hidden lg:contents",
-  belowLg: "contents lg:hidden",
+  lgUp: "hidden @4xl:contents",
+  belowLg: "contents @4xl:hidden",
 } as const
 
 type Gap = keyof typeof gaps
@@ -128,13 +128,13 @@ interface GridProps extends Omit<React.ComponentProps<"div">, "className" | "sty
 
 function Grid({ columns, gap = "section", ...props }: GridProps) {
   if (columns === "masonry") {
-    return <div className={cn("lg:columns-2 *:break-inside-avoid", masonryGaps[gap])} {...props} />
+    return <div className={cn("@4xl:columns-2 *:break-inside-avoid", masonryGaps[gap])} {...props} />
   }
   return (
     <div
       className={cn(
         "grid",
-        columns === 2 ? "grid-cols-2" : columns === "split" ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
+        columns === 2 ? "grid-cols-2" : columns === "split" ? "grid-cols-1 @4xl:grid-cols-2" : "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-4",
         gaps[gap]
       )}
       {...props}
@@ -355,7 +355,7 @@ function AppHeader(props: Omit<React.ComponentProps<"header">, "className" | "st
 
 /** Área de conteúdo das páginas autenticadas. `--table-sticky-top`: altura do `AppHeader`, onde o cabeçalho das tabelas gruda ao rolar a página. */
 function AppMain(props: Omit<React.ComponentProps<"main">, "className" | "style">) {
-  return <main className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8 [--table-sticky-top:--spacing(14)]" {...props} />
+  return <main className="@container flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8 [--table-sticky-top:--spacing(14)]" {...props} />
 }
 
 /** Tela central cheia (login). */
