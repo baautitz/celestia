@@ -30,13 +30,13 @@ describe("prévia do Prêmio", () => {
   });
 
   it("mostra o Proporcional com Gatilho e Teto", () => {
-    const foco = tipo({ indicador: "foco-qtd", alvoPadrao: 200, regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: 80, teto: 120 } });
-    expect(descreverPremio(foco)).toBe("Qtd. Total Foco: R$ 100,00 ao chegar a 200, proporcional ao % Atingido · nada abaixo de 160 · no máximo R$ 120,00 a partir de 240");
+    const foco = tipo({ indicador: "vendas-cadastro-qtd", alvoPadrao: 200, regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: 80, teto: 120 } });
+    expect(descreverPremio(foco)).toBe("Qtd. de Vendas com Cadastro: R$ 100,00 ao chegar a 200, proporcional ao % Atingido · nada abaixo de 160 · no máximo R$ 120,00 a partir de 240");
   });
 
   it("mostra o Percentual de outro Indicador e se só paga ao atingir", () => {
-    const percentual = tipo({ indicador: "foco-qtd", regra: { tipo: "percentual", percentual: 2.5, indicadorBase: "foco-valor", soSeAtingir: true } });
-    expect(descreverPremio(percentual)).toBe("Paga 2,5% do Valor Total Foco, se atingir o Alvo");
+    const percentual = tipo({ indicador: "vendas-cadastro-qtd", regra: { tipo: "percentual", percentual: 2.5, indicadorBase: "venda-liquida", soSeAtingir: true } });
+    expect(descreverPremio(percentual)).toBe("Paga 2,5% do Venda Líquida, se atingir o Alvo");
   });
 
   it("mostra o Saldo da Meta de Avaliações com o valor inicial", () => {
@@ -52,8 +52,8 @@ describe("regras do Tipo de Meta", () => {
   });
 
   it("sem Alvo só aceita o Percentual que não depende de atingir", () => {
-    expect(problemaDoTipo(tipo({ indicador: "foco-valor", semAlvo: true, exibicao: "progresso" }))).toMatch(/sem Alvo/);
-    const comissao = tipo({ indicador: "foco-valor", semAlvo: true, exibicao: "progresso", regra: { tipo: "percentual", percentual: 1, indicadorBase: "foco-valor", soSeAtingir: false } });
+    expect(problemaDoTipo(tipo({ indicador: "venda-liquida", semAlvo: true, exibicao: "progresso" }))).toMatch(/sem Alvo/);
+    const comissao = tipo({ indicador: "venda-liquida", semAlvo: true, exibicao: "progresso", regra: { tipo: "percentual", percentual: 1, indicadorBase: "venda-liquida", soSeAtingir: false } });
     expect(problemaDoTipo(comissao)).toBeNull();
     expect(problemaDoTipo({ ...comissao, exibicao: "atingida" })).toMatch(/Atingida/);
   });
@@ -65,7 +65,7 @@ describe("regras do Tipo de Meta", () => {
   });
 
   it("o Percentual se aplica a um Indicador em R$", () => {
-    expect(problemaDoTipo(tipo({ indicador: "foco-qtd", regra: { tipo: "percentual", percentual: 1, indicadorBase: "foco-qtd", soSeAtingir: true } }))).toMatch(/R\$/);
+    expect(problemaDoTipo(tipo({ indicador: "vendas-cadastro-qtd", regra: { tipo: "percentual", percentual: 1, indicadorBase: "vendas-cadastro-qtd", soSeAtingir: true } }))).toMatch(/R\$/);
   });
 
   it("a Lista é obrigatória no Indicador Lista de Produtos e proibida nos outros", () => {

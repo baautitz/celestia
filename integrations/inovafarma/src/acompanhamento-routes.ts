@@ -87,32 +87,17 @@ export async function colaboradorDasMinhasMetas(
   return (await vinculoDoUsuario(vinculos, user.sub))?.codigoColaborador ?? null;
 }
 
-type LinhaDesempenho = { codigoColaborador: number; quantidadeVendas: number | null; totalLiquido: number | null; totalCmv: number | null; vendasComCadastro: number | null } & Record<
-  string,
-  number | null
->;
+type LinhaDesempenho = { codigoColaborador: number; quantidadeVendas: number | null; totalLiquido: number | null; totalCmv: number | null; vendasComCadastro: number | null; totalBruto: number | null; totalDesconto: number | null };
 
 const INDICADORES_DE_VENDAS: Partial<Record<IndicadorId, (r: LinhaDesempenho) => number>> = (() => {
   const n = (v: number | null | undefined) => Number(v) || 0;
   const porVenda = (r: LinhaDesempenho, valor: number) => (n(r.quantidadeVendas) > 0 ? valor / n(r.quantidadeVendas) : 0);
-  const categoria = (coluna: string) => ({ qtd: (r: LinhaDesempenho) => n(r[`qtd${coluna}`]), valor: (r: LinhaDesempenho) => Math.round(n(r[`valor${coluna}`]) * 100) });
-  const [foco, vitaminas, genericos, similares, incentivos] = [categoria("TotalFoco"), categoria("Vitaminas"), categoria("Genericos"), categoria("Similares"), categoria("Incentivos")];
   return {
     "venda-liquida": (r) => Math.round(n(r.totalLiquido) * 100),
     "desconto-valor": (r) => Math.round(n(r.totalDesconto) * 100),
     "desconto-percent": (r) => (n(r.totalBruto) > 0 ? (n(r.totalDesconto) / n(r.totalBruto)) * 100 : 0),
     cmv: (r) => (n(r.totalLiquido) > 0 ? (n(r.totalCmv) / n(r.totalLiquido)) * 100 : 0),
     "ticket-medio": (r) => Math.round(porVenda(r, n(r.totalLiquido) * 100)),
-    "foco-qtd": foco.qtd,
-    "foco-valor": foco.valor,
-    "vitaminas-qtd": vitaminas.qtd,
-    "vitaminas-valor": vitaminas.valor,
-    "genericos-qtd": genericos.qtd,
-    "genericos-valor": genericos.valor,
-    "similares-qtd": similares.qtd,
-    "similares-valor": similares.valor,
-    "incentivos-qtd": incentivos.qtd,
-    "incentivos-valor": incentivos.valor,
     "vendas-cadastro-qtd": (r) => n(r.vendasComCadastro),
     "vendas-cadastro-percent": (r) => porVenda(r, n(r.vendasComCadastro) * 100),
   };

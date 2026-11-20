@@ -4,7 +4,7 @@ import type { DadosTipoMeta } from "./tipos-meta";
 
 const tipo = (dados: Partial<DadosTipoMeta>): DadosTipoMeta => ({
   nome: "Meta",
-  indicador: "foco-qtd",
+  indicador: "vendas-cadastro-qtd",
   exibicao: "progresso",
   mostrarPremio: true,
   semAlvo: false,
@@ -20,9 +20,9 @@ const ana = (alvo: number | null) => ({ codigoColaborador: 1, nome: "ANA", alvo 
 
 describe("Apuração de um Participante", () => {
   it("em que maior é melhor, mostra quanto falta e não paga o Fixo abaixo do Alvo", () => {
-    const r = apurarParticipante(tipo({}), ana(100), dados({ indicadores: { "foco-qtd": 80 } }));
+    const r = apurarParticipante(tipo({}), ana(100), dados({ indicadores: { "vendas-cadastro-qtd": 80 } }));
     expect(r).toMatchObject({ realizado: 80, atingimento: 80, atingida: false, premioCentavos: 0 });
-    expect(r.resultado).toBe("Qtd. Total Foco 80 de 100 un. · faltam 20");
+    expect(r.resultado).toBe("Qtd. de Vendas com Cadastro 80 de 100 un. · faltam 20");
   });
 
   it("em que menor é melhor, o % Atingido é Alvo ÷ Realizado e o resultado fala em p.p. abaixo", () => {
@@ -33,7 +33,7 @@ describe("Apuração de um Participante", () => {
 
   it("nas Faixas em % do Prêmio, paga o % da maior Faixa atingida sobre o Prêmio a 100%", () => {
     const regra = { tipo: "faixasPercentuais" as const, valorCentavos: 100000, faixas: [{ atingimento: 100, percentual: 100 }, { atingimento: 80, percentual: 80 }, { atingimento: 90, percentual: 90 }] };
-    const premio = (realizado: number) => apurarParticipante(tipo({ regra }), ana(100), dados({ indicadores: { "foco-qtd": realizado } })).premioCentavos;
+    const premio = (realizado: number) => apurarParticipante(tipo({ regra }), ana(100), dados({ indicadores: { "vendas-cadastro-qtd": realizado } })).premioCentavos;
     expect([premio(79), premio(87), premio(90), premio(130)]).toEqual([0, 80000, 90000, 100000]);
   });
 
@@ -66,40 +66,40 @@ describe("Apuração de um Participante", () => {
   it("usa o Prêmio próprio do Participante quando é do mesmo tipo de regra do Tipo de Meta", () => {
     const fixo = tipo({});
     const comProprio = { ...ana(100), premio: { tipo: "fixo" as const, valorCentavos: 15000 } };
-    expect(apurarParticipante(fixo, comProprio, dados({ indicadores: { "foco-qtd": 120 } })).premioCentavos).toBe(15000);
+    expect(apurarParticipante(fixo, comProprio, dados({ indicadores: { "vendas-cadastro-qtd": 120 } })).premioCentavos).toBe(15000);
     const outroTipo = { ...ana(100), premio: { tipo: "percentual" as const, percentual: 1, indicadorBase: "venda-liquida" as const, soSeAtingir: true } };
-    expect(apurarParticipante(fixo, outroTipo, dados({ indicadores: { "foco-qtd": 120 } })).premioCentavos).toBe(10000);
+    expect(apurarParticipante(fixo, outroTipo, dados({ indicadores: { "vendas-cadastro-qtd": 120 } })).premioCentavos).toBe(10000);
   });
 
   it("paga a maior Faixa alcançada", () => {
     const faixas = tipo({ regra: { tipo: "faixas", faixas: [{ atingimento: 100, valorCentavos: 10000 }, { atingimento: 80, valorCentavos: 5000 }, { atingimento: 120, valorCentavos: 15000 }] } });
-    expect(apurarParticipante(faixas, ana(100), dados({ indicadores: { "foco-qtd": 110 } })).premioCentavos).toBe(10000);
-    expect(apurarParticipante(faixas, ana(100), dados({ indicadores: { "foco-qtd": 70 } })).premioCentavos).toBe(0);
+    expect(apurarParticipante(faixas, ana(100), dados({ indicadores: { "vendas-cadastro-qtd": 110 } })).premioCentavos).toBe(10000);
+    expect(apurarParticipante(faixas, ana(100), dados({ indicadores: { "vendas-cadastro-qtd": 70 } })).premioCentavos).toBe(0);
   });
 
   it("no Proporcional, nada abaixo do Gatilho e no máximo o Teto", () => {
     const prop = tipo({ regra: { tipo: "proporcional", valorCentavos: 10000, gatilho: 80, teto: 120 } });
-    expect(apurarParticipante(prop, ana(100), dados({ indicadores: { "foco-qtd": 79 } })).premioCentavos).toBe(0);
-    expect(apurarParticipante(prop, ana(100), dados({ indicadores: { "foco-qtd": 90 } })).premioCentavos).toBe(9000);
-    expect(apurarParticipante(prop, ana(100), dados({ indicadores: { "foco-qtd": 150 } })).premioCentavos).toBe(12000);
+    expect(apurarParticipante(prop, ana(100), dados({ indicadores: { "vendas-cadastro-qtd": 79 } })).premioCentavos).toBe(0);
+    expect(apurarParticipante(prop, ana(100), dados({ indicadores: { "vendas-cadastro-qtd": 90 } })).premioCentavos).toBe(9000);
+    expect(apurarParticipante(prop, ana(100), dados({ indicadores: { "vendas-cadastro-qtd": 150 } })).premioCentavos).toBe(12000);
   });
 
   it("no Percentual, paga a parte do Indicador em R$, só se atingir quando marcado", () => {
-    const pct = (soSeAtingir: boolean) => tipo({ regra: { tipo: "percentual", percentual: 2, indicadorBase: "foco-valor", soSeAtingir } });
-    const vendas = dados({ indicadores: { "foco-qtd": 50, "foco-valor": 500000 } });
+    const pct = (soSeAtingir: boolean) => tipo({ regra: { tipo: "percentual", percentual: 2, indicadorBase: "venda-liquida", soSeAtingir } });
+    const vendas = dados({ indicadores: { "vendas-cadastro-qtd": 50, "venda-liquida": 500000 } });
     expect(apurarParticipante(pct(true), ana(100), vendas).premioCentavos).toBe(0);
     expect(apurarParticipante(pct(false), ana(100), vendas).premioCentavos).toBe(10000);
   });
 
   it("sem Alvo, paga a comissão sem falar em Atingida", () => {
-    const comissao = tipo({ semAlvo: true, indicador: "foco-valor", regra: { tipo: "percentual", percentual: 1, indicadorBase: "foco-valor", soSeAtingir: false } });
-    const r = apurarParticipante(comissao, ana(null), dados({ indicadores: { "foco-valor": 300000 } }));
-    expect(r).toMatchObject({ atingimento: null, atingida: null, premioCentavos: 3000, resultado: "Valor Total Foco R$ 3.000,00" });
+    const comissao = tipo({ semAlvo: true, indicador: "venda-liquida", regra: { tipo: "percentual", percentual: 1, indicadorBase: "venda-liquida", soSeAtingir: false } });
+    const r = apurarParticipante(comissao, ana(null), dados({ indicadores: { "venda-liquida": 300000 } }));
+    expect(r).toMatchObject({ atingimento: null, atingida: null, premioCentavos: 3000, resultado: "Venda Líquida R$ 3.000,00" });
   });
 
   it("com o Alvo pendente, não paga e avisa", () => {
-    const r = apurarParticipante(tipo({}), ana(null), dados({ indicadores: { "foco-qtd": 80 } }));
-    expect(r).toMatchObject({ atingimento: null, atingida: false, premioCentavos: 0, resultado: "Qtd. Total Foco 80 un. · Alvo pendente" });
+    const r = apurarParticipante(tipo({}), ana(null), dados({ indicadores: { "vendas-cadastro-qtd": 80 } }));
+    expect(r).toMatchObject({ atingimento: null, atingida: false, premioCentavos: 0, resultado: "Qtd. de Vendas com Cadastro 80 un. · Alvo pendente" });
   });
 
   it("na Meta de Avaliações, o Saldo é o valor inicial menos os descontos, nunca negativo, e é o Prêmio", () => {
