@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { createCaApp } from "../src/app.js";
+import { describe, it, expect, beforeAll, vi } from "vitest";
+import { createCaApp, type CaLogger } from "../src/app.js";
 import { defined } from "./helpers/defined.js";
 import { DeviceCertificateAuthority } from "../src/authority.js";
-import { MemoryDeviceStore } from "../src/device-store.js";
+import { DuplicateDeviceFingerprintError, MemoryDeviceStore } from "../src/device-store.js";
 
 const SECRET = "chave-em-comum-com-mais-de-32-caracteres";
 const CALLBACK = "https://app.exemplo.com/login/certificado";
@@ -13,14 +13,15 @@ beforeAll(async () => {
   authority = new DeviceCertificateAuthority(await DeviceCertificateAuthority.create({ commonName: "Celestia CA (teste)" }));
 });
 
-function setup(options: { withAuthority?: boolean } = {}) {
-  const deviceStore = new MemoryDeviceStore();
+function setup(options: { withAuthority?: boolean; deviceStore?: MemoryDeviceStore; logger?: CaLogger } = {}) {
+  const deviceStore = options.deviceStore ?? new MemoryDeviceStore();
   const app = createCaApp({
     deviceStore,
     authority: options.withAuthority === false ? undefined : authority,
     sharedSecret: SECRET,
     publicUrl: "https://acesso.exemplo.com",
     callbackUrl: CALLBACK,
+    logger: options.logger,
     // Os testes escolhem o certificado "apresentado" por um header; em produção ele vem do proxy.
     readCertificate: (c) => c.req.header("x-test-fingerprint"),
   });
@@ -45,6 +46,73 @@ describe("autenticação da API", () => {
 
   it("recusa uma chave em comum curta demais", () => {
     expect(() => createCaApp({ deviceStore: new MemoryDeviceStore(), sharedSecret: "curta", publicUrl: "http://x", callbackUrl: CALLBACK, readCertificate: () => undefined })).toThrow(/32/);
+  });
+});
+
+describe("todas as rotas da API", () => {
+  const routes: { method: string; path: string; body?: unknown }[] = [
+    { method: "GET", path: "/devices" },
+    { method: "GET", path: "/devices/abc" },
+    { method: "POST", path: "/devices", body: { name: "Caixa 1" } },
+    { method: "POST", path: "/devices/abc/revoke", body: {} },
+    { method: "DELETE", path: "/devices/abc" },
+    { method: "POST", path: "/challenges", body: { userId: "usr_1" } },
+    { method: "POST", path: "/challenges/exchange", body: { challengeId: crypto.randomUUID() } },
+  ];
+
+  it.each(routes)("$method $path responde 401 com a chave errada, sem emitir nada", async ({ method, path, body }) => {
+    const { app, deviceStore } = setup();
+    const res = await app.request(path, {
+      method,
+      headers: { Authorization: `Bearer ${"x".repeat(40)}`, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    expect(res.status).toBe(401);
+    expect(await deviceStore.list()).toEqual([]);
+  });
+
+  it("nunca deixa a resposta em cache, nem a do .pfx", async () => {
+    const { app, call } = setup();
+    expect((await call("/devices", { name: "Caixa 1" })).headers.get("cache-control")).toBe("no-store");
+    expect((await call("/devices")).headers.get("cache-control")).toBe("no-store");
+    expect((await app.request("/verify")).headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("limita o tamanho de quem agiu e do código", async () => {
+    const { call } = setup();
+    expect((await call("/devices", { name: "Caixa", createdBy: "u".repeat(101) })).status).toBe(400);
+    expect((await call("/devices/abc/revoke", { revokedBy: "u".repeat(101) })).status).toBe(400);
+    expect((await call("/challenges", { userId: "u".repeat(101) })).status).toBe(400);
+    expect((await call("/challenges/exchange", { challengeId: "x" })).status).toBe(400);
+    expect((await call("/challenges/exchange", { challengeId: crypto.randomUUID(), code: "c".repeat(201) })).status).toBe(400);
+  });
+});
+
+describe("falhas na emissão", () => {
+  it("responde 409 e não devolve o .pfx se o fingerprint já existe", async () => {
+    const deviceStore = new MemoryDeviceStore();
+    vi.spyOn(deviceStore, "create").mockRejectedValueOnce(new DuplicateDeviceFingerprintError());
+    const { call } = setup({ deviceStore });
+    const res = await call("/devices", { name: "Caixa 1" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Já existe um Dispositivo com este certificado." });
+  });
+
+  it("responde JSON 500 sem vazar o erro e registra só o essencial", async () => {
+    const deviceStore = new MemoryDeviceStore();
+    vi.spyOn(deviceStore, "create").mockRejectedValueOnce(new Error("connection to 10.0.0.5 refused"));
+    const logger = { error: vi.fn() };
+    const { call } = setup({ deviceStore, logger });
+    const res = await call("/devices", { name: "Caixa 1", createdBy: "usr_1" });
+    expect(res.status).toBe(500);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    const text = await res.text();
+    expect(JSON.parse(text)).toEqual({ error: "Erro interno da autoridade certificadora." });
+    expect(text).not.toContain("10.0.0.5");
+    expect(logger.error).toHaveBeenCalledOnce();
+    const logged = JSON.stringify(logger.error.mock.calls[0]);
+    expect(logged).not.toContain(SECRET);
+    expect(logged).not.toContain("Caixa 1");
   });
 });
 
@@ -160,9 +228,18 @@ describe("desafio de login e leitura do certificado", () => {
     expect(location.searchParams.get("code")).toBeNull();
   });
 
+  it("com o desafio malformado volta ao app sem ecoá-lo", async () => {
+    const { app } = setup();
+    for (const query of ["", "?challenge=abc", `?challenge=${"a".repeat(5000)}`]) {
+      const verify = await app.request(`/verify${query}`);
+      expect(verify.status).toBe(302);
+      expect(verify.headers.get("location")).toBe(CALLBACK);
+    }
+  });
+
   it("não deixa quem não tem a chave abrir nem trocar desafios", async () => {
     const { call } = setup();
     expect((await call("/challenges", { userId: "user-1" }, {})).status).toBe(401);
-    expect((await call("/challenges/exchange", { challengeId: "x" }, {})).status).toBe(401);
+    expect((await call("/challenges/exchange", { challengeId: crypto.randomUUID() }, {})).status).toBe(401);
   });
 });

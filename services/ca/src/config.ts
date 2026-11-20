@@ -43,15 +43,16 @@ function readOrExplain(file: string, read: ReadFile): Buffer {
 
 /** A CA vem de dois arquivos que só fazem sentido juntos: os dois, nenhum, ou erro nomeando o que falta. */
 function loadAuthority(env: Env, read: ReadFile): CertificateAuthorityMaterial | undefined {
-  const absent = CA_VARS.filter((name) => !env[name]);
-  if (absent.length === CA_VARS.length) return undefined;
-  if (absent.length > 0) throw new Error(`Configuração incompleta: defina também ${absent.join(", ")}.`);
-  const certificateFile = env.DEVICE_CA_CERT_FILE;
-  const privateKeyFile = env.DEVICE_CA_KEY_FILE;
-  if (!certificateFile || !privateKeyFile) throw new Error("Configuração incompleta: defina DEVICE_CA_CERT_FILE e DEVICE_CA_KEY_FILE.");
+  const certFile = env.DEVICE_CA_CERT_FILE;
+  const keyFile = env.DEVICE_CA_KEY_FILE;
+  if (!certFile && !keyFile) return undefined;
+  if (!certFile || !keyFile) {
+    const absent = CA_VARS.filter((name) => !env[name]);
+    throw new Error(`Configuração incompleta: defina também ${absent.join(", ")}.`);
+  }
   return {
-    certificatePem: readOrExplain(certificateFile, read).toString("utf8"),
-    privateKeyPem: readOrExplain(privateKeyFile, read).toString("utf8"),
+    certificatePem: readOrExplain(certFile, read).toString("utf8"),
+    privateKeyPem: readOrExplain(keyFile, read).toString("utf8"),
   };
 }
 
@@ -66,15 +67,23 @@ function requireUrl(env: Env, name: string, fallback: string | undefined): strin
   return value;
 }
 
+/** Só `development` e `test`, escritos assim, liberam a simulação e os endereços locais; qualquer outro valor (ou nenhum) é produção. */
+const NON_PRODUCTION_ENVIRONMENTS = ["development", "test"];
+
+function isExplicitNonProduction(nodeEnv: string | undefined): boolean {
+  return nodeEnv !== undefined && NON_PRODUCTION_ENVIRONMENTS.includes(nodeEnv);
+}
+
 /**
- * Lê a configuração da CA. Em produção ela só sobe com a chave em comum, os endereços, a CA dos Dispositivos e
+ * Lê a configuração da CA. Falha fechada: o ambiente só é tratado como desenvolvimento com `NODE_ENV=development`
+ * ou `NODE_ENV=test`; NODE_ENV ausente ou com outro valor (inclusive um erro de digitação) vale como produção. Em produção ela só sobe com a chave em comum, os endereços, a CA dos Dispositivos e
  * `CA_CERT_SOURCE=header` (com o segredo do proxy), para a falta de configuração nunca virar "sem exigência de
  * certificado". Fora de produção, sem fonte configurada, ninguém apresenta certificado.
  *
  * O Node nunca termina TLS: o certificado chega de um proxy que já o validou contra a CA dos Dispositivos.
  */
 export function loadCaConfig(env: Env = process.env, read: ReadFile = readFileSync): CaConfig {
-  const production = env.NODE_ENV === "production";
+  const production = !isExplicitNonProduction(env.NODE_ENV);
   const port = Number(env.CA_PORT) || DEFAULT_PORT;
 
   const sharedSecret = env.CA_SHARED_SECRET;
@@ -86,13 +95,13 @@ export function loadCaConfig(env: Env = process.env, read: ReadFile = readFileSy
   const callbackUrl = requireUrl(env, "APP_CALLBACK_URL", production ? undefined : "http://localhost:5173/login/certificado");
   const authority = loadAuthority(env, read);
   if (production && !authority) {
-    throw new Error(`Em produção a CA dos Dispositivos é obrigatória. Defina: ${CA_VARS.join(", ")}.`);
+    throw new Error(`Em produção (NODE_ENV diferente de development e test) a CA dos Dispositivos é obrigatória. Defina: ${CA_VARS.join(", ")}.`);
   }
   const base = { port, sharedSecret, publicUrl, callbackUrl, authority };
 
   const source = env.CA_CERT_SOURCE || (production ? undefined : "mock");
   if (source === undefined) {
-    throw new Error("Em produção defina CA_CERT_SOURCE=header (o proxy que termina o TLS repassa o certificado do cliente).");
+    throw new Error("Em produção (NODE_ENV diferente de development e test) defina CA_CERT_SOURCE=header (o proxy que termina o TLS repassa o certificado do cliente).");
   }
   if (source === "header") {
     // O segredo é a única trava contra um header forjado, então é obrigatório em qualquer ambiente.
@@ -113,7 +122,7 @@ export function loadCaConfig(env: Env = process.env, read: ReadFile = readFileSy
   }
   if (source === "mock") {
     // Simular o certificado em produção deixaria entrar qualquer um: a CA nem sobe.
-    if (production) throw new Error("CA_CERT_SOURCE=mock não existe em produção: use header.");
+    if (production) throw new Error("CA_CERT_SOURCE=mock não existe em produção: use header, ou defina NODE_ENV=development para simular.");
     return { ...base, source: "mock", mock: { deviceName: env.CA_MOCK_DEVICE || undefined } };
   }
   throw new Error(`CA_CERT_SOURCE inválido ("${source}"): use "header" ou "mock".`);

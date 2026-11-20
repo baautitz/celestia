@@ -57,13 +57,9 @@ export class ChallengeStore {
     const challenge = this.live(challengeId);
     this.challenges.delete(challengeId);
     if (!challenge) return { granted: false };
-    const { codeHash, deviceId } = challenge;
-    const valid =
-      code !== undefined &&
-      codeHash !== undefined &&
-      deviceId !== undefined &&
-      (challenge.codeExpiresAt ?? 0) > this.now() &&
-      timingSafeEqual(hash(code), codeHash);
+    const { deviceId, codeHash, codeExpiresAt } = challenge;
+    if (code === undefined || deviceId === undefined || codeHash === undefined) return { granted: false, userId: challenge.userId };
+    const valid = (codeExpiresAt ?? 0) > this.now() && timingSafeEqual(hash(code), codeHash);
     return valid ? { granted: true, userId: challenge.userId, deviceId } : { granted: false, userId: challenge.userId };
   }
 

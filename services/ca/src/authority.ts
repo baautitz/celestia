@@ -1,16 +1,20 @@
 import { createHash, randomBytes } from "node:crypto";
 import * as asn1js from "asn1js";
 import forge from "node-forge";
-import { AttributeTypeAndValue, BasicConstraints, Certificate, Extension, ExtKeyUsage } from "pkijs";
+import { AttributeTypeAndValue, AuthorityKeyIdentifier, BasicConstraints, Certificate, Extension, ExtKeyUsage } from "pkijs";
 
 const subtle = globalThis.crypto.subtle;
 const RSA = { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" } as const;
 
 const DEVICE_VALIDITY_YEARS = 10;
 const CA_VALIDITY_YEARS = 20;
+/** O certificado vale desde um pouco antes de emitir, para o relógio de um aparelho atrasado não o recusar como "ainda não válido". */
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 const OID = {
   commonName: "2.5.4.3",
+  subjectKeyIdentifier: "2.5.29.14",
+  authorityKeyIdentifier: "2.5.29.35",
   basicConstraints: "2.5.29.19",
   keyUsage: "2.5.29.15",
   extKeyUsage: "2.5.29.37",
@@ -68,11 +72,17 @@ const name = (certificate: Certificate["subject"], commonName: string) => {
   );
 };
 
+const keyIdentifierOf = async (certificate: Certificate): Promise<ArrayBuffer> =>
+  subtle.digest("SHA-1", toArrayBuffer(certificate.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView));
+
 const keyUsageDigitalSignature = new asn1js.BitString({ valueHex: new Uint8Array([0x80]).buffer, unusedBits: 7 });
 
 async function buildCertificate(params: {
   commonName: string;
-  issuerCommonName: string;
+  /** Nome do emissor: o da CA que assina. Sem ele o certificado é autoassinado e o emissor é ele mesmo. */
+  issuer?: Certificate["issuer"];
+  /** Chave pública do emissor, para o authorityKeyIdentifier; sem ela vale a do próprio certificado. */
+  issuerCertificate?: Certificate;
   publicKey: CryptoKey;
   signingKey: CryptoKey;
   notBefore: Date;
@@ -83,21 +93,29 @@ async function buildCertificate(params: {
   cert.version = 2;
   cert.serialNumber = new asn1js.Integer({ valueHex: randomSerial() });
   name(cert.subject, params.commonName);
-  name(cert.issuer, params.issuerCommonName);
-  cert.notBefore.value = params.notBefore;
+  cert.issuer = params.issuer ?? cert.subject;
+  cert.notBefore.value = new Date(params.notBefore.getTime() - CLOCK_SKEW_MS);
   cert.notAfter.value = params.notAfter;
   await cert.subjectPublicKeyInfo.importKey(params.publicKey);
 
   const keyUsage = params.isCa
     ? new asn1js.BitString({ valueHex: new Uint8Array([0x06]).buffer, unusedBits: 1 }) // keyCertSign, cRLSign
     : keyUsageDigitalSignature;
+  const subjectKeyId = await keyIdentifierOf(cert);
+  const authorityKeyId = params.issuerCertificate ? await keyIdentifierOf(params.issuerCertificate) : subjectKeyId;
   cert.extensions = [
     new Extension({
       extnID: OID.basicConstraints,
       critical: true,
-      extnValue: new BasicConstraints({ cA: params.isCa }).toSchema().toBER(false),
+      // A CA só assina Dispositivos, nunca outra CA.
+      extnValue: new BasicConstraints(params.isCa ? { cA: true, pathLenConstraint: 0 } : { cA: false }).toSchema().toBER(false),
     }),
     new Extension({ extnID: OID.keyUsage, critical: true, extnValue: keyUsage.toBER(false) }),
+    new Extension({ extnID: OID.subjectKeyIdentifier, extnValue: new asn1js.OctetString({ valueHex: subjectKeyId }).toBER(false) }),
+    new Extension({
+      extnID: OID.authorityKeyIdentifier,
+      extnValue: new AuthorityKeyIdentifier({ keyIdentifier: new asn1js.OctetString({ valueHex: authorityKeyId }) }).toSchema().toBER(false),
+    }),
   ];
   if (!params.isCa) {
     cert.extensions.push(
@@ -125,7 +143,6 @@ export class DeviceCertificateAuthority {
     const pair = (await subtle.generateKey(RSA, true, ["sign", "verify"])) as CryptoKeyPair;
     const cert = await buildCertificate({
       commonName: options.commonName,
-      issuerCommonName: options.commonName,
       publicKey: pair.publicKey,
       signingKey: pair.privateKey,
       notBefore: now,
@@ -147,11 +164,11 @@ export class DeviceCertificateAuthority {
   async issue(options: { name: string; now?: Date }): Promise<IssuedDeviceCertificate> {
     const now = options.now ?? new Date();
     const pair = (await subtle.generateKey(RSA, true, ["sign", "verify"])) as CryptoKeyPair;
-    const issuerCn = this.caCertificate.subject.typesAndValues[0]?.value.valueBlock.value as string;
     const notAfter = yearsFrom(now, DEVICE_VALIDITY_YEARS);
     const cert = await buildCertificate({
       commonName: options.name,
-      issuerCommonName: issuerCn,
+      issuer: this.caCertificate.subject,
+      issuerCertificate: this.caCertificate,
       publicKey: pair.publicKey,
       signingKey: await this.getSigningKey(),
       notBefore: now,
@@ -192,19 +209,37 @@ async function buildPfx(params: {
   const cert = forge.pki.certificateFromAsn1(forge.asn1.fromDer(certDer));
   const caCert = forge.pki.certificateFromAsn1(forge.asn1.fromDer(caDer));
   const key = forge.pki.privateKeyFromAsn1(forge.asn1.fromDer(keyDer));
-  // O forge reescreve o certificado ao empacotar (acrescenta parâmetros NULL ao algoritmo), o que invalida a assinatura.
-  // Por isso os bytes DER originais, exatamente como a CA assinou, entram no .pfx sem passar pela reserialização.
-  const originals = new Map<object, string>([[cert, certDer], [caCert, caDer]]);
+  const p12 = toPkcs12Asn1PreservingDer(key, [
+    { cert, der: certDer },
+    { cert: caCert, der: caDer },
+  ], params.password, params.friendlyName);
+  return toArrayBuffer(Buffer.from(forge.asn1.toDer(p12).getBytes(), "binary"));
+}
+
+/**
+ * O forge reescreve o certificado ao empacotar (acrescenta parâmetros NULL ao algoritmo de assinatura), o que invalida
+ * a assinatura. Como `toPkcs12Asn1` não aceita o DER pronto, o único jeito é substituir `forge.pki.certificateToAsn1`
+ * por um instante para devolver os bytes originais, exatamente como a CA assinou.
+ *
+ * Esta é a ÚNICA função que mexe nesse global e ela precisa continuar SÍNCRONA, sem `await` entre trocar e restaurar:
+ * é isso que impede outra emissão concorrente de enxergar a função trocada (o Node roda um callback por vez).
+ */
+function toPkcs12Asn1PreservingDer(
+  key: ReturnType<typeof forge.pki.privateKeyFromAsn1>,
+  certificates: { cert: forge.pki.Certificate; der: string }[],
+  password: string,
+  friendlyName: string,
+): forge.asn1.Asn1 {
+  const originals = new Map<forge.pki.Certificate, string>(certificates.map(({ cert, der }) => [cert, der]));
   const original = forge.pki.certificateToAsn1;
   forge.pki.certificateToAsn1 = (c) => {
     const der = originals.get(c);
     return der ? forge.asn1.fromDer(der) : original(c);
   };
-  let p12: forge.asn1.Asn1;
   try {
-    p12 = forge.pkcs12.toPkcs12Asn1(key, [cert, caCert], params.password, {
+    return forge.pkcs12.toPkcs12Asn1(key, certificates.map(({ cert }) => cert), password, {
       algorithm: "3des",
-      friendlyName: params.friendlyName,
+      friendlyName,
       generateLocalKeyId: true,
       useMac: true,
       count: 2048,
@@ -212,5 +247,4 @@ async function buildPfx(params: {
   } finally {
     forge.pki.certificateToAsn1 = original;
   }
-  return toArrayBuffer(Buffer.from(forge.asn1.toDer(p12).getBytes(), "binary"));
 }
