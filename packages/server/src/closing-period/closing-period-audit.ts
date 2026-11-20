@@ -10,7 +10,7 @@ const WithRange = Base.merge(Range);
 
 /** Declara no Audit Log o schema de atributos de cada ação do Plugin (ADR 0001). */
 export function declareClosingPeriodAudit(auditLog: AuditLog): void {
-  const declare = <S extends z.ZodTypeAny>(action: string, schema: S, summary: (a: z.infer<S>) => string): void =>
+  const declare = <S extends z.ZodType<Record<string, unknown>>>(action: string, schema: S, summary: (a: z.infer<S>) => string): void =>
     auditLog.declareAction({ plugin: CLOSING_PERIOD_PLUGIN, action, schemaVersion: 1, schema, summary });
 
   declare("create", WithRange, (a) => `Criou o período "${a.name}" (${a.startDate} a ${a.endDate}).`);

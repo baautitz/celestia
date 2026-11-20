@@ -9,7 +9,7 @@ const Device = z.object({ name: z.string() });
 
 /** Declara no Audit Log as ações do `iam` ligadas a Dispositivos e ao acesso sem certificado (ADR 0001). */
 export function declareIamAudit(auditLog: AuditLog): void {
-  const declare = <S extends z.ZodTypeAny>(action: string, schema: S, summary: (a: z.infer<S>) => string): void =>
+  const declare = <S extends z.ZodType<Record<string, unknown>>>(action: string, schema: S, summary: (a: z.infer<S>) => string): void =>
     auditLog.declareAction({ plugin: IAM_AUDIT_PLUGIN, action, schemaVersion: 1, schema, summary });
 
   declare("issue_device", Device, (a) => `Emitiu o certificado do Dispositivo "${a.name}".`);

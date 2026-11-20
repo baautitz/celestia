@@ -28,7 +28,7 @@ export class PasswordService {
     if (!result.success) {
       return {
         valid: false,
-        error: result.error.errors[0]?.message || "Senha inválida.",
+        error: result.error.issues[0]?.message || "Senha inválida.",
       };
     }
     return { valid: true };

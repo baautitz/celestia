@@ -3,7 +3,7 @@ import type { z } from "zod";
 import type { AuditFacets, AuditFilter, AuditStore, LogEntry } from "./audit-store.js";
 import { currentDevice, type RequestDevice } from "./request-device.js";
 
-export interface AuditActionDef<S extends z.ZodTypeAny = z.ZodTypeAny> {
+export interface AuditActionDef<S extends z.ZodType<Record<string, unknown>> = z.ZodType<Record<string, unknown>>> {
   plugin: string;
   action: string;
   /** Versão do schema de atributos; guardada em cada entrada. */
@@ -26,11 +26,11 @@ export interface RecordInput {
 
 /** Audit Log único do sistema (ADR 0001). Plugins declaram o schema de cada ação e gravam entradas. */
 export class AuditLog {
-  private actions = new Map<string, AuditActionDef<z.ZodTypeAny>>();
+  private actions = new Map<string, AuditActionDef<z.ZodType<Record<string, unknown>>>>();
 
   constructor(private readonly store: AuditStore) {}
 
-  declareAction<S extends z.ZodTypeAny>(def: AuditActionDef<S>): void {
+  declareAction<S extends z.ZodType<Record<string, unknown>>>(def: AuditActionDef<S>): void {
     const key = `${def.plugin}:${def.action}`;
     if (this.actions.has(key)) throw new Error(`Ação de auditoria "${key}" já declarada.`);
     this.actions.set(key, def);

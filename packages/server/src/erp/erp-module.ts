@@ -53,7 +53,7 @@ export function createErpModule({ erpStore, clients, clientFactory, auth, extraD
         "/erps/:id",
         auth,
         manage,
-        zValidator("json", z.object({ name: z.string().min(1), driver: z.string().min(1), values: z.record(z.unknown()) })),
+        zValidator("json", z.object({ name: z.string().min(1), driver: z.string().min(1), values: z.record(z.string(), z.unknown()) })),
         async (c) => {
           const id = c.req.param("id");
           if (!/^[a-z][a-z0-9_]*$/.test(id)) {
