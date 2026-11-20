@@ -253,6 +253,16 @@ const NestedTableContext = createContext(false);
  * e o cabeçalho gruda na rolagem da página, abaixo da barra superior (`--table-sticky-top`, definida em `AppMain`).
  * Larga demais, o contêiner rola na horizontal e o cabeçalho deixa de grudar; com `scroll="table"` gruda dentro dele.
  */
+/**
+ * A cópia grudada do cabeçalho acompanha a rolagem lateral do contêiner por uma animação ligada à rolagem
+ * (`animation-timeline`), que roda no compositor junto com o scroll; sincronizar por `scrollLeft` num evento ficava
+ * um quadro atrás e o cabeçalho piscava. Sem suporte, cai no `scrollLeft`.
+ */
+const HEAD_FOLLOWS_SCROLL =
+  typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("animation-timeline: --x");
+const HEAD_TIMELINE = "--celestia-table-x";
+const HEAD_SCROLL_KEYFRAMES = `@keyframes celestia-head-x{to{transform:translateX(calc(var(--head-max,0px)*-1))}}`;
+
 const PAGE_STICKY_HEAD_CLASS = "top-(--table-sticky-top,0px)";
 
 /**
@@ -521,6 +531,7 @@ export function DataTable<TRow>({
     tableWidth: number;
     columnWidths: number[];
     headHeight: number;
+    maxScroll: number;
   } | null>(null);
   const isWide = scroll === "page" && !fitsWidth && !isMobile && !nested;
   const wide = isWide ? wideLayout : null;
@@ -535,12 +546,14 @@ export function DataTable<TRow>({
         tableWidth: table.offsetWidth,
         columnWidths: cells.map((c) => c.getBoundingClientRect().width),
         headHeight: head.offsetHeight,
+        maxScroll: Math.max(0, (containerRef.current?.scrollWidth ?? 0) - (containerRef.current?.clientWidth ?? 0)),
       };
       // Mesmas medidas: mantém o objeto, senão a cópia do cabeçalho redesenha e volta o `scrollLeft` no meio da rolagem.
       setWideLayout((prev) =>
         prev &&
         prev.tableWidth === next.tableWidth &&
         prev.headHeight === next.headHeight &&
+        prev.maxScroll === next.maxScroll &&
         prev.columnWidths.length === next.columnWidths.length &&
         prev.columnWidths.every((w, i) => w === next.columnWidths[i])
           ? prev
@@ -551,11 +564,13 @@ export function DataTable<TRow>({
     const observer = new ResizeObserver(measure);
     observer.observe(table);
     observer.observe(head);
+    if (containerRef.current) observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, [isWide, columns]);
   const syncScroll = (e: React.UIEvent<HTMLElement>) => {
     const left = e.currentTarget.scrollLeft;
     for (const el of [containerRef.current, stickyHeadRef.current, scrollbarRef.current]) {
+      if (el === stickyHeadRef.current && HEAD_FOLLOWS_SCROLL) continue;
       if (el && el !== e.currentTarget && el.scrollLeft !== left) el.scrollLeft = left;
     }
   };
@@ -563,7 +578,7 @@ export function DataTable<TRow>({
   useLayoutEffect(() => {
     // Ao montar a cópia (ou trocar as larguras), ela parte da posição lateral atual da tabela.
     const left = containerRef.current?.scrollLeft ?? 0;
-    if (stickyHeadRef.current) stickyHeadRef.current.scrollLeft = left;
+    if (stickyHeadRef.current && !HEAD_FOLLOWS_SCROLL) stickyHeadRef.current.scrollLeft = left;
     if (scrollbarRef.current) scrollbarRef.current.scrollLeft = left;
   }, [wide]);
   const trendTooltip = useTrendTooltipHandle();
@@ -1077,7 +1092,7 @@ export function DataTable<TRow>({
         ) : (
           <>
             {/* biome-ignore lint/a11y/noStaticElementInteractions: keyboard/focus delegation container for arrow navigation across the real inputs inside the rows. */}
-            <div className={bordered ? "border border-border" : undefined} data-arrow-root={arrowNavigation ? "" : undefined}
+            <div className={bordered ? "border border-border" : undefined} style={wide && HEAD_FOLLOWS_SCROLL ? ({ timelineScope: HEAD_TIMELINE } as React.CSSProperties) : undefined} data-arrow-root={arrowNavigation ? "" : undefined}
               onKeyDown={arrowNavigation ? handleArrowNavigation : undefined}
               onFocus={
                 arrowNavigation
@@ -1089,6 +1104,7 @@ export function DataTable<TRow>({
                     }
                   : undefined
               }>
+              {wide && HEAD_FOLLOWS_SCROLL && <style>{HEAD_SCROLL_KEYFRAMES}</style>}
               {wide && (
                 <div
                   ref={stickyHeadRef}
@@ -1097,7 +1113,16 @@ export function DataTable<TRow>({
                 >
                   <table
                     className="caption-bottom text-xs table-fixed"
-                    style={{ width: wide.tableWidth }}
+                    style={
+                      HEAD_FOLLOWS_SCROLL
+                        ? ({
+                            width: wide.tableWidth,
+                            "--head-max": `${wide.maxScroll}px`,
+                            animation: "celestia-head-x linear both",
+                            animationTimeline: HEAD_TIMELINE,
+                          } as React.CSSProperties)
+                        : { width: wide.tableWidth }
+                    }
                   >
                     <colgroup>
                       {wide.columnWidths.map((w, idx) => (
@@ -1111,7 +1136,14 @@ export function DataTable<TRow>({
               <Table
                 containerRef={containerRef}
                 onContainerScroll={wide ? syncScroll : undefined}
-                containerStyle={wide ? { marginTop: -wide.headHeight } : undefined}
+                containerStyle={
+                  wide
+                    ? ({
+                        marginTop: -wide.headHeight,
+                        ...(HEAD_FOLLOWS_SCROLL ? { scrollTimeline: `${HEAD_TIMELINE} x` } : null),
+                      } as React.CSSProperties)
+                    : undefined
+                }
                 containerClassName={
                   scroll === "page"
                     ? cn(
