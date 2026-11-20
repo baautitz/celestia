@@ -434,7 +434,7 @@ export function ColaboradoresPage() {
               </Button>
             )}
             {alterada(r, edicoes) && (
-              <Button type="button" variant="ghost" size="default" aria-label={`Desfazer as alterações de ${r.nome}`} disabled={salvando.has(r.codigoColaborador)} onClick={() => desfazer(r)}>
+              <Button type="button" variant="outline" size="default" aria-label={`Desfazer as alterações de ${r.nome}`} disabled={salvando.has(r.codigoColaborador)} onClick={() => desfazer(r)}>
                 Desfazer
               </Button>
             )}
