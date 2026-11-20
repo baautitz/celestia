@@ -1,17 +1,15 @@
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { AVALIACAO_ACTIONS, AVALIACAO_PLUGIN, AVALIACAO_TARGET, type AtributosAvaliacao } from "./avaliacoes-audit.js";
 import type { Avaliacao, AvaliacaoStore } from "./avaliacoes-store.js";
-import { COLABORADORES_SQL, LOJAS_SQL, type UsersService } from "./colaboradores-routes.js";
+import { COLABORADORES_SQL, type UsersService } from "./colaboradores-routes.js";
+import { ator, Codigo, CodigoEmTexto, ERP_INDISPONIVEL, PERIODO_NAO_ENCONTRADO, periodoAindaAberto, recusaDeValidacao, Version, versaoDaQuery, versaoDesatualizada, vinculoDoUsuario, type AuthContext, type ErpQuery } from "./metas-comum.js";
+import { lojasDoErp } from "./pre-vencidos-comum.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { PeriodoResumo, PeriodsService } from "./pre-vencidos-routes.js";
 import type { AuditService } from "./vinculo-audit.js";
-import { vinculoDesfeito, type VinculoStore } from "./vinculo-store.js";
-
-interface ErpQuery {
-  query<T = Record<string, unknown>>(sql: string, params?: Record<string, unknown>): Promise<T[]>;
-}
+import type { VinculoStore } from "./vinculo-store.js";
 
 export interface AvaliacoesRoutesDeps {
   routes: ModuleContext["routes"];
@@ -39,19 +37,23 @@ interface Elegivel {
   lojas: number[];
 }
 
-type AuthContext = Context<{ Variables: { user?: { sub?: string; fullname?: string; permissions?: string[] } } }>;
-
-const ERP_INDISPONIVEL = "ERP InovaFarma indisponível. Tente novamente em instantes.";
-const VERSAO_DESATUALIZADA = { error: "A Avaliação foi alterada por outra pessoa. A lista foi recarregada.", code: "versao_desatualizada" };
-const PERIODO_NAO_ENCONTRADO = "Período de Fechamento não encontrado.";
+const VERSAO_DESATUALIZADA = versaoDesatualizada("A Avaliação foi alterada por outra pessoa. A lista foi recarregada.");
 const PERIODO_FECHADO = "O Período de Fechamento está fechado: não é possível lançar, alterar nem excluir.";
 const NAO_ENCONTRADA = "Avaliação não encontrada.";
 const LOJA_FORA = "A Loja informada não está entre as Lojas que você gerencia.";
 
 const Descricao = z.string().trim().min(1, "Informe a descrição.").max(500, "A descrição deve ter no máximo 500 caracteres.");
-const Valor = z.number({ error: "Informe o valor descontado." }).min(0, "O valor descontado não pode ser negativo.").max(1_000_000, "Valor descontado muito alto.");
-const Nova = z.object({ periodoId: z.string().min(1), codigoColaborador: z.number().int().min(1), codigoLoja: z.number().int().min(1), descricao: Descricao, valor: Valor });
-const Edicao = z.object({ descricao: Descricao, valor: Valor, version: z.number().int().min(1) });
+// Em reais, com até 2 casas: 0,001 viraria 0 centavos. Zero continua aceito (uma Avaliação sem desconto).
+const Valor = z
+  .number({ error: "Informe o valor descontado." })
+  .min(0, "O valor descontado não pode ser negativo.")
+  .max(1_000_000, "Valor descontado muito alto.")
+  .multipleOf(0.01, "O valor descontado deve ter no máximo 2 casas decimais.");
+const Nova = z.object({ periodoId: z.string().min(1), codigoColaborador: Codigo, codigoLoja: Codigo, descricao: Descricao, valor: Valor });
+const Edicao = z.object({ descricao: Descricao, valor: Valor, version: Version });
+const PeriodoId = z.string({ error: "Parâmetro 'periodoId' é obrigatório." }).min(1, "Parâmetro 'periodoId' é obrigatório.");
+/** Filtros da listagem de quem gerencia; `""` é o mesmo que ausente. */
+const Filtro = z.object({ periodoId: PeriodoId, codigoLoja: CodigoEmTexto.optional(), codigoColaborador: CodigoEmTexto.optional() });
 
 const centavos = (valor: number) => Math.round(valor * 100);
 
@@ -67,23 +69,12 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
 
   const vinculoDe = async (c: AuthContext) => {
     const sub = c.get("user")?.sub;
-    return sub ? ((await vinculos.list()).find((v) => v.usuarioId === sub && !vinculoDesfeito(v)) ?? null) : null;
+    return sub ? vinculoDoUsuario(vinculos, sub) : null;
   };
 
   /** Lojas que o Usuário gerencia: todas (undefined) com a Permission geral, senão as do seu Vínculo. */
   const lojasGerenciadas = async (c: AuthContext): Promise<number[] | undefined> => (pode(c, geral) ? undefined : ((await vinculoDe(c))?.lojas ?? []));
   const gerencia = (lojas: number[] | undefined, codigoLoja: number) => lojas === undefined || lojas.includes(codigoLoja);
-
-  const lojasDoErp = async () => {
-    const client = erpClient();
-    if (!client) return [];
-    try {
-      const rows = await client.query<{ codigoEmpresa: number; nome: string | null }>(LOJAS_SQL);
-      return rows.map((r) => ({ codigo: Number(r.codigoEmpresa), nome: (r.nome || "").trim() }));
-    } catch {
-      return [];
-    }
-  };
 
   /**
    * Colaboradores que o Usuário pode avaliar, menos ele mesmo: os de uma Loja que ele gerencia.
@@ -116,7 +107,6 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
   };
 
   const registrar = (c: AuthContext, action: string, alvo: Avaliacao, periodo: PeriodoResumo | undefined, anterior: AtributosAvaliacao["anterior"] = null) => {
-    const user = c.get("user");
     const atributos: AtributosAvaliacao = {
       periodo: periodo?.name ?? alvo.periodoId,
       codigoColaborador: alvo.codigoColaborador,
@@ -129,7 +119,7 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     return audit.record({
       plugin: AVALIACAO_PLUGIN,
       action,
-      actor: { id: user?.sub ?? "", name: user?.fullname ?? "" },
+      actor: ator(c),
       target: { type: AVALIACAO_TARGET, id: alvo.id },
       attributes: atributos,
     });
@@ -143,7 +133,7 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     const gerenciar = podeGerenciar(c);
     if (!podeVer && !gerenciar) return c.json({ error: individual.deniedMessage }, 403);
     const vinculo = await vinculoDe(c);
-    const lojasErp = await lojasDoErp();
+    const lojasErp = await lojasDoErp(erpClient());
     const lojas = gerenciar ? await lojasGerenciadas(c) : [];
     return c.json({
       podeVer,
@@ -159,11 +149,11 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
 
   routes.get("/avaliacoes/minhas", auth, async (c: AuthContext) => {
     if (!pode(c, individual)) return c.json({ error: individual.deniedMessage }, 403);
-    const periodoId = c.req.query("periodoId");
-    if (!periodoId) return c.json({ error: "Parâmetro 'periodoId' é obrigatório." }, 400);
+    const periodoId = PeriodoId.safeParse(c.req.query("periodoId"));
+    if (!periodoId.success) return recusaDeValidacao(c, periodoId.error);
     const vinculo = await vinculoDe(c);
     if (!vinculo?.usuarioId) return c.json([]);
-    return c.json((await store.listar({ periodoId, codigoColaborador: vinculo.codigoColaborador })).map(publico));
+    return c.json((await store.listar({ periodoId: periodoId.data, codigoColaborador: vinculo.codigoColaborador })).map(publico));
   });
 
   routes.get("/avaliacoes/colaboradores", auth, async (c: AuthContext) => {
@@ -173,12 +163,13 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     if (lista === null) return c.json({ error: ERP_INDISPONIVEL }, 503);
     const [usuarios, todos] = await Promise.all([users.list(), vinculos.list()]);
     const vinculoPorCodigo = new Map(todos.map((v) => [v.codigoColaborador, v]));
+    const usernames = new Map(usuarios.map((u) => [u.id, u.username]));
     return c.json(
       lista
         .map((v) => ({
           codigoColaborador: v.codigoColaborador,
           nome: v.nome || `Colaborador cód. ${v.codigoColaborador}`,
-          usuario: usuarios.find((u) => u.id === vinculoPorCodigo.get(v.codigoColaborador)?.usuarioId)?.username ?? null,
+          usuario: usernames.get(vinculoPorCodigo.get(v.codigoColaborador)?.usuarioId ?? "") ?? null,
           lojas: v.lojas.filter((l) => gerencia(lojas, l)),
         }))
         .sort((a, b) => a.nome.localeCompare(b.nome)),
@@ -187,27 +178,21 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
 
   routes.get("/avaliacoes", auth, async (c: AuthContext) => {
     if (!podeGerenciar(c)) return c.json({ error: porLoja.deniedMessage }, 403);
-    const periodoId = c.req.query("periodoId");
-    if (!periodoId) return c.json({ error: "Parâmetro 'periodoId' é obrigatório." }, 400);
-    const loja = c.req.query("codigoLoja");
-    if (loja !== undefined && loja !== "" && !Number.isInteger(Number(loja))) return c.json({ error: "O filtro 'codigoLoja' deve ser um número inteiro." }, 400);
+    // `codigoColaborador`: só as de um Colaborador, o atalho (olho) das Metas de Avaliações.
+    const consulta = Filtro.safeParse({ periodoId: c.req.query("periodoId"), codigoLoja: c.req.query("codigoLoja") || undefined, codigoColaborador: c.req.query("codigoColaborador") || undefined });
+    if (!consulta.success) return recusaDeValidacao(c, consulta.error);
+    const { periodoId, codigoLoja, codigoColaborador } = consulta.data;
     const lojas = await lojasGerenciadas(c);
-    const filtro = loja === undefined || loja === "" ? lojas : gerencia(lojas, Number(loja)) ? [Number(loja)] : [];
-    // Só as de um Colaborador: o atalho (olho) das Metas de Avaliações.
-    const colaborador = c.req.query("codigoColaborador");
-    if (colaborador !== undefined && colaborador !== "" && !Number.isInteger(Number(colaborador))) return c.json({ error: "O filtro 'codigoColaborador' deve ser um número inteiro." }, 400);
-    const codigoColaborador = colaborador === undefined || colaborador === "" ? undefined : Number(colaborador);
+    const filtro = codigoLoja === undefined ? lojas : gerencia(lojas, codigoLoja) ? [codigoLoja] : [];
     // Quem lançou só aparece para quem gerencia; o Colaborador avaliado não vê.
-    const usuarios = await users.list();
-    return c.json(
-      (await store.listar({ periodoId, lojas: filtro, codigoColaborador })).map((a) => ({ ...publico(a), lancadoPor: usuarios.find((u) => u.id === a.criadoPor)?.fullname ?? "" })),
-    );
+    const nomes = new Map((await users.list()).map((u) => [u.id, u.fullname]));
+    return c.json((await store.listar({ periodoId, lojas: filtro, codigoColaborador })).map((a) => ({ ...publico(a), lancadoPor: nomes.get(a.criadoPor) ?? "" })));
   });
 
   routes.post("/avaliacoes", auth, async (c: AuthContext) => {
     if (!podeGerenciar(c)) return c.json({ error: porLoja.deniedMessage }, 403);
     const parsed = Nova.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const { periodoId, codigoColaborador, codigoLoja, descricao, valor } = parsed.data;
 
     const lojas = await lojasGerenciadas(c);
@@ -222,6 +207,8 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     const periodo = (await periods.list()).find((p) => p.id === periodoId);
     if (!periodo) return c.json({ error: PERIODO_NAO_ENCONTRADO }, 404);
     if (periodo.status !== "open") return c.json({ error: PERIODO_FECHADO }, 409);
+    // O Período pode ter fechado durante as conferências acima: confere de novo logo antes de gravar.
+    if (!(await periodoAindaAberto(periods, periodoId))) return c.json({ error: PERIODO_FECHADO }, 409);
 
     const criada = await store.criar({
       periodoId,
@@ -241,8 +228,9 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     if (!podeGerenciar(c)) return { recusa: c.json({ error: porLoja.deniedMessage }, 403) } as const;
     const avaliacao = await store.get(c.req.param("id") ?? "");
     if (!avaliacao || !gerencia(await lojasGerenciadas(c), avaliacao.codigoLoja)) return { recusa: c.json({ error: NAO_ENCONTRADA }, 404) } as const;
-    const periodo = (await periods.list()).find((p) => p.id === avaliacao.periodoId && p.status === "open");
-    if (!periodo) return { recusa: c.json({ error: PERIODO_FECHADO }, 409) } as const;
+    const periodo = (await periods.list()).find((p) => p.id === avaliacao.periodoId);
+    if (!periodo) return { recusa: c.json({ error: PERIODO_NAO_ENCONTRADO }, 404) } as const;
+    if (periodo.status !== "open") return { recusa: c.json({ error: PERIODO_FECHADO }, 409) } as const;
     return { avaliacao, periodo } as const;
   };
 
@@ -250,8 +238,9 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
     const alvo = await gerenciavelEmPeriodoAberto(c);
     if ("recusa" in alvo) return alvo.recusa;
     const parsed = Edicao.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos." }, 400);
+    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
     const { version, descricao, valor } = parsed.data;
+    if (!(await periodoAindaAberto(periods, alvo.avaliacao.periodoId))) return c.json({ error: PERIODO_FECHADO }, 409);
     const atualizada = await store.atualizar(alvo.avaliacao.id, { descricao, valorCentavos: centavos(valor) }, version);
     if (!atualizada) return c.json(VERSAO_DESATUALIZADA, 409);
     await registrar(c, AVALIACAO_ACTIONS.editar, atualizada, alvo.periodo, { descricao: alvo.avaliacao.descricao, valorCentavos: alvo.avaliacao.valorCentavos });
@@ -261,9 +250,10 @@ export function registerAvaliacoesRoutes({ routes, permissions, auth, erpClient,
   routes.delete("/avaliacoes/:id", auth, async (c: AuthContext) => {
     const alvo = await gerenciavelEmPeriodoAberto(c);
     if ("recusa" in alvo) return alvo.recusa;
-    const version = Number(c.req.query("version"));
-    if (!Number.isInteger(version) || version < 1) return c.json({ error: "Parâmetro 'version' é obrigatório." }, 400);
-    if (!(await store.excluir(alvo.avaliacao.id, version))) return c.json(VERSAO_DESATUALIZADA, 409);
+    const lida = versaoDaQuery(c);
+    if ("recusa" in lida) return lida.recusa;
+    if (!(await periodoAindaAberto(periods, alvo.avaliacao.periodoId))) return c.json({ error: PERIODO_FECHADO }, 409);
+    if (!(await store.excluir(alvo.avaliacao.id, lida.version))) return c.json(VERSAO_DESATUALIZADA, 409);
     await registrar(c, AVALIACAO_ACTIONS.excluir, alvo.avaliacao, alvo.periodo);
     return c.json({ success: true });
   });

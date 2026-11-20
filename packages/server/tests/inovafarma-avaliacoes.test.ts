@@ -23,9 +23,15 @@ const COLABORADORES = [
   { codigoColaborador: 11, nome: "DORA INATIVA", ativo: false, codigoEmpresa: 1 },
 ];
 
+/** Roda uma vez, no meio da próxima consulta de Colaboradores ao ERP: simula o que acontece fora da requisição enquanto ela espera o ERP. */
+let aoConsultarColaboradores: (() => Promise<void>) | null = null;
+
 const erp: ErpClient = {
   query: async <TRow>(sql: string, params?: Record<string, unknown>) => {
     if (sql.includes("Config")) return LOJAS as TRow[];
+    const durante = aoConsultarColaboradores;
+    aoConsultarColaboradores = null;
+    await durante?.();
     return (params?.codigo === undefined ? COLABORADORES : COLABORADORES.filter((c) => c.codigoColaborador === params.codigo)) as TRow[];
   },
 };
@@ -86,6 +92,49 @@ describe("Avaliações do Colaborador", () => {
     const { lancar } = await boot();
     expect((await lancar("gil", { valor: 0 })).status).toBe(201);
     expect((await lancar("gil", { valor: -1 })).status).toBe(400);
+  });
+
+  it("recusa o valor com mais de 2 casas decimais, que arredondaria para centavos errados, e guarda os centavos certos", async () => {
+    const { lancar, req, abril } = await boot();
+    for (const valor of [0.001, 12.345, 0.005]) {
+      const res = await lancar("gil", { valor });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["valor"], message: "O valor descontado deve ter no máximo 2 casas decimais." }] } });
+    }
+    expect((await lancar("gil", { valor: 0.01 })).status).toBe(201);
+    expect((await lancar("gil", { valor: 19.99 })).status).toBe(201);
+    const valores = (await (await req("gil", "GET", `/api/m/inovafarma/avaliacoes?periodoId=${abril.id}`)).json()) as Avaliacao[];
+    expect(valores.map((a) => a.valor).sort((a, b) => a - b)).toEqual([0.01, 19.99]);
+  });
+
+  it("recusa com o corpo de validação da plataforma o campo inválido, o filtro que não é código e a version fora do padrão", async () => {
+    const { lancar, req, abril } = await boot();
+    const semDescricao = await lancar("gil", { descricao: "  " });
+    expect(semDescricao.status).toBe(400);
+    expect(await semDescricao.json()).toEqual({ error: { issues: [{ path: ["descricao"], message: "Informe a descrição." }] } });
+    const semPeriodo = await req("gil", "GET", "/api/m/inovafarma/avaliacoes");
+    expect(semPeriodo.status).toBe(400);
+    expect(await semPeriodo.json()).toEqual({ error: { issues: [{ path: ["periodoId"], message: "Parâmetro 'periodoId' é obrigatório." }] } });
+    for (const filtro of ["codigoLoja", "codigoColaborador"]) {
+      const res = await req("gil", "GET", `/api/m/inovafarma/avaliacoes?periodoId=${abril.id}&${filtro}=abc`);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { issues: [{ path: [filtro], message: "Informe um código inteiro maior que zero." }] } });
+    }
+    const criada = (await (await lancar("gil")).json()) as Avaliacao;
+    for (const version of ["", "0", "x"]) {
+      const res = await req("gil", "DELETE", `/api/m/inovafarma/avaliacoes/${criada.id}?version=${version}`);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: { issues: [{ path: ["version"], message: "Parâmetro 'version' é obrigatório." }] } });
+    }
+  });
+
+  it("não lança no Período que fechou enquanto a rota consultava o ERP", async () => {
+    const { req, lancar, abril } = await boot();
+    aoConsultarColaboradores = async () => void expect((await req("adm", "POST", `/api/closing-periods/${abril.id}/close`)).status).toBe(200);
+    const res = await lancar("gil");
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "O Período de Fechamento está fechado: não é possível lançar, alterar nem excluir." });
+    expect(await (await req("gil", "GET", `/api/m/inovafarma/avaliacoes?periodoId=${abril.id}`)).json()).toEqual([]);
   });
 
   it("o gestor só lança e vê nas suas Lojas e não avalia a si mesmo", async () => {
