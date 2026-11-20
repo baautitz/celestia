@@ -23,12 +23,6 @@ import {
   FormControl,
   FormMessage,
 } from "@platform/ui/components/form";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@platform/ui/components/dropdown-menu";
 import { DataTable } from "@platform/ui/data-table/data-table";
 import type { DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
@@ -37,7 +31,6 @@ import {
   Shield,
   PlusCircle,
   RefreshCw,
-  MoreHorizontal,
   Edit2,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
@@ -333,17 +326,9 @@ export const IAMRolesPage: React.FC = () => {
 
         {hasPermission("system:roles:create") && (
           <Show on="belowLg">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
-              <MoreHorizontal />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={openCreateWindow}>
-                <PlusCircle />
-                Novo Grupo
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="outline" size="icon" aria-label="Novo Grupo" title="Novo Grupo" onClick={openCreateWindow}>
+<PlusCircle />
+</Button>
           </Show>
         )}
       </HeaderActions>

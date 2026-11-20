@@ -11,12 +11,11 @@ import { Input } from "@platform/ui/components/input";
 import { FieldGroup } from "@platform/ui/components/field";
 import { PageHeader, Show, Spin, Stack, Text } from "@platform/ui/components/layout";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@platform/ui/components/dropdown-menu";
 import { DataTable } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { useWindow, WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { formatDate } from "@platform/ui/lib/format";
-import { CheckCircle2, Ban, Copy, Download, MoreHorizontal, MonitorSmartphone, RefreshCw, Trash2 } from "lucide-react";
+import { CheckCircle2, Ban, Copy, Download, MonitorSmartphone, RefreshCw, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 import { HeaderActions } from "@/context/HeaderActionsContext";
@@ -226,17 +225,9 @@ export const IAMDevicesPage: React.FC = () => {
 
         {canCreate && (
           <Show on="belowLg">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
-                <MoreHorizontal />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={openIssueWindow}>
-                  <MonitorSmartphone />
-                  Novo Dispositivo
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="outline" size="icon" aria-label="Novo Dispositivo" title="Novo Dispositivo" onClick={openIssueWindow}>
+<MonitorSmartphone />
+</Button>
           </Show>
         )}
       </HeaderActions>

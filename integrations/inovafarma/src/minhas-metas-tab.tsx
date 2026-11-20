@@ -1,9 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
-import { Label } from "@platform/ui/components/label";
 import { PairGrid, Stack, Text } from "@platform/ui/components/layout";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
@@ -13,7 +11,8 @@ import type { MinhaBaixa, MinhaMeta } from "./minhas-metas";
 import { OlhoAvaliacoes } from "./avaliacoes-do-colaborador";
 import { useVisaoMetas, VisaoSelect } from "./metas-visualizacao";
 import { API } from "./inovafarma-api";
-import { type Periodo, periodoInicial } from "./periodos";
+import type { Periodo } from "./periodos";
+import { SeletorPeriodo, usePeriodoSelecionado } from "./periodo-selecionado";
 import { useLatestFetch } from "./use-latest-fetch";
 
 interface MinhasMetas {
@@ -125,7 +124,7 @@ const colunasBaixa: DataTableColumn<MinhaBaixa>[] = [
 export function MinhasMetas({ periodos, lerAvaliacoes = false }: { periodos: Periodo[]; lerAvaliacoes?: boolean }) {
   const { feedback } = useUi();
   const { visao, salvar: salvarVisao, disponiveis } = useVisaoMetas("minhas-metas", ["table", "list"], "list");
-  const [periodoId, setPeriodoId] = useState(() => periodoInicial(periodos));
+  const [periodoId, setPeriodoId] = usePeriodoSelecionado(periodos);
   const [dados, setDados] = useState<MinhasMetas | null>(null);
   const [carregando, setCarregando] = useState(false);
   const novaConsulta = useLatestFetch();
@@ -173,22 +172,7 @@ export function MinhasMetas({ periodos, lerAvaliacoes = false }: { periodos: Per
     <Stack gap="section">
       <Stack direction="row" align="end" gap="section" wrap>
       <VisaoSelect visao={visao} disponiveis={disponiveis} onChange={salvarVisao} />
-      <Stack gap="field">
-        <Label>Período de Fechamento</Label>
-        <Select value={periodoId} onValueChange={(v) => v && setPeriodoId(v)}>
-          <SelectTrigger aria-label="Período de Fechamento">
-            <SelectValue>{(id: string) => periodos.find((p) => p.id === id)?.name ?? "Selecione"}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {periodos.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-                {p.status === "closed" ? " · fechado" : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Stack>
+      <SeletorPeriodo periodos={periodos} valor={periodoId} onChange={setPeriodoId} />
       </Stack>
       <DataTable
         scroll="page"

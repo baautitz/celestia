@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { AvaliacoesPage } from "./avaliacoes-page";
+vi.mock("@platform/ui/contracts/web-services", async () => (await import("./periodo-teste")).servicosFalsos);
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));

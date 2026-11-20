@@ -88,7 +88,7 @@ function UserSummary({ fullname, subtitle }: { fullname: string; subtitle: strin
 
 export const AppLayout: React.FC = () => {
   const { user, logout, hasPermission } = useAuth();
-  const { actions, backTo } = useHeaderActions();
+  const { actions, toolbar, backTo } = useHeaderActions();
   const location = useLocation();
   const navigate = useNavigate();
   const ui = useUi();
@@ -231,8 +231,9 @@ export const AppLayout: React.FC = () => {
             </Breadcrumb>
           </Stack>
 
-          {actions && (
+          {(toolbar || actions) && (
             <Stack direction="row" align="center" gap="field" shrink={false}>
+              {toolbar}
               {actions}
             </Stack>
           )}

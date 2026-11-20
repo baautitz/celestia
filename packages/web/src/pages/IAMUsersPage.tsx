@@ -18,12 +18,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@platform/ui/components/form";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@platform/ui/components/dropdown-menu";
 import { DataTable } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { useWindow, WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
@@ -31,7 +25,6 @@ import {
   UserPlus,
   KeyRound,
   RefreshCw,
-  MoreHorizontal,
   Edit2,
   Power,
   Trash2,
@@ -208,17 +201,9 @@ export const IAMUsersPage: React.FC = () => {
 
         {hasPermission("system:users:create") && (
           <Show on="belowLg">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
-              <MoreHorizontal />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => openUserWindow(null)}>
-                <UserPlus />
-                Novo Usuário
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="outline" size="icon" aria-label="Novo Usuário" title="Novo Usuário" onClick={() => openUserWindow(null)}>
+<UserPlus />
+</Button>
           </Show>
         )}
       </HeaderActions>

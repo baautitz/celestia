@@ -9,7 +9,7 @@ export interface Periodo {
   status: "open" | "closed";
 }
 
-export const periodoLabel = (p: Periodo) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})${p.status === "closed" ? " · fechado" : ""}`;
+export const periodoLabel = (p: Periodo) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})${p.status === "closed" ? " · Fechado" : ""}`;
 
 /** O período aberto de data mais recente; sem nenhum aberto, o mais recente. */
 export const periodoInicial = (periodos: Periodo[]) => (periodos.find((p) => p.status !== "closed") ?? periodos[0])?.id ?? "";

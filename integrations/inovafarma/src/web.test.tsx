@@ -5,6 +5,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { ApiError } from "@platform/ui/lib/api";
 import { VendasComissoesPage } from "./web";
+vi.mock("@platform/ui/contracts/web-services", async () => (await import("./periodo-teste")).servicosFalsos);
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));

@@ -112,7 +112,7 @@ describe("aba Estoque", () => {
   it("inclui um Item em janela, enviando o identificador opaco do produto, e a lista volta do servidor", async () => {
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
-    fireEvent.click(screen.getByRole("button", { name: "Incluir Item" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Incluir Item" })[0]);
     const campo = (await screen.findByLabelText("Produto (bipe o código de barras ou digite o nome)")) as HTMLInputElement;
     fireEvent.change(campo, { target: { value: "7891234567895" } });
     await waitFor(() => expect(campo.value).toContain("DIPIRONA 500MG"));
@@ -140,7 +140,7 @@ describe("aba Estoque", () => {
   it("sem a Permission de Baixas, a janela de inclusão não tem data de abrangência", async () => {
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
-    fireEvent.click(screen.getByRole("button", { name: "Incluir Item" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Incluir Item" })[0]);
     await screen.findByLabelText("Quantidade");
     expect(within(screen.getByRole("dialog")).queryByText("Data de abrangência")).toBeNull();
   });
@@ -149,7 +149,7 @@ describe("aba Estoque", () => {
     contexto = { ...contextoEstoque, podeBaixas: true, inclusaoRetroativa: { inicio: dia(-5), hoje: dia(0) }, periodos: [{ id: "p1", name: "Atual", startDate: dia(-5), endDate: dia(10), status: "open" }] };
     renderizar();
     await screen.findByRole("cell", { name: "DIPIRONA 500MG" });
-    fireEvent.click(screen.getByRole("button", { name: "Incluir Item" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Incluir Item" })[0]);
     const campo = (await screen.findByLabelText("Produto (bipe o código de barras ou digite o nome)")) as HTMLInputElement;
     fireEvent.change(campo, { target: { value: "7891234567895" } });
     await waitFor(() => expect(campo.value).toContain("DIPIRONA 500MG"));
