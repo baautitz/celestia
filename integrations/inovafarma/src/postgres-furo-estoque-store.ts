@@ -11,6 +11,7 @@ import {
   type MotivoAjuste,
   type NovaJustificativa,
 } from "./furo-estoque-store.js";
+import { returned } from "./returned.js";
 
 type MotivoRow = typeof motivosAjuste.$inferSelect;
 type JustificativaRow = typeof justificativasAjuste.$inferSelect;
@@ -27,7 +28,7 @@ export class PostgresFuroEstoqueStore implements FuroEstoqueStore {
 
   async criarMotivo(nome: string): Promise<MotivoAjuste> {
     const [row] = await this.db.insert(motivosAjuste).values({ id: novoIdMotivo(), nome }).returning();
-    return motivo(row!);
+    return motivo(returned(row));
   }
 
   async atualizarMotivo(id: string, valores: EdicaoMotivo, expectedVersion: number): Promise<MotivoAjuste | null> {

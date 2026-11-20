@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { defined } from "./helpers/defined.js";
 import { CHALLENGE_TTL_MS, CODE_TTL_MS, ChallengeStore, MAX_PENDING_CHALLENGES } from "../src/challenge-store.js";
 
 function setup() {
@@ -10,7 +11,7 @@ describe("ChallengeStore", () => {
   it("troca o código do desafio pelo usuário e pelo Dispositivo, uma única vez", () => {
     const { store } = setup();
     const id = store.create("user-1");
-    const code = store.bindDevice(id, "device-1")!;
+    const code = defined(store.bindDevice(id, "device-1"), "the challenge code");
     expect(store.exchange(id, code)).toEqual({ granted: true, userId: "user-1", deviceId: "device-1" });
     expect(store.exchange(id, code)).toEqual({ granted: false });
   });
@@ -18,7 +19,7 @@ describe("ChallengeStore", () => {
   it("consome o desafio mesmo com o código errado: errar dá uma chance só", () => {
     const { store } = setup();
     const id = store.create("user-1");
-    const code = store.bindDevice(id, "device-1")!;
+    const code = defined(store.bindDevice(id, "device-1"), "the challenge code");
     expect(store.exchange(id, "errado")).toEqual({ granted: false, userId: "user-1" });
     expect(store.exchange(id, code)).toEqual({ granted: false });
   });
@@ -41,7 +42,7 @@ describe("ChallengeStore", () => {
   it("o código vale 60 segundos e o desafio 5 minutos", () => {
     const a = setup();
     const idA = a.store.create("user-1");
-    const codeA = a.store.bindDevice(idA, "device-1")!;
+    const codeA = defined(a.store.bindDevice(idA, "device-1"), "the challenge code");
     a.clock.now += CODE_TTL_MS + 1;
     expect(a.store.exchange(idA, codeA)).toEqual({ granted: false, userId: "user-1" });
 

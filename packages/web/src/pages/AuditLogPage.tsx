@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AuditLogEntry, AuditLogFacets, AuditLogFilter } from "@platform/shared";
 import { Button } from "@platform/ui/components/button";
 import { Show, Spin, Stack, Text } from "@platform/ui/components/layout";

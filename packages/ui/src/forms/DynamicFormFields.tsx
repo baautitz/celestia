@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { parseLocalDate, toLocalISODate } from "../lib/utils";
 import type { FormFieldDef } from "@platform/shared";
 import type { UseFormReturn } from "react-hook-form";
@@ -57,6 +58,7 @@ function useFieldOptions(field: FormFieldDef, fetchLookupOptions?: (field: FormF
   const [loading, setLoading] = useState(false);
   const fieldRef = useLatest(field);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: o efeito lê o campo pela ref; `field.name` só dispara a busca quando o campo troca.
   useEffect(() => {
     const field = fieldRef.current;
     if (!isLookup) {

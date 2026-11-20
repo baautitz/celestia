@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LoginCertificatePage } from "./pages/LoginCertificatePage";
 import { LoginPage } from "./pages/LoginPage";

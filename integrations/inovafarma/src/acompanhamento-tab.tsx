@@ -104,7 +104,7 @@ const colunaProjecao = <T,>(key: string, linha: (r: T) => LinhaAcompanhamento | 
   value: (r) => {
     const l = linha(r);
     const p = l && periodo ? projetar(indicadorDoTipo(l.tipo), l.realizado, l.alvo, periodo, hojeLocal()) : null;
-    return p ? formatarValor(indicadorDoTipo(l!.tipo), p.valor) : "";
+    return l && p ? formatarValor(indicadorDoTipo(l.tipo), p.valor) : "";
   },
   render: (r) => {
     const l = linha(r);

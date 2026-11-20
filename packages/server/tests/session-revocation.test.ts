@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createPlatformApp } from "../src/index.js";
 import { createSeededUserStore, TEST_PASSWORD, withAuth } from "./helpers/fixtures.js";
+import { defined } from "./helpers/defined.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -83,7 +84,7 @@ describe("sessões revogáveis", () => {
 describe("último administrador ativo é protegido no store", () => {
   it("rebaixar, inativar ou excluir o último admin ativo lança", async () => {
     const store = createSeededUserStore({ admin: true });
-    const root = (await store.findByUsername("test.root"))!;
+    const root = defined(await store.findByUsername("test.root"), "await store.findByUsername('test.root')");
     await expect(store.updateUser(root.id, { isAdmin: false })).rejects.toThrow(/administrador ativo/);
     await expect(store.updateUser(root.id, { status: "inactive" })).rejects.toThrow(/administrador ativo/);
     await expect(store.deleteUser(root.id)).rejects.toThrow(/administrador ativo/);

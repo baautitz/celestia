@@ -28,25 +28,18 @@
     "enabled": true,
     "rules": {
       "correctness": {
+        "preset": "recommended",
         "noUnusedVariables": "error",
         "noUnusedFunctionParameters": "error",
         "noUnusedImports": "error",
         "useHookAtTopLevel": "error",
         "useExhaustiveDependencies": "warn"
       },
-      "suspicious": {
-        "noExplicitAny": "error",
-        "useIterableCallbackReturn": "off",
-        "noAssignInExpressions": "off",
-        "noImplicitAnyLet": "off",
-        "noDoubleEquals": "off",
-        "noGlobalIsNan": "off",
-        "noDocumentCookie": "off"
-      },
-      "a11y": { "preset": "none" },
-      "style": { "preset": "none" },
-      "performance": { "preset": "none" },
-      "complexity": { "preset": "none" }
+      "suspicious": { "preset": "recommended", "noExplicitAny": "error" },
+      "a11y": { "preset": "recommended" },
+      "style": { "preset": "recommended" },
+      "performance": { "preset": "recommended" },
+      "complexity": { "preset": "recommended" }
     }
   }
 }

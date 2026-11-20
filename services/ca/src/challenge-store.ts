@@ -57,13 +57,14 @@ export class ChallengeStore {
     const challenge = this.live(challengeId);
     this.challenges.delete(challengeId);
     if (!challenge) return { granted: false };
+    const { codeHash, deviceId } = challenge;
     const valid =
       code !== undefined &&
-      challenge.codeHash !== undefined &&
-      challenge.deviceId !== undefined &&
+      codeHash !== undefined &&
+      deviceId !== undefined &&
       (challenge.codeExpiresAt ?? 0) > this.now() &&
-      timingSafeEqual(hash(code), challenge.codeHash);
-    return valid ? { granted: true, userId: challenge.userId, deviceId: challenge.deviceId! } : { granted: false, userId: challenge.userId };
+      timingSafeEqual(hash(code), codeHash);
+    return valid ? { granted: true, userId: challenge.userId, deviceId } : { granted: false, userId: challenge.userId };
   }
 
   get size(): number {

@@ -4,6 +4,7 @@ import { TestUserStore } from "./helpers/fixtures.js";
 import { createPlatform } from "../src/index.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import type { ErpClient } from "../src/erp/erp-client.js";
+import { defined } from "./helpers/defined.js";
 
 const VIEW = "inovafarma:colaboradores:view";
 const UPDATE = "inovafarma:colaboradores:update";
@@ -94,7 +95,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
     expect(colaboradores[0]).toEqual({ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, confirmado: false, usuarioId: null, usuario: null, lojas: [], version: 0, avisos: [], sugestao: { usuarioId: "ana", lojas: [] } });
     expect(usuarios.map((u) => u.id)).toEqual(expect.arrayContaining(["ana", "bia"]));
     expect(usuarios.map((u) => u.id)).not.toContain("caio");
-    expect(Object.keys(usuarios[0]!).sort()).toEqual(["fullname", "id", "username"]);
+    expect(Object.keys(defined(usuarios[0], "the first user")).sort()).toEqual(["fullname", "id", "username"]);
   });
 
   it("grava o vínculo, passa a Confirmado e altera com a nova version", async () => {
@@ -133,7 +134,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
     const { salvar, listar, auditoria } = await boot();
     await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     await salvar(7, { usuarioId: null, lojas: [], version: 1 });
-    const pendente = (await listar()).colaboradores.find((c) => c.codigoColaborador === 7)!;
+    const pendente = defined((await listar()).colaboradores.find((c) => c.codigoColaborador === 7), "the Colaborador 7");
     expect(pendente).toMatchObject({ confirmado: false, version: 2, avisos: [], sugestao: { usuarioId: "ana", lojas: [] } });
 
     expect(await (await salvar(7, { usuarioId: "ana", lojas: [], version: pendente.version })).json()).toMatchObject({ confirmado: true, version: 3 });
@@ -260,7 +261,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
       expect((await salvar(7, { usuarioId: "ana", lojas: [99], version: 0 })).status).toBe(400);
       expect((await salvar(7, { usuarioId: "ana", version: 0 })).status).toBe(400);
 
-      const saiu = LOJAS[2]!;
+      const saiu = defined(LOJAS[2], "LOJAS[2]");
       try {
         await salvar(7, { usuarioId: "ana", lojas: [saiu.codigoEmpresa], version: 0 });
         LOJAS.pop();
@@ -352,7 +353,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
 
     it("avisa cada Loja vinculada que saiu do ERP", async () => {
       const { salvar, listar } = await boot();
-      const saiu = LOJAS[2]!;
+      const saiu = defined(LOJAS[2], "LOJAS[2]");
       await salvar(7, { usuarioId: null, lojas: [1, saiu.codigoEmpresa], version: 0 });
       LOJAS.pop();
       try {
@@ -364,7 +365,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
 
     it("Colaborador vinculado que sumiu do ERP vira linha com aviso, e desfazer libera o Usuário", async () => {
       const { salvar, listar } = await boot();
-      const sumiu = COLABORADORES[1]!;
+      const sumiu = defined(COLABORADORES[1], "COLABORADORES[1]");
       await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
       COLABORADORES.pop();
       try {
@@ -383,7 +384,7 @@ describe("Vínculo do Colaborador com Usuário", () => {
 
     it("um vínculo desfeito de quem sumiu do ERP não vira linha nem aceita nova gravação", async () => {
       const { salvar, listar } = await boot();
-      const sumiu = COLABORADORES[1]!;
+      const sumiu = defined(COLABORADORES[1], "COLABORADORES[1]");
       await salvar(9, { usuarioId: "ana", lojas: [], version: 0 });
       await salvar(9, { usuarioId: null, lojas: [], version: 1 });
       COLABORADORES.pop();
@@ -413,17 +414,17 @@ describe("Sugestões do Vínculo do Colaborador", () => {
   const colaborador = (codigoColaborador: number, nome: string, codigoEmpresa: number | null = null) => ({ codigoColaborador, nome, ativo: true, codigoEmpresa });
   const sugestaoDe = async (nome: string, extras: User[] = []) => {
     const { listar } = await boot([VIEW, UPDATE], erpCom([colaborador(7, nome)]), extras);
-    return (await listar()).colaboradores[0]!.sugestao!.usuarioId;
+    return defined(defined((await listar()).colaboradores[0], "the first Colaborador").sugestao, "the suggestion").usuarioId;
   };
 
   it("sugere a Loja de Cadastro.CodigoEmpresa", async () => {
     const { listar } = await boot([VIEW, UPDATE], erpCom([colaborador(7, "SEM PAR", 2)]));
-    expect((await listar()).colaboradores[0]!.sugestao).toEqual({ usuarioId: null, lojas: [2] });
+    expect(defined((await listar()).colaboradores[0], "the first Colaborador").sugestao).toEqual({ usuarioId: null, lojas: [2] });
   });
 
   it("não sugere uma Loja que não existe entre as do ERP", async () => {
     const { listar } = await boot([VIEW, UPDATE], erpCom([colaborador(7, "SEM PAR", 99)]));
-    expect((await listar()).colaboradores[0]!.sugestao).toEqual({ usuarioId: null, lojas: [] });
+    expect(defined((await listar()).colaboradores[0], "the first Colaborador").sugestao).toEqual({ usuarioId: null, lojas: [] });
   });
 
   it("ignora acentos e maiúsculas ao comparar os nomes", async () => {
@@ -451,14 +452,14 @@ describe("Sugestões do Vínculo do Colaborador", () => {
 
   it("deixa vazio quando o mesmo Usuário serviria a dois Colaboradores", async () => {
     const { listar } = await boot([VIEW, UPDATE], erpCom([colaborador(7, "ANA SOUZA"), colaborador(8, "ANA SOUZA")]));
-    expect((await listar()).colaboradores.map((c) => c.sugestao!.usuarioId)).toEqual([null, null]);
+    expect((await listar()).colaboradores.map((c) => defined(c.sugestao, "the suggestion").usuarioId)).toEqual([null, null]);
   });
 
   it("um Colaborador inativo não disputa a sugestão com um ativo de mesmo nome", async () => {
     const { listar } = await boot([VIEW, UPDATE], erpCom([colaborador(7, "ANA SOUZA"), { ...colaborador(8, "ANA SOUZA", 2), ativo: false }]));
     const { colaboradores } = await listar();
-    expect(colaboradores.find((c) => c.codigoColaborador === 7)!.sugestao!.usuarioId).toBe("ana");
-    expect(colaboradores.find((c) => c.codigoColaborador === 8)!.sugestao).toEqual({ usuarioId: null, lojas: [2] });
+    expect(defined(defined(colaboradores.find((c) => c.codigoColaborador === 7), "the Colaborador 7").sugestao, "the suggestion").usuarioId).toBe("ana");
+    expect(defined(colaboradores.find((c) => c.codigoColaborador === 8), "the Colaborador 8").sugestao).toEqual({ usuarioId: null, lojas: [2] });
   });
 
   it("considera só Usuários ativos", async () => {
@@ -469,8 +470,8 @@ describe("Sugestões do Vínculo do Colaborador", () => {
     const { salvar, listar } = await boot([VIEW, UPDATE], erpCom([colaborador(7, "ANA MARIA"), colaborador(8, "ANA SOUZA", 2)]));
     await salvar(7, { usuarioId: "ana", lojas: [], version: 0 });
     const { colaboradores } = await listar();
-    expect(colaboradores.find((c) => c.codigoColaborador === 7)!.sugestao).toBeNull();
-    expect(colaboradores.find((c) => c.codigoColaborador === 8)!.sugestao).toEqual({ usuarioId: null, lojas: [2] });
+    expect(defined(colaboradores.find((c) => c.codigoColaborador === 7), "the Colaborador 7").sugestao).toBeNull();
+    expect(defined(colaboradores.find((c) => c.codigoColaborador === 8), "the Colaborador 8").sugestao).toEqual({ usuarioId: null, lojas: [2] });
   });
 
   it("carregar a lista não grava nem audita nada", async () => {

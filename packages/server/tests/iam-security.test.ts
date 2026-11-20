@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createPlatformApp } from "../src/index.js";
 import { PasswordService } from "../src/iam/password-service.js";
 import { TokenService } from "../src/iam/token-service.js";
-import { MemoryUserStore } from "../src/iam/user-store.js";
+import type { MemoryUserStore } from "../src/iam/user-store.js";
 import { SYSTEM_PERMISSION_KEYS } from "../src/iam/system-permissions.js";
 import { createSeededUserStore } from "./helpers/fixtures.js";
 import type {

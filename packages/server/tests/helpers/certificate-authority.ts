@@ -1,6 +1,7 @@
 import { createCaApp, DeviceCertificateAuthority, MemoryDeviceStore } from "@platform/ca";
 import type { IssuedDevice } from "@platform/shared";
 import { HttpCertificateAuthorityClient } from "../../src/iam/certificate-authority-client.js";
+import { defined } from "./defined.js";
 
 const SECRET = "chave-em-comum-com-mais-de-32-caracteres";
 const CALLBACK = "https://app.exemplo.com/login/certificado";
@@ -38,8 +39,8 @@ export async function createTestCertificateAuthority(options: { withAuthority?: 
     const res = await app.request(new URL(verifyUrl).pathname + new URL(verifyUrl).search, {
       headers: fingerprint ? { "x-test-fingerprint": fingerprint } : {},
     });
-    const location = new URL(res.headers.get("location")!);
-    return { challengeId: location.searchParams.get("challenge")!, code: location.searchParams.get("code") ?? undefined };
+    const location = new URL(defined(res.headers.get("location"), "the callback location"));
+    return { challengeId: location.searchParams.get("challenge") ?? "", code: location.searchParams.get("code") ?? undefined };
   };
 
   /** Simula a CA fora do ar: toda chamada do backend falha como uma falha de rede. */

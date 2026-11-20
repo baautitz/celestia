@@ -95,6 +95,11 @@ function readHiddenPassword(prompt: string): Promise<string> {
   });
 }
 
+function readHiddenAfterClose(rl: { close(): void }): Promise<string> {
+  rl.close();
+  return readHiddenPassword("Senha: ");
+}
+
 async function main() {
   const { db, pool } = await import("../db/client.js");
   try {
@@ -116,7 +121,7 @@ async function main() {
     // Sem TTY (stdin redirecionado) não há modo raw: aceita ADMIN_PASSWORD ou cai na leitura de linha comum.
     const password =
       process.env.ADMIN_PASSWORD ||
-      (process.stdin.isTTY ? (rl.close(), await readHiddenPassword("Senha: ")) : await rl.question("Senha: "));
+      (process.stdin.isTTY ? await readHiddenAfterClose(rl) : await rl.question("Senha: "));
     rl.close();
 
     const store = new PostgresUserStore(db);

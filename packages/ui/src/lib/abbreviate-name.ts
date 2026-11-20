@@ -13,14 +13,14 @@ export function abbreviateName(name: string, maxLength: number): string {
 
   const last = words.length - 1;
   // A partícula logo antes do último sobrenome faz parte dele.
-  const lastStart = PARTICLES.has(words[last - 1]!.toLowerCase()) && last - 1 > 0 ? last - 1 : last;
+  const lastStart = PARTICLES.has((words[last - 1] ?? "").toLowerCase()) && last - 1 > 0 ? last - 1 : last;
   const parts: (string | null)[] = [...words];
   for (let i = lastStart - 1; i >= 1; i--) {
-    const word = words[i]!;
-    if (PARTICLES.has(word.toLowerCase())) continue;
-    parts[i] = `${word[0]!.toUpperCase()}.`;
+    const word = words[i];
+    if (word === undefined || PARTICLES.has(word.toLowerCase())) continue;
+    parts[i] = `${word.charAt(0).toUpperCase()}.`;
     // A partícula que ligava esta palavra à anterior some junto.
-    if (i - 1 >= 1 && PARTICLES.has(words[i - 1]!.toLowerCase())) parts[i - 1] = null;
+    if (i - 1 >= 1 && PARTICLES.has((words[i - 1] ?? "").toLowerCase())) parts[i - 1] = null;
     if (join(parts).length <= maxLength) break;
   }
   return join(parts);

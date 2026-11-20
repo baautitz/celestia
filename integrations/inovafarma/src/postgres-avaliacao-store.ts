@@ -2,6 +2,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { avaliacoes } from "./schema.js";
 import { novoIdAvaliacao, type Avaliacao, type AvaliacaoStore, type EdicaoAvaliacao, type FiltroAvaliacoes, type NovaAvaliacao } from "./avaliacoes-store.js";
+import { returned } from "./returned.js";
 
 type Row = typeof avaliacoes.$inferSelect;
 
@@ -12,7 +13,7 @@ export class PostgresAvaliacaoStore implements AvaliacaoStore {
 
   async criar(nova: NovaAvaliacao): Promise<Avaliacao> {
     const [row] = await this.db.insert(avaliacoes).values({ ...nova, id: novoIdAvaliacao() }).returning();
-    return toRecord(row!);
+    return toRecord(returned(row));
   }
 
   async listar({ periodoId, codigoColaborador, lojas }: FiltroAvaliacoes): Promise<Avaliacao[]> {

@@ -60,7 +60,10 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
     if (options.routeMiddleware) routes.use("*", options.routeMiddleware);
     const own = new Map<string, unknown>();
     const offs: (() => void)[] = [];
-    const track = (off: () => void): (() => void) => (offs.push(off), off);
+    const track = (off: () => void): (() => void) => {
+      offs.push(off);
+      return off;
+    };
     const ctx: ModuleContext = {
       moduleId: def.id,
       routes,
@@ -99,7 +102,7 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
       services.set(def.id, own);
       loaded.push(def.id);
     } catch (e) {
-      offs.forEach((off) => off()); // atomicidade: sem handlers residuais (serviços só são publicados no sucesso)
+      for (const off of offs) off(); // atomicidade: sem handlers residuais (serviços só são publicados no sucesso)
       failedIds.add(def.id);
       failed.push({ moduleId: def.id, reason: msg(e) });
       logger.error(`Módulo "${def.id}" falhou ao carregar: ${msg(e)}`, { cause: e });

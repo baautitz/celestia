@@ -225,9 +225,11 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
     }
     if (semAlvo !== estava) form.setValue("semAlvo", semAlvo, { shouldDirty: true });
     const permitidas = regrasPermitidas(indicadorId, semAlvo);
-    if (!permitidas.includes(form.getValues("regraTipo"))) form.setValue("regraTipo", permitidas[0]!, { shouldDirty: true });
+    const primeiraRegra = permitidas[0];
+    if (primeiraRegra !== undefined && !permitidas.includes(form.getValues("regraTipo"))) form.setValue("regraTipo", primeiraRegra, { shouldDirty: true });
     const exib = exibicoesPermitidas(semAlvo);
-    if (!exib.includes(form.getValues("exibicao"))) form.setValue("exibicao", exib[0]!, { shouldDirty: true });
+    const primeiraExibicao = exib[0];
+    if (primeiraExibicao !== undefined && !exib.includes(form.getValues("exibicao"))) form.setValue("exibicao", primeiraExibicao, { shouldDirty: true });
   };
 
   const onSubmit = async (valores: Valores) => {

@@ -186,7 +186,9 @@ export function registerFuroEstoqueRoutes({ routes, permissions, auth, erpClient
     let filtro = extra.sql;
     if (lojas !== undefined) {
       filtro += ` AND m.CodigoEmpresa IN (${lojas.map((_, i) => `@loja${i}`).join(", ")})`;
-      lojas.forEach((codigo, i) => (params[`loja${i}`] = codigo));
+      lojas.forEach((codigo, i) => {
+        params[`loja${i}`] = codigo;
+      });
     }
     try {
       return { ajustes: agruparAjustes(await client.query<LinhaAjuste>(ajustesSql(filtro), params)) } as const;

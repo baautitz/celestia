@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defined } from "../test/defined";
 import { rankBySearch, searchScore } from "./fuzzy-search";
 
 describe("searchScore", () => {
@@ -29,10 +30,10 @@ describe("searchScore", () => {
   });
 
   it("pontua palavra inteira > começo de palavra > meio do texto > com erro", () => {
-    const whole = searchScore("caixa", ["Caixa 1"])!;
-    const prefix = searchScore("caix", ["Caixas"])!;
-    const middle = searchScore("aixa", ["Caixa"])!;
-    const typo = searchScore("caiza", ["Caixa"])!;
+    const whole = defined(searchScore("caixa", ["Caixa 1"]), "the search score");
+    const prefix = defined(searchScore("caix", ["Caixas"]), "the search score");
+    const middle = defined(searchScore("aixa", ["Caixa"]), "the search score");
+    const typo = defined(searchScore("caiza", ["Caixa"]), "the search score");
     expect(whole).toBeGreaterThan(prefix);
     expect(prefix).toBeGreaterThan(middle);
     expect(middle).toBeGreaterThan(typo);

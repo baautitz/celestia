@@ -6,6 +6,7 @@ import { assertReadOnlyQuery } from "../src/erp/read-only-guard.js";
 import { decryptSecret } from "../src/erp/secret-box.js";
 import type { ErpClient } from "../src/erp/erp-client.js";
 import { createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
+import { defined } from "./helpers/defined.js";
 
 describe("assertReadOnlyQuery", () => {
   it("aceita SELECT e WITH, inclusive com comentários e literais", () => {
@@ -77,9 +78,9 @@ describe("ERPs (/api/admin/erps)", () => {
     expect(JSON.stringify(await res.json())).not.toMatch(/Seg@1234|password/i);
 
     const stored = await erpStore.get("inovafarma");
-    expect(stored!.secretsEncrypted).not.toContain("Seg@1234");
-    expect(JSON.parse(decryptSecret(stored!.secretsEncrypted))).toEqual({ password: "Seg@1234" });
-    expect(JSON.stringify(stored!.config)).not.toContain("Seg@1234");
+    expect(defined(stored, "the stored ERP").secretsEncrypted).not.toContain("Seg@1234");
+    expect(JSON.parse(decryptSecret(defined(stored, "the stored ERP").secretsEncrypted))).toEqual({ password: "Seg@1234" });
+    expect(JSON.stringify(defined(stored, "the stored ERP").config)).not.toContain("Seg@1234");
 
     const list = await (await send("GET", "/api/admin/erps", token)).text();
     expect(list).not.toMatch(/Seg@1234|password/i);
@@ -92,8 +93,8 @@ describe("ERPs (/api/admin/erps)", () => {
     const res = await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, values: { ...semSenha, host: "novo" } });
     expect(res.status).toBe(200);
     const stored = await erpStore.get("inovafarma");
-    expect(stored!.config.host).toBe("novo");
-    expect(JSON.parse(decryptSecret(stored!.secretsEncrypted))).toEqual({ password: "Seg@1234" });
+    expect(defined(stored, "the stored ERP").config.host).toBe("novo");
+    expect(JSON.parse(decryptSecret(defined(stored, "the stored ERP").secretsEncrypted))).toEqual({ password: "Seg@1234" });
     expect(closed).toHaveLength(1);
   });
 
@@ -116,14 +117,14 @@ describe("ERPs (/api/admin/erps)", () => {
     const res = await send("GET", "/api/admin/erp-drivers", await tokenOf("carlos.admin"));
     const drivers = (await res.json()) as { id: string; label: string; fields: { name: string; type: string }[] }[];
     expect(drivers.map((t) => t.id).sort()).toEqual(["inovafarma", "mssql"]);
-    const inovafarma = drivers.find((d) => d.id === "inovafarma")!;
+    const inovafarma = defined(drivers.find((d) => d.id === "inovafarma"), "the inovafarma driver");
     expect(inovafarma.label).toBe("InovaFarma");
     expect(inovafarma).not.toHaveProperty("externalFields");
 
-    const mssql = drivers.find((d) => d.id === "mssql")!;
+    const mssql = defined(drivers.find((d) => d.id === "mssql"), "the mssql driver");
     expect(mssql.label).toBe("SQL Server");
     expect(mssql.fields.map((f) => f.name)).toEqual(["host", "port", "database", "username", "password", "trustServerCertificate"]);
-    expect(mssql.fields.find((f) => f.name === "password")!.type).toBe("password");
+    expect(defined(mssql.fields.find((f) => f.name === "password"), "the password field").type).toBe("password");
   });
 
   it("não expõe mais as rotas de identificadores de ERP", async () => {

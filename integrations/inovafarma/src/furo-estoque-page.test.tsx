@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { FuroEstoquePage } from "./furo-estoque-page";
+import { defined } from "./test/defined";
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
@@ -53,8 +54,8 @@ describe("Furo de Estoque", () => {
     renderizar();
     const furo = await screen.findByRole("button", { name: "Furo" }, { timeout: 5000 });
     // Os cards aparecem antes dos Ajustes chegarem: espera os valores, em vez de lê-los na hora.
-    expect(await within(furo.parentElement!).findByText("R$ 500,00")).toBeTruthy();
-    expect(within(screen.getByRole("button", { name: "Entradas não justificadas" }).parentElement!).getByText("R$ 500,00")).toBeTruthy();
+    expect(await within(defined(furo.parentElement, "the card of Furo")).findByText("R$ 500,00")).toBeTruthy();
+    expect(within(defined(screen.getByRole("button", { name: "Entradas não justificadas" }).parentElement, "the card of Entradas n\u00e3o justificadas")).getByText("R$ 500,00")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Justificar Ajuste 300" })).toBeNull();
   });
 
@@ -65,8 +66,8 @@ describe("Furo de Estoque", () => {
     expect(furo.getAttribute("aria-pressed")).toBe("true");
     const justificados = screen.getByRole("button", { name: "Justificados" });
     // Os cards aparecem antes dos Ajustes chegarem: espera os valores, em vez de lê-los na hora.
-    expect(await within(justificados.parentElement!).findByText("R$ 9,00")).toBeTruthy();
-    expect(within(justificados.parentElement!).getByText("1 de 3 ajustes (33%)")).toBeTruthy();
+    expect(await within(defined(justificados.parentElement, "the card of Justificados")).findByText("R$ 9,00")).toBeTruthy();
+    expect(within(defined(justificados.parentElement, "the card of Justificados")).getByText("1 de 3 ajustes (33%)")).toBeTruthy();
 
     fireEvent.click(justificados);
     expect(await screen.findByRole("button", { name: "Alterar Justificativa do Ajuste 200" })).toBeTruthy();

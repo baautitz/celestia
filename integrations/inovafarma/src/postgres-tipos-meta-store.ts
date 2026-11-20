@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { tiposMeta } from "./schema.js";
 import type { DadosTipoMeta, TipoMeta } from "./tipos-meta.js";
 import { novoIdTipoMeta, type TipoMetaStore } from "./tipos-meta-store.js";
+import { returned } from "./returned.js";
 
 type TipoRow = typeof tiposMeta.$inferSelect;
 
@@ -22,7 +23,7 @@ export class PostgresTipoMetaStore implements TipoMetaStore {
 
   async criar(dados: DadosTipoMeta): Promise<TipoMeta> {
     const [row] = await this.db.insert(tiposMeta).values({ ...dados, id: novoIdTipoMeta() }).returning();
-    return tipo(row!);
+    return tipo(returned(row));
   }
 
   async atualizar(id: string, dados: DadosTipoMeta, expectedVersion: number): Promise<TipoMeta | null> {

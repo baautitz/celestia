@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { MetasPage } from "./metas-page";
+import { defined } from "./test/defined";
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
@@ -86,7 +87,7 @@ beforeEach(() => {
   Object.assign(preferencias, PREFERENCIAS_AGRUPADAS);
   apiFetch.mockImplementation(async (url: string, init?: RequestInit) => {
     // Visualização salva de cada aba: os testes agrupados usam a de antes da Tabela.
-    if (url.startsWith("/api/iam/preferences/")) return { value: init?.method === "PUT" ? null : (preferencias[decodeURIComponent(url.split("/").pop()!)] ?? null) };
+    if (url.startsWith("/api/iam/preferences/")) return { value: init?.method === "PUT" ? null : (preferencias[decodeURIComponent(url.split("/").pop() ?? "")] ?? null) };
     if (init?.method === "PUT") return { ...cmv, ...JSON.parse(String(init.body)), version: 2, premio: "CMV % até 28% paga R$ 100,00" };
     if (init?.method === "POST") return { metas: [] };
     if (url.endsWith("/metas/contexto")) return contexto;
@@ -132,7 +133,7 @@ describe("Metas: Tipos de Meta", () => {
     fireEvent.click(screen.getByRole("switch", { name: "BIA" }));
     fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/tipos/tme_1/aplicar-alvo-padrao", expect.anything()));
-    const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/aplicar-alvo-padrao"))!;
+    const [, init] = defined(apiFetch.mock.calls.find(([url]) => String(url).endsWith("/aplicar-alvo-padrao")), "the call to /aplicar-alvo-padrao");
     expect(JSON.parse(String(init.body))).toEqual({ aplicacoes: [{ metaId: "met_1", version: 3, codigos: [2] }] });
   });
 });
@@ -159,7 +160,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
     premio: "…",
   };
   const comTipos = () => {
-    const padrao = apiFetch.getMockImplementation()!;
+    const padrao = defined(apiFetch.getMockImplementation(), "the default apiFetch implementation");
     apiFetch.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url.endsWith("/tipos-meta/lista/conferir")) return { ausentes: [{ tipo: "grupo", id: "44" }] };
       if (url.includes("/tipos-meta/lista/busca?tipo=secao")) return [{ tipo: "secao", id: "261", nome: "GENERICOS", detalhe: null }];
@@ -204,7 +205,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
   const montarLista = async (construtor: HTMLElement) => {
     fireEvent.click(within(construtor).getByRole("button", { name: "Montar Lista" }));
     await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(2));
-    return screen.getAllByRole("dialog")[1]!;
+    return defined(screen.getAllByRole("dialog")[1], "the second dialog");
   };
 
   it("em O que mede, resume a Lista em uma linha com as entradas fora do ERP", async () => {
@@ -222,7 +223,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
     expect(document.activeElement).toBe(within(lista).getByPlaceholderText("Buscar Produto no ERP"));
     const linhas = () => within(lista).getAllByRole("row").slice(1).map((r) => r.textContent);
     expect(linhas()).toEqual([expect.stringContaining("ProdutoDipirona 1g"), expect.stringContaining("GrupoVitaminas"), expect.stringContaining("LaboratórioEMS")]);
-    expect(within(lista).getAllByRole("row")[2]!.textContent).toContain("não encontrado no ERP");
+    expect(defined(within(lista).getAllByRole("row")[2], "the third row").textContent).toContain("não encontrado no ERP");
 
     await escolher(within(lista).getByRole("combobox", { name: "Tipo da entrada" }), "Seção");
     fireEvent.input(within(lista).getByPlaceholderText("Buscar Seção no ERP"), { target: { value: "GEN" }, inputType: "insertText" });
@@ -258,7 +259,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
   });
 
   it("não deixa trocar a unidade da Lista quando o Tipo de Meta já tem Metas", async () => {
-    const padrao = apiFetch.getMockImplementation()!;
+    const padrao = defined(apiFetch.getMockImplementation(), "the default apiFetch implementation");
     apiFetch.mockImplementation(async (url: string, init?: RequestInit) =>
       url.endsWith("/metas/tipos") && !init ? [{ ...mix, temMetas: true }] : padrao(url, init),
     );
@@ -295,7 +296,7 @@ describe("Metas: construtor de Tipo de Meta", () => {
     const erro = await waitFor(() => {
       const achado = within(modal).getAllByText("Duas Faixas não podem ter o mesmo % Atingido.").find((e) => e.getAttribute("role") === "alert");
       expect(achado).toBeTruthy();
-      return achado!;
+      return defined(achado, "the alert");
     });
     // Logo abaixo das Faixas, antes do botão de adicionar outra.
     expect(erro.nextElementSibling?.textContent).toContain("Adicionar Faixa");
@@ -324,7 +325,7 @@ describe("Metas: Montar Metas na Tabela", () => {
 
   it("edita o Prêmio Fixo na própria célula e grava no Salvar alterações", async () => {
     preferencias["inovafarma:montar-metas:view"] = null;
-    const padrao = apiFetch.getMockImplementation()!;
+    const padrao = defined(apiFetch.getMockImplementation(), "the default apiFetch implementation");
     const fixo = { ...metaCmv, tipo: { ...cmv, regra: { tipo: "fixo", valorCentavos: 10000 } } };
     apiFetch.mockImplementation(async (url: string, init?: RequestInit) =>
       url.includes("/metas?periodoId=") ? { ...montagem, metas: [fixo] } : url.endsWith("/premio") ? fixo : padrao(url, init),
@@ -336,7 +337,7 @@ describe("Metas: Montar Metas na Tabela", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Salvar alterações (1)" }));
     fireEvent.click(await screen.findByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/met_1/participantes/1/premio", expect.anything()));
-    const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/participantes/1/premio"))!;
+    const [, init] = defined(apiFetch.mock.calls.find(([url]) => String(url).endsWith("/participantes/1/premio")), "the call to /participantes/1/premio");
     expect(JSON.parse(String(init.body))).toEqual({ version: 1, premio: { tipo: "fixo", valorCentavos: 15000 } });
   });
 });
@@ -355,12 +356,12 @@ describe("Metas: Definir Alvo fora do Por Meta", () => {
 describe("Metas: Montar Metas por Colaborador", () => {
   it("edita o Prêmio Fixo na linha expandida do Colaborador", async () => {
     preferencias["inovafarma:montar-metas:view"] = "by-colaborador";
-    const padrao = apiFetch.getMockImplementation()!;
+    const padrao = defined(apiFetch.getMockImplementation(), "the default apiFetch implementation");
     const fixo = { ...metaCmv, tipo: { ...cmv, regra: { tipo: "fixo", valorCentavos: 10000 } } };
     apiFetch.mockImplementation(async (url: string, init?: RequestInit) => (url.includes("/metas?periodoId=") ? { ...montagem, metas: [fixo] } : padrao(url, init)));
     renderizar();
     fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
-    fireEvent.click((await screen.findAllByRole("button", { name: "Expandir linha" }))[0]!);
+    fireEvent.click(defined((await screen.findAllByRole("button", { name: "Expandir linha" }))[0], "the expand button"));
     fireEvent.change(await screen.findByRole("textbox", { name: "Prêmio de ANA na Meta CMV" }), { target: { value: "R$ 150,00" } });
     expect(await screen.findByRole("button", { name: "Salvar alterações (1)" })).toBeTruthy();
   });
@@ -371,7 +372,7 @@ describe("Metas: Montar Metas", () => {
     renderizar();
     fireEvent.click(await screen.findByRole("tab", { name: "Montar Metas" }));
     // Cada Meta é uma linha que expande para os Participantes.
-    fireEvent.click((await screen.findAllByRole("button", { name: "Expandir linha" }))[0]!);
+    fireEvent.click(defined((await screen.findAllByRole("button", { name: "Expandir linha" }))[0], "the expand button"));
     return screen.findByRole("switch", { name: "BIA participa da Meta CMV" });
   };
 
@@ -383,7 +384,7 @@ describe("Metas: Montar Metas", () => {
     expect((await screen.findAllByText("Não participa")).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/met_1/participantes/2", expect.anything()));
-    const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/participantes/2"))!;
+    const [, init] = defined(apiFetch.mock.calls.find(([url]) => String(url).endsWith("/participantes/2")), "the call to /participantes/2");
     expect(JSON.parse(String(init.body))).toEqual({ version: 1, participa: false });
   });
 
@@ -394,7 +395,7 @@ describe("Metas: Montar Metas", () => {
     fireEvent.click(screen.getByRole("switch", { name: "ANA" }));
     fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/m/inovafarma/metas/met_1/definir-alvo", expect.anything()));
-    const [, init] = apiFetch.mock.calls.find(([url]) => String(url).endsWith("/definir-alvo"))!;
+    const [, init] = defined(apiFetch.mock.calls.find(([url]) => String(url).endsWith("/definir-alvo")), "the call to /definir-alvo");
     expect(JSON.parse(String(init.body))).toEqual({ version: 1, codigos: [2], alvo: 27.5 });
   });
 });

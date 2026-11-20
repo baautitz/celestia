@@ -55,7 +55,9 @@ describe("módulo iam: eventos", () => {
     const { app, result, authed, admin } = await boot();
     const seen: Record<string, object> = {};
     for (const e of ["iam.user.create", "iam.user.update", "iam.user.reset_password", "iam.user.delete", "iam.role.create", "iam.role.update"]) {
-      result.events.after(e, (p) => void (seen[e] = p));
+      result.events.after(e, (p) => {
+        seen[e] = p;
+      });
     }
     const created = await app.request("/api/iam/users", {
       method: "POST",

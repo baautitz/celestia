@@ -42,7 +42,7 @@ for await (const rel of glob("integrations/*/**/*.{ts,tsx,mjs,js}", { cwd: root 
 }
 
 if (violations.length) {
-  console.error("Fronteira de Plugin violada:\n" + violations.sort().join("\n"))
+  console.error(`Fronteira de Plugin violada:\n${violations.sort().join("\n")}`)
   process.exitCode = 1
 } else {
   console.log("Fronteiras de Plugin verificadas sem violacoes.")

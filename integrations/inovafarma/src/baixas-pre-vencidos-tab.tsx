@@ -98,6 +98,7 @@ export function BaixasPreVencidosTab({ visualizacoes, periodos, lojasDaCorrecao 
 
   // Só a resposta da última consulta vale.
   const consulta = useRef(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `recarga` é o contador que o botão de recarregar incrementa para refazer a consulta, sem ser lido no efeito.
   useEffect(() => {
     if (!visualizacao || !periodoId) return;
     const minha = ++consulta.current;

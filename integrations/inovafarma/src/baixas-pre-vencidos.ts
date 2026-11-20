@@ -92,9 +92,10 @@ export function calcularBaixas<V extends VendaParaBaixa>({ itens, vendas, congel
     const gastos: { itemId: string; quantidade: number }[] = [];
     for (const item of porProduto.get(venda.produtoId) ?? []) {
       if (falta <= 0) break;
-      if (item.incluidoEm > venda.data || restante[item.id]! <= 0) continue;
-      const gasto = Math.min(falta, restante[item.id]!);
-      restante[item.id]! -= gasto;
+      const disponivel = restante[item.id] ?? 0;
+      if (item.incluidoEm > venda.data || disponivel <= 0) continue;
+      const gasto = Math.min(falta, disponivel);
+      restante[item.id] = disponivel - gasto;
       falta -= gasto;
       gastos.push({ itemId: item.id, quantidade: gasto });
     }

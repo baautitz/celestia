@@ -62,7 +62,11 @@ export type IndicadorId = (typeof INDICADORES)[number]["id"];
 
 export const INDICADOR_IDS = INDICADORES.map((i) => i.id) as [IndicadorId, ...IndicadorId[]];
 
-export const indicadorPorId = (id: IndicadorId): Indicador => INDICADORES.find((i) => i.id === id)!;
+export const indicadorPorId = (id: IndicadorId): Indicador => {
+  const indicador = INDICADORES.find((i) => i.id === id);
+  if (!indicador) throw new Error(`Indicador desconhecido: ${id}`);
+  return indicador;
+};
 
 /**
  * % Atingido: Realizado ÷ Alvo; quando menor é melhor, Alvo ÷ Realizado (ficar abaixo do Alvo passa de 100%).

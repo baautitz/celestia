@@ -18,7 +18,9 @@ describe("prefixo de montagem", () => {
 
   it("colisão de prefixo derruba o boot nomeando os dois módulos, sem registrar nada", async () => {
     let called = false;
-    const reg: ModuleDef["register"] = () => void (called = true);
+    const reg: ModuleDef["register"] = () => {
+      called = true;
+    };
     await expect(
       loadModules(new Hono(), [withPrefix("alfa", "/api", reg), withPrefix("beta", "/api/", reg)], { logger: quiet }),
     ).rejects.toThrow(/"alfa".*"beta"|"beta".*"alfa"/);

@@ -53,7 +53,7 @@ export function handleArrowNavigation(e: React.KeyboardEvent<HTMLElement>): void
     const rows = rowsOf(cell);
     const at = rows.indexOf(cell.parentElement as HTMLTableRowElement);
     for (let i = at + delta; i >= 0 && i < rows.length; i += delta) {
-      const other = rows[i]!.cells[cell.cellIndex];
+      const other = rows[i]?.cells[cell.cellIndex];
       if (!other) continue;
       const list = focusablesOf(other);
       if (list.length && focus(list[Math.min(position, list.length - 1)])) return true;

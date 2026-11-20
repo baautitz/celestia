@@ -19,6 +19,7 @@ export const PASSWORD_RULES: readonly PasswordRule[] = [
 
 export const PasswordPolicySchema = PASSWORD_RULES.reduce((schema, rule) => schema.regex(rule.pattern, rule.message), z.string());
 
+// biome-ignore lint/complexity/noStaticOnlyClass: `PasswordService.hash/verify/validate` is the public API used across the IAM module.
 export class PasswordService {
   /**
    * Valida a senha contra a política de complexidade.

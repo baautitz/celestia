@@ -732,6 +732,12 @@ interface LinhaTabela {
   premios: Record<string, number | undefined>;
 }
 const idDaLinha = (l: LinhaTabela) => String(l.colaborador.codigoColaborador);
+const estadoDaMeta = (linha: { estados: Record<string, Edicao> }, metaId: string): Edicao => {
+  const estado = linha.estados[metaId];
+  if (!estado) throw new Error(`A linha não tem estado para a Meta ${metaId}.`);
+  return estado;
+};
+
 const mesmaEdicao = (a: Edicao | undefined, b: Edicao) => a !== undefined && a.participa === b.participa && a.alvo === b.alvo;
 
 /** Prêmio do Participante na própria célula: o valor editável (Faixas em R$ pelo lápis) e o selo do Prêmio próprio. */
@@ -834,7 +840,8 @@ function TabelaMontarMetas({
       premios[m.id] = premio(m, c.codigoColaborador);
       if (antiga?.premios[m.id] !== premios[m.id]) igual = false;
       const e = estado(m, c.codigoColaborador);
-      if (igual && mesmaEdicao(antiga!.estados[m.id], e)) estados[m.id] = antiga!.estados[m.id]!;
+      const guardada = antiga?.estados[m.id];
+      if (igual && guardada !== undefined && mesmaEdicao(guardada, e)) estados[m.id] = guardada;
       else {
         estados[m.id] = e;
         igual = false;
@@ -879,10 +886,10 @@ function TabelaMontarMetas({
         label: meta.tipo.nome,
         centered: true,
         divider: true,
-        value: (l) => textoParticipacao(meta, l.estados[meta.id]!),
+        value: (l) => textoParticipacao(meta, estadoDaMeta(l, meta.id)),
         render: (l) => {
           const a = antes(l);
-          const estadoMeta = l.estados[meta.id]!;
+          const estadoMeta = estadoDaMeta(l, meta.id);
           const atingidoTexto = a ? (
             <Text variant="small" tone={a.atingida === true ? "success" : "default"}>
               {formatarValor(indicador, a.realizado)}
@@ -946,7 +953,7 @@ function TabelaMontarMetas({
         // No papel, o que está na tela (inclusive o ainda não salvo) em texto, sem os campos.
         printValue: (l) => {
           const a = antes(l);
-          const e = l.estados[meta.id]!;
+          const e = estadoDaMeta(l, meta.id);
           const codigo = l.colaborador.codigoColaborador;
           const nova = !e.participa ? "Não participa" : !usaAlvo(meta.tipo) ? "Participa" : e.alvo === null ? "Pendente" : formatarValor(indicador, e.alvo);
           const pendente = l.premios[meta.id];

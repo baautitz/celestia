@@ -81,9 +81,9 @@ export interface OpcoesBaixasDaLoja {
 export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: readonly ItemPreVencido[], { base = null, ate, correcoes }: OpcoesBaixasDaLoja = {}): Promise<ResultadoBaixas<VendaDaLoja>> {
   const paraMotor = itens.map((i) => ({ id: i.id, produtoId: i.produtoId, validade: i.validade, quantidade: i.quantidade, incluidoEm: horaDoErp(i.incluidoEm) }));
   const congelado = base ? { ate: base.ate, restante: restanteCongelado(itens, base) } : null;
-  if (paraMotor.length === 0) return calcularBaixas({ itens: [], vendas: [] });
+  const inclusao = paraMotor.map((i) => i.incluidoEm).sort()[0];
+  if (inclusao === undefined) return calcularBaixas({ itens: [], vendas: [] });
 
-  const inclusao = paraMotor.map((i) => i.incluidoEm).sort()[0]!;
   const dataInicio = congelado && congelado.ate > inclusao ? congelado.ate : inclusao;
   // Em lotes de produtos: o SQL Server aceita cerca de 2100 parâmetros por consulta.
   const codigos = [...new Set(itens.map((i) => i.codigoProduto))];
@@ -91,7 +91,9 @@ export async function baixasDaLoja(client: ErpQuery, codigoLoja: number, itens: 
   for (let i = 0; i < codigos.length; i += LOTE_PRODUTOS) {
     const lote = codigos.slice(i, i + LOTE_PRODUTOS);
     const params: Record<string, unknown> = { codigoLoja, dataInicio };
-    lote.forEach((codigo, n) => (params[`p${n}`] = codigo));
+    lote.forEach((codigo, n) => {
+      params[`p${n}`] = codigo;
+    });
     const linhas = await client.query<LinhaVendaErp>(vendasDaLojaSql(lote.length), params);
     vendas.push(
       ...linhas.map((l) => ({
