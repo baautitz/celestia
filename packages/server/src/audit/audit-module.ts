@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import type { MiddlewareHandler } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { zValidator } from "../validation.js";
 import { z } from "zod";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import { requirePermission } from "../iam/middleware.js";

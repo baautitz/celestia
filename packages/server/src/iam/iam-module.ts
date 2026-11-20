@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import type { Context, MiddlewareHandler } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { zValidator } from "@hono/zod-validator";
+import { zValidator } from "../validation.js";
 import { z } from "zod";
 import { defineModule, type ModuleDef } from "@platform/core/module";
 import type { JWTAccessPayload, PermissionItem, User } from "@platform/shared";
