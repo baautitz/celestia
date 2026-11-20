@@ -50,7 +50,8 @@ import type { TipoMetaComPremio } from "./tipo-meta-window";
 import { useVisaoMetas, VisaoSelect } from "./metas-visualizacao";
 import { TrendTooltip } from "@platform/ui/components/trend";
 import { API, json } from "./inovafarma-api";
-import { type Periodo, periodoInicial } from "./periodos";
+import type { Periodo } from "./periodos";
+import { SeletorPeriodo, usePeriodoSelecionado } from "./periodo-selecionado";
 import { useLatestFetch } from "./use-latest-fetch";
 
 const BASE = `${API}/metas`;
@@ -1082,7 +1083,7 @@ export function MontarMetas({
   lojas: LojaMetas[];
 }) {
   const { feedback, windows } = useUi();
-  const [periodoId, setPeriodoId] = useState(() => periodoInicial(periodos));
+  const [periodoId, setPeriodoId] = usePeriodoSelecionado(periodos);
   const [loja, setLoja] = useState(TODAS);
   const [montagem, setMontagem] = useState<Montagem | null>(null);
   const { visao, salvar: salvarVisao, disponiveis } = useVisaoMetas("montar-metas", ["table", "by-meta", "by-colaborador"], "by-meta");
@@ -1364,26 +1365,7 @@ export function MontarMetas({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        <Stack gap="field">
-          <Label>Período de Fechamento</Label>
-          <Select value={periodoId} onValueChange={(v) => v && setPeriodoId(v)}>
-            <SelectTrigger aria-label="Período de Fechamento">
-              <SelectValue>
-                {(id: string) =>
-                  periodos.find((p) => p.id === id)?.name ?? "Selecione"
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {periodos.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                  {p.status === "closed" ? " · fechado" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Stack>
+        <SeletorPeriodo periodos={periodos} valor={periodoId} onChange={setPeriodoId} />
         <Stack gap="field">
           <Label>Loja</Label>
           <Select value={loja} onValueChange={(v) => v && setLoja(v)}>

@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { FuroEstoquePage } from "./furo-estoque-page";
 import { defined } from "./test/defined";
+vi.mock("@platform/ui/contracts/web-services", async () => (await import("./periodo-teste")).servicosFalsos);
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));

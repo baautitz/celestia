@@ -14,7 +14,8 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { AvaliacaoWindow, type Avaliacao, type LojaOpcao } from "./avaliacao-window";
 import { API } from "./inovafarma-api";
-import { type Periodo, periodoInicial, periodoLabel } from "./periodos";
+import type { Periodo, } from "./periodos";
+import { usePeriodoSelecionado, SeletorPeriodo } from "./periodo-selecionado";
 import { useLatestFetch } from "./use-latest-fetch";
 import { FalhaAoCarregar, useContexto } from "./contexto";
 
@@ -41,26 +42,6 @@ interface LinhaColaborador {
 }
 
 const somar = (avaliacoes: Avaliacao[]) => avaliacoes.reduce((total, a) => total + a.valor, 0);
-
-function SeletorPeriodo({ periodos, valor, onChange }: { periodos: Periodo[]; valor: string; onChange: (id: string) => void }) {
-  return (
-    <Stack gap="field">
-      <Label>Período de Fechamento</Label>
-      <Select value={valor} onValueChange={(v) => v && onChange(v)}>
-        <SelectTrigger aria-label="Período de Fechamento">
-          <SelectValue>{(id: string) => periodos.find((p) => p.id === id)?.name ?? "Selecione"}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {periodos.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {periodoLabel(p)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </Stack>
-  );
-}
 
 /** Lista as Avaliações de `url`; só a resposta da última consulta vale. */
 function useAvaliacoes(url: string | null) {
@@ -97,7 +78,7 @@ function SemPeriodo() {
 }
 
 function MinhasAvaliacoes({ contexto }: { contexto: Contexto }) {
-  const [periodoId, setPeriodoId] = useState(periodoInicial(contexto.periodos));
+  const [periodoId, setPeriodoId] = usePeriodoSelecionado(contexto.periodos);
   const { avaliacoes, carregando } = useAvaliacoes(contexto.vinculado && periodoId ? `${BASE}/minhas?periodoId=${encodeURIComponent(periodoId)}` : null);
 
   if (!contexto.vinculado) {
@@ -137,7 +118,7 @@ function MinhasAvaliacoes({ contexto }: { contexto: Contexto }) {
 
 function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
   const { feedback, windows } = useUi();
-  const [periodoId, setPeriodoId] = useState(periodoInicial(contexto.periodos));
+  const [periodoId, setPeriodoId] = usePeriodoSelecionado(contexto.periodos);
   const [loja, setLoja] = useState(contexto.todasAsLojas || contexto.lojasGerenciadas.length !== 1 ? TODAS : String(contexto.lojasGerenciadas[0]?.codigo ?? TODAS));
   const consulta = new URLSearchParams({ periodoId });
   if (loja !== TODAS) consulta.set("codigoLoja", loja);

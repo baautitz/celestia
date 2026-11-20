@@ -1,5 +1,5 @@
 import { lazy, useState, useEffect, useCallback, useMemo, type ComponentType, type ReactNode } from "react";
-import { TrendingUp, RefreshCw, Calendar, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch, Target } from "lucide-react";
+import { TrendingUp, RefreshCw, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch, Target } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { Badge } from "@platform/ui/components/badge";
@@ -14,6 +14,7 @@ import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imper
 import type { Trend } from "@platform/ui/components/trend";
 import { ColaboradoresPendentesBadge } from "./colaboradores-badge";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
+import { SeletorPeriodo, usePeriodoSelecionado } from "./periodo-selecionado";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
 import { API } from "./inovafarma-api";
 
@@ -317,7 +318,7 @@ interface Filtros {
   visualizacao: Visualizacao;
 }
 
-const periodLabel = (p: ClosingPeriod) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})`;
+const _periodLabel = (p: ClosingPeriod) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})`;
 
 const lojaLabel = (lojas: Loja[], loja: string, visualizacao: Visualizacao = "geral") =>
   loja === "all" ? (visualizacao === "loja" ? "Todas as minhas Lojas" : "Todas as Filiais") : lojas.find((l) => String(l.codigoEmpresa) === loja)?.nome || `Filial ${loja}`;
@@ -345,19 +346,16 @@ function FiltroSelect({ icon, label, children }: { icon: ReactNode; label: strin
   );
 }
 
-/** Seletores de Período de Fechamento e Filial, na barra do desktop e no drawer do celular. */
+/** Seletores de Visualização e Filial (o Período de Fechamento fica na barra global), na barra do desktop e no drawer do celular. */
 function FiltrosCampos({
-  periods,
   visualizacoes,
   value,
   onChange,
 }: {
-  periods: ClosingPeriod[];
   visualizacoes: VisualizacaoDisponivel[];
   value: Filtros;
   onChange: (next: Filtros) => void;
 }) {
-  const period = periods.find((p) => p.id === value.periodId);
   const lojas = visualizacoes.find((v) => v.id === value.visualizacao)?.lojas ?? [];
   return (
     <>
@@ -377,28 +375,6 @@ function FiltrosCampos({
           </Select>
         </FiltroSelect>
       )}
-
-      <FiltroSelect icon={<Calendar />} label="Período de Fechamento">
-        <Select value={value.periodId} onValueChange={(val) => val && onChange({ ...value, periodId: val })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione um período">{period ? periodLabel(period) : "Selecione um Período"}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {periods.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {periodLabel(p)}
-              </SelectItem>
-            ))}
-            {periods.length === 0 && (
-              <Stack padding="compact" align="center">
-                <Text variant="caption" tone="muted">
-                  Nenhum período cadastrado
-                </Text>
-              </Stack>
-            )}
-          </SelectContent>
-        </Select>
-      </FiltroSelect>
 
       {value.visualizacao !== "individual" && (
         <FiltroSelect icon={<Store />} label="Filial / Loja">
@@ -422,12 +398,12 @@ function FiltrosCampos({
 }
 
 /** Filtros no drawer do celular: só valem ao tocar em Aplicar, para não consultar o ERP a cada troca. */
-function FiltrosDrawer({ periods, visualizacoes, initial }: { periods: ClosingPeriod[]; visualizacoes: VisualizacaoDisponivel[]; initial: Filtros }) {
+function FiltrosDrawer({ visualizacoes, initial }: { visualizacoes: VisualizacaoDisponivel[]; initial: Filtros }) {
   const { resolve } = useWindow<Filtros>();
   const [draft, setDraft] = useState(initial);
   return (
     <>
-      <FiltrosCampos periods={periods} visualizacoes={visualizacoes} value={draft} onChange={setDraft} />
+      <FiltrosCampos visualizacoes={visualizacoes} value={draft} onChange={setDraft} />
       <WindowActions>
         <WindowCancelButton />
         <Button onClick={() => resolve(draft)}>Aplicar</Button>
@@ -439,7 +415,7 @@ function FiltrosDrawer({ periods, visualizacoes, initial }: { periods: ClosingPe
 export function VendasComissoesPage() {
   const ui = useUi();
   const [periods, setPeriods] = useState<ClosingPeriod[]>([]);
-  const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
+  const [selectedPeriodId, setSelectedPeriodId] = usePeriodoSelecionado(periods);
   // null enquanto carrega; vazio quando o Usuário não tem nenhuma Visualização disponível.
   const [visualizacoes, setVisualizacoes] = useState<VisualizacaoDisponivel[] | null>(null);
   const [visualizacao, setVisualizacao] = useState<Visualizacao>("geral");
@@ -466,9 +442,7 @@ export function VendasComissoesPage() {
       if (visualizacoesData[0]) setVisualizacao(visualizacoesData[0].id);
       else setLoading(false);
 
-      const initial = periodos.find((p) => p.status === "open") ?? periodos[0];
-      if (initial) setSelectedPeriodId((prev) => prev || initial.id);
-      else setLoading(false);
+      if (periodos.length === 0) setLoading(false);
     }
     void initFilters();
   }, []);
@@ -540,7 +514,7 @@ export function VendasComissoesPage() {
     const result = await ui.windows.open<Filtros>({
       surface: "drawer",
       title: "Filtros",
-      content: () => <FiltrosDrawer periods={periods} visualizacoes={visualizacoes ?? []} initial={filtros} />,
+      content: () => <FiltrosDrawer visualizacoes={visualizacoes ?? []} initial={filtros} />,
     });
     if (result.status === "confirmed") applyFiltros(result.value);
   };
@@ -596,6 +570,7 @@ export function VendasComissoesPage() {
 
   return (
     <Stack gap="section">
+      <SeletorPeriodo periodos={periods} valor={selectedPeriodId} onChange={setSelectedPeriodId} />
       {/* Barra de Filtros (desktop) */}
       <Show on="lgUp">
         <Stack
@@ -607,7 +582,7 @@ export function VendasComissoesPage() {
           surface="card"
         >
           <Stack direction="row" wrap align="end" gap="section" grow>
-            <FiltrosCampos periods={periods} visualizacoes={visualizacoes ?? []} value={filtros} onChange={applyFiltros} />
+            <FiltrosCampos visualizacoes={visualizacoes ?? []} value={filtros} onChange={applyFiltros} />
 
             {selectedPeriod && (
               <Stack direction="row" align="center" gap="field" height="control" surface="muted">
@@ -831,7 +806,7 @@ export function VendasComissoesPage() {
 export const inovafarmaWebModule = defineWebModule({
   id: "inovafarma",
   // Colaboradores cria Usuário pelo cadastro do IAM (serviço `iam:users`).
-  dependsOn: ["iam"],
+  dependsOn: ["iam", "closing_period"],
   sections: [
     // Trabalho do dia a dia de quem lança, logo abaixo de Fechamento.
     { id: "inovafarma-lancamentos", label: "Lançamentos", order: 150 },

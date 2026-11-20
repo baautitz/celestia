@@ -15,7 +15,8 @@ import { dataHora } from "./datas";
 import type { LojaOpcao } from "./loja-opcao";
 import { LojaSelect, TODAS_AS_LOJAS } from "./loja-select";
 import type { Visualizacao } from "./visualizacoes";
-import { type Periodo, periodoInicial, periodoLabel } from "./periodos";
+import type { Periodo, } from "./periodos";
+import { SeletorPeriodo, usePeriodoSelecionado } from "./periodo-selecionado";
 import { API } from "./inovafarma-api";
 import { useLatestFetch } from "./use-latest-fetch";
 
@@ -82,7 +83,7 @@ export function BaixasPreVencidosTab({ visualizacoes, periodos, lojasDaCorrecao 
   const [visualizacao, setVisualizacao] = useState<Visualizacao | undefined>(visualizacoes[0]?.id);
   const [loja, setLoja] = useState(TODAS_AS_LOJAS);
   // Abre no período aberto de data mais recente; sem nenhum aberto, no mais recente.
-  const [periodoId, setPeriodoId] = useState(periodoInicial(periodos));
+  const [periodoId, setPeriodoId] = usePeriodoSelecionado(periodos);
   const [grupos, setGrupos] = useState<BaixasDoColaborador[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [busca, setBusca] = useState("");
@@ -201,21 +202,7 @@ export function BaixasPreVencidosTab({ visualizacoes, periodos, lojasDaCorrecao 
         {visualizacao !== "individual" && (
           <LojaSelect lojas={lojas} value={loja} onChange={setLoja} todas={visualizacao === "loja" ? "Todas as minhas Lojas" : "Todas as Filiais"} />
         )}
-        <Stack gap="field">
-          <Label>Período de Fechamento</Label>
-          <Select value={periodoId} onValueChange={(v) => v && setPeriodoId(v)}>
-            <SelectTrigger aria-label="Período de Fechamento">
-              <SelectValue>{(id: string) => periodos.find((p) => p.id === id)?.name ?? "Selecione"}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {periodos.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {periodoLabel(p)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Stack>
+        <SeletorPeriodo periodos={periodos} valor={periodoId} onChange={setPeriodoId} />
       </Stack>
       <DataTable
         scroll="page"

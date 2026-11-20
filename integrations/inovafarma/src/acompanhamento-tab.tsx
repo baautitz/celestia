@@ -33,7 +33,8 @@ import { hojeLocal, projetar, type PeriodoDaProjecao } from "./projecao";
 import { PairGrid, Stack, Text } from "@platform/ui/components/layout";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@platform/ui/components/tooltip";
 import { API } from "./inovafarma-api";
-import { type Periodo, periodoInicial } from "./periodos";
+import type { Periodo } from "./periodos";
+import { SeletorPeriodo, usePeriodoSelecionado } from "./periodo-selecionado";
 import { useLatestFetch } from "./use-latest-fetch";
 
 const TODAS = "todas";
@@ -328,7 +329,7 @@ export function AcompanhamentoMetas({
 }) {
   const { visao, salvar: salvarVisao, disponiveis } = useVisaoMetas("acompanhamento", ["table", "by-colaborador", "by-meta"], "by-colaborador");
   const { feedback } = useUi();
-  const [periodoId, setPeriodoId] = useState(() => periodoInicial(periodos));
+  const [periodoId, setPeriodoId] = usePeriodoSelecionado(periodos);
   const [visualizacao, setVisualizacao] = useState(
     visualizacoes[0]?.id ?? "geral",
   );
@@ -396,26 +397,7 @@ export function AcompanhamentoMetas({
     <Stack gap="section">
       <Stack direction="row" align="end" gap="section" wrap>
         <VisaoSelect visao={visao} disponiveis={disponiveis} onChange={salvarVisao} />
-        <Stack gap="field">
-          <Label>Período de Fechamento</Label>
-          <Select value={periodoId} onValueChange={(v) => v && setPeriodoId(v)}>
-            <SelectTrigger aria-label="Período de Fechamento">
-              <SelectValue>
-                {(id: string) =>
-                  periodos.find((p) => p.id === id)?.name ?? "Selecione"
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {periodos.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                  {p.status === "closed" ? " · fechado" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Stack>
+        <SeletorPeriodo periodos={periodos} valor={periodoId} onChange={setPeriodoId} />
         {visualizacoes.length > 1 && (
           <Stack gap="field">
             <Label>Visualização</Label>

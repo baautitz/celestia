@@ -15,7 +15,8 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
 import { formatCurrency, formatNumber } from "@platform/ui/lib/format";
 import { BASE, JustificativaWindow, MotivoWindow, VerJustificativaWindow, type Justificativa, type Motivo } from "./furo-estoque-window";
-import { type Periodo, periodoInicial, periodoLabel } from "./periodos";
+import type { Periodo, } from "./periodos";
+import { SeletorPeriodo, usePeriodoSelecionado } from "./periodo-selecionado";
 import { useLatestFetch } from "./use-latest-fetch";
 import { FalhaAoCarregar, useContexto } from "./contexto";
 
@@ -69,7 +70,7 @@ const somaAbsoluta = (ajustes: Ajuste[]) => ajustes.reduce((n, a) => n + Math.ab
 
 function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: Motivo[] }) {
   const { feedback, windows } = useUi();
-  const [periodoId, setPeriodoId] = useState(periodoInicial(contexto.periodos));
+  const [periodoId, setPeriodoId] = usePeriodoSelecionado(contexto.periodos);
   const [loja, setLoja] = useState(contexto.todasAsLojas || contexto.lojasGerenciadas.length !== 1 ? TODAS : String(contexto.lojasGerenciadas[0]?.codigo ?? TODAS));
   const [grupo, setGrupo] = useState<Grupo | null>("furo");
   const [ajustes, setAjustes] = useState<Ajuste[]>([]);
@@ -219,21 +220,7 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
   return (
     <Stack gap="section">
       <Stack direction="row" align="end" gap="section" wrap>
-        <Stack gap="field">
-          <Label>Período de Fechamento</Label>
-          <Select value={periodoId} onValueChange={(v) => v && setPeriodoId(v)}>
-            <SelectTrigger aria-label="Período de Fechamento">
-              <SelectValue>{(id: string) => contexto.periodos.find((p) => p.id === id)?.name ?? "Selecione"}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {contexto.periodos.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {periodoLabel(p)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Stack>
+        <SeletorPeriodo periodos={contexto.periodos} valor={periodoId} onChange={setPeriodoId} />
         <Stack gap="field">
           <Label>Loja</Label>
           <Select value={loja} onValueChange={(v) => v && setLoja(v)}>
