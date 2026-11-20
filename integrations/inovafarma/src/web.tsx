@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { lazy, useState, useEffect, useCallback, useMemo, type ComponentType, type ReactNode } from "react";
 import { TrendingUp, RefreshCw, Calendar, Eye, Store, Users, DollarSign, Award, AlertCircle, Package, Pill, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch, Target } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
@@ -13,14 +13,18 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import type { Trend } from "@platform/ui/components/trend";
 import { ColaboradoresPendentesBadge } from "./colaboradores-badge";
-import { ColaboradoresPage } from "./colaboradores-page";
-import { AvaliacoesPage } from "./avaliacoes-page";
-import { PreVencidosPage } from "./pre-vencidos-page";
-import { FuroEstoquePage } from "./furo-estoque-page";
-import { MetasPage } from "./metas-page";
 import { colaboradoresTotals, colaboradoresTotalsCompare } from "./colaboradores-totals";
 import { previousClosingPeriodRange, type ClosingPeriod } from "./previous-closing-period";
 import { API } from "./inovafarma-api";
+
+// Telas carregadas sob demanda (code-splitting): o chunk só é baixado quando a rota é aberta.
+const lazyPage = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K): ComponentType =>
+  lazy<ComponentType>(async () => ({ default: (await load())[name] }));
+const ColaboradoresPage = lazyPage(() => import("./colaboradores-page"), "ColaboradoresPage");
+const AvaliacoesPage = lazyPage(() => import("./avaliacoes-page"), "AvaliacoesPage");
+const PreVencidosPage = lazyPage(() => import("./pre-vencidos-page"), "PreVencidosPage");
+const FuroEstoquePage = lazyPage(() => import("./furo-estoque-page"), "FuroEstoquePage");
+const MetasPage = lazyPage(() => import("./metas-page"), "MetasPage");
 
 interface Loja {
   codigoEmpresa: number;

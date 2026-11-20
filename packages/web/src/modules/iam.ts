@@ -1,9 +1,10 @@
 import { MonitorSmartphone, Shield, Users } from "lucide-react";
 import { defineWebModule } from "@platform/ui/contracts/module";
 import { usersWebService } from "@/iam/UserFormWindow";
-import { IAMUsersPage } from "@/pages/IAMUsersPage";
-import { IAMRolesPage } from "@/pages/IAMRolesPage";
-import { IAMDevicesPage } from "@/pages/IAMDevicesPage";
+import { lazyPage } from "@/lib/lazy-page";
+const IAMUsersPage = lazyPage(() => import("@/pages/IAMUsersPage"), "IAMUsersPage");
+const IAMRolesPage = lazyPage(() => import("@/pages/IAMRolesPage"), "IAMRolesPage");
+const IAMDevicesPage = lazyPage(() => import("@/pages/IAMDevicesPage"), "IAMDevicesPage");
 
 /** Usuários, Grupos e Dispositivos; oferece o cadastro de Usuário aos módulos que dependem de `iam`. */
 export const iamModule = defineWebModule({

@@ -1,6 +1,7 @@
 import { CalendarRange } from "lucide-react";
 import { defineWebModule } from "@platform/ui/contracts/module";
-import { ClosingPeriodsPage } from "@/pages/ClosingPeriodsPage";
+import { lazyPage } from "@/lib/lazy-page";
+const ClosingPeriodsPage = lazyPage(() => import("@/pages/ClosingPeriodsPage"), "ClosingPeriodsPage");
 
 export const closingPeriodModule = defineWebModule({
   id: "closing_period",

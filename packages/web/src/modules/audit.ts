@@ -1,6 +1,7 @@
 import { ScrollText } from "lucide-react";
 import { defineWebModule } from "@platform/ui/contracts/module";
-import { AuditLogPage } from "@/pages/AuditLogPage";
+import { lazyPage } from "@/lib/lazy-page";
+const AuditLogPage = lazyPage(() => import("@/pages/AuditLogPage"), "AuditLogPage");
 
 export const auditModule = defineWebModule({
   id: "audit",

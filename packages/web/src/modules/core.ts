@@ -1,6 +1,7 @@
 import { Database } from "lucide-react";
 import { defineWebModule } from "@platform/ui/contracts/module";
-import { ERPsPage } from "@/pages/ERPsPage";
+import { lazyPage } from "@/lib/lazy-page";
+const ERPsPage = lazyPage(() => import("@/pages/ERPsPage"), "ERPsPage");
 
 export const coreModule = defineWebModule({
   id: "core",

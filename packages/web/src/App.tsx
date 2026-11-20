@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LoginCertificatePage } from "./pages/LoginCertificatePage";
@@ -41,7 +42,11 @@ const EntryScreen: React.FC<{ entry: NavEntry }> = ({ entry }) => {
       </Card>
     );
   }
-  return <Screen />;
+  return (
+    <Suspense fallback={null}>
+      <Screen />
+    </Suspense>
+  );
 };
 
 export const App: React.FC = () => {
