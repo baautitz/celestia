@@ -6,7 +6,9 @@ import { feedbackService } from "../adapters/feedback-toast";
 import { usePreference } from "./use-preference";
 
 const stored: Record<string, unknown> = { a: "tabela", b: "cartoes" };
-const fetchMock = vi.fn<ApiFetch>();
+const fetchMock = vi.fn<(path: string, options?: RequestInit) => Promise<unknown>>();
+/** `ApiFetch` é genérico no tipo da resposta; o mock devolve `unknown` e o teste escolhe o que devolver. */
+const apiFetchMock: ApiFetch = <T,>(path: string, options?: RequestInit) => fetchMock(path, options) as Promise<T>;
 
 afterEach(() => {
   fetchMock.mockReset();
@@ -20,8 +22,8 @@ const readStored = async (path: string) => {
 
 describe("usePreference", () => {
   it("volta ao padrão ao trocar a chave, até a leitura da nova chegar", async () => {
-    fetchMock.mockImplementation(async (path, options) => (options?.method === "PUT" ? undefined : readStored(path)) as never);
-    setApiFetch(fetchMock);
+    fetchMock.mockImplementation(async (path, options) => options?.method === "PUT" ? undefined : readStored(path));
+    setApiFetch(apiFetchMock);
     const { result, rerender } = renderHook(({ k }) => usePreference(k, "padrao"), { initialProps: { k: "a" } });
     await waitFor(() => expect(result.current[0]).toBe("tabela"));
 
@@ -36,9 +38,9 @@ describe("usePreference", () => {
     const notifyError = vi.spyOn(feedbackService, "notifyError").mockImplementation(() => undefined);
     fetchMock.mockImplementation(async (_path, options) => {
       if (options?.method === "PUT") throw new ApiError("Sem permissão", 403);
-      return { value: null } as never;
+      return { value: null };
     });
-    setApiFetch(fetchMock);
+    setApiFetch(apiFetchMock);
     const { result } = renderHook(() => usePreference("a", "padrao"));
 
     act(() => result.current[1]("cartoes"));

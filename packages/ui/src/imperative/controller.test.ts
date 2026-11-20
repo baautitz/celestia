@@ -3,7 +3,7 @@ import type { DiscardRequest, FocusTarget } from "../contracts/windows.ts"
 import { defined } from "../test/defined.ts"
 import { WindowController } from "./controller.ts"
 
-const flush = () => new Promise<void>((r) => setImmediate(r))
+const flush = () => new Promise<void>((r) => setTimeout(r, 0))
 
 function setup(discard = false) {
   const focus = vi.fn()
