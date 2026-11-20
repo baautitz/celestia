@@ -1,12 +1,24 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
+import type { Device } from "@platform/shared";
 import { zValidator } from "./validation.js";
 import { z } from "zod";
 import type { DeviceCertificateAuthority } from "./authority.js";
 import { ChallengeStore } from "./challenge-store.js";
-import { DeviceNotFoundError, DeviceStillActiveError, type DeviceStore } from "./device-store.js";
+import { DeviceNotFoundError, DeviceStillActiveError, DuplicateDeviceFingerprintError, type DeviceStore } from "./device-store.js";
 
 export const MIN_SHARED_SECRET_LENGTH = 32;
+
+/** Identificadores opacos de quem agiu (ex.: `usr_<uuid>`), vindos do backend: só se limita o tamanho. */
+const actorId = z.string().trim().min(1).max(100);
+const challengeIdSchema = z.uuid();
+/** O código de uso único tem 43 caracteres (32 bytes em base64url); o limite só barra entradas abusivas. */
+const MAX_CODE_LENGTH = 200;
+
+/** O mínimo que a CA precisa de um logger (compatível com o pino). */
+export interface CaLogger {
+  error(fields: Record<string, unknown>, message: string): void;
+}
 
 export interface CaAppOptions {
   deviceStore: DeviceStore;
@@ -21,6 +33,8 @@ export interface CaAppOptions {
   /** Fingerprint (SHA-256 do DER, hexadecimal) do certificado de cliente da conexão, ou `undefined` se não houve. */
   readCertificate: (c: Context) => string | undefined | Promise<string | undefined>;
   challenges?: ChallengeStore;
+  /** Recebe as falhas inesperadas, sem corpo, headers nem segredos. Sem ele, elas só viram a resposta 500. */
+  logger?: CaLogger;
 }
 
 const sameSecret = (received: string, expected: string): boolean =>
@@ -47,12 +61,25 @@ export function createCaApp({
   callbackUrl,
   readCertificate,
   challenges = new ChallengeStore(),
+  logger,
 }: CaAppOptions) {
   if (sharedSecret.length < MIN_SHARED_SECRET_LENGTH) {
     throw new Error(`A chave em comum precisa ter ao menos ${MIN_SHARED_SECRET_LENGTH} caracteres.`);
   }
   const app = new Hono();
   const api = requireSharedSecret(sharedSecret);
+
+  // O .pfx e a senha trafegam nestas respostas e o link de leitura leva o desafio: nada disso pode ficar em cache.
+  app.use(async (c, next) => {
+    await next();
+    c.header("Cache-Control", "no-store");
+  });
+
+  app.onError((err, c) => {
+    // Só o tipo e a mensagem do erro: nunca o corpo, os headers (a chave em comum) nem o .pfx.
+    logger?.error({ method: c.req.method, path: c.req.path, errorName: err.name, errorMessage: err.message }, "Falha inesperada na CA");
+    return c.json({ error: "Erro interno da autoridade certificadora." }, 500);
+  });
 
   app.get("/health", (c) => c.json({ status: "ok" }));
 
@@ -66,24 +93,31 @@ export function createCaApp({
   app.post(
     "/devices",
     api,
-    zValidator("json", z.object({ name: z.string().trim().min(1).max(100), createdBy: z.string().optional() })),
+    zValidator("json", z.object({ name: z.string().trim().min(1).max(100), createdBy: actorId.optional() })),
     async (c) => {
       if (!authority) return c.json({ error: "A autoridade certificadora não tem a CA configurada." }, 503);
       const { name, createdBy } = c.req.valid("json");
       // O .pfx e a senha só existem nesta resposta: nada além do fingerprint e dos metadados é gravado.
       const issued = await authority.issue({ name });
-      const device = await deviceStore.create({
-        name,
-        fingerprint: issued.fingerprint,
-        serial: issued.serial,
-        notAfter: issued.notAfter.toISOString(),
-        createdBy,
-      });
+      let device: Device;
+      try {
+        device = await deviceStore.create({
+          name,
+          fingerprint: issued.fingerprint,
+          serial: issued.serial,
+          notAfter: issued.notAfter.toISOString(),
+          createdBy,
+        });
+      } catch (err: unknown) {
+        // Sem registro o .pfx não sai: o certificado emitido fica sem uso, pois o login só aceita fingerprint cadastrado.
+        if (err instanceof DuplicateDeviceFingerprintError) return c.json({ error: err.message }, 409);
+        throw err;
+      }
       return c.json({ device, pfx: Buffer.from(issued.pfx).toString("base64"), password: issued.password }, 201);
     },
   );
 
-  app.post("/devices/:id/revoke", api, zValidator("json", z.object({ revokedBy: z.string().optional() })), async (c) => {
+  app.post("/devices/:id/revoke", api, zValidator("json", z.object({ revokedBy: actorId.optional() })), async (c) => {
     try {
       return c.json(await deviceStore.revoke(c.req.param("id"), c.req.valid("json").revokedBy));
     } catch (err: unknown) {
@@ -103,7 +137,7 @@ export function createCaApp({
     }
   });
 
-  app.post("/challenges", api, zValidator("json", z.object({ userId: z.string().min(1) })), (c) => {
+  app.post("/challenges", api, zValidator("json", z.object({ userId: actorId })), (c) => {
     const challengeId = challenges.create(c.req.valid("json").userId);
     const verifyUrl = new URL("/verify", publicUrl);
     verifyUrl.searchParams.set("challenge", challengeId);
@@ -113,7 +147,7 @@ export function createCaApp({
   app.post(
     "/challenges/exchange",
     api,
-    zValidator("json", z.object({ challengeId: z.string().min(1), code: z.string().optional() })),
+    zValidator("json", z.object({ challengeId: challengeIdSchema, code: z.string().max(MAX_CODE_LENGTH).optional() })),
     async (c) => {
       const { challengeId, code } = c.req.valid("json");
       const result = challenges.exchange(challengeId, code);
@@ -127,11 +161,14 @@ export function createCaApp({
 
   // Única rota aberta ao navegador. Sempre volta ao app: com o código se há um Dispositivo ativo, sem ele se não há.
   app.get("/verify", async (c) => {
-    const challengeId = c.req.query("challenge") ?? "";
+    const parsed = challengeIdSchema.safeParse(c.req.query("challenge"));
+    const back = new URL(callbackUrl);
+    // Desafio ausente ou malformado: volta ao app sem ecoar nada da URL.
+    if (!parsed.success) return c.redirect(back.toString(), 302);
+    const challengeId = parsed.data;
     const fingerprint = (await readCertificate(c))?.toLowerCase();
     const device = fingerprint ? await deviceStore.findActiveByFingerprint(fingerprint) : null;
     const code = device ? challenges.bindDevice(challengeId, device.id) : undefined;
-    const back = new URL(callbackUrl);
     back.searchParams.set("challenge", challengeId);
     if (code) back.searchParams.set("code", code);
     return c.redirect(back.toString(), 302);
