@@ -291,14 +291,14 @@ function KpiCard({
       <CardContent>
         <Stack gap="tight">
           <Stack direction="row" align="center" justify="between" gap="section">
-            <Stack gap="tight">
+            <Stack gap="tight" grow>
               <Text variant="caption" tone="muted" weight="medium">
                 {label}
               </Text>
               {loading ? (
                 <Skeleton className="h-8 w-32" />
               ) : (
-                <Text id={`${descricao}-valor`} variant="kpi" tone={highlight ? "success" : "default"}>
+                <Text id={`${descricao}-valor`} variant="kpi" tone={highlight ? "success" : "default"} breakAll>
                   {value}
                 </Text>
               )}
