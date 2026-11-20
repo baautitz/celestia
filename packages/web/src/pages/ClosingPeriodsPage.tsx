@@ -105,7 +105,6 @@ const CreatePeriodSheet: React.FC = () => {
     resolver: zodResolver(createSchema),
     defaultValues: { name: "" },
   });
-
   const onSubmit = async (v: CreateFormValues) => {
     try {
       setSaving(true);
@@ -129,19 +128,6 @@ const CreatePeriodSheet: React.FC = () => {
           <FieldGroup>
             <FormField
               control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome do Período</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Ex.: Outubro/2026" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="startDate"
               render={({ field }) => (
                 <FormItem>
@@ -161,6 +147,22 @@ const CreatePeriodSheet: React.FC = () => {
                   <FormLabel>Data Final</FormLabel>
                   <FormControl>
                     <DatePicker value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome do Período</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="Ex.: Outubro/2026"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
