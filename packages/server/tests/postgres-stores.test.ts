@@ -18,6 +18,7 @@ import { CorrecaoDuplicadaError } from "../../../integrations/inovafarma/src/cor
 import { PostgresAvaliacaoStore } from "../../../integrations/inovafarma/src/postgres-avaliacao-store.js";
 import { PostgresFuroEstoqueStore } from "../../../integrations/inovafarma/src/postgres-furo-estoque-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
+import { PeriodOverlapError } from "../src/closing-period/closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
 import { defined } from "./helpers/defined.js";
 
@@ -50,8 +51,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA) e a que troca Excluir por Inativar Usuários; o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos, a das Avaliações, a do Furo de Estoque, as cinco das Metas (Tipos de Meta, Montar Metas, Apuração, Prêmio do Participante e Lista de Produtos no Tipo de Meta), a dos Itens de Pré-vencido, a que remove os Lançamentos, a das Baixas congeladas e a das Correções de Baixa; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 6 : item.moduleId === "erp" || item.moduleId === "audit" ? 2 : item.moduleId === "inovafarma" ? 14 : 1);
+        // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA) e a que troca Excluir por Inativar Usuários e a das Preferências do Usuário; o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, a das Lojas, a dos Lançamentos de Pré-vencidos, a das Avaliações, a do Furo de Estoque, as cinco das Metas (Tipos de Meta, Montar Metas, Apuração, Prêmio do Participante e Lista de Produtos no Tipo de Meta), a dos Itens de Pré-vencido, a que remove os Lançamentos, a das Baixas congeladas e a das Correções de Baixa; o closing_period tem a inicial e a que passa as datas para `date` e impede faixas coincidentes; os demais só a inicial.
+        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 7 : item.moduleId === "erp" || item.moduleId === "audit" || item.moduleId === "closing_period" ? 2 : item.moduleId === "inovafarma" ? 14 : 1);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
@@ -69,6 +70,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "closing_period", name: "periods" },
         { schema: "erp", name: "erps" },
         { schema: "iam", name: "roles" },
+        { schema: "iam", name: "user_preferences" },
         { schema: "iam", name: "users" },
         { schema: "inovafarma", name: "apuracoes_metas" },
         { schema: "inovafarma", name: "avaliacoes" },
@@ -409,6 +411,42 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         expect((await store.get("w2"))?.endDate).toBe("2026-08-31");
         await store.save({ ...next, status: "closed" });
         expect(await store.updateIfCurrent({ ...next, version: 3 }, 2)).toBe(false);
+      });
+
+      it("deleteIfCurrent só remove com a versão e a situação esperadas", async () => {
+        const store = new PostgresClosingPeriodStore(db);
+        const base = {
+          id: "w4", name: "Nov", startDate: "2026-11-01", endDate: "2026-11-30", status: "open" as const, version: 1,
+          createdAt: "2026-11-01T00:00:00.000Z", updatedAt: "2026-11-01T00:00:00.000Z",
+        };
+        await store.save(base);
+        expect(await store.deleteIfCurrent("w4", 2, "open")).toBe(false);
+        expect(await store.deleteIfCurrent("w4", 1, "closed")).toBe(false);
+        expect(await store.get("w4")).not.toBeNull();
+        expect(await store.deleteIfCurrent("w4", 1, "open")).toBe(true);
+        expect(await store.get("w4")).toBeNull();
+        expect(await store.deleteIfCurrent("w4", 1, "open")).toBe(false);
+      });
+
+      it("a restrição de exclusão recusa faixas que coincidem, mesmo em gravações concorrentes", async () => {
+        const store = new PostgresClosingPeriodStore(db);
+        const at = "2026-12-01T00:00:00.000Z";
+        const make = (id: string, startDate: string, endDate: string) => ({
+          id, name: id, startDate, endDate, status: "open" as const, version: 1, createdAt: at, updatedAt: at,
+        });
+        await store.save(make("a", "2026-12-01", "2026-12-15"));
+        await expect(store.save(make("b", "2026-12-15", "2026-12-20"))).rejects.toBeInstanceOf(PeriodOverlapError);
+        await store.save(make("c", "2026-12-16", "2026-12-20")); // faixas adjacentes não coincidem
+        await expect(store.updateIfCurrent({ ...make("c", "2026-12-10", "2026-12-20"), version: 2 }, 1)).rejects.toBeInstanceOf(PeriodOverlapError);
+        // O upsert do próprio período não conflita consigo mesmo.
+        await store.save({ ...make("a", "2026-12-01", "2026-12-15"), name: "renomeado" });
+
+        const results = await Promise.allSettled([
+          store.save(make("d", "2027-01-01", "2027-01-31")),
+          store.save(make("e", "2027-01-15", "2027-02-15")),
+        ]);
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        expect(results.find((r) => r.status === "rejected")).toMatchObject({ reason: expect.any(PeriodOverlapError) });
       });
 
       it("transitionIfCurrent só grava com a versão e a situação esperadas", async () => {

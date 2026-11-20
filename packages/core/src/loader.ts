@@ -34,26 +34,27 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
     owners.set(path, d.id);
   }
   const registry = options.registry ?? new PermissionRegistry();
-  const events = options.events ?? new EventBus<EventMap>();
   const logger: Logger = options.logger ?? console;
+  const events = options.events ?? new EventBus<EventMap>(undefined, logger);
   const services = new Map<string, Map<string, unknown>>();
   const loaded: string[] = [];
   const failed: LoadResult["failed"] = [];
   const failedIds = new Set<string>();
 
   for (const def of ordered) {
+    const badDep = (def.dependsOn ?? []).find((d) => failedIds.has(d));
+    if (badDep) {
+      // Não chegou a carregar: não publica permissões de um módulo que nem rodou.
+      failedIds.add(def.id);
+      failed.push({ moduleId: def.id, reason: `Dependência "${badDep}" falhou ao carregar.` });
+      continue;
+    }
+
     const dynamic: (() => PermissionItem[])[] = [];
     try {
       registry.registerProvider(def.id, () => [...(def.permissions?.items ?? []), ...dynamic.flatMap((p) => p())]);
     } catch (e) {
       throw new Error(`Falha ao registrar permissões do módulo "${def.id}": ${msg(e)}`, { cause: e });
-    }
-
-    const badDep = (def.dependsOn ?? []).find((d) => failedIds.has(d));
-    if (badDep) {
-      failedIds.add(def.id);
-      failed.push({ moduleId: def.id, reason: `Dependência "${badDep}" falhou ao carregar.` });
-      continue;
     }
 
     const routes = new Hono();
@@ -96,12 +97,17 @@ export async function loadModules(app: Hono, modules: ModuleDef[], options: Load
       logger,
     };
 
+    let registered = false;
     try {
       await def.register(ctx);
+      registered = true;
       app.route(mountOf(def), routes);
       services.set(def.id, own);
       loaded.push(def.id);
     } catch (e) {
+      // Se o `register` terminou mas as rotas não montaram, as permissões não correspondem a nada servido: retira-as.
+      // Falha dentro do `register` mantém as permissões publicadas (a poda de órfãs é pulada via pruneSafe).
+      if (registered) registry.unregisterModule(def.id);
       for (const off of offs) off(); // atomicidade: sem handlers residuais (serviços só são publicados no sucesso)
       failedIds.add(def.id);
       failed.push({ moduleId: def.id, reason: msg(e) });

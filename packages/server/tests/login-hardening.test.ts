@@ -39,7 +39,7 @@ describe("limite de tentativas de login", () => {
     for (let i = 0; i < 3; i++) expect((await login("carlos.admin", "errada")).status).toBe(401);
     const res = await login("carlos.admin", TEST_PASSWORD);
     expect(res.status).toBe(429);
-    expect(res.headers.get("retry-after")).toBeTruthy();
+    expect(res.headers.get("retry-after")).toMatch(/^[1-9]\d*$/);
   });
 
   it("resposta de bloqueio é idêntica para username existente e inexistente", async () => {

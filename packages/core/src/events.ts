@@ -1,4 +1,6 @@
 // owner: T2 events
+import type { Logger } from "./module.js";
+
 export interface EventHandlerOptions {
   /** "before": valida/cancela antes da ação. "after": notifica depois do commit. Padrão "after". */
   phase?: "before" | "after";
@@ -26,12 +28,22 @@ export class CancelEvent extends Error {
 export interface BeforeContext<P> {
   readonly payload: Readonly<P>;
   cancel(reason: string): void;
+  /** Abortado quando o `timeoutMs` do handler estoura; repasse-o a I/O cancelável (fetch, consultas) para não deixar trabalho órfão. */
+  readonly signal: AbortSignal;
 }
+
+/** Payload entregue aos handlers `after`: o do evento mais o `result` da ação. */
+export type AfterPayload<P, R = unknown> = P & { readonly result: R };
+export interface AfterContext {
+  /** Abortado quando o `timeoutMs` do handler estoura. */
+  readonly signal: AbortSignal;
+}
+
 export type BeforeHandler<P> = (ctx: BeforeContext<P>) => void | Promise<void>;
-export type AfterHandler<P> = (payload: Readonly<P>) => void | Promise<void>;
+export type AfterHandler<P, R = unknown> = (payload: Readonly<AfterPayload<P, R>>, ctx: AfterContext) => void | Promise<void>;
 
 interface Entry {
-  handler: (arg: never) => void | Promise<void>;
+  handler: (...args: never[]) => void | Promise<void>;
   phase: "before" | "after";
   priority: number;
   timeoutMs: number;
@@ -41,14 +53,23 @@ interface Entry {
 
 const TIMEOUT = Symbol("timeout");
 
-async function withTimeout(fn: () => void | Promise<void>, ms: number): Promise<void> {
+/**
+ * Espera `fn` por no máximo `ms`. Estourar o prazo NÃO cancela o handler (JavaScript não interrompe uma Promise em
+ * andamento): o `AbortSignal` é abortado e a cadeia segue, mas o handler que ignorar o sinal continua rodando e pode
+ * concluir depois, inclusive com efeitos. Por isso handlers devem repassar o `signal` a qualquer I/O cancelável.
+ */
+async function withTimeout(fn: (signal: AbortSignal) => void | Promise<void>, ms: number): Promise<void> {
+  const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<typeof TIMEOUT>((res) => {
     timer = setTimeout(() => res(TIMEOUT), ms);
   });
   try {
-    const r = await Promise.race([Promise.resolve().then(fn), timeout]);
-    if (r === TIMEOUT) throw TIMEOUT;
+    const r = await Promise.race([Promise.resolve().then(() => fn(controller.signal)), timeout]);
+    if (r === TIMEOUT) {
+      controller.abort(new Error("Tempo esgotado"));
+      throw TIMEOUT;
+    }
   } finally {
     clearTimeout(timer);
   }
@@ -56,11 +77,21 @@ async function withTimeout(fn: () => void | Promise<void>, ms: number): Promise<
 
 export type ErrorSink = (err: Error, info: { event: string; module?: string }) => void;
 
+/** Sink padrão: só evento, módulo e mensagem. Nunca o payload nem o objeto do erro (pode carregar parâmetros e segredos). */
+const loggingSink =
+  (logger: Logger): ErrorSink =>
+  (err, { event, module }) =>
+    logger.error(`Falha em handler do evento "${event}"${module ? ` (módulo "${module}")` : ""}: ${err.name}: ${err.message}`);
+
 export class EventBus<EventMap extends Record<string, object>> {
   private entries = new Map<keyof EventMap, Entry[]>();
   private seq = 0;
+  private readonly onError: ErrorSink;
 
-  constructor(private onError: ErrorSink = (e) => console.error(e)) {}
+  /** `onError` recebe as falhas isoladas dos handlers; sem ele, vão para o `logger` injetado (padrão: console). */
+  constructor(onError?: ErrorSink, logger: Logger = console) {
+    this.onError = onError ?? loggingSink(logger);
+  }
 
   on<K extends keyof EventMap>(
     event: K,
@@ -107,14 +138,17 @@ export class EventBus<EventMap extends Record<string, object>> {
     const frozen: Readonly<EventMap[K]> = Object.freeze({ ...payload });
     for (const e of this.sorted(event, "before")) {
       let reason: string | undefined;
-      const ctx: BeforeContext<EventMap[K]> = {
-        payload: frozen,
-        cancel: (r) => {
-          reason ??= r;
-        },
-      };
       try {
-        await withTimeout(() => (e.handler as BeforeHandler<EventMap[K]>)(ctx), e.timeoutMs);
+        await withTimeout((signal) => {
+          const ctx: BeforeContext<EventMap[K]> = {
+            payload: frozen,
+            cancel: (r) => {
+              reason ??= r;
+            },
+            signal,
+          };
+          return (e.handler as BeforeHandler<EventMap[K]>)(ctx);
+        }, e.timeoutMs);
       } catch (err) {
         if (err === TIMEOUT) {
           reason = `Tempo esgotado em ${e.module ?? "handler"}`;
@@ -131,11 +165,11 @@ export class EventBus<EventMap extends Record<string, object>> {
   }
 
   /** Primitiva: dispara os `after`; falhas isoladas e enviadas a `onError`. */
-  async commit<K extends keyof EventMap>(event: K, payload: object): Promise<void> {
-    const frozen = Object.freeze({ ...payload });
+  async commit<K extends keyof EventMap, R = unknown>(event: K, payload: AfterPayload<EventMap[K], R>): Promise<void> {
+    const frozen: Readonly<AfterPayload<EventMap[K], R>> = Object.freeze({ ...payload });
     for (const e of this.sorted(event, "after")) {
       try {
-        await withTimeout(() => (e.handler as AfterHandler<object>)(frozen), e.timeoutMs);
+        await withTimeout((signal) => (e.handler as AfterHandler<EventMap[K], R>)(frozen, { signal }), e.timeoutMs);
       } catch (err) {
         this.fail(err === TIMEOUT ? new Error(`Tempo esgotado em ${e.module ?? "handler"}`) : err, event, e.module);
       }
@@ -154,7 +188,7 @@ export class EventBus<EventMap extends Record<string, object>> {
     const r = await this.emit(event, payload);
     if (r.cancelled) return r;
     const result = await action();
-    await this.commit(event, { ...payload, result });
+    await this.commit<K, R>(event, { ...payload, result });
     return { cancelled: false, result };
   }
 }

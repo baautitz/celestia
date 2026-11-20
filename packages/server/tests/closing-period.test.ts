@@ -35,13 +35,31 @@ describe("Closing Period (Período de Fechamento)", () => {
     expect(res.status).toBe(201);
     const created = (await res.json()) as { id: string; status: string; startDate: string };
     expect(created).toMatchObject({ ...jan, status: "open" });
-    expect(created.id).toBeTruthy();
+    expect(created.id).toMatch(/^cp_[0-9a-f-]{36}$/);
 
     const list = (await (await send("GET", "/api/closing-periods", admin)).json()) as { id: string }[];
     expect(list.map((p) => p.id)).toEqual([created.id]);
     const one = await send("GET", `/api/closing-periods/${created.id}`, admin);
     expect(one.status).toBe(200);
     expect(await one.json()).toMatchObject(jan);
+  });
+
+  it("recusa com 400 quando a faixa coincide com outro período gravado entre a checagem e a gravação", async () => {
+    await create(jan);
+    // Simula a corrida: a checagem prévia não enxerga o período que a outra requisição acabou de gravar.
+    store.list = async () => [];
+    const clash = await create({ name: "Janeiro 2", startDate: "2026-01-31", endDate: "2026-02-10" });
+    expect(clash.status).toBe(400);
+    expect(JSON.stringify(await clash.json())).toContain("coincide");
+  });
+
+  it("recusa com 400 a edição de faixa que passa a coincidir com outro período na corrida", async () => {
+    await create(jan);
+    const fev = (await (await create({ name: "Fev", startDate: "2026-02-01", endDate: "2026-02-28" })).json()) as { id: string; version: number };
+    store.list = async () => [];
+    const res = await send("PUT", `/api/closing-periods/${fev.id}/range`, admin, { startDate: "2026-01-31", endDate: "2026-02-28", version: fev.version });
+    expect(res.status).toBe(400);
+    expect((await store.get(fev.id))?.startDate).toBe("2026-02-01");
   });
 
   it("aceita período de um único dia e de qualquer duração", async () => {
@@ -230,6 +248,33 @@ describe("Closing Period (Período de Fechamento)", () => {
       const after = await original(id);
       expect(after?.endDate).toBe("2026-01-20");
       expect(after?.version).toBe((before?.version ?? 0) + 1);
+    });
+
+    it("cancelar não remove um período editado entre a leitura e a remoção (409)", async () => {
+      const id = await make();
+      const original = store.get.bind(store);
+      store.get = async (pid: string) => {
+        const read = await original(pid);
+        store.get = original;
+        if (read) await store.updateIfCurrent({ ...read, endDate: "2026-01-20", version: read.version + 1 }, read.version);
+        return read;
+      };
+      const res = await remove(id);
+      expect(res.status).toBe(409);
+      expect((await original(id))?.endDate).toBe("2026-01-20");
+    });
+
+    it("cancelar não remove um período fechado entre a leitura e a remoção (409)", async () => {
+      const id = await make();
+      const original = store.get.bind(store);
+      store.get = async (pid: string) => {
+        const read = await original(pid);
+        store.get = original;
+        if (read) await store.transitionIfCurrent({ ...read, status: "closed", version: read.version + 1 }, read.version, "open");
+        return read;
+      };
+      expect((await remove(id)).status).toBe(409);
+      expect(await statusOf(id)).toBe("closed");
     });
 
     it("responde 404 para id desconhecido", async () => {

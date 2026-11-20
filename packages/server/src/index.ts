@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { cors } from "hono/cors";
+import { HTTPException } from "hono/http-exception";
 import { serve } from "@hono/node-server";
 import { assertEncryptionKey } from "./erp/secret-box.js";
 import type { ErpClientRegistry } from "./erp/erp-client.js";
@@ -27,12 +28,28 @@ import { createAuthMiddleware } from "./iam/middleware.js";
 import { integrationPlugins, integrationErpDrivers } from "./plugins.js";
 import { createClosingPeriodModule } from "./closing-period/closing-period-module.js";
 import { MemoryClosingPeriodStore, type ClosingPeriodStore } from "./closing-period/closing-period-store.js";
+import { createLogger, type AppLogger } from "./logger.js";
 import type { JWTAccessPayload } from "@platform/shared";
 
 // Mensagens de validação do zod em português (as de cada campo, quando existem, têm precedência).
 z.config(z.locales.ptBR());
 
+export const INTERNAL_ERROR_MESSAGE = "Erro interno do servidor.";
+export const NOT_FOUND_MESSAGE = "Rota não encontrada.";
+
+/** Respostas de erro em JSON (`{ error }`); o detalhe de uma falha inesperada vai só para o log. */
+function installErrorHandlers(app: Hono, logger: AppLogger): void {
+  app.notFound((c) => c.json({ error: NOT_FOUND_MESSAGE }, 404));
+  app.onError((err, c) => {
+    if (err instanceof HTTPException) return err.getResponse();
+    logger.error({ err, method: c.req.method, path: c.req.path }, "Erro não tratado na requisição");
+    return c.json({ error: INTERNAL_ERROR_MESSAGE }, 500);
+  });
+}
+
 export interface CreatePlatformAppOptions {
+  /** Logger estruturado (pino); por padrão, o do processo (silencioso nos testes). */
+  logger?: AppLogger;
   erpClients?: ErpClientRegistry;
   erpStore?: ErpStore;
   clientFactory?: ErpClientFactory;
@@ -52,7 +69,9 @@ export interface CreatePlatformAppOptions {
 }
 
 export function createPlatform(options?: CreatePlatformAppOptions) {
+  const logger = options?.logger ?? createLogger();
   const app = new Hono();
+  installErrorHandlers(app, logger);
 
   // Middleware CORS para desenvolvimento e produção
   // Allowlist explícita (CORS_ORIGINS, separada por vírgula); nunca reflete uma origem arbitrária.
@@ -69,7 +88,8 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
       allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     })
   );
-  const erpClients = options?.erpClients || {};
+  // Sem protótipo: o id de um ERP vem do usuário e não pode resolver `constructor`, `toString`...
+  const erpClients = options?.erpClients ?? (Object.create(null) as ErpClientRegistry);
   const erpStore = options?.erpStore || new MemoryErpStore();
   const extraDrivers = integrationErpDrivers();
   const allDrivers = { ...ERP_DRIVERS, ...extraDrivers };
@@ -108,6 +128,7 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
         clients: erpClients,
         clientFactory,
         auth,
+        auditLog,
         extraDrivers,
       }),
     },
@@ -115,12 +136,13 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
     ...(options?.extraModules ?? []),
   ];
   const moduleApp = new Hono();
+  installErrorHandlers(moduleApp, logger);
   let started: Promise<unknown> | undefined;
   // Remove das roles as permissões fora do catálogo, só se todos os Modules carregaram (o Core decide via pruneSafe).
   const start = (): Promise<unknown> =>
     (started ??= composeModules(moduleApp, entries, {
       registry,
-      logger: console,
+      logger,
       prune: (keys) => userStore.syncOrphanPermissions(new Set([...keys, ...SYSTEM_PERMISSION_KEYS])),
     }));
   // O encaminhamento segue os prefixos dos Modules (o mesmo cálculo do loader: `prefix` ou `/api/m/<id>`).
@@ -134,13 +156,13 @@ export function createPlatform(options?: CreatePlatformAppOptions) {
     }
   }
 
-  return { app, start, modules: entries.map((e) => e.def) };
+  return { app, start, logger, modules: entries.map((e) => e.def) };
 }
 
 export function createPlatformApp(options?: CreatePlatformAppOptions) {
   const platform = createPlatform(options);
   // Falha de Module do Base System: as rotas dos Modules respondem 500; quem precisa abortar o boot usa createPlatform().start().
-  void platform.start().catch((err: unknown) => console.error(err instanceof Error ? err.message : err));
+  void platform.start().catch((err: unknown) => platform.logger.error({ err }, "Falha ao carregar os Modules"));
   return platform.app;
 }
 
@@ -154,10 +176,11 @@ const isMain =
 if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
   void (async () => {
     // Falha antes de qualquer outra coisa: sem a chave em comum com a CA (e, em produção, o endereço dela) o servidor não sobe.
+    const logger = createLogger();
     const certificateAuthority = loadCertificateAuthorityClient();
     assertEncryptionKey();
     let userStore: UserStore | undefined;
-    const erpClients: ErpClientRegistry = {};
+    const erpClients = Object.create(null) as ErpClientRegistry;
     let erpStore: ErpStore | undefined;
     let closingPeriodStore: ClosingPeriodStore | undefined;
     let auditLog: AuditLog | undefined;
@@ -181,7 +204,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
         try {
           erpClients[record.id] = bootClientFactory(record);
         } catch (err: unknown) {
-          console.error(`ERP '${record.id}' ignorado: ${err instanceof Error ? err.message : err}`);
+          logger.error({ err, erpId: record.id }, "ERP ignorado no boot");
         }
       }
     }
@@ -193,6 +216,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
       erpClients,
       auditLog,
       db: pluginDb,
+      logger,
     });
     if (process.env.POSTGRES_HOST) {
       // Verifica (sem aplicar) que as migrations dos Modules estão em dia; a mensagem nomeia o Module.
@@ -203,7 +227,7 @@ if (isMain && process.env?.NODE_ENV !== "test" && !process.env?.VITEST) {
     const app = platform.app;
     if (process.env.WEB_ROOT) serveWebApp(app, process.env.WEB_ROOT);
     const port = Number(process.env.PORT) || 3000;
-    console.log(`🚀 Plataforma Celestia Backend rodando em http://localhost:${port}`);
+    logger.info(`Plataforma Celestia Backend rodando em http://localhost:${port}`);
     serve({ fetch: app.fetch, port });
   })();
 }

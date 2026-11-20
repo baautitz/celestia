@@ -44,7 +44,7 @@ describe("EventBus", () => {
     const after = vi.fn();
     bus.after("save", after);
     await bus.run("save", { id: 1 }, () => "ok");
-    expect(after).toHaveBeenCalledWith({ id: 1, result: "ok" });
+    expect(after).toHaveBeenCalledWith({ id: 1, result: "ok" }, { signal: expect.any(AbortSignal) });
     after.mockClear();
     await expect(bus.run("save", { id: 1 }, () => { throw new Error("boom"); })).rejects.toThrow("boom");
     expect(after).not.toHaveBeenCalled();
@@ -103,5 +103,45 @@ describe("EventBus", () => {
     bus.before("save", (c) => { frozen = Object.isFrozen(c.payload); });
     await bus.emit("save", { id: 1 });
     expect(frozen).toBe(true);
+  });
+
+  it("sem onError, falhas vão ao logger injetado só com evento, módulo e mensagem (nunca o payload nem o erro bruto)", async () => {
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const bus = new EventBus<M>(undefined, logger);
+    bus.after("save", () => { throw Object.assign(new Error("falhou"), { params: ["Seg@1234"] }); }, { module: "m" });
+    await bus.run("save", { id: 99 }, () => 1);
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledWith('Falha em handler do evento "save" (módulo "m"): Error: falhou');
+  });
+
+  it("o after recebe o result tipado e um signal", async () => {
+    const { bus } = mk();
+    let seen: { result: number; signal: AbortSignal } | undefined;
+    bus.after("save", (p, ctx) => { seen = { result: (p as { result: number }).result, signal: ctx.signal }; });
+    await bus.run("save", { id: 1 }, () => 7);
+    expect(seen?.result).toBe(7);
+    expect(seen?.signal.aborted).toBe(false);
+  });
+
+  it("no timeout o signal do handler é abortado, mas o handler que o ignora segue rodando", async () => {
+    vi.useFakeTimers();
+    try {
+      const { bus } = mk();
+      let signal: AbortSignal | undefined;
+      let finished = false;
+      bus.before("save", (c) => {
+        signal = c.signal;
+        return new Promise<void>((res) => setTimeout(() => { finished = true; res(); }, 500));
+      }, { timeoutMs: 100 });
+      const p = bus.emit("save", { id: 1 });
+      await vi.advanceTimersByTimeAsync(100);
+      expect((await p).cancelled).toBe(true);
+      expect(signal?.aborted).toBe(true);
+      expect(finished).toBe(false);
+      await vi.advanceTimersByTimeAsync(400);
+      expect(finished).toBe(true); // o timeout não cancela um handler que ignora o sinal
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

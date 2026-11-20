@@ -23,6 +23,10 @@ describe("planMigrations", () => {
     ]);
     expect(p.map((x) => x.moduleId)).toEqual(["a", "b"]);
   });
+  it("recusa identificadores inválidos já no plano", () => {
+    expect(() => planMigrations([{ id: "a", migrations: { moduleId: "a;b", folder: "/x" } }])).toThrow(/inválido/);
+    expect(() => planMigrations([{ id: "a", migrations: { moduleId: "a", folder: "/x", schema: "Public" } }])).toThrow(/inválido/);
+  });
   it("ciclo e dependência desconhecida", () => {
     expect(() => planMigrations([{ id: "a", dependsOn: ["b"] }, { id: "b", dependsOn: ["a"] }])).toThrow(/circular/);
     expect(() => planMigrations([{ id: "a", dependsOn: ["z"] }])).toThrow(/não existe/);
@@ -39,6 +43,15 @@ function fakeDb(applied?: string[]): { db: MigrationsDb; calls: string[] } {
     if (s.includes("to_regclass")) return { rows: [{ r: applied ? "x" : null }] };
     return { rows: (applied ?? []).map((name) => ({ name })) };
   }) as typeof db.execute);
+  // A transação que segura o lock consultivo: o que ela executa entra no mesmo registro de chamadas.
+  vi.spyOn(db, "transaction").mockImplementation((async (work: (tx: { execute: typeof db.execute }) => Promise<unknown>) => {
+    calls.push("BEGIN");
+    try {
+      return await work({ execute: db.execute.bind(db) });
+    } finally {
+      calls.push("COMMIT");
+    }
+  }) as typeof db.transaction);
   return { db, calls };
 }
 
@@ -69,6 +82,40 @@ describe("runModuleMigrations (db falso)", () => {
       /"a".*20240101000000_init/,
     );
   });
+  it("segura o lock consultivo do módulo durante schema, consulta e migrate, e só então solta", async () => {
+    migrateMock.mockReset();
+    const dir = localMigrationsDir(["20240101000000_init"]);
+    const { db, calls } = fakeDb();
+    migrateMock.mockImplementation(async () => void calls.push("MIGRATE"));
+    await runModuleMigrations(db, [{ moduleId: "a", folder: dir }]);
+    const lock = calls.findIndex((c) => c.includes("pg_advisory_xact_lock"));
+    expect(calls[lock - 1]).toBe("BEGIN");
+    expect(calls.slice(lock + 1).filter((c) => c === "MIGRATE" || c === "COMMIT")).toEqual(["MIGRATE", "COMMIT"]);
+    expect(calls.findIndex((c) => c.startsWith("CREATE SCHEMA"))).toBeGreaterThan(lock);
+    expect(calls.findIndex((c) => c.includes("to_regclass"))).toBeGreaterThan(lock);
+  });
+
+  it("applied só traz o que este processo aplicou (o outro processo já tinha aplicado tudo)", async () => {
+    migrateMock.mockReset();
+    const dir = localMigrationsDir(["20240101000000_init"]);
+    const { db } = fakeDb(["20240101000000_init"]);
+    expect(await runModuleMigrations(db, [{ moduleId: "a", folder: dir }])).toEqual([{ moduleId: "a", applied: [] }]);
+  });
+
+  it("não aplica nada se o lock falhar", async () => {
+    migrateMock.mockReset();
+    const { db } = fakeDb();
+    vi.spyOn(db, "transaction").mockRejectedValue(new Error("sem conexão"));
+    await expect(runModuleMigrations(db, [{ moduleId: "a", folder: "/x" }])).rejects.toThrow("sem conexão");
+    expect(migrateMock).not.toHaveBeenCalled();
+  });
+
+  it("rejeita identificadores perigosos também no dry-run", async () => {
+    const { db, calls } = fakeDb();
+    await expect(runModuleMigrations(db, [{ moduleId: "a", folder: "/x", schema: "public; drop" }], { dryRun: true })).rejects.toThrow(/inválido/);
+    expect(calls).toEqual([]);
+  });
+
   it("rejeita identificadores perigosos antes de tocar o banco", async () => {
     const { db, calls } = fakeDb();
     await expect(runModuleMigrations(db, [{ moduleId: "a", folder: "/x", schema: "public; drop" }])).rejects.toThrow(
@@ -141,6 +188,38 @@ describe.skipIf(!process.env.POSTGRES_HOST || process.env.MIGRATIONS_TEST_DB !==
     } finally {
       await db.execute(sql`DROP SCHEMA IF EXISTS ${sql.identifier(id)} CASCADE`);
       await db.execute(sql`DROP TABLE IF EXISTS drizzle.${sql.identifier(`__migrations_${id}`)}`);
+    }
+  });
+
+  it("dois processos migrando ao mesmo tempo: um aplica, o outro espera e nada falha", async () => {
+    const real = await vi.importActual<typeof import("drizzle-orm/node-postgres/migrator")>(
+      "drizzle-orm/node-postgres/migrator",
+    );
+    migrateMock.mockImplementation(real.migrate);
+    if (!["127.0.0.1", "localhost", "::1"].includes(process.env.POSTGRES_HOST ?? "")) {
+      throw new Error(`Recusado: POSTGRES_HOST "${process.env.POSTGRES_HOST}" não é local.`);
+    }
+    const db = drizzle({
+      connection: {
+        host: process.env.POSTGRES_HOST,
+        port: Number(process.env.POSTGRES_PORT ?? 5432),
+        user: process.env.POSTGRES_USER,
+        password: process.env.POSTGRES_PASSWORD,
+        database: process.env.POSTGRES_DB,
+        max: 10,
+      },
+    });
+    const id = `t4c_${Date.now()}`;
+    const dir = mkdtempSync(join(tmpdir(), "mig-"));
+    mkdirSync(join(dir, "20240101000000_t"));
+    writeFileSync(join(dir, "20240101000000_t", "migration.sql"), `CREATE TABLE "${id}"."t" (id int)`);
+    const plan = [{ moduleId: id, folder: dir }];
+    try {
+      const runs = await Promise.all([runModuleMigrations(db, plan), runModuleMigrations(db, plan), runModuleMigrations(db, plan)]);
+      expect(runs.flatMap((r) => r[0]?.applied ?? [])).toEqual(["20240101000000_t"]);
+    } finally {
+      await db.execute(sql`DROP SCHEMA IF EXISTS ${sql.identifier(id)} CASCADE`);
+      await db.execute(sql`DROP TABLE IF EXISTS drizzle.${sql.identifier("__migrations_" + id)}`);
     }
   });
 });

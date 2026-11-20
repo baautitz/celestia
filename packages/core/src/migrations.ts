@@ -19,10 +19,17 @@ function ident(kind: string, v: string): string {
   return v;
 }
 
+/** Valida os identificadores do plano (módulo e schema), para o dry-run e o `run` recusarem o mesmo que o banco recusaria. */
+function validated(m: ModuleMigrations): ModuleMigrations {
+  ident("moduleId", m.moduleId);
+  ident("schema", m.schema ?? m.moduleId);
+  return m;
+}
+
 export function planMigrations(
   modules: { id: string; dependsOn?: string[]; migrations?: ModuleMigrations }[],
 ): ModuleMigrations[] {
-  return topoSort(modules).flatMap((m) => (m.migrations ? [m.migrations] : []));
+  return topoSort(modules).flatMap((m) => (m.migrations ? [validated(m.migrations)] : []));
 }
 
 function controlTable(m: ModuleMigrations): string {
@@ -44,7 +51,20 @@ async function pending(db: MigrationsDb, m: ModuleMigrations): Promise<string[]>
   return local.filter((n) => !names.has(n));
 }
 
-/** `applied` = migrations aplicadas nesta execução (com dryRun: as pendentes, nada é aplicado). */
+/**
+ * Roda `work` com um lock consultivo (por módulo) do Postgres, para que `db:migrate`, o boot do servidor e o `start.sh`
+ * da CA não apliquem as mesmas migrations ao mesmo tempo. O lock é de transação (`pg_advisory_xact_lock`): fica numa
+ * única conexão, é solto no commit/rollback e também se a conexão cair, sem risco de lock órfão.
+ * Quem espera o lock só consulta as pendentes depois de obtê-lo, então enxerga o que o outro processo já aplicou.
+ */
+function withMigrationLock<T>(db: MigrationsDb, moduleId: string, work: () => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`celestia:migrations:${moduleId}`}))`);
+    return work();
+  });
+}
+
+/** `applied` = migrations que ESTE processo aplicou (com dryRun: as pendentes, nada é aplicado). */
 export async function runModuleMigrations(
   db: MigrationsDb,
   plan: ModuleMigrations[],
@@ -52,20 +72,23 @@ export async function runModuleMigrations(
 ): Promise<MigrationResult[]> {
   const results: MigrationResult[] = [];
   for (const m of plan) {
-    const schema = ident("schema", m.schema ?? m.moduleId);
+    const schema = ident("schema", validated(m).schema ?? m.moduleId);
     const table = controlTable(m);
     if (options.dryRun) {
       results.push({ moduleId: m.moduleId, applied: await pending(db, m) });
       continue;
     }
-    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.identifier(schema)}`);
-    const before = await pending(db, m);
-    await migrate(db, {
-      migrationsFolder: m.folder,
-      migrationsTable: table,
-      migrationsSchema: CONTROL_SCHEMA,
+    const applied = await withMigrationLock(db, m.moduleId, async () => {
+      await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.identifier(schema)}`);
+      const before = await pending(db, m);
+      await migrate(db, {
+        migrationsFolder: m.folder,
+        migrationsTable: table,
+        migrationsSchema: CONTROL_SCHEMA,
+      });
+      return before;
     });
-    results.push({ moduleId: m.moduleId, applied: before });
+    results.push({ moduleId: m.moduleId, applied });
   }
   return results;
 }
