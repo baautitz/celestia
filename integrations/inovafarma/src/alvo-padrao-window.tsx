@@ -12,6 +12,7 @@ import { AlvoInput, rotuloAlvo } from "./alvo-input";
 import { formatarValor, type Indicador } from "./indicadores";
 import { indicadorDoTipo } from "./tipos-meta";
 import { BASE, type TipoMetaComPremio } from "./tipo-meta-window";
+import { API, json } from "./inovafarma-api";
 
 interface Participante {
   codigoColaborador: number;
@@ -148,7 +149,6 @@ function EscolhaDeParticipantes({ indicador, periodos, valorFixo, aplicar, vazio
   );
 }
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
 
 /** Janela "Alterar o Alvo padrão": escolhe em quais Períodos abertos e para quais Participantes o novo Alvo padrão vale. */
 export function AlvoPadraoWindow({ tipo }: { tipo: TipoMetaComPremio }) {
@@ -177,7 +177,7 @@ export function AlvoPadraoWindow({ tipo }: { tipo: TipoMetaComPremio }) {
       }}
       aplicar={async (marcados) => {
         const aplicacoes = periodos.filter((p) => (marcados[p.id] ?? []).length > 0).map((p) => ({ metaId: p.metaId, version: p.version, codigos: marcados[p.id] }));
-        await apiFetch(`${BASE}/${tipo.id}/aplicar-alvo-padrao`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ aplicacoes }) });
+        await apiFetch(`${BASE}/${tipo.id}/aplicar-alvo-padrao`, json("POST", { aplicacoes }));
         feedback.notify({ type: "success", title: avaliacoes ? "Valor inicial aplicado." : "Alvo padrão aplicado." });
       }}
     />
@@ -194,11 +194,7 @@ export function DefinirAlvoWindow({ indicador, meta }: { indicador: Indicador; m
       periodos={[meta]}
       vazio={{ titulo: "Nenhum Participante", texto: "Marque os Colaboradores que participam da Meta antes de definir o valor." }}
       aplicar={async (marcados, alvo) => {
-        await apiFetch(`/api/m/inovafarma/metas/${meta.metaId}/definir-alvo`, {
-          method: "POST",
-          headers: JSON_HEADERS,
-          body: JSON.stringify({ version: meta.version, codigos: marcados[meta.id] ?? [], alvo }),
-        });
+        await apiFetch(`${API}/metas/${meta.metaId}/definir-alvo`, json("POST", { version: meta.version, codigos: marcados[meta.id] ?? [], alvo }));
         feedback.notify({ type: "success", title: avaliacoes ? "Valor inicial definido." : "Alvo definido." });
       }}
     />

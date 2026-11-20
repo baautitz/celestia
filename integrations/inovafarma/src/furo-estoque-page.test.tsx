@@ -41,9 +41,19 @@ afterEach(cleanup);
 const renderizar = () => render(<UiProvider><FuroEstoquePage /></UiProvider>, { wrapper: MemoryRouter });
 
 describe("Furo de Estoque", () => {
+  it("mostra o erro do contexto e carrega ao tentar novamente", async () => {
+    apiFetch.mockRejectedValueOnce(new Error("Servidor fora do ar"));
+    renderizar();
+    expect(await screen.findByText("Servidor fora do ar")).toBeDefined();
+    expect(screen.getByText("Não foi possível carregar o Furo de Estoque")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByLabelText("Justificar Ajuste 100")).toBeDefined();
+    expect(screen.queryByText("Servidor fora do ar")).toBeNull();
+  });
+
   it("abre no Furo e soma só as saídas sem justificativa", async () => {
     renderizar();
-    expect(await screen.findByRole("button", { name: "Justificar Ajuste 100" }, { timeout: 5000 })).toBeTruthy();
+    await screen.findByLabelText("Justificar Ajuste 100");
     expect(screen.queryByRole("cell", { name: "200" })).toBeNull();
     expect(screen.queryByText(/OBS 100/)).toBeNull();
     expect(screen.getAllByText(/50,50/).length).toBeGreaterThan(0);
@@ -52,62 +62,65 @@ describe("Furo de Estoque", () => {
   it("uma entrada sem justificativa não abate o Furo e tem card próprio", async () => {
     ajustes = [ajuste(100, -500, null), ajuste(300, 500, null)];
     renderizar();
-    const furo = await screen.findByRole("button", { name: "Furo" }, { timeout: 5000 });
+    await screen.findByLabelText("Justificar Ajuste 100");
+    const furo = screen.getByRole("button", { name: "Furo" });
     // Os cards aparecem antes dos Ajustes chegarem: espera os valores, em vez de lê-los na hora.
-    expect(await within(defined(furo.parentElement, "the card of Furo")).findByText("R$ 500,00")).toBeTruthy();
-    expect(within(defined(screen.getByRole("button", { name: "Entradas não justificadas" }).parentElement, "the card of Entradas n\u00e3o justificadas")).getByText("R$ 500,00")).toBeTruthy();
+    await within(defined(furo.parentElement, "the card of Furo")).findByText("R$ 500,00");
+    within(defined(screen.getByRole("button", { name: "Entradas não justificadas" }).parentElement, "the card of Entradas n\u00e3o justificadas")).getByText("R$ 500,00");
     expect(screen.queryByRole("button", { name: "Justificar Ajuste 300" })).toBeNull();
   });
 
   it("o card escolhido filtra a tabela e clicar de novo mostra todos", async () => {
     ajustes = [ajuste(100, -50.5, null), ajuste(200, -9, justificado), ajuste(300, 20, null)];
     renderizar();
-    const furo = await screen.findByRole("button", { name: "Furo" }, { timeout: 5000 });
+    await screen.findByLabelText("Justificar Ajuste 100");
+    const furo = screen.getByRole("button", { name: "Furo" });
     expect(furo.getAttribute("aria-pressed")).toBe("true");
     const justificados = screen.getByRole("button", { name: "Justificados" });
     // Os cards aparecem antes dos Ajustes chegarem: espera os valores, em vez de lê-los na hora.
-    expect(await within(defined(justificados.parentElement, "the card of Justificados")).findByText("R$ 9,00")).toBeTruthy();
-    expect(within(defined(justificados.parentElement, "the card of Justificados")).getByText("1 de 3 ajustes (33%)")).toBeTruthy();
+    await within(defined(justificados.parentElement, "the card of Justificados")).findByText("R$ 9,00");
+    within(defined(justificados.parentElement, "the card of Justificados")).getByText("1 de 3 ajustes (33%)");
 
     fireEvent.click(justificados);
-    expect(await screen.findByRole("button", { name: "Alterar Justificativa do Ajuste 200" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Justificar Ajuste 100" })).toBeNull();
+    await screen.findByLabelText("Alterar Justificativa do Ajuste 200");
+    expect(screen.queryByLabelText("Justificar Ajuste 100")).toBeNull();
 
     fireEvent.click(justificados);
-    expect(await screen.findByRole("button", { name: "Justificar Ajuste 300" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Justificar Ajuste 100" })).toBeTruthy();
+    await screen.findByLabelText("Justificar Ajuste 300");
+    screen.getByLabelText("Justificar Ajuste 100");
   });
 
   it("o Ajuste justificado mostra um olho que abre a Justificativa", async () => {
     ajustes = [ajuste(200, -9, { ...justificado, observacao: "Quebrou na prateleira" })];
     renderizar();
-    fireEvent.click(await screen.findByRole("button", { name: "Justificados" }, { timeout: 5000 }));
-    fireEvent.click(await screen.findByRole("button", { name: "Ver Justificativa do Ajuste 200" }));
+    await screen.findByText("Justificados");
+    fireEvent.click(screen.getByRole("button", { name: "Justificados" }));
+    fireEvent.click(await screen.findByLabelText("Ver Justificativa do Ajuste 200"));
     const janela = await screen.findByRole("dialog");
-    expect(within(janela).getByText("Vencido")).toBeTruthy();
-    expect(within(janela).getByText("Quebrou na prateleira")).toBeTruthy();
-    expect(within(janela).getByText("gil")).toBeTruthy();
+    within(janela).getByText("Vencido");
+    within(janela).getByText("Quebrou na prateleira");
+    within(janela).getByText("gil");
   });
 
   it("a busca encontra o Ajuste pelo produto, por nome ou código de barras", async () => {
     const item = { produtoId: "p1", nome: "DIPIRONA 500MG", codigoBarra: "7891234567890", quantidade: 1, precoCusto: 9, totalCusto: 9 };
     ajustes = [{ ...ajuste(100, -9, null), itens: [item] }, ajuste(300, -5, null)];
     renderizar();
-    expect(await screen.findByRole("button", { name: "Justificar Ajuste 300" }, { timeout: 5000 })).toBeTruthy();
+    await screen.findByLabelText("Justificar Ajuste 300");
     const busca = screen.getByPlaceholderText("Buscar Ajuste, Colaborador, Motivo ou produto");
 
     fireEvent.change(busca, { target: { value: "dipirona" } });
-    expect(await screen.findByRole("button", { name: "Justificar Ajuste 100" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Justificar Ajuste 300" })).toBeNull();
+    await screen.findByLabelText("Justificar Ajuste 100");
+    expect(screen.queryByLabelText("Justificar Ajuste 300")).toBeNull();
 
     fireEvent.change(busca, { target: { value: "7891234567890" } });
-    expect(await screen.findByRole("button", { name: "Justificar Ajuste 100" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Justificar Ajuste 300" })).toBeNull();
+    await screen.findByLabelText("Justificar Ajuste 100");
+    expect(screen.queryByLabelText("Justificar Ajuste 300")).toBeNull();
   });
 
   it("só mostra a aba Motivos com a Permission geral", async () => {
     contexto = { ...contexto, podeGerenciarMotivos: true };
     renderizar();
-    expect(await screen.findByRole("tab", { name: "Motivos" })).toBeTruthy();
+    await screen.findByRole("tab", { name: "Motivos" });
   });
 });

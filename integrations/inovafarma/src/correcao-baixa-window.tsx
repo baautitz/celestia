@@ -9,8 +9,9 @@ import { Textarea } from "@platform/ui/components/textarea";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
+import { API } from "./inovafarma-api";
 
-const BASE = "/api/m/inovafarma/pre-vencidos";
+const BASE = `${API}/pre-vencidos`;
 
 /** Correção de Baixa como a API devolve. */
 export interface CorrecaoDaBaixa {

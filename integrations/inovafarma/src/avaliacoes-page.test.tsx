@@ -61,6 +61,16 @@ describe("Avaliações", () => {
     expect(screen.queryByRole("tab", { name: "Avaliações da Loja" })).toBeNull();
   });
 
+  it("mostra o erro do contexto e carrega ao tentar novamente", async () => {
+    apiFetch.mockRejectedValueOnce(new Error("Servidor fora do ar"));
+    renderizar();
+    expect(await screen.findByText("Servidor fora do ar")).toBeDefined();
+    expect(screen.getByText("Não foi possível carregar as Avaliações")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByRole("tab", { name: "Minhas Avaliações" })).toBeDefined();
+    expect(screen.queryByText("Servidor fora do ar")).toBeNull();
+  });
+
   it("o Colaborador vê as suas Avaliações com o total descontado", async () => {
     avaliacoes = [avaliacao(), avaliacao({ id: "av_2", valor: 7.5, descricao: "Uniforme" })];
     renderizar();

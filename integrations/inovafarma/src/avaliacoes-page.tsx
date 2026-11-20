@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Trash2, MoreHorizontal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Button } from "@platform/ui/components/button";
@@ -12,19 +12,14 @@ import { HeaderActions } from "@platform/ui/context/header-actions";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import { formatDate } from "@platform/ui/lib/format";
 import { AvaliacaoWindow, type Avaliacao, type LojaOpcao } from "./avaliacao-window";
+import { API } from "./inovafarma-api";
+import { type Periodo, periodoInicial, periodoLabel } from "./periodos";
+import { useLatestFetch } from "./use-latest-fetch";
+import { FalhaAoCarregar, useContexto } from "./contexto";
 
-const BASE = "/api/m/inovafarma/avaliacoes";
+const BASE = `${API}/avaliacoes`;
 const TODAS = "todas";
-
-interface Periodo {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status?: "open" | "closed";
-}
 
 interface Contexto {
   podeVer: boolean;
@@ -45,8 +40,6 @@ interface LinhaColaborador {
   avaliacoes: Avaliacao[];
 }
 
-const periodoLabel = (p: Periodo) => `${p.name} (${formatDate(p.startDate)} a ${formatDate(p.endDate)})${p.status === "closed" ? " · fechado" : ""}`;
-const periodoInicial = (periodos: Periodo[]) => (periodos.find((p) => p.status !== "closed") ?? periodos[0])?.id ?? "";
 const somar = (avaliacoes: Avaliacao[]) => avaliacoes.reduce((total, a) => total + a.valor, 0);
 
 function SeletorPeriodo({ periodos, valor, onChange }: { periodos: Periodo[]; valor: string; onChange: (id: string) => void }) {
@@ -74,20 +67,20 @@ function useAvaliacoes(url: string | null) {
   const { feedback } = useUi();
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const consulta = useRef(0);
+  const novaConsulta = useLatestFetch();
   const carregar = useCallback(async () => {
     if (!url) return;
-    const minha = ++consulta.current;
+    const vale = novaConsulta();
     setCarregando(true);
     try {
       const recebidas = await apiFetch<Avaliacao[]>(url);
-      if (minha === consulta.current) setAvaliacoes(recebidas);
+      if (vale()) setAvaliacoes(recebidas);
     } catch (err: unknown) {
-      if (minha === consulta.current) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar as Avaliações."));
+      if (vale()) feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar as Avaliações."));
     } finally {
-      if (minha === consulta.current) setCarregando(false);
+      if (vale()) setCarregando(false);
     }
-  }, [url, feedback]);
+  }, [url, feedback, novaConsulta]);
   useEffect(() => {
     void carregar();
   }, [carregar]);
@@ -310,17 +303,11 @@ function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
 
 /** Tela Avaliações: o Colaborador vê as que recebeu; o gestor lança e gerencia as da sua Loja. */
 export function AvaliacoesPage() {
-  const { feedback } = useUi();
-  const [contexto, setContexto] = useState<Contexto | null>(null);
+  const { contexto, falha, carregar } = useContexto<Contexto>(`${BASE}/contexto`, "Erro ao carregar as Avaliações.");
   const [aba, setAba] = useTabParam<"minhas" | "loja">(contexto ? [contexto.podeVer && "minhas", contexto.podeGerenciar && "loja"] : []);
 
-  useEffect(() => {
-    apiFetch<Contexto>(`${BASE}/contexto`)
-      .then(setContexto)
-      .catch((err: unknown) => feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar as Avaliações.")));
-  }, [feedback]);
-
-  if (!contexto || !aba) return null;
+  if (!contexto) return falha ? <FalhaAoCarregar titulo="Não foi possível carregar as Avaliações" descricao={falha} onTentarNovamente={carregar} /> : null;
+  if (!aba) return null;
   return (
     <Stack gap="section">
       <Tabs value={aba} onValueChange={setAba}>

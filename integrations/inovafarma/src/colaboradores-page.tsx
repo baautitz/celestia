@@ -23,6 +23,7 @@ import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useWebService } from "@platform/ui/contracts/web-services";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch, ApiError } from "@platform/ui/lib/api";
+import { API } from "./inovafarma-api";
 
 interface UsuarioOpcao {
   id: string;
@@ -204,7 +205,7 @@ export function ColaboradoresPage() {
 
   const buscar = useCallback(async () => {
     try {
-      const data = await apiFetch<ListaColaboradores>("/api/m/inovafarma/colaboradores");
+      const data = await apiFetch<ListaColaboradores>(`${API}/colaboradores`);
       setColaboradores(data.colaboradores);
       setUsuarios(data.usuarios);
       setPodeCriarUsuario(data.podeCriarUsuario);
@@ -239,7 +240,7 @@ export function ColaboradoresPage() {
       const codigo = row.codigoColaborador;
       setSalvando((atual) => new Set(atual).add(codigo));
       try {
-        const salvo = await apiFetch<CamposVinculo>(`/api/m/inovafarma/colaboradores/${codigo}/vinculo`, {
+        const salvo = await apiFetch<CamposVinculo>(`${API}/colaboradores/${codigo}/vinculo`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ usuarioId: rascunho.usuarioId, lojas: rascunho.lojas, version: rascunho.version }),

@@ -11,6 +11,7 @@ import { regraDoParticipante } from "./apuracao";
 import { porcentagem, reais } from "./indicadores";
 import type { ParticipanteMeta } from "./metas-store";
 import { descreverPremio, type RegraPremio, type TipoMeta } from "./tipos-meta";
+import { API } from "./inovafarma-api";
 
 /** O Prêmio em poucas palavras, para a coluna dos Participantes. */
 export function resumoPremio(regra: RegraPremio): string {
@@ -71,7 +72,7 @@ export function PremioParticipanteWindow<M extends MetaDoPremio>({ meta, partici
     setEnviando(true);
     try {
       resolve(
-        await apiFetch<M>(`/api/m/inovafarma/metas/${meta.id}/participantes/${participante.codigoColaborador}/premio`, {
+        await apiFetch<M>(`${API}/metas/${meta.id}/participantes/${participante.codigoColaborador}/premio`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ version: meta.version, premio }),

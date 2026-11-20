@@ -11,8 +11,9 @@ import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
 import { MIN_BUSCA_LISTA, TIPOS_ENTRADA, TIPO_ENTRADA_LABEL, ordenarEntradas, type EntradaLista, type TipoEntrada } from "./tipos-meta";
+import { API } from "./inovafarma-api";
 
-const BASE_LISTA = "/api/m/inovafarma/tipos-meta/lista";
+const BASE_LISTA = `${API}/tipos-meta/lista`;
 const ESPERA_BUSCA_MS = 300;
 
 const NENHUM: Record<TipoEntrada, string> = {

@@ -14,8 +14,9 @@ import { Textarea } from "@platform/ui/components/textarea";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
+import { API } from "./inovafarma-api";
 
-const BASE = "/api/m/inovafarma/avaliacoes";
+const BASE = `${API}/avaliacoes`;
 export const MAX_DESCRICAO = 500;
 
 export interface Avaliacao {
