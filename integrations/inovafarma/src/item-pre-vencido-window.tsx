@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@platform/ui/components/button";
@@ -6,7 +7,10 @@ import { DatePicker } from "@platform/ui/components/date-picker";
 import { FieldGroup } from "@platform/ui/components/field";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@platform/ui/components/form";
 import { Input } from "@platform/ui/components/input";
+import { Label } from "@platform/ui/components/label";
+import { Stack } from "@platform/ui/components/layout";
 import { MonthPicker } from "@platform/ui/components/month-picker";
+import { Switch } from "@platform/ui/components/switch";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
@@ -27,14 +31,14 @@ export interface ItemPreVencido {
   quantidade: number;
   /** O que sobra do Item depois das Baixas. */
   restante: number;
-  incluidoEm: string;
+  abrangenciaEm: string;
   version: number;
 }
 
 /** O que a gravação devolve: a edição vem sem o Restante, que depende das vendas do ERP. */
 export type ItemSalvo = Omit<ItemPreVencido, "restante"> & { restante?: number };
 
-/** Limites da data de inclusão retroativa, calculados pelo servidor na hora do ERP (`AAAA-MM-DD`). */
+/** Limites da data de abrangência retroativa, calculados pelo servidor na hora do ERP (`AAAA-MM-DD`). */
 export interface InclusaoRetroativa {
   /** Início do Closing Period aberto: a data não vai antes dele. */
   inicio: string;
@@ -51,13 +55,13 @@ const esquema = (retroativa: InclusaoRetroativa | undefined) =>
       produtoId: z.string().min(1, "Busque e selecione o produto."),
       quantidade: z.string().regex(/^[1-9]\d{0,6}$/, "Informe uma quantidade inteira maior que zero."),
       validade: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe a validade (mês e ano)."),
-      incluidoEm: z.date().optional(),
+      abrangenciaEm: z.date().optional(),
     })
-    .superRefine(({ incluidoEm }, ctx) => {
-      if (!incluidoEm || !retroativa) return;
-      const dia = diaLocal(incluidoEm);
-      if (dia > retroativa.hoje) ctx.addIssue({ code: "custom", path: ["incluidoEm"], message: "A data de inclusão não pode ser no futuro." });
-      else if (dia < retroativa.inicio) ctx.addIssue({ code: "custom", path: ["incluidoEm"], message: `A data de inclusão não pode ser antes do início do Período aberto (${dataBr(retroativa.inicio)}).` });
+    .superRefine(({ abrangenciaEm }, ctx) => {
+      if (!abrangenciaEm || !retroativa) return;
+      const dia = diaLocal(abrangenciaEm);
+      if (dia > retroativa.hoje) ctx.addIssue({ code: "custom", path: ["abrangenciaEm"], message: "A data de abrangência não pode ser no futuro." });
+      else if (dia < retroativa.inicio) ctx.addIssue({ code: "custom", path: ["abrangenciaEm"], message: `A data de abrangência não pode ser antes do início do Período aberto (${dataBr(retroativa.inicio)}).` });
     });
 type Valores = z.infer<ReturnType<typeof esquema>>;
 
@@ -66,17 +70,22 @@ interface Props {
   /** Presente na edição: só quantidade e validade mudam. */
   item?: ItemPreVencido;
   /**
-   * Só para quem gere as Baixas: a data de inclusão pode retroagir até o início do Período aberto. Na edição, só se o
+   * Só para quem gere as Baixas: a data de abrangência pode retroagir até o início do Período aberto. Na edição, só se o
    * Item foi incluído a partir dele (o incluído antes já entrou num Período fechado).
    */
   retroativa?: InclusaoRetroativa;
+  /** Chamado a cada Item salvo com "Adicionar mais" ligado, em que a janela segue aberta para o próximo. */
+  onSalvo?: (salvo: ItemSalvo) => void;
 }
 
 /** Janela de Item de Pré-vencido (incluir ou editar) no Estoque de uma Loja; resolve com o Item salvo. */
-export function ItemPreVencidoWindow({ codigoLoja, item, retroativa }: Props) {
+export function ItemPreVencidoWindow({ codigoLoja, item, retroativa, onSalvo }: Props) {
   const { resolve } = useWindow<ItemSalvo>();
   const { feedback } = useUi();
-  const diaIncluido = item ? diaLocal(new Date(item.incluidoEm)) : undefined;
+  const [adicionarMais, setAdicionarMais] = useState(false);
+  // Muda a cada Item salvo com "Adicionar mais": remonta a busca de produto, que guarda a escolha por dentro.
+  const [rodada, setRodada] = useState(0);
+  const diaIncluido = item ? diaLocal(new Date(item.abrangenciaEm)) : undefined;
   const comData = retroativa !== undefined && (diaIncluido === undefined || diaIncluido >= retroativa.inicio);
   const form = useForm<Valores>({
     resolver: zodResolver(esquema(retroativa)),
@@ -84,14 +93,14 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroativa }: Props) {
       produtoId: item?.produtoId ?? "",
       quantidade: item ? String(item.quantidade) : "",
       validade: item?.validade ?? "",
-      incluidoEm: comData && item ? new Date(item.incluidoEm) : undefined,
+      abrangenciaEm: comData && item ? new Date(item.abrangenciaEm) : undefined,
     },
   });
 
   const onSubmit = async (valores: Valores) => {
     // Só vai a data que mudou: sem ela, a inclusão fica agora (ou como estava, na edição).
-    const dia = comData && valores.incluidoEm ? diaLocal(valores.incluidoEm) : undefined;
-    const corpo = { quantidade: Number(valores.quantidade), validade: valores.validade, ...(dia && dia !== diaIncluido ? { incluidoEm: dia } : {}) };
+    const dia = comData && valores.abrangenciaEm ? diaLocal(valores.abrangenciaEm) : undefined;
+    const corpo = { quantidade: Number(valores.quantidade), validade: valores.validade, ...(dia && dia !== diaIncluido ? { abrangenciaEm: dia } : {}) };
     try {
       const salvo = item
         ? await apiFetch<ItemSalvo>(`${BASE}/estoque/itens/${item.id}`, {
@@ -105,6 +114,12 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroativa }: Props) {
             body: JSON.stringify({ codigoLoja, produtoId: valores.produtoId, ...corpo }),
           });
       feedback.notify({ type: "success", title: item ? "Item alterado." : "Item incluído." });
+      if (!item && adicionarMais) {
+        onSalvo?.(salvo);
+        form.reset({ produtoId: "", quantidade: "", validade: valores.validade, abrangenciaEm: valores.abrangenciaEm });
+        setRodada((r) => r + 1);
+        return;
+      }
       resolve(salvo);
     } catch (err: unknown) {
       feedback.notifyError(err instanceof Error ? err : new Error("Erro ao salvar o Item."));
@@ -124,6 +139,7 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroativa }: Props) {
                 render={() => (
                   <FormItem>
                     <ProdutoBusca
+                      key={rodada}
                       id="item-pre-vencido-busca"
                       url={`${BASE}/produtos`}
                       onChange={(p) => form.setValue("produtoId", p?.id ?? "", { shouldValidate: form.formState.isSubmitted })}
@@ -162,10 +178,10 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroativa }: Props) {
             {comData && (
               <FormField
                 control={form.control}
-                name="incluidoEm"
+                name="abrangenciaEm"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Data de inclusão</FormLabel>
+                    <FormLabel>Data de abrangência</FormLabel>
                     <FormControl>
                       <DatePicker value={field.value} onChange={field.onChange} />
                     </FormControl>
@@ -181,6 +197,12 @@ export function ItemPreVencidoWindow({ codigoLoja, item, retroativa }: Props) {
         </form>
       </Form>
       <WindowActions>
+        {!item && (
+          <Stack direction="row" align="center" gap="field">
+            <Switch id="item-pre-vencido-adicionar-mais" checked={adicionarMais} onCheckedChange={(on: boolean) => setAdicionarMais(on)} />
+            <Label htmlFor="item-pre-vencido-adicionar-mais">Adicionar mais</Label>
+          </Stack>
+        )}
         <WindowCancelButton />
         <Button type="submit" form="item-pre-vencido-form" disabled={form.formState.isSubmitting}>
           {item ? "Salvar" : "Incluir"}
