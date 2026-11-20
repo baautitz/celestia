@@ -3,11 +3,6 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.18.2",
-  "workspaces": [
-    "integrations/*",
-    "packages/*",
-    "services/*"
-  ],
   "scripts": {
     "build": "pnpm -r run build",
     "test": "vitest run",
@@ -30,18 +25,10 @@
     "check": "pnpm check:ui && pnpm check:ui:test && pnpm check:plugins && pnpm lint && pnpm build && pnpm test",
     "prepare": "node scripts/setup-git-hooks.mjs"
   },
-  "dependencies": {
-    "@hono/node-server": "^2.0.0",
-    "@hono/zod-validator": "^0.9.1",
-    "esbuild": "^0.28.0",
-    "hono": "^4.13.19",
-    "pino": "^10.0.0",
-    "zod": "^4.6.7"
-  },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
-    "@testing-library/dom": "10.4.2",
-    "@testing-library/react": "16.3.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^26.0.0",
     "jsdom": "^31.0.0",
     "oxc-parser": "^0.159.0",
