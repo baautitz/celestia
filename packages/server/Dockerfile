@@ -16,7 +16,7 @@ RUN cd packages/server/src && find . -type d -name migrations -exec cp -r --pare
 # Source maps e declaration maps nao vao para a imagem de producao.
 RUN find packages/server/dist packages/web/dist -name '*.map' -delete
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-  pnpm --filter @platform/server deploy --legacy --prod /deploy --store-dir $PNPM_STORE_DIR
+  pnpm --filter @platform/server deploy --prod /deploy --store-dir $PNPM_STORE_DIR
 
 FROM node:24-slim
 ENV NODE_ENV=production WEB_ROOT=./public PORT=3000

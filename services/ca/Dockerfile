@@ -16,7 +16,7 @@ RUN cp -r services/ca/src/migrations services/ca/dist/migrations
 # Source maps e declaration maps nao vao para a imagem de producao.
 RUN find services/ca/dist -name '*.map' -delete
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-  pnpm --filter @platform/ca deploy --legacy --prod /deploy --store-dir $PNPM_STORE_DIR
+  pnpm --filter @platform/ca deploy --prod /deploy --store-dir $PNPM_STORE_DIR
 
 FROM node:24-slim
 ENV NODE_ENV=production CA_PORT=3001 CA_CERT_SOURCE=header \

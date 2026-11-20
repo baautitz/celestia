@@ -4,11 +4,15 @@ packages:
   - services/*
 
 # esbuild (via tsx, drizzle-kit) is the only dependency whose install script is needed (it validates/links the platform binary).
-onlyBuiltDependencies:
-  - esbuild
+allowBuilds:
+  esbuild: true
 
 # drizzle-orm declara peer mssql ^11, mas o ERP usa o driver mssql 12 diretamente (sem passar pelo drizzle).
 peerDependencyRules:
   allowedVersions:
     mssql: "*"
     "@types/mssql": "*"
+
+permissions:
+  drizzle-kit:
+    skills: true
