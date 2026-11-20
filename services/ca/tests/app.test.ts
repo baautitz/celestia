@@ -64,7 +64,10 @@ describe("Dispositivos", () => {
 
   it("valida o nome", async () => {
     const { call } = setup();
-    expect((await call("/devices", { name: "  " })).status).toBe(400);
+    const res = await call("/devices", { name: "  " });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { issues: { path: unknown[]; message: string }[] } };
+    expect(body.error.issues[0]?.path).toEqual(["name"]);
   });
 
   it("lista, consulta e revoga de forma definitiva e idempotente", async () => {
