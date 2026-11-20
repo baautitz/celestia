@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { HeaderActionsProvider, useHeaderActions } from "@/context/HeaderActionsContext";
 import { IAMDevicesPage } from "./IAMDevicesPage";
+import { defined } from "@/test/defined";
 
 const api = vi.hoisted(() => ({
   iam: { listDevices: vi.fn(), issueDevice: vi.fn(), revokeDevice: vi.fn(), deleteDevice: vi.fn() },
@@ -139,7 +140,7 @@ describe("IAMDevicesPage", () => {
     renderPage();
     const botoes = await screen.findAllByRole("button", { name: "Excluir Dispositivo" });
     expect(botoes).toHaveLength(1);
-    fireEvent.click(botoes[0]!);
+    fireEvent.click(defined(botoes[0], "the delete button"));
     await screen.findByText(/Excluir o Dispositivo revogado "Celular antigo"\?/);
     fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
     await waitFor(() => expect(api.iam.deleteDevice).toHaveBeenCalledWith("d2"));
