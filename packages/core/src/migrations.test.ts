@@ -219,7 +219,7 @@ describe.skipIf(!process.env.POSTGRES_HOST || process.env.MIGRATIONS_TEST_DB !==
       expect(runs.flatMap((r) => r[0]?.applied ?? [])).toEqual(["20240101000000_t"]);
     } finally {
       await db.execute(sql`DROP SCHEMA IF EXISTS ${sql.identifier(id)} CASCADE`);
-      await db.execute(sql`DROP TABLE IF EXISTS drizzle.${sql.identifier("__migrations_" + id)}`);
+      await db.execute(sql`DROP TABLE IF EXISTS drizzle.${sql.identifier(`__migrations_${id}`)}`);
     }
   });
 });

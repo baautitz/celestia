@@ -9,9 +9,9 @@ import type { ErpClientRegistry } from "../src/erp/erp-client.js";
 import { MemoryErpStore } from "../src/erp/erp-store.js";
 import { assertReadOnlyQuery } from "../src/erp/read-only-guard.js";
 import { decryptSecret } from "../src/erp/secret-box.js";
+import { defined } from "./helpers/defined.js";
 import type { ErpClient } from "../src/erp/erp-client.js";
 import { createSeededUserStore, TEST_PASSWORD } from "./helpers/fixtures.js";
-import { defined } from "./helpers/defined.js";
 
 describe("assertReadOnlyQuery", () => {
   it("aceita SELECT e WITH, inclusive com comentários e literais", () => {
@@ -205,7 +205,7 @@ describe("ERPs (/api/admin/erps)", () => {
     expect(entries.map((e) => e.attributes).filter((a) => "created" in a).map((a) => a.created).sort()).toEqual([false, true]);
     expect(entries.every((e) => e.targetType === "erp" && e.targetId === "inovafarma" && e.actorName)).toBe(true);
     expect(JSON.stringify(entries)).not.toMatch(/Seg@1234|password|"host"|"db"|ro"/);
-    expect(entries.find((e) => e.action === "test")!.attributes).toMatchObject({ ok: true });
+    expect(defined(entries.find((e) => e.action === "test"), "the test audit entry").attributes).toMatchObject({ ok: true });
   });
 
   it("não grava nada no Audit Log quando a requisição é recusada", async () => {
@@ -248,7 +248,7 @@ describe("ERPs (/api/admin/erps)", () => {
 
     const badId = await send("PUT", "/api/admin/erps/Inova-Farma", token, body);
     expect(badId.status).toBe(400);
-    expect((await issues(badId))[0]!.path).toEqual(["id"]);
+    expect(defined((await issues(badId))[0], "the id issue").path).toEqual(["id"]);
 
     const badDriver = await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, driver: "oracle" });
     expect(badDriver.status).toBe(400);
@@ -264,7 +264,7 @@ describe("ERPs (/api/admin/erps)", () => {
     expect((await issues(wrongType)).map((i) => i.path.join(".")).sort()).toEqual(["values.host", "values.trustServerCertificate"]);
 
     const range = await send("PUT", "/api/admin/erps/inovafarma", token, { ...body, values: { ...values, port: 99999 } });
-    expect((await issues(range))[0]!.path).toEqual(["values", "port"]);
+    expect(defined((await issues(range))[0], "the port issue").path).toEqual(["values", "port"]);
   });
 });
 
