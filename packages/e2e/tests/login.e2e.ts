@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { ADMIN_PASSWORD, ADMIN_USERNAME } from "./credentials";
+import { ADMIN_PASSWORD, ADMIN_USERNAME } from "./credentials.ts";
 
 test.describe("login", () => {
   test("rejeita senha incorreta e permanece na tela de login", async ({ page }) => {

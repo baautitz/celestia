@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginAsAdmin, openMenu } from "./helpers";
+import { loginAsAdmin, openMenu } from "./helpers.ts";
 
 test("cadastra um ERP e o exclui", async ({ page }) => {
   await loginAsAdmin(page);

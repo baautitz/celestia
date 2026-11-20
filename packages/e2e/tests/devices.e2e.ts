@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginAsAdmin, openMenu } from "./helpers";
+import { loginAsAdmin, openMenu } from "./helpers.ts";
 
 test("emite um Dispositivo, mostra a senha do certificado e o revoga", async ({ page }) => {
   const name = `Caixa ${Date.now().toString(36)}`;

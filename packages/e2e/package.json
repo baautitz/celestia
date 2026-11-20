@@ -9,6 +9,7 @@
     "lint": "biome lint ."
   },
   "devDependencies": {
+    "@hono/node-server": "catalog:",
     "@playwright/test": "^1.65.1",
     "@types/node": "catalog:",
     "tsx": "catalog:",

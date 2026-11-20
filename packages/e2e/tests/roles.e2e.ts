@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginAsAdmin, openMenu } from "./helpers";
+import { loginAsAdmin, openMenu } from "./helpers.ts";
 
 test("cria e edita um grupo de acesso", async ({ page }) => {
   const id = Date.now().toString(36);

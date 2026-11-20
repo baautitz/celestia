@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { CERT_DEVICE_NAME, CERT_PASSWORD, CERT_USERNAME } from "./credentials";
-import { loginAsAdmin, openMenu, provisionCertificateDevice } from "./helpers";
+import { CERT_DEVICE_NAME, CERT_PASSWORD, CERT_USERNAME } from "./credentials.ts";
+import { loginAsAdmin, openMenu, provisionCertificateDevice } from "./helpers.ts";
 
 const signIn = async (page: import("@playwright/test").Page) => {
   await page.goto("/");

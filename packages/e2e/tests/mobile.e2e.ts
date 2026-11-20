@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { ADMIN_PASSWORD, ADMIN_USERNAME } from "./credentials";
+import { ADMIN_PASSWORD, ADMIN_USERNAME } from "./credentials.ts";
 
 const PAGES = ["Usuários", "Grupos", "Dispositivos", "ERPs", "Períodos de Fechamento", "Auditoria"];
 

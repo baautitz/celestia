@@ -1,6 +1,6 @@
 import { expect, type APIRequestContext, type APIResponse, type Page } from "@playwright/test";
 import { z } from "zod";
-import { ADMIN_PASSWORD, ADMIN_USERNAME } from "./credentials";
+import { ADMIN_PASSWORD, ADMIN_USERNAME } from "./credentials.ts";
 
 export async function loginAsAdmin(page: Page): Promise<void> {
   await page.goto("/");

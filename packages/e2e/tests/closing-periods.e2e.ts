@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { apiLoginAsAdmin, loginAsAdmin, openMenu } from "./helpers";
+import { apiLoginAsAdmin, loginAsAdmin, openMenu } from "./helpers.ts";
 
 test("lista os Períodos de Fechamento", async ({ page, request }) => {
   // Períodos não podem se sobrepor: um dia aleatório distante garante unicidade entre repetições e retentativas.
