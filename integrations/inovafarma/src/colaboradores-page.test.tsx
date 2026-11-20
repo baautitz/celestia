@@ -15,6 +15,13 @@ vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof
 const feedback = vi.hoisted(() => ({ notify: vi.fn(), notifyError: vi.fn() }));
 const windows = vi.hoisted(() => ({ confirm: vi.fn(), open: vi.fn() }));
 vi.mock("@platform/ui/imperative/provider", () => ({ useUi: () => ({ feedback, windows }) }));
+/** O dialog das Lojas aberto por `windows.open`: `resolver` fecha a janela com o valor escolhido. */
+const dialogo = vi.hoisted(() => ({ resolver: (_resultado: { status: "confirmed"; value: unknown }) => {} }));
+vi.mock("@platform/ui/imperative/use-window", () => ({
+  useWindow: () => ({ resolve: (value: unknown) => dialogo.resolver({ status: "confirmed", value }) }),
+  WindowActions: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  WindowCancelButton: () => <button type="button">Cancelar</button>,
+}));
 const usuariosIam = vi.hoisted(() => ({ openCreate: vi.fn() }));
 vi.mock("@platform/ui/contracts/web-services", () => ({ useWebService: () => usuariosIam }));
 
@@ -72,12 +79,24 @@ async function escolherUsuario(row: HTMLElement, nome: string) {
 }
 
 async function escolherLoja(row: HTMLElement, nome: string) {
-  const trigger = within(row).getByRole("button", { name: /^Lojas de / });
-  if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger);
-  const opcao = await screen.findByRole("menuitemcheckbox", { name: nome });
-  const marcada = opcao.getAttribute("aria-checked");
-  fireEvent.click(opcao);
-  await waitFor(() => expect(screen.getByRole("menuitemcheckbox", { name: nome }).getAttribute("aria-checked")).not.toBe(marcada));
+  let fechar = () => {};
+  windows.open.mockImplementationOnce(
+    ({ content }: { content: () => ReactElement }) =>
+      new Promise((resolve) => {
+        const montado = renderTela(content());
+        fechar = montado.unmount;
+        dialogo.resolver = (resultado) => {
+          fechar();
+          resolve(resultado);
+        };
+      }),
+  );
+  fireEvent.click(within(row).getByRole("button", { name: /^Lojas de / }));
+  fireEvent.click(await screen.findByRole("switch", { name: nome }));
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(screen.queryByRole("switch", { name: nome })).toBeNull());
+  // O vínculo só recebe as Lojas quando a promessa da janela resolve.
+  await act(async () => {});
 }
 
 const botao = (row: HTMLElement, nome: string) => within(row).getByRole("button", { name: nome }) as HTMLButtonElement;
@@ -366,12 +385,11 @@ describe("ColaboradoresPage", () => {
       expect(within(await linha("ANA SOUZA")).getByText("Loja não encontrada (cód. 99)")).toBeTruthy();
     });
 
-    it("mostra o nome de todas as Lojas selecionadas", async () => {
+    it("resume as Lojas selecionadas no botão", async () => {
       apiFetch.mockResolvedValueOnce(comLojas([1, 2, 3]));
       render(<ColaboradoresPage />);
       const row = await linha("ANA SOUZA");
-      const lojas = within(row).getByRole("button", { name: /^Lojas de / });
-      for (const nome of ["Centro", "Bairro", "Shopping"]) expect(within(lojas).getByText(nome)).toBeTruthy();
+      expect(within(row).getByRole("button", { name: /^Lojas de / }).textContent).toBe("3 Lojas");
     });
   });
 
@@ -403,6 +421,30 @@ describe("ColaboradoresPage", () => {
       expect(salvarTudo().textContent).toBe("Salvar (0)");
       await waitFor(() => expect(salvarTudo().disabled).toBe(true));
       expect(within(row).getByText("Pendente")).toBeTruthy();
+    });
+
+    it("Aceitar a sugestão da linha a põe no Salvar sem precisar editar nada", async () => {
+      apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
+      render(<ColaboradoresPage />);
+      const row = await linha("ANA SOUZA");
+      fireEvent.click(within(row).getByRole("button", { name: "Aceitar a sugestão de ANA SOUZA" }));
+      await waitFor(() => expect(salvarTudo().textContent).toBe("Salvar (1)"));
+      expect(within(row).queryByRole("button", { name: /^Aceitar a sugestão/ })).toBeNull();
+
+      apiFetch.mockResolvedValueOnce({ codigoColaborador: 7, confirmado: true, usuarioId: "ana", usuario: { ...ana, status: "active" }, lojas: [2], version: 1, avisos: [], sugestao: null });
+      apiFetch.mockResolvedValueOnce(revalidada([{ codigoColaborador: 7, nome: "ANA SOUZA", ativo: true, ...vinculadoAna, lojas: [2], version: 1 }]));
+      fireEvent.click(salvarTudo());
+      expect(await within(row).findByText("Confirmado")).toBeTruthy();
+      expect(apiFetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ body: JSON.stringify({ usuarioId: "ana", lojas: [2], version: 0 }) }));
+    });
+
+    it("Aceitar sugestões põe todas as linhas sugeridas no Salvar", async () => {
+      apiFetch.mockResolvedValueOnce(sugerida({ usuarioId: "ana", lojas: [2] }));
+      render(<ColaboradoresPage />);
+      await linha("ANA SOUZA");
+      fireEvent.click(screen.getByRole("button", { name: "Aceitar sugestões (1)" }));
+      await waitFor(() => expect(salvarTudo().textContent).toBe("Salvar (1)"));
+      expect(screen.queryByRole("button", { name: /^Aceitar sugestões/ })).toBeNull();
     });
 
     it("editar a sugestão e salvar confirma o vínculo e o selo some", async () => {

@@ -4,7 +4,7 @@ import { avisarVinculoAlterado } from "./colaboradores-badge";
 import { sugerirUsername } from "./username-sugerido";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
 import { Badge } from "@platform/ui/components/badge";
-import { Button, MultiValueButton } from "@platform/ui/components/button";
+import { Button } from "@platform/ui/components/button";
 import {
   Combobox,
   ComboboxContent,
@@ -13,7 +13,6 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@platform/ui/components/combobox";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
 import { Label } from "@platform/ui/components/label";
 import { Stack } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
@@ -21,6 +20,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useLeaveGuard } from "@platform/ui/adapters/leave-guard";
 import { HeaderActions } from "@platform/ui/context/header-actions";
 import { useWebService } from "@platform/ui/contracts/web-services";
+import { LojasColaboradorWindow } from "./lojas-colaborador-window";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch, ApiError } from "@platform/ui/lib/api";
 import { API } from "./inovafarma-api";
@@ -75,11 +75,16 @@ type Valores = Pick<CamposVinculo, "usuarioId" | "lojas">;
 /** A `version` é a de quando a edição começou: recarregar a lista não pode esconder um conflito. */
 type Rascunho = Valores & Pick<CamposVinculo, "version">;
 
+const novoRascunhoDe = (c: Colaborador): Rascunho => ({ ...iniciais(c), version: c.version });
 const iniciais = ({ usuarioId, lojas, sugestao }: CamposVinculo): Valores => sugestao ?? { usuarioId, lojas };
 const mesmasLojas = (a: number[], b: number[]) => a.length === b.length && a.every((codigo) => b.includes(codigo));
 const mudou = (a: Valores, b: Valores) => a.usuarioId !== b.usuarioId || !mesmasLojas(a.lojas, b.lojas);
 
 const naoEncontrado = (c: CamposVinculo) => c.avisos.some((a) => a.tipo === "colaborador_nao_encontrado");
+
+/** A linha tem uma sugestão ainda não aceita nem editada: aparece preenchida, mas só entra no Salvar depois de aceita. */
+const sugestaoPendente = (c: Colaborador, edicoes: Record<number, Rascunho>) =>
+  !c.confirmado && !naoEncontrado(c) && edicoes[c.codigoColaborador] === undefined && c.sugestao !== null && (c.sugestao.usuarioId !== null || c.sugestao.lojas.length > 0);
 
 function SeloSugestao() {
   return <Badge variant="info">Sugestão</Badge>;
@@ -159,29 +164,27 @@ function LojasSelect({
   lojas: number[];
   onChange: (lojas: number[]) => void;
 }) {
+  const { windows } = useUi();
   const items = useMemo(() => {
     const foraDoErp = row.lojas.filter((codigo) => !opcoes.some((o) => o.codigo === codigo)).map((codigo) => ({ codigo, nome: `Loja não encontrada (cód. ${codigo})` }));
     return [...foraDoErp, ...opcoes];
   }, [row.lojas, opcoes]);
   const selecionadas = items.filter((o) => lojas.includes(o.codigo));
-  const alternar = (codigo: number, marcada: boolean) =>
-    onChange((marcada ? [...lojas, codigo] : lojas.filter((l) => l !== codigo)).sort((a, b) => a - b));
+  const resumo = selecionadas.length === 0 ? "Selecione as Lojas" : selecionadas.length === 1 ? selecionadas[0].nome : `${selecionadas.length} Lojas`;
+  const abrir = async () => {
+    const resultado = await windows.open<number[]>({
+      surface: "dialog",
+      title: "Lojas do Colaborador",
+      description: row.nome,
+      content: () => <LojasColaboradorWindow opcoes={items} lojas={lojas} />,
+    });
+    if (resultado.status === "confirmed") onChange(resultado.value);
+  };
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger
-        render={
-          <MultiValueButton aria-label={`Lojas de ${row.nome}`} values={selecionadas.map((o) => o.nome)} placeholder="Selecione as Lojas" />
-        }
-      />
-      <DropdownMenuContent>
-        {items.map((o) => (
-          <DropdownMenuCheckboxItem key={o.codigo} closeOnClick={false} checked={lojas.includes(o.codigo)} onCheckedChange={(marcada) => alternar(o.codigo, marcada)}>
-            {o.nome}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button type="button" variant="outline" size="default" aria-label={`Lojas de ${row.nome}`} title={selecionadas.map((o) => o.nome).join(", ")} onClick={() => void abrir()}>
+      {resumo}
+    </Button>
   );
 }
 
@@ -277,6 +280,14 @@ export function ColaboradoresPage() {
 
   const [salvandoTudo, setSalvandoTudo] = useState(false);
 
+  // As sugestões das linhas à vista, para aceitar de uma vez e conferir o resultado antes de salvar.
+  const aceitaveis = useMemo(
+    () => colaboradores.filter((c) => (situacao === "todos" || c.ativo) && (filtroStatus === "todos" || c.confirmado === (filtroStatus === "confirmados")) && sugestaoPendente(c, edicoes)),
+    [colaboradores, edicoes, situacao, filtroStatus],
+  );
+  const aceitarSugestoes = () =>
+    setEdicoes((atual) => ({ ...Object.fromEntries(aceitaveis.map((c) => [c.codigoColaborador, novoRascunhoDe(c)])), ...atual }));
+
   const salvarTudo = useCallback(async () => {
     setSalvandoTudo(true);
     setFalhas({});
@@ -315,7 +326,7 @@ export function ColaboradoresPage() {
   const opcoes = useMemo(() => usuarios.map(paraOpcao), [usuarios]);
 
   const columns = useMemo<DataTableColumn<Colaborador>[]>(() => {
-    const novoRascunho = (r: Colaborador): Rascunho => ({ ...iniciais(r), version: r.version });
+    const novoRascunho = novoRascunhoDe;
     const valoresDe = (r: Colaborador): Rascunho => edicoes[r.codigoColaborador] ?? novoRascunho(r);
     const editar = (r: Colaborador, alteracao: Partial<Valores>) => {
       // Uma linha em gravação não aceita edição: ao terminar, o rascunho seria descartado.
@@ -386,9 +397,6 @@ export function ColaboradoresPage() {
         key: "lojas",
         mobileWide: true,
         label: "Lojas",
-        // O botão das Lojas aceita quebrar o texto, mas na linha não encolhe: sem isso a coluna fica estreita e o
-        // selo Sugestão invade o Status. Na largura do conteúdo, a tabela alarga e rola na horizontal.
-        cellClassName: "*:w-max",
         render: (r) => {
           const valores = valoresDe(r).lojas;
           const sugeridas = r.sugestao?.lojas ?? [];
@@ -402,11 +410,15 @@ export function ColaboradoresPage() {
       },
       {
         key: "status",
-        centered: true,
         label: "Status",
         render: (r) => (
-          <Stack direction="row" wrap justify="center" gap="field">
+          <Stack direction="row" wrap align="center" gap="field">
             <Badge variant={r.confirmado ? "success" : "warning"}>{r.confirmado ? "Confirmado" : "Pendente"}</Badge>
+            {sugestaoPendente(r, edicoes) && (
+              <Button type="button" variant="outline" size="default" aria-label={`Aceitar a sugestão de ${r.nome}`} onClick={() => editar(r, {})}>
+                Aceitar
+              </Button>
+            )}
             {falhas[r.codigoColaborador] && (
               <Badge variant="destructive" title={falhas[r.codigoColaborador]}>
                 Não salvo
@@ -459,6 +471,11 @@ export function ColaboradoresPage() {
   return (
     <Stack gap="section">
       <HeaderActions>
+        {aceitaveis.length > 0 && (
+          <Button variant="outline" disabled={salvandoTudo} onClick={aceitarSugestoes}>
+            Aceitar sugestões ({aceitaveis.length})
+          </Button>
+        )}
         <Button disabled={pendentes.length === 0 || salvandoTudo} onClick={() => void salvarTudo()}>
           {salvandoTudo ? "Salvando…" : `Salvar (${pendentes.length})`}
         </Button>
