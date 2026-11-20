@@ -459,7 +459,7 @@ export function VendasComissoesPage() {
       // Períodos e Visualizações vêm da mesma rota, que não exige a Permission de ler o Fechamento: se falhar, a falha aparece na tela, não some.
       const contexto = await apiFetch<{ periodos: ClosingPeriod[]; visualizacoes: VisualizacaoDisponivel[]; podeGerenciarColunas?: boolean }>(`${API}/relatorios/vendas-colaborador/visualizacoes`).catch((err: unknown) => {
         setError(`Não foi possível carregar os Períodos de Fechamento e as Visualizações: ${err instanceof Error ? err.message : "erro desconhecido"}`);
-        return { periodos: [] as ClosingPeriod[], visualizacoes: [] as VisualizacaoDisponivel[] };
+        return { periodos: [] as ClosingPeriod[], visualizacoes: [] as VisualizacaoDisponivel[], podeGerenciarColunas: false };
       });
       const { periodos, visualizacoes: visualizacoesData } = contexto;
 
