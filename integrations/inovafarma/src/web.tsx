@@ -285,7 +285,7 @@ const columns: DataTableColumn<ColaboradorItem>[] = [
 ];
 
 /** Colunas que cada Cartão de resumo do Desempenho de Vendas liga ou desliga na tabela. */
-const COLUNAS_DO_CARTAO = {
+const COLUNAS_DO_CARTAO: Record<string, readonly string[]> = {
   vendas: ["quantidadeVendas"],
   bruto: ["totalBruto"],
   descontos: ["totalDesconto"],
@@ -296,9 +296,9 @@ const COLUNAS_DO_CARTAO = {
   ticket: ["ticketMedio"],
   cadastros: ["cadastroPercent"],
   ...Object.fromEntries(CATEGORIAS.map(({ key }) => [key, [`${key}-quantidade`, `${key}-valor`]])),
-} as const satisfies Record<string, readonly string[]>;
-type CartaoColuna = keyof typeof COLUNAS_DO_CARTAO;
-const CARTOES: CartaoColuna[] = Object.keys(COLUNAS_DO_CARTAO) as CartaoColuna[];
+};
+type CartaoColuna = string;
+const CARTOES: CartaoColuna[] = Object.keys(COLUNAS_DO_CARTAO);
 const CARTOES_KEY = "inovafarma:vendas:cartoes";
 
 function lerCartoes(): CartaoColuna[] {
@@ -568,8 +568,8 @@ export function VendasComissoesPage() {
   };
   const colunasVisiveis = useMemo(
     () => [
-      ...tableColumns.filter((c) => !CARTOES.some((k) => (COLUNAS_DO_CARTAO[k] as readonly string[]).includes(c.key))).map((c) => c.key),
-      ...cartoes.flatMap((k) => COLUNAS_DO_CARTAO[k]),
+      ...tableColumns.filter((c) => !CARTOES.some((k) => COLUNAS_DO_CARTAO[k]?.includes(c.key))).map((c) => c.key),
+      ...cartoes.flatMap((k) => COLUNAS_DO_CARTAO[k] ?? []),
     ],
     [tableColumns, cartoes],
   );
