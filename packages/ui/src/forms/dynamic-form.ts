@@ -39,7 +39,7 @@ export function buildDynamicDefaultValues(fields: FormFieldDef[]): DynamicFormVa
  * Cada campo receive uma mensagem de validação própria com o label.
  */
 export function buildDynamicSchema(fields: FormFieldDef[]) {
-  const shape: Record<string, z.ZodTypeAny> = {};
+  const shape: Record<string, z.ZodType> = {};
 
   for (const field of fields) {
     const errorMsg = `${field.label} é obrigatório.`;
