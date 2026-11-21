@@ -112,4 +112,9 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite ver as Metas do Colaborador vinculado ao Usuário, na Exibição escolhida no Tipo de Meta.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para ver as próprias Metas.",
   },
+  "pedidos-lancamento:ver": {
+    label: "Pedidos: Lançamento",
+    description: "Permite abrir o Lançamento de Pedidos e ver as vendas, o estoque e as compras dos produtos por Loja.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver o Lançamento de Pedidos.",
+  },
 });

@@ -102,6 +102,22 @@ _Avoid_: Perda, Quebra
 An incoming (`+`) Ajuste de Estoque without a Justificativa. It needs a Justificativa like any other Ajuste, but it is reported apart from the Furo and never reduces it, since it can hide an outgoing one.
 _Avoid_: Sobra
 
+### Pedidos
+
+**Pedidos** (en: Purchasing):
+The InovaFarma module where the buyer sees what to buy, quotes with suppliers and checks receipt by invoice. Its tabs are Lançamento, Listas and Pedidos. It only reads the ERP; what it keeps (lists, minimums, orders, quotes) lives in Celestia.
+_Avoid_: Compras
+
+**Lançamento** (en: Order Entry):
+The Pedidos tab that shows, per product and per Loja, the current stock and the quantity sold in a date filter, with the monthly sales and purchases of the product in focus. The date filter is either a period (from–to) or from a date until today; it is independent of Closing Periods and opens on the previous day. The products ticked in its grid stay ticked while the filters change. Seeing it takes the Permission `inovafarma:pedidos-lancamento:ver`.
+_Avoid_: Lançamentos (the menu Seção), Sugestão
+
+**Estoque Atual** (en: Current Stock):
+The quantity of a product in a Loja right now, as `Produto_Estoque.Estoque` in the ERP; across Lojas it is their sum.
+
+**Movimentação Mensal** (en: Monthly Movement):
+The quantity of a product sold (net sales rules) and bought (invoice entries) in each of the last twelve months, for the Lojas in the filter.
+
 ### Metas
 
 **Indicador** (en: Indicator):

@@ -1,5 +1,5 @@
 import { lazy, useState, useEffect, useCallback, useMemo, type ComponentType, type ReactNode } from "react";
-import { TrendingUp, RefreshCw, Eye, Store, Users, DollarSign, Award, AlertCircle, MoreHorizontal, Package, Pill, Plus, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch, Target } from "lucide-react";
+import { TrendingUp, RefreshCw, Eye, Store, Users, DollarSign, Award, AlertCircle, MoreHorizontal, Package, Pill, Plus, SlidersHorizontal, PackageX, ClipboardCheck, PackageSearch, ShoppingCart, Target } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { Button } from "@platform/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@platform/ui/components/dropdown-menu";
@@ -30,6 +30,7 @@ const AvaliacoesPage = lazyPage(() => import("./avaliacoes-page"), "AvaliacoesPa
 const PreVencidosPage = lazyPage(() => import("./pre-vencidos-page"), "PreVencidosPage");
 const FuroEstoquePage = lazyPage(() => import("./furo-estoque-page"), "FuroEstoquePage");
 const MetasPage = lazyPage(() => import("./metas-page"), "MetasPage");
+const PedidosPage = lazyPage(() => import("./pedidos-page"), "PedidosPage");
 
 interface Loja {
   codigoEmpresa: number;
@@ -945,6 +946,17 @@ export const inovafarmaWebModule = defineWebModule({
       permission: "inovafarma:furo-estoque-loja:manage",
       component: FuroEstoquePage,
       variants: [{ permission: "inovafarma:furo-estoque-geral:manage", component: FuroEstoquePage }],
+    },
+    {
+      id: "inovafarma-pedidos",
+      label: "Pedidos",
+      title: "Pedidos",
+      icon: ShoppingCart,
+      path: "/inovafarma/pedidos",
+      section: "inovafarma-lancamentos",
+      order: 60,
+      permission: "inovafarma:pedidos-lancamento:ver",
+      component: PedidosPage,
     },
     {
       id: "inovafarma-metas",
