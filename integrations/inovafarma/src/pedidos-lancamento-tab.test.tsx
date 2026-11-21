@@ -20,8 +20,8 @@ const contexto = {
 };
 const visaoBase = { lojas: [1], listas: ["plp_1"], laboratorio: "7", grupo: null, secao: null, apenasComMinimo: false, usuarioId: "ana", version: 1 };
 let visoes: unknown[];
-const dipirona = { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 5, estoque: 10, minimo: 0, sugestao: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, version: 0 }] };
-const aas = { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, minimo: 8, sugestao: 5, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: 8, maximo: 20, sugestao: 5, version: 2 }] };
+const dipirona = { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 5, estoque: 10, minimo: 0, sugestao: 0, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }] };
+const aas = { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, minimo: 8, sugestao: 5, aChegar: 7, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: 8, maximo: 20, sugestao: 5, aChegar: 7, version: 2 }] };
 let produtos: unknown[];
 
 beforeEach(() => {
@@ -77,6 +77,7 @@ describe("Pedidos: Lançamento", () => {
     renderizar();
     await screen.findByLabelText("Selecionar AAS");
     expect(screen.getByText("Sugestão")).toBeDefined();
+    expect(screen.getByText("A chegar")).toBeDefined();
     expect(screen.getByText("Estoque mínimo")).toBeDefined();
   });
 
