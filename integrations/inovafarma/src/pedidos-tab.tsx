@@ -14,7 +14,7 @@ import { PEDIDOS_BASE, PedidoRascunhoWindow, type Pedido } from "./pedido-rascun
 import { useLatestFetch } from "./use-latest-fetch";
 import { API } from "./inovafarma-api";
 
-const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguardando_precos: "Aguardando preços", cotado: "Cotado", cancelado: "Cancelado" };
+const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguardando_precos: "Aguardando preços", cotado: "Cotado", confirmado: "Confirmado", parcialmente_recebido: "Parcialmente recebido", recebido: "Recebido", cancelado: "Cancelado" };
 const dia = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
 
 /** Aba Pedidos: a listagem dos Pedidos, com edição e cancelamento do rascunho. */
@@ -75,7 +75,7 @@ export function PedidosTab() {
       size: "full",
       title: "Cotação",
       description: `Pedido de ${dia(pedido.criadoEm)}`,
-      content: () => <CotacaoWindow pedidoId={pedido.id} />,
+      content: () => <CotacaoWindow pedidoId={pedido.id} lojas={contexto?.lojas ?? []} />,
     });
     void carregar();
   };
@@ -116,11 +116,7 @@ export function PedidosTab() {
         emptyMessage="Nenhum Pedido ainda. Marque produtos no Lançamento e use Gerar pedido."
         search={{ placeholder: "Buscar Pedido" }}
         rowActions={(p) =>
-          p.status === "aguardando_precos" || p.status === "cotado" ? (
-            <Button size="icon" variant="ghost" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
-              <Scale />
-            </Button>
-          ) : p.status === "rascunho" ? (
+          p.status === "rascunho" ? (
             <Stack direction="row" gap="tight">
               <Button size="icon" variant="ghost" aria-label={`Cotar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cotar(p)}>
                 <ClipboardList />
@@ -132,7 +128,11 @@ export function PedidosTab() {
                 <Ban />
               </Button>
             </Stack>
-          ) : null
+          ) : p.status === "cancelado" ? null : (
+            <Button size="icon" variant="ghost" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
+              <Scale />
+            </Button>
+          )
         }
       />
     </Stack>
