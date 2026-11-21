@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { DadosPedido, Pedido, PedidoStatus } from "./pedidos.js";
 import { novoIdPedido, type PedidoStore } from "./pedidos-store.js";
@@ -7,7 +7,7 @@ import { pedidos } from "./schema.js";
 
 type PedidoRow = typeof pedidos.$inferSelect;
 
-const pedido = (row: PedidoRow): Pedido => ({ ...row, status: row.status as PedidoStatus, criadoEm: row.criadoEm.toISOString(), atualizadoEm: row.atualizadoEm.toISOString() });
+const pedido = (row: PedidoRow): Pedido => ({ ...row, status: row.status as PedidoStatus, confirmadoEm: row.confirmadoEm?.toISOString() ?? null, criadoEm: row.criadoEm.toISOString(), atualizadoEm: row.atualizadoEm.toISOString() });
 
 export class PostgresPedidoStore implements PedidoStore {
   constructor(private readonly db: NodePgDatabase) {}
@@ -42,12 +42,20 @@ export class PostgresPedidoStore implements PedidoStore {
     return this.mudar(id, undefined, { status: "cotado" }, "aguardando_precos");
   }
 
-  private async mudar(id: string, expectedVersion: number | undefined, mudancas: Partial<PedidoRow>, de: PedidoStatus = "rascunho"): Promise<Pedido | null> {
+  async confirmar(id: string, escolhas: Record<string, number>, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "confirmado", escolhas, confirmadoEm: new Date() }, "cotado");
+  }
+
+  async registrarRecebimento(id: string, status: "confirmado" | "parcialmente_recebido" | "recebido"): Promise<Pedido | null> {
+    return this.mudar(id, undefined, { status }, ["confirmado", "parcialmente_recebido", "recebido"]);
+  }
+
+  private async mudar(id: string, expectedVersion: number | undefined, mudancas: Partial<PedidoRow>, de: PedidoStatus | PedidoStatus[] = "rascunho"): Promise<Pedido | null> {
     const t = pedidos;
     const [row] = await this.db
       .update(t)
       .set({ ...mudancas, version: sql`${t.version} + 1`, atualizadoEm: new Date() })
-      .where(and(eq(t.id, id), eq(t.status, de), expectedVersion === undefined ? undefined : eq(t.version, expectedVersion)))
+      .where(and(eq(t.id, id), inArray(t.status, ([] as PedidoStatus[]).concat(de)), expectedVersion === undefined ? undefined : eq(t.version, expectedVersion)))
       .returning();
     return row ? pedido(row) : null;
   }

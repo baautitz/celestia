@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { Codigo } from "./metas-comum.js";
 
-/** Estados do Pedido. A Cotação leva o rascunho a aguardando preços e a cotado; as próximas fatias acrescentam os demais. */
-export const PEDIDO_STATUS = ["rascunho", "aguardando_precos", "cotado", "cancelado"] as const;
+/** Estados do Pedido: a Cotação leva o rascunho a cotado; a confirmação a confirmado; a conferência com a NF a parcialmente recebido e recebido. */
+export const PEDIDO_STATUS = ["rascunho", "aguardando_precos", "cotado", "confirmado", "parcialmente_recebido", "recebido", "cancelado"] as const;
 export type PedidoStatus = (typeof PEDIDO_STATUS)[number];
 
 const MAX_QUANTIDADE = 1_000_000;
@@ -28,6 +28,9 @@ export type ItemPedido = DadosPedido["itens"][number];
 export interface Pedido extends DadosPedido {
   id: string;
   status: PedidoStatus;
+  /** `produtoId` -> código do fornecedor escolhido; vazio até a confirmação. */
+  escolhas: Record<string, number>;
+  confirmadoEm: string | null;
   /** Referência lógica a `iam.users`. */
   criadoPorId: string;
   criadoPorNome: string;

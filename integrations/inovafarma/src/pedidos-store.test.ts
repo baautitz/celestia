@@ -12,6 +12,18 @@ describe("Store de Pedidos", () => {
     expect(await store.atualizarRascunho(p.id, dados, 1)).toMatchObject({ version: 2, status: "rascunho" });
   });
 
+  it("confirma só um Pedido cotado e na versão esperada, e registra o recebimento depois", async () => {
+    const store = new MemoryPedidoStore();
+    const p = await store.criar(dados, autor);
+    expect(await store.confirmar(p.id, { "p-1": 7 }, 1)).toBeNull();
+    await store.iniciarCotacao(p.id, 1);
+    await store.marcarCotado(p.id);
+    expect(await store.confirmar(p.id, { "p-1": 7 }, 1)).toBeNull();
+    expect(await store.confirmar(p.id, { "p-1": 7 }, 3)).toMatchObject({ status: "confirmado", escolhas: { "p-1": 7 }, version: 4 });
+    expect(await store.registrarRecebimento(p.id, "recebido")).toMatchObject({ status: "recebido" });
+    expect(await store.registrarRecebimento("nada", "recebido")).toBeNull();
+  });
+
   it("não edita nem cancela de novo um Pedido cancelado", async () => {
     const store = new MemoryPedidoStore();
     const p = await store.criar(dados, autor);

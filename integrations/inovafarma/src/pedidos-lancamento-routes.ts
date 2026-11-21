@@ -9,6 +9,9 @@ import type { MinimoMaximoStore } from "./pedidos-minimos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { COLUNA_DO_PRODUTO, idsPorTipo } from "./lista-produtos.js";
+import { aChegarPorLinha, chaveDaLinha, conferir } from "./pedidos-conferencia.js";
+import { entradasDoPedido } from "./pedidos-nf.js";
+import type { PedidoStore } from "./pedidos-store.js";
 import { listaPronta } from "./pedidos-listas.js";
 import type { PedidosListasStore } from "./pedidos-listas-store.js";
 import { lojasDoErp } from "./pre-vencidos-comum.js";
@@ -21,6 +24,8 @@ export interface PedidosLancamentoRoutesDeps {
   /** As listas de produtos de Pedidos: só as prontas viram filtro. */
   listas: PedidosListasStore;
   minimos: MinimoMaximoStore;
+  /** Os Pedidos do Celestia: os confirmados e ainda não recebidos por inteiro alimentam a coluna a chegar. */
+  pedidos: PedidoStore;
   audit: AuditService;
 }
 
@@ -94,6 +99,8 @@ interface LojaLancamento {
   minimo: number | null;
   maximo: number | null;
   sugestao: number;
+  /** Pedido aberto menos as entradas de NF. */
+  aChegar: number;
   /** 0 enquanto a Loja não tem mínimo/máximo gravado. */
   version: number;
 }
@@ -106,6 +113,7 @@ interface ProdutoLancamento {
   estoque: number;
   minimo: number;
   sugestao: number;
+  aChegar: number;
   lojas: LojaLancamento[];
 }
 
@@ -178,12 +186,22 @@ async function nomeDaLoja(client: ErpQuery | undefined, codigo: number): Promise
   }
 }
 
+/** Pedido aberto menos as entradas de NF (`produtoId|codigoLoja` -> quantidade), somado entre os Pedidos confirmados ou parcialmente recebidos. */
+async function aChegarDosPedidos(client: ErpQuery, pedidos: PedidoStore): Promise<Map<string, number>> {
+  const total = new Map<string, number>();
+  const abertos = (await pedidos.listar()).filter((p) => p.status === "confirmado" || p.status === "parcialmente_recebido");
+  for (const pedido of abertos) {
+    for (const [chave, falta] of aChegarPorLinha(conferir(pedido, await entradasDoPedido(client, pedido)))) total.set(chave, (total.get(chave) ?? 0) + falta);
+  }
+  return total;
+}
+
 /** `AAAA-MM-DD` de hoje na hora do ERP. */
 const hojeNoErp = () => horaDoErp(new Date().toISOString()).slice(0, 10);
 const diaAnterior = (dia: string) => new Date(Date.parse(`${dia}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 
 /** Lançamento de Pedidos: filtros, grade de produtos por Loja e movimentação mensal. Só leitura no ERP. */
-export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, audit, listas }: PedidosLancamentoRoutesDeps): void {
+export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, audit, listas, pedidos }: PedidosLancamentoRoutesDeps): void {
   const recusa = (c: AuthContext) => (permissions.has(c.get("user")?.permissions, VER.key) ? null : c.json({ error: VER.deniedMessage }, 403));
 
   routes.get(`${BASE}/contexto`, auth, async (c: AuthContext) => {
@@ -228,18 +246,20 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     try {
       const linhas = await client.query<LinhaVenda>(produtosSql(filtros.join(" ")), params);
       const definidos = new Map((await minimos.listar()).map((m) => [`${m.produtoId}|${m.codigoLoja}`, m]));
+      const chegando = await aChegarDosPedidos(client, pedidos);
       const porProduto = new Map<string, ProdutoLancamento>();
       for (const l of linhas) {
         const vendida = Number(l.vendida) || 0;
         const estoque = Number(l.estoque) || 0;
         const definido = definidos.get(`${l.produtoId}|${l.codigoLoja}`);
         // Sugestão: só apoio ao comprador, nunca negativa.
-        const loja = { codigoLoja: Number(l.codigoLoja), vendida, estoque, minimo: definido?.minimo ?? null, maximo: definido?.maximo ?? null, sugestao: Math.max(0, vendida + (definido?.minimo ?? 0) - estoque), version: definido?.version ?? 0 };
-        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, vendida: 0, estoque: 0, minimo: 0, sugestao: 0, lojas: [] };
+        const loja = { codigoLoja: Number(l.codigoLoja), vendida, estoque, minimo: definido?.minimo ?? null, maximo: definido?.maximo ?? null, sugestao: Math.max(0, vendida + (definido?.minimo ?? 0) - estoque), aChegar: chegando.get(chaveDaLinha(l.produtoId, Number(l.codigoLoja))) ?? 0, version: definido?.version ?? 0 };
+        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, vendida: 0, estoque: 0, minimo: 0, sugestao: 0, aChegar: 0, lojas: [] };
         produto.vendida += vendida;
         produto.estoque += estoque;
         produto.minimo += loja.minimo ?? 0;
         produto.sugestao += loja.sugestao;
+        produto.aChegar += loja.aChegar;
         produto.lojas.push(loja);
         porProduto.set(l.produtoId, produto);
       }

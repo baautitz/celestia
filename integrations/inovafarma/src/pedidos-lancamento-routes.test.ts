@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Hono, type MiddlewareHandler } from "hono";
 import { registerPedidosLancamentoRoutes } from "./pedidos-lancamento-routes";
+import { MemoryPedidoStore } from "./pedidos-store";
 import { MemoryPedidosListasStore } from "./pedidos-listas-store";
 import { MemoryMinimoMaximoStore } from "./pedidos-minimos-store";
 import { declarePedidosMinimosAudit } from "./pedidos-minimos-audit";
@@ -16,6 +17,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
     await next();
   };
   const listas = new MemoryPedidosListasStore();
+  const pedidos = new MemoryPedidoStore();
   const store = new MemoryMinimoMaximoStore();
   const resumos = new Map<string, (a: never) => string>();
   const log: string[] = [];
@@ -30,6 +32,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
     auth,
     listas,
+    pedidos,
     minimos: store,
     audit,
     erpClient: () => ({
@@ -37,6 +40,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
         consultas.push({ sql, params });
         if (falha) throw new Error("boom");
         if (sql.includes("FROM Config")) return [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Norte" }] as T[];
+        if (sql.includes("c.DataNota")) return [{ produtoId: "p-1", codigoLoja: 1, recebida: 6 }] as T[];
         if (sql.includes("Produto_Fabricante")) return [{ id: 7, nome: "EMS" }] as T[];
         if (sql.includes("Produto_Grupo")) return [{ id: 3, nome: "MEDICAMENTOS" }] as T[];
         if (sql.includes("Produto_Sessao")) return [{ id: 9, nome: "GENERICOS" }] as T[];
@@ -55,7 +59,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
   });
   const get = (path: string) => app.request(path);
   const put = (corpo: unknown) => app.request("/pedidos/lancamento/minimos", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
-  return { get, put, consultas, log, listas };
+  return { get, put, consultas, log, listas, pedidos };
 }
 
 describe("Lançamento de Pedidos: contexto", () => {
@@ -92,8 +96,8 @@ describe("Lançamento de Pedidos: produtos", () => {
     const res = await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&lojas=1,2&grupo=3");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([
-      { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 8, estoque: 10, minimo: 0, sugestao: 3, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, version: 0 }, { codigoLoja: 2, vendida: 3, estoque: 0, minimo: null, maximo: null, sugestao: 3, version: 0 }] },
-      { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, minimo: 0, sugestao: 0, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: null, maximo: null, sugestao: 0, version: 0 }] },
+      { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 8, estoque: 10, minimo: 0, sugestao: 3, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }, { codigoLoja: 2, vendida: 3, estoque: 0, minimo: null, maximo: null, sugestao: 3, aChegar: 0, version: 0 }] },
+      { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, minimo: 0, sugestao: 0, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }] },
     ]);
     const { sql, params } = consultas[0] ?? { sql: "" };
     expect(params).toMatchObject({ dataInicio: "2027-04-01 00:00:00", dataFim: "2027-04-02 23:59:59", loja0: 1, loja1: 2, grupo: 3 });
@@ -199,5 +203,34 @@ describe("Lançamento de Pedidos: estoque mínimo e máximo", () => {
   it("exige a Permission de editar", async () => {
     const res = await boot({ permissions: [PERMISSAO] }).put({ produtoId: "p-1", codigoLoja: 1, minimo: 1, maximo: null, version: 0 });
     expect(res.status).toBe(403);
+  });
+});
+
+describe("Lançamento de Pedidos: a chegar", () => {
+  const item = (produtoId: string, quantidades: { codigoLoja: number; quantidade: number }[]) => ({ produtoId, nome: produtoId, codigoBarra: null, quantidades });
+  const consulta = "/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-30";
+
+  it("mostra o pedido aberto menos as entradas de NF, por Loja e por produto", async () => {
+    const { get, pedidos } = boot();
+    const p = await pedidos.criar({ itens: [item("p-1", [{ codigoLoja: 1, quantidade: 10 }, { codigoLoja: 2, quantidade: 4 }])] }, { id: "u", nome: "U" });
+    await pedidos.iniciarCotacao(p.id, 1);
+    await pedidos.marcarCotado(p.id);
+    await pedidos.confirmar(p.id, { "p-1": 7 }, 3);
+    const produtos = (await (await get(consulta)).json()) as { produtoId: string; aChegar: number; lojas: { codigoLoja: number; aChegar: number }[] }[];
+    const dipirona = produtos.find((x) => x.produtoId === "p-1");
+    expect(dipirona?.lojas.map((l) => l.aChegar)).toEqual([4, 4]);
+    expect(dipirona?.aChegar).toBe(8);
+    expect(produtos.find((x) => x.produtoId === "p-2")?.aChegar).toBe(0);
+  });
+
+  it("não conta Pedido que ainda não foi confirmado nem o já recebido por inteiro", async () => {
+    const { get, pedidos } = boot();
+    await pedidos.criar({ itens: [item("p-1", [{ codigoLoja: 1, quantidade: 10 }])] }, { id: "u", nome: "U" });
+    const feito = await pedidos.criar({ itens: [item("p-1", [{ codigoLoja: 1, quantidade: 6 }])] }, { id: "u", nome: "U" });
+    await pedidos.iniciarCotacao(feito.id, 1);
+    await pedidos.marcarCotado(feito.id);
+    await pedidos.confirmar(feito.id, { "p-1": 7 }, 3);
+    const produtos = (await (await get(consulta)).json()) as { produtoId: string; aChegar: number }[];
+    expect(produtos.find((x) => x.produtoId === "p-1")?.aChegar).toBe(0);
   });
 });

@@ -48,6 +48,8 @@ interface LinhaLoja {
   minimo: number | null;
   maximo: number | null;
   sugestao: number;
+  /** Pedido aberto menos as entradas de NF. */
+  aChegar: number;
   /** 0 enquanto a Loja não tem mínimo/máximo gravado. */
   version: number;
 }
@@ -60,6 +62,7 @@ export interface ProdutoLancamento {
   estoque: number;
   minimo: number;
   sugestao: number;
+  aChegar: number;
   lojas: LinhaLoja[];
 }
 
@@ -250,6 +253,7 @@ function Detalhe({ produto, contexto, lojasFiltro, onSalvo }: { produto: Produto
       ? { key: "maximo", label: "Estoque máximo", render: (l) => <CampoMinimoMaximo linha={l} produtoId={produto.produtoId} campo="maximo" rotulo={`Estoque máximo da Loja ${nomeLoja(l.codigoLoja)}`} onSalvo={onSalvo} />, mobileWide: true }
       : { key: "maximo", label: "Estoque máximo", format: "decimal", value: (l) => l.maximo ?? 0 },
     { key: "sugestao", label: "Sugestão", format: "decimal", value: (l) => l.sugestao },
+    { key: "aChegar", label: "A chegar", format: "decimal", value: (l) => l.aChegar },
   ];
   const colunasMes: DataTableColumn<Mes>[] = [
     { key: "mes", label: "Mês", value: (m) => mesBr(m.mes) },
@@ -401,6 +405,7 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
       { key: "vendida", label: "Qtde vendida", format: "decimal", value: (p) => p.vendida, sortable: true, firstSort: "desc" },
       { key: "minimo", label: "Estoque mínimo", format: "decimal", value: (p) => p.minimo, sortable: true },
       { key: "sugestao", label: "Sugestão", format: "decimal", value: (p) => p.sugestao, sortable: true },
+      { key: "aChegar", label: "A chegar", format: "decimal", value: (p) => p.aChegar, sortable: true },
   ];
 
   const emFoco = foco ? (produtos.find((p) => p.produtoId === foco) ?? selecionados.get(foco)) : undefined;

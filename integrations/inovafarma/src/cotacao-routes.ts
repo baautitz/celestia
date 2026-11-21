@@ -44,7 +44,7 @@ const FORNECEDORES_SQL = `
   ORDER BY c.Nome`;
 
 /** Os nomes não filtram por situação: um fornecedor desativado depois continua legível na cotação. */
-const nomesSql = (codigos: number) => `
+export const nomesSql = (codigos: number) => `
   SELECT f.CodigoFornecedor AS codigo, LTRIM(RTRIM(c.Nome)) AS nome
   FROM Fornecedor f
   JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro
@@ -63,6 +63,9 @@ const plano = (v: unknown): string | null => (typeof v === "string" && v.trim() 
 export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pedidos, cotacoes, audit }: CotacaoRoutesDeps): void {
   const gerir = INOVAFARMA_PERMISSIONS.ref("pedidos-pedidos:gerir");
   const pode = (c: AuthContext) => permissions.has(c.get("user")?.permissions, gerir.key);
+
+  const confirmar = INOVAFARMA_PERMISSIONS.ref("pedidos-pedidos:confirmar");
+  const podeConfirmar = (c: AuthContext) => permissions.has(c.get("user")?.permissions, confirmar.key);
 
   const registrar = (c: AuthContext, action: string, pedido: Pedido, attributes: Record<string, unknown>) =>
     audit.record({ plugin: PEDIDOS_PLUGIN, action, actor: ator(c), target: { type: PEDIDO_TARGET, id: pedido.id }, attributes });
@@ -84,11 +87,12 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     return mapa;
   };
 
-  const detalhe = async (pedido: Pedido) => {
+  const detalhe = async (pedido: Pedido, podeConfirmar: boolean) => {
     const lista = await cotacoes.listar(pedido.id);
     const nomeDe = await nomes(lista.map((c) => c.codigoFornecedor));
     return {
-      pedido: { id: pedido.id, status: pedido.status, version: pedido.version },
+      pedido: { id: pedido.id, status: pedido.status, version: pedido.version, escolhas: pedido.escolhas },
+      podeConfirmar,
       fornecedores: lista.map((c) => ({ codigo: c.codigoFornecedor, nome: nomeDe.get(c.codigoFornecedor) ?? fallback(c.codigoFornecedor), importado: c.precos !== null, importadoEm: c.importadoEm, version: c.version })),
       produtos: pedido.itens.map((i) => ({
         produtoId: i.produtoId,
@@ -128,13 +132,13 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     if (!iniciado) return c.json(versaoDesatualizada("O Pedido foi alterado por outra pessoa ou já não é um rascunho. A lista foi recarregada."), 409);
     await cotacoes.criar(iniciado.id, lido.data.fornecedores);
     await registrar(c, COTACAO_ACTIONS.iniciar, iniciado, { fornecedores: lido.data.fornecedores.length });
-    return c.json(await detalhe(iniciado));
+    return c.json(await detalhe(iniciado, podeConfirmar(c)));
   });
 
   routes.get(BASE, auth, async (c: AuthContext) => {
     const achado = await doPedido(c);
     if ("recusa" in achado) return achado.recusa;
-    return c.json(await detalhe(achado.pedido));
+    return c.json(await detalhe(achado.pedido, podeConfirmar(c)));
   });
 
   /** Pedido em cotação e o fornecedor participante da rota; senão a recusa. */
@@ -198,7 +202,7 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     if (!gravada) return c.json(DESATUALIZADO, 409);
     const atual = (await pedidos.marcarCotado(achado.pedido.id)) ?? (await pedidos.pedido(achado.pedido.id)) ?? achado.pedido;
     await registrar(c, COTACAO_ACTIONS.importar, atual, { codigoFornecedor: gravada.codigoFornecedor, ofertas: conferido.previa.validas });
-    return c.json(await detalhe(atual));
+    return c.json(await detalhe(atual, podeConfirmar(c)));
   });
 }
 

@@ -101,6 +101,14 @@ describe("Cotação: fornecedores", () => {
     expect(b.log).toEqual(["Iniciou a cotação do Pedido com 2 fornecedores."]);
   });
 
+  it("informa no detalhe a escolha gravada e se o usuário pode confirmar", async () => {
+    const b = await boot();
+    await iniciar(b);
+    const detalhe = (await (await b.req("gil", "GET", BASE(b.pedido.id))).json()) as { pedido: Pedido & { escolhas: unknown }; podeConfirmar: boolean };
+    expect(detalhe.pedido.escolhas).toEqual({});
+    expect(detalhe.podeConfirmar).toBe(false);
+  });
+
   it("recusa iniciar com versão antiga (409), sem fornecedores ou repetidos (400) e sem Permission (403)", async () => {
     const b = await boot();
     expect((await b.req("gil", "POST", BASE(b.pedido.id), { fornecedores: [7], version: 5 })).status).toBe(409);
