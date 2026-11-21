@@ -850,7 +850,7 @@ describe("DataTable arrowNavigation", () => {
 
   it("move o foco entre os campos das células com as setas e o Enter, como numa planilha", () => {
     setViewport(1280);
-    render(<DataTable columns={colunasEditaveis} rows={linhas} getRowId={(r) => r.id} arrowNavigation />);
+    render(<DataTable columns={colunasEditaveis} rows={linhas} getRowId={(r) => r.id} />);
     const a1 = screen.getByLabelText("A Ana") as HTMLInputElement;
     a1.focus();
     fireEvent.keyDown(a1, { key: "ArrowDown" });
@@ -870,6 +870,15 @@ describe("DataTable arrowNavigation", () => {
     fireEvent.keyDown(a1, { key: "ArrowRight" });
     fireEvent.keyDown(defined(document.activeElement, "the focused element"), { key: "Enter" });
     expect(document.activeElement).toBe(screen.getByLabelText("B Bia"));
+  });
+
+  it("pode ser desligada com arrowNavigation={false}", () => {
+    setViewport(1280);
+    render(<DataTable columns={colunasEditaveis} rows={linhas} getRowId={(r) => r.id} arrowNavigation={false} />);
+    const a1 = screen.getByLabelText("A Ana") as HTMLInputElement;
+    a1.focus();
+    fireEvent.keyDown(a1, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(a1);
   });
 });
 

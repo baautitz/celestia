@@ -222,7 +222,7 @@ export interface DataTableProps<TRow> {
   highlightRow?: (row: TRow) => boolean;
   /** `key` da última coluna presa à esquerda na rolagem horizontal; ela e as anteriores ficam fixas. Não afeta a impressão. */
   frozenUntil?: string;
-  /** Setas movem o foco entre os campos de valor das células, como numa planilha (↑/↓ e Enter trocam de linha); chaves e botões ficam fora. */
+  /** Ligado por padrão: setas movem o foco entre os campos de valor das células, como numa planilha (↑/↓ e Enter trocam de linha); chaves e botões ficam fora. Passe `false` para desligar. */
   arrowNavigation?: boolean;
   /**
    * Totalizador: valores por `key` de coluna, calculados por quem usa a tabela e formatados pelo `format` da coluna.
@@ -490,7 +490,7 @@ export function DataTable<TRow>({
   striped = false,
   highlightRow,
   frozenUntil,
-  arrowNavigation = false,
+  arrowNavigation = true,
   totals,
   totalsCompare,
 }: DataTableProps<TRow>) {
@@ -1124,7 +1124,8 @@ export function DataTable<TRow>({
                   ? (e) => {
                       handleArrowNavigationFocus(e);
                       // Campo da linha com foco: a linha fica destacada como se tivesse sido clicada (não a de uma tabela aninhada).
-                      const tr = (e.target as Element).closest("tr[data-row-id]");
+                      const target = e.target as Element;
+                      const tr = target.matches("input, textarea") ? target.closest("tr[data-row-id]") : null;
                       if (tr && tr.closest("[data-arrow-root]") === e.currentTarget) setSelectedId(tr.getAttribute("data-row-id"));
                     }
                   : undefined
