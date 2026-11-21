@@ -26,7 +26,8 @@ beforeEach(() => {
   situacao = "rascunho";
   apiFetch.mockReset();
   apiFetch.mockImplementation(async (url: string, init?: RequestInit) => {
-    if (url.includes("/contexto")) return { hoje: "2027-04-10", ontem: "2027-04-09", lojas: [{ codigo: 1, nome: "Centro" }], laboratorios: [], grupos: [], secoes: [] };
+    if (url.includes("/contexto")) return { hoje: "2027-04-10", ontem: "2027-04-09", lojas: [{ codigo: 1, nome: "Centro" }], laboratorios: [], grupos: [], secoes: [], listas: [] };
+    if (url.includes("/pedidos/visoes") || url.includes("/pedidos/listas")) return [];
     if (url.includes("/pedidos/lancamento/")) return [];
     if (url.includes("/pedidos/fornecedores")) return fornecedores;
     if (url.endsWith("/cotacao/7/planilha")) return { nome: "cotacao-7.xlsx", conteudo: "AAAA" };
@@ -85,7 +86,8 @@ describe("Cotação por fornecedor", () => {
   it("mostra os erros da prévia e não importa", async () => {
     situacao = "aguardando_precos";
     apiFetch.mockImplementation(async (url: string) => {
-      if (url.includes("/contexto")) return { hoje: "2027-04-10", ontem: "2027-04-09", lojas: [], laboratorios: [], grupos: [], secoes: [] };
+      if (url.includes("/contexto")) return { hoje: "2027-04-10", ontem: "2027-04-09", lojas: [], laboratorios: [], grupos: [], secoes: [], listas: [] };
+      if (url.includes("/pedidos/visoes") || url.includes("/pedidos/listas")) return [];
       if (url.includes("/pedidos/lancamento/")) return [];
       if (url.endsWith("/cotacao/7/previa")) return { validas: 0, semOferta: 0, erros: [{ linha: 2, mensagem: "Preço inválido." }], semMatch: [] };
       if (url.endsWith("/cotacao")) return detalhe(false);
