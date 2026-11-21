@@ -351,7 +351,7 @@ function GroupHeaderRow({
           className={cn(leadingHead?.className)}
         />
       )}
-      {spans.map(({ key, lastKey, group, frozen, span }) => {
+      {spans.map(({ key, lastKey, group, frozen, span }, i) => {
         const head = frozen ? frozenHead?.(key, lastKey) : undefined;
         return (
           <TableHead
@@ -361,7 +361,7 @@ function GroupHeaderRow({
             className={cn(
               "h-8",
               group && "text-center",
-              boundaries.has(key) && GROUP_BOUNDARY_CLASS,
+              boundaries.has(key) && !(spans[i - 1]?.frozen && !frozen) && GROUP_BOUNDARY_CLASS,
               head?.className,
             )}
           >
@@ -655,6 +655,9 @@ export function DataTable<TRow>({
   /** Linha inferior do cabeçalho de colunas, que dobra como borda direita na última coluna fixa. */
   const headerEdgeClass = (key: string) =>
     key === lastFrozenKey ? FROZEN_HEADER_EDGE_CLASS : HEADER_EDGE_CLASS;
+  /** A 1ª coluna após as fixas já tem a linha de 2px da última fixa: sem a borda de grupo, para não duplicar. */
+  const boundaryClass = (key: string) =>
+    boundaries.has(key) && !(frozenCount > 0 && key === columns[frozenCount]?.key) && GROUP_BOUNDARY_CLASS;
   const setHeadRef = (key: string) => (el: HTMLTableCellElement | null) => {
     if (el) headRefs.current.set(key, el);
     else headRefs.current.delete(key);
@@ -929,7 +932,7 @@ export function DataTable<TRow>({
                           isNumericColumn(col) && "text-right",
                           isCenteredColumn(col) && "text-center",
                           hasFixedWidth(col) && FIXED_COLUMN_WIDTH_CLASS,
-                          boundaries.has(col.key) && !(part === "rest" && col.key === columns[frozenCount]?.key) && GROUP_BOUNDARY_CLASS,
+                          boundaryClass(col.key),
                           frozenClass(col.key, true),
                           headerEdgeClass(col.key),
                         )}
@@ -1283,8 +1286,7 @@ export function DataTable<TRow>({
                                   style={frozenStyle(col.key)}
                                   className={cn(
                                     columnCellClassName(col, row),
-                                    boundaries.has(col.key) &&
-                                      GROUP_BOUNDARY_CLASS,
+                                    boundaryClass(col.key),
                                     frozenClass(col.key),
                                     col.key === lastFrozenKey &&
                                       FROZEN_EDGE_CLASS,
@@ -1351,7 +1353,7 @@ export function DataTable<TRow>({
                             style={frozenStyle(col.key)}
                             className={cn(
                               totalsCellClassName(col),
-                              boundaries.has(col.key) && GROUP_BOUNDARY_CLASS,
+                              boundaryClass(col.key),
                               frozenClass(col.key, true),
                               col.key === lastFrozenKey && FROZEN_EDGE_CLASS,
                               trend && "cursor-help",
