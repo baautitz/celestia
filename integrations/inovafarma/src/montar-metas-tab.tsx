@@ -980,7 +980,6 @@ function TabelaMontarMetas({
       emptyMessage={metas.length === 0 ? "Nenhuma Meta. Use Adicionar Meta para escolher os Tipos de Meta deste Período." : "Nenhum Colaborador nesta Loja."}
       search={{ placeholder: "Buscar Colaborador" }}
       frozenUntil="nome"
-      arrowNavigation
       striped
       print={{
         orientation: "landscape",
@@ -1067,7 +1066,6 @@ function PorColaboradorMontarMetas({ metas, colaboradores, somenteLeitura, estad
           rows={metas}
           getRowId={(m) => m.id}
           emptyMessage="Nenhuma Meta neste Período."
-          arrowNavigation
         />
       )}
     />
