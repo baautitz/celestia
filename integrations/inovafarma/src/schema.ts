@@ -231,3 +231,19 @@ export const preVencidosCorrecoesBaixa = inovafarmaSchema.table(
   },
   (t) => [uniqueIndex("pre_vencidos_correcoes_baixa_linha_idx").on(t.codigoLoja, t.vendaId, t.produtoId)],
 );
+
+/** Estoque Mínimo e máximo por produto e Loja (valores do Celestia, nunca do ERP). */
+export const pedidosMinimos = inovafarmaSchema.table(
+  "pedidos_minimos",
+  {
+    /** Identificador opaco do produto (`Produto.rowguid`), sem FK. */
+    produtoId: text("produto_id").notNull(),
+    /** Código da Loja no ERP, sem FK. */
+    codigoLoja: integer("codigo_loja").notNull(),
+    minimo: doublePrecision("minimo").notNull(),
+    maximo: doublePrecision("maximo"),
+    version: integer("version").notNull().default(1),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.produtoId, t.codigoLoja] })],
+);
