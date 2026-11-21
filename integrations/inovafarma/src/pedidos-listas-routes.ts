@@ -3,7 +3,8 @@ import type { ModuleContext } from "@platform/core/module";
 import { NomeDuplicadoError } from "./erros-de-store.js";
 import { ator, recusaDeValidacao, Version, versaoDaQuery, versaoDesatualizada, type AuthContext } from "./metas-comum.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
-import { PEDIDO_LISTA_TARGET, PEDIDOS_LISTAS_ACTIONS, PEDIDOS_LISTAS_PLUGIN } from "./pedidos-listas-audit.js";
+import { PEDIDOS_PLUGIN } from "./pedidos-audit.js";
+import { PEDIDO_LISTA_TARGET, PEDIDOS_LISTAS_ACTIONS } from "./pedidos-listas-audit.js";
 import { DadosListaPedidos, descreverLista, problemaDaLista, type ListaPedidos } from "./pedidos-listas.js";
 import type { PedidosListasStore } from "./pedidos-listas-store.js";
 import type { AuditService } from "./vinculo-audit.js";
@@ -31,7 +32,7 @@ export function registerPedidosListasRoutes({ routes, permissions, auth, store, 
   const valores = (l: Pick<ListaPedidos, "nome" | "entradas">) => ({ nome: l.nome, conteudo: descreverLista(l) });
   const registrar = (c: AuthContext, action: string, lista: ListaPedidos, anterior: ListaPedidos | null = null) =>
     audit.record({
-      plugin: PEDIDOS_LISTAS_PLUGIN,
+      plugin: PEDIDOS_PLUGIN,
       action,
       actor: ator(c),
       target: { type: PEDIDO_LISTA_TARGET, id: lista.id },

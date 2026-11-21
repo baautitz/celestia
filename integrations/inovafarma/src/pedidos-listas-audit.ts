@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { PEDIDOS_PLUGIN } from "./pedidos-audit.js";
 import type { AuditService } from "./vinculo-audit.js";
 
-export const PEDIDOS_LISTAS_PLUGIN = "inovafarma";
 export const PEDIDO_LISTA_TARGET = "pedido_lista_produtos";
 export const PEDIDOS_LISTAS_ACTIONS = {
   criar: "pedido_lista_create",
@@ -17,7 +17,7 @@ export type ValoresListaPedidos = z.infer<typeof Valores>;
 const nome = (a: ValoresListaPedidos) => `"${a.nome}"`;
 
 export function declarePedidosListasAudit(audit: AuditService): void {
-  const base = { plugin: PEDIDOS_LISTAS_PLUGIN, schemaVersion: 1, schema: Atributos };
+  const base = { plugin: PEDIDOS_PLUGIN, schemaVersion: 1, schema: Atributos };
   audit.declareAction({ ...base, action: PEDIDOS_LISTAS_ACTIONS.criar, summary: (a) => `Criou a lista de produtos ${nome(a)} de Pedidos: ${a.conteudo}.` });
   audit.declareAction({
     ...base,
