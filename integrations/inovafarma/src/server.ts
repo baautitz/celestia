@@ -9,6 +9,10 @@ import { declareColunasDesempenhoAudit } from "./colunas-desempenho-audit.js";
 import { registerColunasDesempenhoRoutes } from "./colunas-desempenho-routes.js";
 import { MemoryColunaDesempenhoStore } from "./colunas-desempenho-store.js";
 import { PostgresColunaDesempenhoStore } from "./postgres-colunas-desempenho-store.js";
+import { declarePedidosAudit } from "./pedidos-audit.js";
+import { registerPedidosRoutes } from "./pedidos-routes.js";
+import { MemoryPedidoStore } from "./pedidos-store.js";
+import { PostgresPedidoStore } from "./postgres-pedidos-store.js";
 import { declarePedidosMinimosAudit } from "./pedidos-minimos-audit.js";
 import { MemoryMinimoMaximoStore } from "./pedidos-minimos-store.js";
 import { PostgresMinimoMaximoStore } from "./postgres-pedidos-minimos-store.js";
@@ -93,6 +97,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declareColunasDesempenhoAudit(audit);
       declareMetasAudit(audit);
       declareApuracaoAudit(audit);
+      declarePedidosAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
       const avaliacoes = db ? new PostgresAvaliacaoStore(db) : new MemoryAvaliacaoStore();
       const users = services.use<UsersService>("iam", "users");
@@ -145,6 +150,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       });
       declarePedidosMinimosAudit(audit);
       registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos: db ? new PostgresMinimoMaximoStore(db) : new MemoryMinimoMaximoStore(), audit });
+      registerPedidosRoutes({ routes, permissions, auth, store: db ? new PostgresPedidoStore(db) : new MemoryPedidoStore(), audit });
       const tiposMeta = db ? new PostgresTipoMetaStore(db) : new MemoryTipoMetaStore();
       const metas = db ? new PostgresMetaStore(db) : new MemoryMetaStore();
       registerTiposMetaRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: tiposMeta, metas, periods, audit });
