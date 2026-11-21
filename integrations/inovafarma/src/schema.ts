@@ -231,3 +231,42 @@ export const preVencidosCorrecoesBaixa = inovafarmaSchema.table(
   },
   (t) => [uniqueIndex("pre_vencidos_correcoes_baixa_linha_idx").on(t.codigoLoja, t.vendaId, t.produtoId)],
 );
+
+/** Listas de produtos nomeadas de Pedidos: globais, com tabela própria (independentes das Listas das Metas). */
+export const pedidosListas = inovafarmaSchema.table(
+  "pedidos_listas",
+  {
+    id: text("id").primaryKey(),
+    nome: text("nome").notNull(),
+    /** Entradas validadas por `EntradaLista`: ids do ERP, sem FK. */
+    entradas: jsonb("entradas").$type<EntradaLista[]>().notNull().default(sql`'[]'::jsonb`),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("pedidos_listas_nome_unique").on(sql`lower(${t.nome})`)],
+);
+
+/** Visões salvas do Lançamento de Pedidos: privadas por Usuário e sem a data. */
+export const pedidosVisoes = inovafarmaSchema.table(
+  "pedidos_visoes",
+  {
+    id: text("id").primaryKey(),
+    /** Referência lógica a `iam.users`, sem FK entre Modules. */
+    usuarioId: text("usuario_id").notNull(),
+    nome: text("nome").notNull(),
+    lojas: integer("lojas").array().notNull().default(sql`'{}'::integer[]`),
+    /** Ids de `pedidos_listas`, sem FK: uma lista apagada some do filtro ao aplicar a visão. */
+    listas: jsonb("listas").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    laboratorio: text("laboratorio"),
+    grupo: text("grupo"),
+    secao: text("secao"),
+    apenasComMinimo: boolean("apenas_com_minimo").notNull().default(false),
+    padrao: boolean("padrao").notNull().default(false),
+    version: integer("version").notNull().default(1),
+  },
+  (t) => [
+    uniqueIndex("pedidos_visoes_usuario_nome_unique").on(t.usuarioId, sql`lower(${t.nome})`),
+    uniqueIndex("pedidos_visoes_usuario_padrao_unique").on(t.usuarioId).where(sql`${t.padrao}`),
+  ],
+);

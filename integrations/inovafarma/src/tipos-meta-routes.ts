@@ -65,9 +65,10 @@ const valores = (t: TipoMeta): ValoresTipo => {
 export function registerTiposMetaRoutes({ routes, permissions, auth, erpClient, store, metas, periods, audit }: TiposMetaRoutesDeps): void {
   const manage = INOVAFARMA_PERMISSIONS.ref("tipos-meta:manage");
   const pode = (c: AuthContext) => permissions.has(c.get("user")?.permissions, manage.key);
-  // A busca e a conferência das entradas também servem à montagem das colunas do Desempenho de Vendas.
+  // A busca e a conferência das entradas também servem às colunas do Desempenho de Vendas e às listas de Pedidos.
   const colunas = INOVAFARMA_PERMISSIONS.ref("colunas-desempenho:manage");
-  const podeBuscar = (c: AuthContext) => pode(c) || permissions.has(c.get("user")?.permissions, colunas.key);
+  const listasPedidos = INOVAFARMA_PERMISSIONS.ref("pedidos-listas:gerir");
+  const podeBuscar = (c: AuthContext) => pode(c) || permissions.has(c.get("user")?.permissions, colunas.key) || permissions.has(c.get("user")?.permissions, listasPedidos.key);
 
   const registrar = (c: AuthContext, action: string, tipo: TipoMeta, anterior: TipoMeta | null = null) =>
     audit.record({
