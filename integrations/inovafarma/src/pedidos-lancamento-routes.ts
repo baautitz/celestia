@@ -8,6 +8,9 @@ import { PEDIDOS_MINIMOS_ACTION, PEDIDOS_MINIMOS_PLUGIN, PEDIDOS_MINIMOS_TARGET 
 import type { MinimoMaximoStore } from "./pedidos-minimos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
+import { COLUNA_DO_PRODUTO, idsPorTipo } from "./lista-produtos.js";
+import { listaPronta } from "./pedidos-listas.js";
+import type { PedidosListasStore } from "./pedidos-listas-store.js";
 import { lojasDoErp } from "./pre-vencidos-comum.js";
 
 export interface PedidosLancamentoRoutesDeps {
@@ -15,6 +18,8 @@ export interface PedidosLancamentoRoutesDeps {
   permissions: ModuleContext["permissions"];
   auth: MiddlewareHandler;
   erpClient: () => ErpQuery | undefined;
+  /** As listas de produtos de Pedidos: só as prontas viram filtro. */
+  listas: PedidosListasStore;
   minimos: MinimoMaximoStore;
   audit: AuditService;
 }
@@ -60,6 +65,7 @@ const ConsultaProdutos = z
     laboratorio: CodigoOpcional,
     grupo: CodigoOpcional,
     secao: CodigoOpcional,
+    listas: z.string().max(2000).transform((v) => v.split(",").filter(Boolean)).optional(),
     apenasMinimo: z.enum(["1"]).optional(),
   })
   .refine((q) => q.modo === "apartir" || q.ate !== undefined, { error: "Informe a data final do período.", path: ["ate"] })
@@ -177,7 +183,7 @@ const hojeNoErp = () => horaDoErp(new Date().toISOString()).slice(0, 10);
 const diaAnterior = (dia: string) => new Date(Date.parse(`${dia}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 
 /** Lançamento de Pedidos: filtros, grade de produtos por Loja e movimentação mensal. Só leitura no ERP. */
-export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, audit }: PedidosLancamentoRoutesDeps): void {
+export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, audit, listas }: PedidosLancamentoRoutesDeps): void {
   const recusa = (c: AuthContext) => (permissions.has(c.get("user")?.permissions, VER.key) ? null : c.json({ error: VER.deniedMessage }, 403));
 
   routes.get(`${BASE}/contexto`, auth, async (c: AuthContext) => {
@@ -189,7 +195,8 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
       const opcoes = async (sql: string) => (await client.query<{ id: string; nome: string | null }>(sql)).map((r) => ({ id: String(r.id), nome: (r.nome ?? "").trim() }));
       const [lojas, laboratorios, grupos, secoes] = await Promise.all([lojasDoErp(client), opcoes(OPCOES_SQL.laboratorios), opcoes(OPCOES_SQL.grupos), opcoes(OPCOES_SQL.secoes)]);
       const hoje = hojeNoErp();
-      return c.json({ hoje, ontem: diaAnterior(hoje), podeEditarMinimos: permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key), lojas, laboratorios, grupos, secoes });
+      const prontas = (await listas.listar()).filter(listaPronta).map((l) => ({ id: l.id, nome: l.nome }));
+      return c.json({ hoje, ontem: diaAnterior(hoje), podeEditarMinimos: permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key), lojas, laboratorios, grupos, secoes, listas: prontas });
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }
@@ -202,7 +209,7 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     if (!consulta.success) return recusaDeValidacao(c, consulta.error);
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
-    const { modo, de, laboratorio, grupo, secao, lojas, apenasMinimo } = consulta.data;
+    const { modo, de, laboratorio, grupo, secao, lojas, apenasMinimo, listas: idsListas } = consulta.data;
     const ate = modo === "apartir" ? hojeNoErp() : (consulta.data.ate ?? de);
     const params: Record<string, unknown> = { dataInicio: `${de} 00:00:00`, dataFim: `${ate} 23:59:59` };
     const filtros = [filtroDeLojas("v.CodigoEmpresa", lojas, params)];
@@ -210,6 +217,13 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
       if (valor === undefined) continue;
       params[nome] = valor;
       filtros.push(`AND ${coluna} = @${nome}`);
+    }
+    if (idsListas) {
+      // Várias listas são a união das entradas; escolhidas mas nenhuma pronta (apagadas ou vazias) não traz produto.
+      const entradas = (await listas.listar()).filter((l) => idsListas.includes(l.id) && listaPronta(l)).flatMap((l) => l.entradas);
+      const condicoes = idsPorTipo(entradas, params, "lista").map(([tipo, nomes]) => `${COLUNA_DO_PRODUTO[tipo]} IN (${nomes})`);
+      if (condicoes.length === 0) return c.json([]);
+      filtros.push(`AND (${condicoes.join(" OR ")})`);
     }
     try {
       const linhas = await client.query<LinhaVenda>(produtosSql(filtros.join(" ")), params);

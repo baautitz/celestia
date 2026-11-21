@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Hono, type MiddlewareHandler } from "hono";
 import { registerPedidosLancamentoRoutes } from "./pedidos-lancamento-routes";
+import { MemoryPedidosListasStore } from "./pedidos-listas-store";
 import { MemoryMinimoMaximoStore } from "./pedidos-minimos-store";
 import { declarePedidosMinimosAudit } from "./pedidos-minimos-audit";
 import type { AuditService } from "./vinculo-audit";
@@ -14,6 +15,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
     c.set("user" as never, { sub: "ana", fullname: "Ana", permissions } as never);
     await next();
   };
+  const listas = new MemoryPedidosListasStore();
   const store = new MemoryMinimoMaximoStore();
   const resumos = new Map<string, (a: never) => string>();
   const log: string[] = [];
@@ -27,6 +29,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
     routes: app,
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
     auth,
+    listas,
     minimos: store,
     audit,
     erpClient: () => ({
@@ -52,7 +55,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
   });
   const get = (path: string) => app.request(path);
   const put = (corpo: unknown) => app.request("/pedidos/lancamento/minimos", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
-  return { get, put, consultas, log };
+  return { get, put, consultas, log, listas };
 }
 
 describe("Lançamento de Pedidos: contexto", () => {
@@ -67,6 +70,14 @@ describe("Lançamento de Pedidos: contexto", () => {
     expect(corpo.podeEditarMinimos).toBe(true);
     expect(corpo.ontem).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(corpo.hoje >= corpo.ontem).toBe(true);
+  });
+
+  it("oferece só as listas prontas (com entradas), por nome", async () => {
+    const { get, listas } = boot();
+    const pronta = await listas.criar({ nome: "Vitaminas", entradas: [{ tipo: "grupo", id: "44", nome: "VITAMINAS" }] });
+    await listas.criar({ nome: "Em montagem", entradas: [] });
+    const corpo = (await (await get("/pedidos/lancamento/contexto")).json()) as { listas: unknown };
+    expect(corpo.listas).toEqual([{ id: pronta.id, nome: "Vitaminas" }]);
   });
 
   it("recusa quem não tem a Permission", async () => {
@@ -87,6 +98,26 @@ describe("Lançamento de Pedidos: produtos", () => {
     const { sql, params } = consultas[0] ?? { sql: "" };
     expect(params).toMatchObject({ dataInicio: "2027-04-01 00:00:00", dataFim: "2027-04-02 23:59:59", loja0: 1, loja1: 2, grupo: 3 });
     expect(sql).toContain("p.CodigoGrupo = @grupo");
+  });
+
+  it("filtra por várias listas prontas, unidas por OR, com os ids por parâmetro", async () => {
+    const { get, consultas, listas } = boot();
+    const a = await listas.criar({ nome: "A", entradas: [{ tipo: "grupo", id: "44", nome: "VITAMINAS" }] });
+    const b = await listas.criar({ nome: "B", entradas: [{ tipo: "laboratorio", id: "7", nome: "EMS" }, { tipo: "grupo", id: "45", nome: "X" }] });
+    const vazia = await listas.criar({ nome: "Vazia", entradas: [] });
+    const res = await get(`/pedidos/lancamento/produtos?modo=apartir&de=2027-04-01&listas=${a.id},${b.id},${vazia.id}`);
+    expect(res.status).toBe(200);
+    const { sql, params } = consultas[0] ?? { sql: "" };
+    expect(sql).toContain("p.CodigoGrupo IN (@listagrupo0, @listagrupo1)");
+    expect(sql).toContain("p.CodigoFabricante IN (@listalaboratorio0)");
+    expect(params).toMatchObject({ listagrupo0: 44, listagrupo1: 45, listalaboratorio0: 7 });
+  });
+
+  it("com listas escolhidas mas nenhuma pronta, não traz produto algum", async () => {
+    const { get, consultas } = boot();
+    const res = await get("/pedidos/lancamento/produtos?modo=apartir&de=2027-04-01&listas=plp_sumiu");
+    expect(await res.json()).toEqual([]);
+    expect(consultas.length).toBe(0);
   });
 
   it("no modo a partir de, vai até hoje", async () => {
