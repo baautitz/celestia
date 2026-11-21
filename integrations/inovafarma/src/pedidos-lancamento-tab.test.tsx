@@ -16,23 +16,25 @@ const contexto = {
   grupos: [{ id: "3", nome: "MEDICAMENTOS" }],
   secoes: [{ id: "9", nome: "GENERICOS" }],
   listas: [{ id: "plp_1", nome: "Vitaminas" }],
+  podeEditarMinimos: true,
 };
 const visaoBase = { lojas: [1], listas: ["plp_1"], laboratorio: "7", grupo: null, secao: null, apenasComMinimo: false, usuarioId: "ana", version: 1 };
 let visoes: unknown[];
-const dipirona = { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 5, estoque: 10, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10 }] };
-const aas = { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4 }] };
+const dipirona = { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 5, estoque: 10, minimo: 0, sugestao: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, version: 0 }] };
+const aas = { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, minimo: 8, sugestao: 5, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: 8, maximo: 20, sugestao: 5, version: 2 }] };
 let produtos: unknown[];
 
 beforeEach(() => {
   produtos = [dipirona, aas];
   visoes = [];
+  contextoAtual = contexto;
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => ({ matches: false, media: query, onchange: null, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false }),
   });
   apiFetch.mockReset();
   apiFetch.mockImplementation(async (url: string) => {
-    if (url.includes("/contexto")) return contexto;
+    if (url.includes("/contexto")) return contextoAtual;
     if (url.includes("/pedidos/visoes")) return visoes;
     if (url.includes("/movimentacao")) return [{ mes: "2027-03", vendida: 12, comprada: 30 }];
     return produtos;
@@ -40,6 +42,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+let contextoAtual = contexto;
 const renderizar = () => render(<UiProvider><PedidosPage /></UiProvider>, { wrapper: MemoryRouter });
 
 describe("Pedidos: Lançamento", () => {
@@ -70,6 +73,40 @@ describe("Pedidos: Lançamento", () => {
     expect(screen.getByText("Lojas: DIPIRONA")).toBeDefined();
   });
 
+  it("mostra o mínimo e a sugestão de cada produto na grade", async () => {
+    renderizar();
+    await screen.findByLabelText("Selecionar AAS");
+    expect(screen.getByText("Sugestão")).toBeDefined();
+    expect(screen.getByText("Estoque mínimo")).toBeDefined();
+  });
+
+  it("filtra apenas os produtos com estoque mínimo", async () => {
+    renderizar();
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Apenas com estoque mínimo" }));
+    await waitFor(() => expect(apiFetch.mock.calls.some(([u]) => String(u).includes("/produtos") && String(u).includes("apenasMinimo=1"))).toBe(true));
+  });
+
+  it("edita o mínimo da Loja na célula e grava com a version", async () => {
+    renderizar();
+    fireEvent.click(await screen.findByLabelText("Selecionar AAS"));
+    const campo = await screen.findByLabelText("Estoque mínimo da Loja Centro");
+    expect((campo as HTMLInputElement).value).toBe("8");
+    fireEvent.change(campo, { target: { value: "12" } });
+    fireEvent.blur(campo);
+    await waitFor(() => {
+      const put = apiFetch.mock.calls.find(([, init]) => init?.method === "PUT");
+      expect(JSON.parse(put?.[1].body)).toEqual({ produtoId: "p-2", codigoLoja: 1, minimo: 12, maximo: 20, version: 2 });
+    });
+  });
+
+  it("sem a Permission de editar, os valores aparecem só para leitura", async () => {
+    contextoAtual = { ...contexto, podeEditarMinimos: false };
+    renderizar();
+    fireEvent.click(await screen.findByLabelText("Selecionar AAS"));
+    await screen.findByText("Lojas: AAS");
+    expect(screen.queryByLabelText("Estoque mínimo da Loja Centro")).toBeNull();
+  });
+
   it("filtra por lista de produtos", async () => {
     renderizar();
     await screen.findByLabelText("Selecionar DIPIRONA");
@@ -95,7 +132,7 @@ describe("Pedidos: visões salvas", () => {
   it("salva a visão atual com os filtros e sem a data, como padrão", async () => {
     renderizar();
     await screen.findByLabelText("Selecionar DIPIRONA");
-    fireEvent.click(screen.getByRole("checkbox", { name: "Apenas com mínimo" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Apenas com estoque mínimo" }));
     fireEvent.click(screen.getByRole("button", { name: "Salvar visão" }));
     fireEvent.change(await screen.findByLabelText("Nome da visão"), { target: { value: "Minha" } });
     fireEvent.click(await screen.findByRole("checkbox", { name: "Abrir por padrão" }));

@@ -2,22 +2,36 @@ import { describe, expect, it } from "vitest";
 import { Hono, type MiddlewareHandler } from "hono";
 import { registerPedidosLancamentoRoutes } from "./pedidos-lancamento-routes";
 import { MemoryPedidosListasStore } from "./pedidos-listas-store";
+import { MemoryMinimoMaximoStore } from "./pedidos-minimos-store";
+import { declarePedidosMinimosAudit } from "./pedidos-minimos-audit";
+import type { AuditService } from "./vinculo-audit";
 
 const PERMISSAO = "inovafarma:pedidos-lancamento:ver";
+const EDITAR = "inovafarma:pedidos-minimos:editar";
 
-function boot({ permissions = [PERMISSAO], falha = false }: { permissions?: string[]; falha?: boolean } = {}) {
+function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permissions?: string[]; falha?: boolean } = {}) {
   const app = new Hono();
   const auth: MiddlewareHandler = async (c, next) => {
     c.set("user" as never, { sub: "ana", fullname: "Ana", permissions } as never);
     await next();
   };
   const listas = new MemoryPedidosListasStore();
+  const store = new MemoryMinimoMaximoStore();
+  const resumos = new Map<string, (a: never) => string>();
+  const log: string[] = [];
+  const audit: AuditService = {
+    declareAction: (def) => void resumos.set(def.action, def.summary as (a: never) => string),
+    record: async (input) => void log.push(resumos.get(input.action)?.(input.attributes as never) ?? "?"),
+  };
+  declarePedidosMinimosAudit(audit);
   const consultas: { sql: string; params?: Record<string, unknown> }[] = [];
   registerPedidosLancamentoRoutes({
     routes: app,
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
     auth,
     listas,
+    minimos: store,
+    audit,
     erpClient: () => ({
       query: async <T,>(sql: string, params?: Record<string, unknown>) => {
         consultas.push({ sql, params });
@@ -40,7 +54,8 @@ function boot({ permissions = [PERMISSAO], falha = false }: { permissions?: stri
     }),
   });
   const get = (path: string) => app.request(path);
-  return { get, consultas, listas };
+  const put = (corpo: unknown) => app.request("/pedidos/lancamento/minimos", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
+  return { get, put, consultas, log, listas };
 }
 
 describe("Lançamento de Pedidos: contexto", () => {
@@ -52,6 +67,7 @@ describe("Lançamento de Pedidos: contexto", () => {
     expect(corpo.laboratorios).toEqual([{ id: "7", nome: "EMS" }]);
     expect(corpo.grupos).toEqual([{ id: "3", nome: "MEDICAMENTOS" }]);
     expect(corpo.secoes).toEqual([{ id: "9", nome: "GENERICOS" }]);
+    expect(corpo.podeEditarMinimos).toBe(true);
     expect(corpo.ontem).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(corpo.hoje >= corpo.ontem).toBe(true);
   });
@@ -76,8 +92,8 @@ describe("Lançamento de Pedidos: produtos", () => {
     const res = await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&lojas=1,2&grupo=3");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([
-      { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 8, estoque: 10, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10 }, { codigoLoja: 2, vendida: 3, estoque: 0 }] },
-      { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4 }] },
+      { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 8, estoque: 10, minimo: 0, sugestao: 3, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, version: 0 }, { codigoLoja: 2, vendida: 3, estoque: 0, minimo: null, maximo: null, sugestao: 3, version: 0 }] },
+      { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, minimo: 0, sugestao: 0, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: null, maximo: null, sugestao: 0, version: 0 }] },
     ]);
     const { sql, params } = consultas[0] ?? { sql: "" };
     expect(params).toMatchObject({ dataInicio: "2027-04-01 00:00:00", dataFim: "2027-04-02 23:59:59", loja0: 1, loja1: 2, grupo: 3 });
@@ -135,5 +151,53 @@ describe("Lançamento de Pedidos: movimentação mensal", () => {
 
   it("exige o produto", async () => {
     expect((await boot().get("/pedidos/lancamento/movimentacao")).status).toBe(400);
+  });
+});
+
+describe("Lançamento de Pedidos: estoque mínimo e máximo", () => {
+  const PRODUTOS = "/pedidos/lancamento/produtos?modo=apartir&de=2027-04-01";
+
+  it("grava o mínimo e o máximo da Loja, com version, e registra no Audit Log", async () => {
+    const { put, log } = boot();
+    const res = await put({ produtoId: "p-1", codigoLoja: 1, minimo: 20, maximo: 50, version: 0 });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ produtoId: "p-1", codigoLoja: 1, minimo: 20, maximo: 50, version: 1 });
+    expect(log).toHaveLength(1);
+    expect(log[0]).toContain("20");
+  });
+
+  it("reflete na grade e na sugestão: vendas + mínimo - estoque, nunca negativa", async () => {
+    const { get, put } = boot();
+    await put({ produtoId: "p-1", codigoLoja: 1, minimo: 20, maximo: null, version: 0 });
+    const produtos = (await (await get(PRODUTOS)).json()) as { produtoId: string; minimo: number; sugestao: number; lojas: { codigoLoja: number; minimo: number | null; sugestao: number; version: number }[] }[];
+    const dipirona = produtos.find((p) => p.produtoId === "p-1");
+    expect(dipirona?.lojas[0]).toMatchObject({ minimo: 20, sugestao: 15, version: 1 });
+    expect(dipirona?.lojas[1]).toMatchObject({ minimo: null, sugestao: 3 });
+    expect(dipirona).toMatchObject({ minimo: 20, sugestao: 18 });
+  });
+
+  it("filtra apenas os produtos com estoque mínimo", async () => {
+    const { get, put } = boot();
+    await put({ produtoId: "p-2", codigoLoja: 1, minimo: 5, maximo: null, version: 0 });
+    const produtos = (await (await get(`${PRODUTOS}&apenasMinimo=1`)).json()) as { produtoId: string }[];
+    expect(produtos.map((p) => p.produtoId)).toEqual(["p-2"]);
+  });
+
+  it("recusa com 409 uma edição sobre version desatualizada", async () => {
+    const { put } = boot();
+    await put({ produtoId: "p-1", codigoLoja: 1, minimo: 1, maximo: null, version: 0 });
+    const res = await put({ produtoId: "p-1", codigoLoja: 1, minimo: 2, maximo: null, version: 0 });
+    expect(res.status).toBe(409);
+  });
+
+  it("recusa máximo menor que o mínimo e valores negativos", async () => {
+    const { put } = boot();
+    expect((await put({ produtoId: "p-1", codigoLoja: 1, minimo: 10, maximo: 5, version: 0 })).status).toBe(400);
+    expect((await put({ produtoId: "p-1", codigoLoja: 1, minimo: -1, maximo: null, version: 0 })).status).toBe(400);
+  });
+
+  it("exige a Permission de editar", async () => {
+    const res = await boot({ permissions: [PERMISSAO] }).put({ produtoId: "p-1", codigoLoja: 1, minimo: 1, maximo: null, version: 0 });
+    expect(res.status).toBe(403);
   });
 });
