@@ -5,6 +5,7 @@ import type { MetaApurada } from "./apuracao-store.js";
 import type { BaixaDoPeriodo } from "./baixas-do-periodo.js";
 import type { ItemCongelado } from "./baixas-congeladas-store.js";
 import type { MedidaColuna } from "./colunas-desempenho.js";
+import type { ItemPedido } from "./pedidos.js";
 import type { EntradaLista, Exibicao, ListaTipo, RegraPremio } from "./tipos-meta.js";
 
 /** Um schema Postgres por Module. */
@@ -230,4 +231,21 @@ export const preVencidosCorrecoesBaixa = inovafarmaSchema.table(
     atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("pre_vencidos_correcoes_baixa_linha_idx").on(t.codigoLoja, t.vendaId, t.produtoId)],
+);
+
+/** Pedidos de compra: uma entidade com estados; os itens (produto, nome e quantidade por Loja) ficam no próprio Pedido. */
+export const pedidos = inovafarmaSchema.table(
+  "pedidos",
+  {
+    id: text("id").primaryKey(),
+    status: text("status").notNull(),
+    itens: jsonb("itens").$type<ItemPedido[]>().notNull(),
+    /** Referência lógica a `iam.users`, sem FK entre Modules. */
+    criadoPorId: text("criado_por_id").notNull(),
+    criadoPorNome: text("criado_por_nome").notNull(),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [index("pedidos_status_idx").on(t.status, t.criadoEm)],
 );
