@@ -25,7 +25,6 @@ export interface CotacaoRoutesDeps {
 const BASE = "/pedidos/pedidos/:id/cotacao";
 const MAX_FORNECEDORES = 30;
 const MAX_ARQUIVO = 5 * 1024 * 1024;
-const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const NAO_ENCONTRADO = "Pedido não encontrado.";
 const DESATUALIZADO = versaoDesatualizada("A cotação foi alterada por outra pessoa. A tela foi recarregada.");
 
@@ -33,6 +32,9 @@ const Inicio = z.object({
   fornecedores: z.array(Codigo).min(1, "Escolha ao menos um fornecedor.").max(MAX_FORNECEDORES, "Fornecedores demais na cotação."),
   version: Version,
 }).refine((i) => new Set(i.fornecedores).size === i.fornecedores.length, { error: "Fornecedor repetido.", path: ["fornecedores"] });
+
+/** A planilha viaja em base64: o cliente de API da plataforma só fala JSON. */
+const Envio = z.object({ arquivo: z.string().min(1, "Envie a planilha preenchida.").max(MAX_ARQUIVO * 2), version: Version.optional() });
 
 const FORNECEDORES_SQL = `
   SELECT f.CodigoFornecedor AS codigo, LTRIM(RTRIM(c.Nome)) AS nome
@@ -155,16 +157,17 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
       codigoFornecedor: cotacao.codigoFornecedor,
       linhas: pedido.itens.map((i) => ({ produtoId: i.produtoId, codigoBarra: i.codigoBarra, nome: i.nome, fabricante: detalhes.get(i.produtoId)?.fabricante ?? null, fracao: detalhes.get(i.produtoId)?.fracao ?? null, quantidade: totalDoItem(i) })),
     });
-    return c.body(new Uint8Array(arquivo), 200, { "Content-Type": XLSX, "Content-Disposition": `attachment; filename="cotacao-${cotacao.codigoFornecedor}.xlsx"` });
+    return c.json({ nome: `cotacao-${cotacao.codigoFornecedor}.xlsx`, conteudo: arquivo.toString("base64") });
   });
 
   /** O arquivo enviado (multipart) já lido e conferido contra o Pedido; senão a recusa. */
   const conferir = async (c: AuthContext, pedido: Pedido, cotacao: Cotacao) => {
-    const corpo = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
-    const arquivo = corpo.arquivo;
-    if (!(arquivo instanceof File)) return { recusa: c.json({ error: "Envie a planilha preenchida." }, 400) } as const;
-    if (arquivo.size > MAX_ARQUIVO) return { recusa: c.json({ error: "A planilha passa de 5 MB." }, 400) } as const;
-    const lida: PlanilhaLida = await lerPlanilha(Buffer.from(await arquivo.arrayBuffer()), { pedidoId: pedido.id, codigoFornecedor: cotacao.codigoFornecedor });
+    const lido = Envio.safeParse(await c.req.json().catch(() => null));
+    if (!lido.success) return { recusa: recusaDeValidacao(c, lido.error) } as const;
+    const corpo = lido.data;
+    const arquivo = Buffer.from(corpo.arquivo, "base64");
+    if (arquivo.length > MAX_ARQUIVO) return { recusa: c.json({ error: "A planilha passa de 5 MB." }, 400) } as const;
+    const lida: PlanilhaLida = await lerPlanilha(arquivo, { pedidoId: pedido.id, codigoFornecedor: cotacao.codigoFornecedor });
     if (!lida.ok) return { recusa: c.json({ error: lida.erro }, 422) } as const;
     const produtosDoPedido = new Set(pedido.itens.map((i) => i.produtoId));
     const erros = lida.linhas.filter((l) => l.erro && produtosDoPedido.has(l.produtoId)).map((l) => ({ linha: l.linha, mensagem: l.erro ?? "" }));
@@ -186,12 +189,12 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     if ("recusa" in achado) return achado.recusa;
     const conferido = await conferir(c, achado.pedido, achado.cotacao);
     if ("recusa" in conferido) return conferido.recusa;
-    const version = Version.safeParse(Number(conferido.corpo.version));
-    if (!version.success) return recusaDeValidacao(c, version.error);
+    const version = conferido.corpo.version;
+    if (version === undefined) return c.json({ error: "Informe a versão da cotação." }, 400);
     if (conferido.previa.erros.length > 0) return c.json({ error: "A planilha tem linhas com erro. Corrija e envie de novo." }, 400);
     const precos: Record<string, number | null> = Object.fromEntries(achado.pedido.itens.map((i) => [i.produtoId, null]));
     for (const l of conferido.validas) precos[l.produtoId] = l.preco;
-    const gravada = await cotacoes.gravarPrecos(achado.pedido.id, achado.cotacao.codigoFornecedor, precos, version.data);
+    const gravada = await cotacoes.gravarPrecos(achado.pedido.id, achado.cotacao.codigoFornecedor, precos, version);
     if (!gravada) return c.json(DESATUALIZADO, 409);
     const atual = (await pedidos.marcarCotado(achado.pedido.id)) ?? (await pedidos.pedido(achado.pedido.id)) ?? achado.pedido;
     await registrar(c, COTACAO_ACTIONS.importar, atual, { codigoFornecedor: gravada.codigoFornecedor, ofertas: conferido.previa.validas });

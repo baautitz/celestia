@@ -62,7 +62,9 @@ async function iniciar(b: Boot, fornecedores = [7, 9]) {
 async function baixarPlanilha(b: Boot, codigo: number): Promise<Buffer> {
   const res = await b.req("gil", "GET", `${BASE(b.pedido.id)}/${codigo}/planilha`);
   expect(res.status).toBe(200);
-  return Buffer.from(await res.arrayBuffer());
+  const { nome, conteudo } = (await res.json()) as { nome: string; conteudo: string };
+  expect(nome).toBe(`cotacao-${codigo}.xlsx`);
+  return Buffer.from(conteudo, "base64");
 }
 
 async function preencher(buffer: Buffer, precos: Record<number, number>): Promise<Buffer> {
@@ -72,12 +74,8 @@ async function preencher(buffer: Buffer, precos: Record<number, number>): Promis
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
-const enviar = (b: Boot, caminho: string, arquivo: Buffer, version?: number) => {
-  const form = new FormData();
-  form.set("arquivo", new File([new Uint8Array(arquivo)], "cotacao.xlsx"));
-  if (version !== undefined) form.set("version", String(version));
-  return b.app.request(`${BASE(b.pedido.id)}${caminho}`, { method: "POST", headers: { "x-user": "gil" }, body: form });
-};
+/** O arquivo vai em base64 no JSON: o cliente de API da plataforma só fala JSON. */
+const enviar = (b: Boot, caminho: string, arquivo: Buffer, version?: number) => b.req("gil", "POST", `${BASE(b.pedido.id)}${caminho}`, { arquivo: arquivo.toString("base64"), version });
 
 describe("Cotação: fornecedores", () => {
   it("lista os fornecedores ativos do ERP em ordem alfabética, com busca", async () => {
