@@ -240,6 +240,9 @@ export const pedidos = inovafarmaSchema.table(
     id: text("id").primaryKey(),
     status: text("status").notNull(),
     itens: jsonb("itens").$type<ItemPedido[]>().notNull(),
+    /** `produtoId` -> código do fornecedor escolhido na confirmação. */
+    escolhas: jsonb("escolhas").$type<Record<string, number>>().notNull().default({}),
+    confirmadoEm: timestamp("confirmado_em"),
     /** Referência lógica a `iam.users`, sem FK entre Modules. */
     criadoPorId: text("criado_por_id").notNull(),
     criadoPorNome: text("criado_por_nome").notNull(),

@@ -14,6 +14,10 @@ export interface PedidoStore {
   iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null>;
   /** aguardando preços -> cotado; null se o Pedido não está aguardando preços. */
   marcarCotado(id: string): Promise<Pedido | null>;
+  /** Compare-and-set pela `version`: cotado -> confirmado com o fornecedor escolhido por produto; null se mudou ou não está cotado. */
+  confirmar(id: string, escolhas: Record<string, number>, expectedVersion: number): Promise<Pedido | null>;
+  /** Grava o resultado da conferência com a NF em um Pedido confirmado ou já em recebimento; null se o Pedido não está nessa fase. */
+  registrarRecebimento(id: string, status: "confirmado" | "parcialmente_recebido" | "recebido"): Promise<Pedido | null>;
 }
 
 export const novoIdPedido = (): string => `ped_${randomUUID()}`;
@@ -31,7 +35,7 @@ export class MemoryPedidoStore implements PedidoStore {
 
   async criar(dados: DadosPedido, autor: { id: string; nome: string }): Promise<Pedido> {
     const agora = new Date().toISOString();
-    const pedido: Pedido = { ...dados, id: novoIdPedido(), status: "rascunho", criadoPorId: autor.id, criadoPorNome: autor.nome, version: 1, criadoEm: agora, atualizadoEm: agora };
+    const pedido: Pedido = { ...dados, id: novoIdPedido(), status: "rascunho", escolhas: {}, confirmadoEm: null, criadoPorId: autor.id, criadoPorNome: autor.nome, version: 1, criadoEm: agora, atualizadoEm: agora };
     this.pedidos.set(pedido.id, pedido);
     return pedido;
   }
@@ -52,9 +56,17 @@ export class MemoryPedidoStore implements PedidoStore {
     return this.mudar(id, undefined, { status: "cotado" }, "aguardando_precos");
   }
 
-  private mudar(id: string, expectedVersion: number | undefined, mudancas: Partial<Pedido>, de: Pedido["status"] = "rascunho"): Pedido | null {
+  async confirmar(id: string, escolhas: Record<string, number>, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "confirmado", escolhas, confirmadoEm: new Date().toISOString() }, "cotado");
+  }
+
+  async registrarRecebimento(id: string, status: "confirmado" | "parcialmente_recebido" | "recebido"): Promise<Pedido | null> {
+    return this.mudar(id, undefined, { status }, ["confirmado", "parcialmente_recebido", "recebido"]);
+  }
+
+  private mudar(id: string, expectedVersion: number | undefined, mudancas: Partial<Pedido>, de: Pedido["status"] | Pedido["status"][] = "rascunho"): Pedido | null {
     const atual = this.pedidos.get(id);
-    if (atual?.status !== de || (expectedVersion !== undefined && atual.version !== expectedVersion)) return null;
+    if (!atual || !([] as string[]).concat(de).includes(atual.status) || (expectedVersion !== undefined && atual.version !== expectedVersion)) return null;
     const novo = { ...atual, ...mudancas, version: atual.version + 1, atualizadoEm: new Date().toISOString() };
     this.pedidos.set(id, novo);
     return novo;
