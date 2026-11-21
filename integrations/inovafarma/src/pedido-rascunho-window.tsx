@@ -19,7 +19,7 @@ export interface ItemPedido {
 
 export interface Pedido {
   id: string;
-  status: "rascunho" | "cancelado";
+  status: "rascunho" | "aguardando_precos" | "cotado" | "cancelado";
   itens: ItemPedido[];
   criadoPorNome: string;
   version: number;
