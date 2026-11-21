@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { Codigo } from "./metas-comum.js";
 
-/** Estados do Pedido. Rascunho e cancelado vêm primeiro; as próximas fatias acrescentam os demais. */
-export const PEDIDO_STATUS = ["rascunho", "cancelado"] as const;
+/** Estados do Pedido. A Cotação leva o rascunho a aguardando preços e a cotado; as próximas fatias acrescentam os demais. */
+export const PEDIDO_STATUS = ["rascunho", "aguardando_precos", "cotado", "cancelado"] as const;
 export type PedidoStatus = (typeof PEDIDO_STATUS)[number];
 
 const MAX_QUANTIDADE = 1_000_000;

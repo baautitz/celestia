@@ -10,6 +10,10 @@ import { registerColunasDesempenhoRoutes } from "./colunas-desempenho-routes.js"
 import { MemoryColunaDesempenhoStore } from "./colunas-desempenho-store.js";
 import { PostgresColunaDesempenhoStore } from "./postgres-colunas-desempenho-store.js";
 import { declarePedidosAudit } from "./pedidos-audit.js";
+import { declareCotacaoAudit } from "./cotacao-audit.js";
+import { registerCotacaoRoutes } from "./cotacao-routes.js";
+import { MemoryCotacaoStore } from "./cotacao-store.js";
+import { PostgresCotacaoStore } from "./postgres-cotacao-store.js";
 import { registerPedidosRoutes } from "./pedidos-routes.js";
 import { MemoryPedidoStore } from "./pedidos-store.js";
 import { PostgresPedidoStore } from "./postgres-pedidos-store.js";
@@ -106,6 +110,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declareMetasAudit(audit);
       declareApuracaoAudit(audit);
       declarePedidosAudit(audit);
+      declareCotacaoAudit(audit);
       const store = db ? new PostgresVinculoStore(db) : new MemoryVinculoStore();
       const avaliacoes = db ? new PostgresAvaliacaoStore(db) : new MemoryAvaliacaoStore();
       const users = services.use<UsersService>("iam", "users");
@@ -161,7 +166,9 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       registerPedidosVisoesRoutes({ routes, permissions, auth, store: db ? new PostgresPedidosVisoesStore(db) : new MemoryPedidosVisoesStore() });
       declarePedidosMinimosAudit(audit);
       registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos: db ? new PostgresMinimoMaximoStore(db) : new MemoryMinimoMaximoStore(), audit, listas: pedidosListas });
-      registerPedidosRoutes({ routes, permissions, auth, store: db ? new PostgresPedidoStore(db) : new MemoryPedidoStore(), audit });
+      const pedidos = db ? new PostgresPedidoStore(db) : new MemoryPedidoStore();
+      registerPedidosRoutes({ routes, permissions, auth, store: pedidos, audit });
+      registerCotacaoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], pedidos, cotacoes: db ? new PostgresCotacaoStore(db) : new MemoryCotacaoStore(), audit });
       const tiposMeta = db ? new PostgresTipoMetaStore(db) : new MemoryTipoMetaStore();
       const metas = db ? new PostgresMetaStore(db) : new MemoryMetaStore();
       registerTiposMetaRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: tiposMeta, metas, periods, audit });

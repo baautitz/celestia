@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { Ban, Pencil } from "lucide-react";
+import { Ban, ClipboardList, Pencil, Scale } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
 import { Stack } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
+import { CotacaoFornecedoresWindow } from "./cotacao-fornecedores-window";
+import { CotacaoWindow } from "./cotacao-window";
 import { FalhaAoCarregar, useContexto } from "./contexto";
 import { json } from "./inovafarma-api";
 import type { LojaOpcao } from "./loja-opcao";
@@ -12,7 +14,7 @@ import { PEDIDOS_BASE, PedidoRascunhoWindow, type Pedido } from "./pedido-rascun
 import { useLatestFetch } from "./use-latest-fetch";
 import { API } from "./inovafarma-api";
 
-const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", cancelado: "Cancelado" };
+const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguardando_precos: "Aguardando preços", cotado: "Cotado", cancelado: "Cancelado" };
 const dia = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
 
 /** Aba Pedidos: a listagem dos Pedidos, com edição e cancelamento do rascunho. */
@@ -55,6 +57,29 @@ export function PedidosTab() {
     void carregar();
   };
 
+  const cotar = async (pedido: Pedido) => {
+    const iniciada = await windows.open<true>({
+      surface: "dialog",
+      size: "default",
+      title: "Cotar Pedido",
+      description: `Escolha os fornecedores do Pedido de ${dia(pedido.criadoEm)}`,
+      content: () => <CotacaoFornecedoresWindow pedido={pedido} />,
+    });
+    void carregar();
+    if (iniciada.status === "confirmed") await verCotacao(pedido);
+  };
+
+  const verCotacao = async (pedido: Pedido) => {
+    await windows.open({
+      surface: "dialog",
+      size: "full",
+      title: "Cotação",
+      description: `Pedido de ${dia(pedido.criadoEm)}`,
+      content: () => <CotacaoWindow pedidoId={pedido.id} />,
+    });
+    void carregar();
+  };
+
   const cancelar = async (pedido: Pedido) => {
     const ok = await windows.confirm({
       title: "Cancelar Pedido",
@@ -91,8 +116,15 @@ export function PedidosTab() {
         emptyMessage="Nenhum Pedido ainda. Marque produtos no Lançamento e use Gerar pedido."
         search={{ placeholder: "Buscar Pedido" }}
         rowActions={(p) =>
-          p.status === "rascunho" ? (
+          p.status === "aguardando_precos" || p.status === "cotado" ? (
+            <Button size="icon" variant="ghost" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
+              <Scale />
+            </Button>
+          ) : p.status === "rascunho" ? (
             <Stack direction="row" gap="tight">
+              <Button size="icon" variant="ghost" aria-label={`Cotar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cotar(p)}>
+                <ClipboardList />
+              </Button>
               <Button size="icon" variant="ghost" aria-label={`Editar Pedido de ${dia(p.criadoEm)}`} onClick={() => void editar(p)}>
                 <Pencil />
               </Button>

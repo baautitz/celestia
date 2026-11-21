@@ -10,6 +10,10 @@ export interface PedidoStore {
   atualizarRascunho(id: string, dados: DadosPedido, expectedVersion: number): Promise<Pedido | null>;
   /** Compare-and-set pela `version`, só em rascunho; null como em `atualizarRascunho`. */
   cancelarRascunho(id: string, expectedVersion: number): Promise<Pedido | null>;
+  /** Compare-and-set pela `version`: rascunho -> aguardando preços; null se o Pedido mudou, sumiu ou saiu do rascunho. */
+  iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null>;
+  /** aguardando preços -> cotado; null se o Pedido não está aguardando preços. */
+  marcarCotado(id: string): Promise<Pedido | null>;
 }
 
 export const novoIdPedido = (): string => `ped_${randomUUID()}`;
@@ -40,9 +44,17 @@ export class MemoryPedidoStore implements PedidoStore {
     return this.mudar(id, expectedVersion, { status: "cancelado" });
   }
 
-  private mudar(id: string, expectedVersion: number, mudancas: Partial<Pedido>): Pedido | null {
+  async iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "aguardando_precos" });
+  }
+
+  async marcarCotado(id: string): Promise<Pedido | null> {
+    return this.mudar(id, undefined, { status: "cotado" }, "aguardando_precos");
+  }
+
+  private mudar(id: string, expectedVersion: number | undefined, mudancas: Partial<Pedido>, de: Pedido["status"] = "rascunho"): Pedido | null {
     const atual = this.pedidos.get(id);
-    if (atual?.status !== "rascunho" || atual.version !== expectedVersion) return null;
+    if (atual?.status !== de || (expectedVersion !== undefined && atual.version !== expectedVersion)) return null;
     const novo = { ...atual, ...mudancas, version: atual.version + 1, atualizadoEm: new Date().toISOString() };
     this.pedidos.set(id, novo);
     return novo;
