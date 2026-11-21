@@ -4,13 +4,14 @@ import type { ModuleContext } from "@platform/core/module";
 import { horaDoErp } from "./baixas-da-loja.js";
 import { vendasFromWhere } from "./desempenho-vendas.js";
 import { ator, DiaDoCalendario, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
-import { PEDIDOS_MINIMOS_ACTION, PEDIDOS_MINIMOS_PLUGIN, PEDIDOS_MINIMOS_TARGET } from "./pedidos-minimos-audit.js";
+import { PEDIDOS_PLUGIN } from "./pedidos-audit.js";
+import { PEDIDOS_MINIMOS_ACTION, PEDIDOS_MINIMOS_TARGET } from "./pedidos-minimos-audit.js";
 import type { MinimoMaximoStore } from "./pedidos-minimos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { COLUNA_DO_PRODUTO, idsPorTipo } from "./lista-produtos.js";
 import { aChegarPorLinha, chaveDaLinha, conferir } from "./pedidos-conferencia.js";
-import { entradasDoPedido } from "./pedidos-nf.js";
+import { entradasDosPedidos } from "./pedidos-nf.js";
 import type { PedidoStore } from "./pedidos-store.js";
 import { listaPronta } from "./pedidos-listas.js";
 import type { PedidosListasStore } from "./pedidos-listas-store.js";
@@ -190,8 +191,9 @@ async function nomeDaLoja(client: ErpQuery | undefined, codigo: number): Promise
 async function aChegarDosPedidos(client: ErpQuery, pedidos: PedidoStore): Promise<Map<string, number>> {
   const total = new Map<string, number>();
   const abertos = (await pedidos.listar()).filter((p) => p.status === "confirmado" || p.status === "parcialmente_recebido");
+  const entradas = await entradasDosPedidos(client, abertos);
   for (const pedido of abertos) {
-    for (const [chave, falta] of aChegarPorLinha(conferir(pedido, await entradasDoPedido(client, pedido)))) total.set(chave, (total.get(chave) ?? 0) + falta);
+    for (const [chave, falta] of aChegarPorLinha(conferir(pedido, entradas.get(pedido) ?? new Map()))) total.set(chave, (total.get(chave) ?? 0) + falta);
   }
   return total;
 }
@@ -303,7 +305,7 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     const client = erpClient();
     const [produto, nomeLoja] = await Promise.all([nomeDoProduto(client, produtoId), nomeDaLoja(client, codigoLoja)]);
     await audit.record({
-      plugin: PEDIDOS_MINIMOS_PLUGIN,
+      plugin: PEDIDOS_PLUGIN,
       action: PEDIDOS_MINIMOS_ACTION,
       actor: ator(c),
       target: { type: PEDIDOS_MINIMOS_TARGET, id: `${produtoId}:${codigoLoja}` },

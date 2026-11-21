@@ -52,7 +52,7 @@ async function boot({ erpFalha = false, semNome = false, entradas = [] }: Opcoes
         consultas.push({ sql, params });
         if (erpFalha) throw new Error("boom");
         if (sql.includes("FROM Fornecedor")) return (semNome ? [] : [{ codigo: 9, nome: "BETA" }, { codigo: 7, nome: "ALFA" }]) as T[];
-        return entradas as T[];
+        return entradas.map((e) => ({ dia: "2999-01-01", ...e })) as T[];
       },
     }),
   });
