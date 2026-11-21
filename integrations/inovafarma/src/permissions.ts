@@ -117,4 +117,9 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite abrir o Lançamento de Pedidos e ver as vendas, o estoque e as compras dos produtos por Loja.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para ver o Lançamento de Pedidos.",
   },
+  "pedidos-pedidos:gerir": {
+    label: "Pedidos: Gerir Pedidos",
+    description: "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar e cancelar Pedidos em rascunho.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir os Pedidos.",
+  },
 });
