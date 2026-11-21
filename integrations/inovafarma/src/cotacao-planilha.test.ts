@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { defined } from "./test/defined";
 import { describe, expect, it } from "vitest";
 import { gerarPlanilha, lerPlanilha } from "./cotacao-planilha";
 
@@ -12,7 +13,7 @@ const alvo = { pedidoId: "ped_1", codigoFornecedor: 7 };
 async function preencher(buffer: Buffer, precos: Record<number, ExcelJS.CellValue>): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer as never);
-  const ws = wb.worksheets[0]!;
+  const ws = defined(wb.worksheets[0], "a planilha");
   for (const [linha, valor] of Object.entries(precos)) ws.getRow(Number(linha)).getCell(6).value = valor;
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
@@ -21,7 +22,7 @@ describe("planilha de cotação", () => {
   it("gera uma linha por produto com a quantidade total, Preço vazio e o ID oculto", async () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await gerarPlanilha({ ...alvo, linhas })) as never);
-    const ws = wb.worksheets[0]!;
+    const ws = defined(wb.worksheets[0], "a planilha");
     expect(ws.getRow(1).values).toEqual([undefined, "EAN", "Produto", "Fabricante", "Fração", "Quantidade", "Preço", "ID"]);
     expect(ws.getRow(2).getCell(1).value).toBe("789");
     expect(ws.getRow(2).getCell(5).value).toBe(13);
