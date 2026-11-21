@@ -250,6 +250,24 @@ export const pedidos = inovafarmaSchema.table(
   (t) => [index("pedidos_status_idx").on(t.status, t.criadoEm)],
 );
 
+/** Cotação do Pedido: uma linha por fornecedor participante (só o código; o nome vem sempre do ERP). */
+export const pedidosCotacoes = inovafarmaSchema.table(
+  "pedidos_cotacoes",
+  {
+    /** Pedido da cotação (`pedidos.id`). */
+    pedidoId: text("pedido_id").notNull(),
+    /** Código do Fornecedor no ERP, sem FK. */
+    codigoFornecedor: integer("codigo_fornecedor").notNull(),
+    /** Preço por produto (`produtoId` -> preço; null = sem oferta); null enquanto a planilha não foi importada. */
+    precos: jsonb("precos").$type<Record<string, number | null>>(),
+    /** Posição em que o fornecedor foi escolhido. */
+    ordem: integer("ordem").notNull(),
+    importadoEm: timestamp("importado_em"),
+    version: integer("version").notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.pedidoId, t.codigoFornecedor] })],
+);
+
 /** Estoque Mínimo e máximo por produto e Loja (valores do Celestia, nunca do ERP). */
 export const pedidosMinimos = inovafarmaSchema.table(
   "pedidos_minimos",

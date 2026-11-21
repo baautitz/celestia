@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { DadosPedido, Pedido, PedidoStatus } from "./pedidos.js";
 import { novoIdPedido, type PedidoStore } from "./pedidos-store.js";
@@ -34,12 +34,20 @@ export class PostgresPedidoStore implements PedidoStore {
     return this.mudar(id, expectedVersion, { status: "cancelado" });
   }
 
-  private async mudar(id: string, expectedVersion: number, mudancas: Partial<PedidoRow>): Promise<Pedido | null> {
+  async iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "aguardando_precos" });
+  }
+
+  async marcarCotado(id: string): Promise<Pedido | null> {
+    return this.mudar(id, undefined, { status: "cotado" }, "aguardando_precos");
+  }
+
+  private async mudar(id: string, expectedVersion: number | undefined, mudancas: Partial<PedidoRow>, de: PedidoStatus = "rascunho"): Promise<Pedido | null> {
     const t = pedidos;
     const [row] = await this.db
       .update(t)
-      .set({ ...mudancas, version: expectedVersion + 1, atualizadoEm: new Date() })
-      .where(and(eq(t.id, id), eq(t.version, expectedVersion), eq(t.status, "rascunho")))
+      .set({ ...mudancas, version: sql`${t.version} + 1`, atualizadoEm: new Date() })
+      .where(and(eq(t.id, id), eq(t.status, de), expectedVersion === undefined ? undefined : eq(t.version, expectedVersion)))
       .returning();
     return row ? pedido(row) : null;
   }
