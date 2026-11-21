@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/alert";
+import { Button } from "@platform/ui/components/button";
 import { Checkbox } from "@platform/ui/components/checkbox";
 import { Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
 import { DatePicker } from "@platform/ui/components/date-picker";
@@ -13,6 +14,7 @@ import { apiFetch } from "@platform/ui/lib/api";
 import { formatNumber } from "@platform/ui/lib/format";
 import { FalhaAoCarregar, useContexto } from "./contexto";
 import { API } from "./inovafarma-api";
+import { PedidoRascunhoWindow, type ItemPedido } from "./pedido-rascunho-window";
 import type { LojaOpcao } from "./loja-opcao";
 import { useLatestFetch } from "./use-latest-fetch";
 
@@ -180,6 +182,7 @@ export function PedidosLancamentoTab() {
 }
 
 function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e: Error) => void }) {
+  const { windows } = useUi();
   const novaConsulta = useLatestFetch();
   const [modo, setModo] = useState<Modo>("periodo");
   const [de, setDe] = useState(contexto.ontem);
@@ -228,6 +231,22 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
       return proximo;
     });
     setFoco((atual) => (marcado ? p.produtoId : atual === p.produtoId ? null : atual));
+  };
+
+  const gerarPedido = async () => {
+    // A quantidade vem digitada na janela; o produto entra com todas as Lojas que ele tem na consulta.
+    const itens: ItemPedido[] = [...selecionados.values()].map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: p.lojas.map((l) => ({ codigoLoja: l.codigoLoja, quantidade: 0 })) }));
+    const resultado = await windows.open<unknown>({
+      surface: "dialog",
+      size: "full",
+      title: "Gerar pedido",
+      description: "Digite a quantidade de cada produto por Loja. O Pedido fica em rascunho.",
+      content: () => <PedidoRascunhoWindow itens={itens} lojas={contexto.lojas} />,
+    });
+    if (resultado.status === "confirmed") {
+      setSelecionados(new Map());
+      setFoco(null);
+    }
   };
 
   const colunas: DataTableColumn<ProdutoLancamento>[] = [
@@ -284,9 +303,14 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
           <FiltroOpcao rotulo="Seção" opcoes={contexto.secoes} valor={secao} onChange={setSecao} />
         </Stack>
       </Stack>
-      <Text variant="caption" tone="muted">
-        {formatNumber(selecionados.size)} {selecionados.size === 1 ? "produto selecionado" : "produtos selecionados"}
-      </Text>
+      <Stack direction="row" gap="group" align="center">
+        <Text variant="caption" tone="muted">
+          {formatNumber(selecionados.size)} {selecionados.size === 1 ? "produto selecionado" : "produtos selecionados"}
+        </Text>
+        <Button type="button" disabled={selecionados.size === 0} onClick={() => void gerarPedido()}>
+          Gerar pedido
+        </Button>
+      </Stack>
       <DataTable
         title="Produtos"
         columns={colunas}
