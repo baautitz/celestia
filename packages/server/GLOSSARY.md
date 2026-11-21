@@ -118,6 +118,14 @@ The quantity of a product in a Loja right now, as `Produto_Estoque.Estoque` in t
 **Movimentação Mensal** (en: Monthly Movement):
 The quantity of a product sold (net sales rules) and bought (invoice entries) in each of the last twelve months, for the Lojas in the filter.
 
+**Lista de Pedidos** (en: Purchasing List):
+A named, global Lista de Produtos kept in the Pedidos tab Listas, with its own table (it shares only the entry format and the resolver with the Listas of the Metas). It is ready for the Lançamento once it has at least one entry; several chosen lists are united (a product in two counts once). Managing them takes the Permission `inovafarma:pedidos-listas:gerir`.
+_Avoid_: Cesta
+
+**Visão Salva** (en: Saved View):
+The Lojas, Listas de Pedidos, Laboratório, Grupo, Seção and "only with minimum" a buyer saved from the Lançamento filters, never the date (it always opens on the previous day). It is private to the User, and at most one is marked to open by default.
+_Avoid_: Filtro salvo
+
 **Cotação** (en: Quote):
 The price survey of a Pedido across the Fornecedores the buyer picks. Only the Fornecedor code is kept; the name is always read from the ERP (`Cadastro.Nome`), falling back to "Fornecedor <código>". The Pedido goes from rascunho to "aguardando preços", the server issues one Excel per Fornecedor (total quantity per product, empty Preço column, hidden ID tying the row to the Cotação, the Fornecedor and the product), and importing the filled Excel after a preview moves it to "cotado". A blank Preço means no offer.
 _Avoid_: Orçamento

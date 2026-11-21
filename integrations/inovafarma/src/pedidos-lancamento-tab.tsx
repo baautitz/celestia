@@ -18,6 +18,8 @@ import { API } from "./inovafarma-api";
 import { PedidoRascunhoWindow, type ItemPedido } from "./pedido-rascunho-window";
 import type { LojaOpcao } from "./loja-opcao";
 import { useLatestFetch } from "./use-latest-fetch";
+import type { VisaoPedidos } from "./pedidos-visoes";
+import { BASE_VISOES, PedidosVisoesBarra } from "./pedidos-visoes-barra";
 
 const BASE = `${API}/pedidos/lancamento`;
 const TODOS = "todos";
@@ -35,6 +37,8 @@ interface Contexto {
   grupos: Opcao[];
   secoes: Opcao[];
   podeEditarMinimos: boolean;
+  /** Listas de produtos prontas. */
+  listas: Opcao[];
 }
 
 interface LinhaLoja {
@@ -129,6 +133,48 @@ function FiltroLojas({ lojas, escolhidas, onChange }: { lojas: LojaOpcao[]; esco
             {(l: LojaOpcao) => (
               <ComboboxItem key={l.codigo} value={l}>
                 {l.nome || `Loja ${l.codigo}`}
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+    </Stack>
+  );
+}
+
+function FiltroListas({ listas, escolhidas, onChange }: { listas: Opcao[]; escolhidas: string[]; onChange: (ids: string[]) => void }) {
+  const ancora = useComboboxAnchor();
+  return (
+    <Stack gap="field">
+      <Label htmlFor="pedidos-listas">Listas de produtos</Label>
+      <Combobox
+        multiple
+        autoHighlight
+        items={listas}
+        value={listas.filter((l) => escolhidas.includes(l.id))}
+        onValueChange={(v: Opcao[]) => onChange(v.map((l) => l.id))}
+        itemToStringLabel={(l: Opcao) => l.nome}
+        itemToStringValue={(l: Opcao) => l.id}
+        isItemEqualToValue={(a: Opcao, b: Opcao) => a.id === b.id}
+      >
+        <ComboboxChips ref={ancora}>
+          <ComboboxValue>
+            {(v: Opcao[]) => (
+              <>
+                {v.map((l) => (
+                  <ComboboxChip key={l.id}>{l.nome}</ComboboxChip>
+                ))}
+                <ComboboxChipsInput id="pedidos-listas" aria-label="Listas de produtos" placeholder={v.length === 0 ? "Todos os produtos" : ""} />
+              </>
+            )}
+          </ComboboxValue>
+        </ComboboxChips>
+        <ComboboxContent anchor={ancora}>
+          <ComboboxEmpty>Nenhuma lista pronta.</ComboboxEmpty>
+          <ComboboxList>
+            {(l: Opcao) => (
+              <ComboboxItem key={l.id} value={l}>
+                {l.nome}
               </ComboboxItem>
             )}
           </ComboboxList>
@@ -240,6 +286,11 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
   const [laboratorio, setLaboratorio] = useState(TODOS);
   const [grupo, setGrupo] = useState(TODOS);
   const [secao, setSecao] = useState(TODOS);
+  const [listas, setListas] = useState<string[]>([]);
+  const [visoes, setVisoes] = useState<VisaoPedidos[]>([]);
+  const [visao, setVisao] = useState<string | null>(null);
+  // A primeira consulta de produtos espera as visões: a padrão já entra nos filtros, sem consulta dupla.
+  const [visoesProntas, setVisoesProntas] = useState(false);
   const [produtos, setProdutos] = useState<ProdutoLancamento[]>([]);
   const [carregando, setCarregando] = useState(true);
   // A seleção sobrevive aos filtros: guarda o produto inteiro, para o detalhe não depender da grade atual.
@@ -247,7 +298,43 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
   const [foco, setFoco] = useState<string | null>(null);
   const [apenasMinimo, setApenasMinimo] = useState(false);
 
+  /** Aplica os filtros de uma visão (ou limpa); a data não muda. Lojas e listas que sumiram ficam de fora. */
+  const aplicarVisao = useCallback(
+    (v: VisaoPedidos | null) => {
+      setVisao(v?.id ?? null);
+      if (!v) return;
+      setLojas(v.lojas.filter((codigo) => contexto.lojas.some((l) => l.codigo === codigo)));
+      setListas(v.listas.filter((id) => contexto.listas.some((l) => l.id === id)));
+      setLaboratorio(v.laboratorio ?? TODOS);
+      setGrupo(v.grupo ?? TODOS);
+      setSecao(v.secao ?? TODOS);
+      setApenasMinimo(v.apenasComMinimo);
+    },
+    [contexto],
+  );
+
+  const carregarVisoes = useCallback(
+    async (salva?: VisaoPedidos, inicial = false) => {
+      try {
+        const lista = await apiFetch<VisaoPedidos[]>(BASE_VISOES);
+        setVisoes(lista);
+        if (inicial) aplicarVisao(lista.find((v) => v.padrao) ?? null);
+        else if (salva) setVisao(salva.id);
+      } catch (err: unknown) {
+        notificar(err instanceof Error ? err : new Error("Erro ao carregar as visões."));
+      } finally {
+        if (inicial) setVisoesProntas(true);
+      }
+    },
+    [aplicarVisao, notificar],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: só na abertura da aba; depois as visões recarregam por `onMudou`.
+  useEffect(() => {
+    void carregarVisoes(undefined, true);
+  }, []);
+
   const carregar = useCallback(async () => {
+    if (!visoesProntas) return;
     const vale = novaConsulta();
     const params = new URLSearchParams({ modo, de });
     if (modo === "periodo") params.set("ate", ate);
@@ -255,6 +342,7 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
     if (laboratorio !== TODOS) params.set("laboratorio", laboratorio);
     if (grupo !== TODOS) params.set("grupo", grupo);
     if (secao !== TODOS) params.set("secao", secao);
+    if (listas.length) params.set("listas", listas.join(","));
     if (apenasMinimo) params.set("apenasMinimo", "1");
     setCarregando(true);
     try {
@@ -268,7 +356,7 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
     } finally {
       if (vale()) setCarregando(false);
     }
-  }, [modo, de, ate, lojas, laboratorio, grupo, secao, apenasMinimo, notificar, novaConsulta]);
+  }, [visoesProntas, modo, de, ate, lojas, laboratorio, grupo, secao, listas, apenasMinimo, notificar, novaConsulta]);
 
   useEffect(() => {
     void carregar();
@@ -349,7 +437,15 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
             )}
           </Stack>
         </Stack>
+        <PedidosVisoesBarra
+          visoes={visoes}
+          selecionada={visao}
+          filtros={{ lojas, listas, laboratorio: laboratorio === TODOS ? null : laboratorio, grupo: grupo === TODOS ? null : grupo, secao: secao === TODOS ? null : secao, apenasComMinimo: apenasMinimo }}
+          onAplicar={aplicarVisao}
+          onMudou={(salva) => void carregarVisoes(salva)}
+        />
         <FiltroLojas lojas={contexto.lojas} escolhidas={lojas} onChange={setLojas} />
+        <FiltroListas listas={contexto.listas} escolhidas={listas} onChange={setListas} />
         <Stack direction="row" gap="group" wrap>
           <FiltroOpcao rotulo="Laboratório" opcoes={contexto.laboratorios} valor={laboratorio} onChange={setLaboratorio} />
           <FiltroOpcao rotulo="Grupo" opcoes={contexto.grupos} valor={grupo} onChange={setGrupo} />

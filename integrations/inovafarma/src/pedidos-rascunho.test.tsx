@@ -8,7 +8,7 @@ import { PedidosPage } from "./pedidos-page";
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
 
-const contexto = { hoje: "2027-04-10", ontem: "2027-04-09", lojas: [{ codigo: 1, nome: "Centro" }, { codigo: 2, nome: "Norte" }], laboratorios: [], grupos: [], secoes: [] };
+const contexto = { hoje: "2027-04-10", ontem: "2027-04-09", lojas: [{ codigo: 1, nome: "Centro" }, { codigo: 2, nome: "Norte" }], laboratorios: [], grupos: [], secoes: [], listas: [] };
 const dipirona = {
   produtoId: "p-1",
   nome: "DIPIRONA",
@@ -36,6 +36,7 @@ beforeEach(() => {
   apiFetch.mockReset();
   apiFetch.mockImplementation(async (url: string, init?: RequestInit) => {
     if (url.includes("/contexto")) return contexto;
+    if (url.includes("/pedidos/visoes")) return [];
     if (url.includes("/movimentacao")) return [];
     if (url.includes("/pedidos/lancamento/produtos")) return [dipirona];
     if (url.endsWith("/pedidos/pedidos") && init?.method === "POST") return { ...rascunho, version: 1 };
