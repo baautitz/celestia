@@ -3,7 +3,10 @@ import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { horaDoErp } from "./baixas-da-loja.js";
 import { vendasFromWhere } from "./desempenho-vendas.js";
-import { DiaDoCalendario, erroDoErp, recusaDeValidacao, SEM_CONEXAO, type AuthContext, type ErpQuery } from "./metas-comum.js";
+import { ator, DiaDoCalendario, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
+import { PEDIDOS_MINIMOS_ACTION, PEDIDOS_MINIMOS_PLUGIN, PEDIDOS_MINIMOS_TARGET } from "./pedidos-minimos-audit.js";
+import type { MinimoMaximoStore } from "./pedidos-minimos-store.js";
+import type { AuditService } from "./vinculo-audit.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { lojasDoErp } from "./pre-vencidos-comum.js";
 
@@ -12,9 +15,13 @@ export interface PedidosLancamentoRoutesDeps {
   permissions: ModuleContext["permissions"];
   auth: MiddlewareHandler;
   erpClient: () => ErpQuery | undefined;
+  minimos: MinimoMaximoStore;
+  audit: AuditService;
 }
 
 const VER = INOVAFARMA_PERMISSIONS.ref("pedidos-lancamento:ver");
+const EDITAR_MINIMOS = INOVAFARMA_PERMISSIONS.ref("pedidos-minimos:editar");
+const MINIMOS_DESATUALIZADOS = versaoDesatualizada("O estoque mínimo foi alterado por outra pessoa. A grade foi recarregada.");
 const BASE = "/pedidos/lancamento";
 /** Meses da movimentação do produto, contando o atual. */
 const MESES_DA_MOVIMENTACAO = 12;
@@ -53,9 +60,15 @@ const ConsultaProdutos = z
     laboratorio: CodigoOpcional,
     grupo: CodigoOpcional,
     secao: CodigoOpcional,
+    apenasMinimo: z.enum(["1"]).optional(),
   })
   .refine((q) => q.modo === "apartir" || q.ate !== undefined, { error: "Informe a data final do período.", path: ["ate"] })
   .refine((q) => q.ate === undefined || q.modo === "apartir" || q.de <= q.ate, { error: "A data final não pode ser anterior à data inicial.", path: ["ate"] });
+
+const Quantidade = z.number().min(0, "Informe um valor maior ou igual a zero.").max(1_000_000_000);
+const EdicaoMinimo = z
+  .object({ produtoId: z.string().min(1, "Informe o produto.").max(36), codigoLoja: z.number().int().min(1), minimo: Quantidade, maximo: Quantidade.nullable(), version: Version.or(z.literal(0)) })
+  .refine((e) => e.maximo === null || e.maximo >= e.minimo, { error: "O máximo não pode ser menor que o mínimo.", path: ["maximo"] });
 
 const ConsultaMovimentacao = z.object({ produtoId: z.string().min(1, "Informe o produto.").max(36), lojas: Lojas });
 
@@ -66,6 +79,28 @@ interface LinhaVenda {
   codigoLoja: number;
   vendida: number | null;
   estoque: number | null;
+}
+
+interface LojaLancamento {
+  codigoLoja: number;
+  vendida: number;
+  estoque: number;
+  minimo: number | null;
+  maximo: number | null;
+  sugestao: number;
+  /** 0 enquanto a Loja não tem mínimo/máximo gravado. */
+  version: number;
+}
+
+interface ProdutoLancamento {
+  produtoId: string;
+  nome: string;
+  codigoBarra: string | null;
+  vendida: number;
+  estoque: number;
+  minimo: number;
+  sugestao: number;
+  lojas: LojaLancamento[];
 }
 
 interface LinhaMes {
@@ -119,12 +154,30 @@ const movimentacaoSql = (filtroVenda: string, filtroCompra: string) => `
   ORDER BY mes
 `;
 
+/** Nome para o Audit Log; se o ERP falhar, o que se tem (o código), sem barrar a gravação. */
+async function nomeDoProduto(client: ErpQuery | undefined, produtoId: string): Promise<string> {
+  try {
+    const [r] = (await client?.query<{ nome: string | null }>("SELECT LTRIM(RTRIM(p.NomeProduto)) AS nome FROM Produto p WHERE CONVERT(varchar(36), p.rowguid) = @produtoId", { produtoId })) ?? [];
+    return r?.nome?.trim() || produtoId;
+  } catch {
+    return produtoId;
+  }
+}
+
+async function nomeDaLoja(client: ErpQuery | undefined, codigo: number): Promise<string | null> {
+  try {
+    return client ? ((await lojasDoErp(client)).find((l) => l.codigo === codigo)?.nome ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** `AAAA-MM-DD` de hoje na hora do ERP. */
 const hojeNoErp = () => horaDoErp(new Date().toISOString()).slice(0, 10);
 const diaAnterior = (dia: string) => new Date(Date.parse(`${dia}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 
 /** Lançamento de Pedidos: filtros, grade de produtos por Loja e movimentação mensal. Só leitura no ERP. */
-export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient }: PedidosLancamentoRoutesDeps): void {
+export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, audit }: PedidosLancamentoRoutesDeps): void {
   const recusa = (c: AuthContext) => (permissions.has(c.get("user")?.permissions, VER.key) ? null : c.json({ error: VER.deniedMessage }, 403));
 
   routes.get(`${BASE}/contexto`, auth, async (c: AuthContext) => {
@@ -136,7 +189,7 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
       const opcoes = async (sql: string) => (await client.query<{ id: string; nome: string | null }>(sql)).map((r) => ({ id: String(r.id), nome: (r.nome ?? "").trim() }));
       const [lojas, laboratorios, grupos, secoes] = await Promise.all([lojasDoErp(client), opcoes(OPCOES_SQL.laboratorios), opcoes(OPCOES_SQL.grupos), opcoes(OPCOES_SQL.secoes)]);
       const hoje = hojeNoErp();
-      return c.json({ hoje, ontem: diaAnterior(hoje), lojas, laboratorios, grupos, secoes });
+      return c.json({ hoje, ontem: diaAnterior(hoje), podeEditarMinimos: permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key), lojas, laboratorios, grupos, secoes });
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }
@@ -149,7 +202,7 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     if (!consulta.success) return recusaDeValidacao(c, consulta.error);
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
-    const { modo, de, laboratorio, grupo, secao, lojas } = consulta.data;
+    const { modo, de, laboratorio, grupo, secao, lojas, apenasMinimo } = consulta.data;
     const ate = modo === "apartir" ? hojeNoErp() : (consulta.data.ate ?? de);
     const params: Record<string, unknown> = { dataInicio: `${de} 00:00:00`, dataFim: `${ate} 23:59:59` };
     const filtros = [filtroDeLojas("v.CodigoEmpresa", lojas, params)];
@@ -160,16 +213,24 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     }
     try {
       const linhas = await client.query<LinhaVenda>(produtosSql(filtros.join(" ")), params);
-      const porProduto = new Map<string, { produtoId: string; nome: string; codigoBarra: string | null; vendida: number; estoque: number; lojas: { codigoLoja: number; vendida: number; estoque: number }[] }>();
+      const definidos = new Map((await minimos.listar()).map((m) => [`${m.produtoId}|${m.codigoLoja}`, m]));
+      const porProduto = new Map<string, ProdutoLancamento>();
       for (const l of linhas) {
-        const loja = { codigoLoja: Number(l.codigoLoja), vendida: Number(l.vendida) || 0, estoque: Number(l.estoque) || 0 };
-        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, vendida: 0, estoque: 0, lojas: [] };
-        produto.vendida += loja.vendida;
-        produto.estoque += loja.estoque;
+        const vendida = Number(l.vendida) || 0;
+        const estoque = Number(l.estoque) || 0;
+        const definido = definidos.get(`${l.produtoId}|${l.codigoLoja}`);
+        // Sugestão: só apoio ao comprador, nunca negativa.
+        const loja = { codigoLoja: Number(l.codigoLoja), vendida, estoque, minimo: definido?.minimo ?? null, maximo: definido?.maximo ?? null, sugestao: Math.max(0, vendida + (definido?.minimo ?? 0) - estoque), version: definido?.version ?? 0 };
+        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, vendida: 0, estoque: 0, minimo: 0, sugestao: 0, lojas: [] };
+        produto.vendida += vendida;
+        produto.estoque += estoque;
+        produto.minimo += loja.minimo ?? 0;
+        produto.sugestao += loja.sugestao;
         produto.lojas.push(loja);
         porProduto.set(l.produtoId, produto);
       }
-      return c.json([...porProduto.values()]);
+      const todos = [...porProduto.values()];
+      return c.json(apenasMinimo ? todos.filter((p) => p.lojas.some((l) => (l.minimo ?? 0) > 0)) : todos);
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }
@@ -195,5 +256,25 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }
+  });
+
+  routes.put(`${BASE}/minimos`, auth, async (c: AuthContext) => {
+    if (!permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key)) return c.json({ error: EDITAR_MINIMOS.deniedMessage }, 403);
+    const lido = EdicaoMinimo.safeParse(await c.req.json().catch(() => null));
+    if (!lido.success) return recusaDeValidacao(c, lido.error);
+    const { produtoId, codigoLoja, version, ...valores } = lido.data;
+    const anterior = (await minimos.listar()).find((m) => m.produtoId === produtoId && m.codigoLoja === codigoLoja) ?? null;
+    const gravado = await minimos.definir(produtoId, codigoLoja, valores, version);
+    if (!gravado) return c.json(MINIMOS_DESATUALIZADOS, 409);
+    const client = erpClient();
+    const [produto, nomeLoja] = await Promise.all([nomeDoProduto(client, produtoId), nomeDaLoja(client, codigoLoja)]);
+    await audit.record({
+      plugin: PEDIDOS_MINIMOS_PLUGIN,
+      action: PEDIDOS_MINIMOS_ACTION,
+      actor: ator(c),
+      target: { type: PEDIDOS_MINIMOS_TARGET, id: `${produtoId}:${codigoLoja}` },
+      attributes: { ...valores, produto, codigoLoja, nomeLoja, anterior: anterior && { minimo: anterior.minimo, maximo: anterior.maximo } },
+    });
+    return c.json(gravado);
   });
 }

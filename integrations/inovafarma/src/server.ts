@@ -13,6 +13,9 @@ import { declarePedidosAudit } from "./pedidos-audit.js";
 import { registerPedidosRoutes } from "./pedidos-routes.js";
 import { MemoryPedidoStore } from "./pedidos-store.js";
 import { PostgresPedidoStore } from "./postgres-pedidos-store.js";
+import { declarePedidosMinimosAudit } from "./pedidos-minimos-audit.js";
+import { MemoryMinimoMaximoStore } from "./pedidos-minimos-store.js";
+import { PostgresMinimoMaximoStore } from "./postgres-pedidos-minimos-store.js";
 import { registerPedidosLancamentoRoutes } from "./pedidos-lancamento-routes.js";
 import { registerDesempenhoRoutes } from "./desempenho-routes.js";
 import type { ErpQuery } from "./metas-comum.js";
@@ -145,7 +148,8 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         periods,
         audit,
       });
-      registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId] });
+      declarePedidosMinimosAudit(audit);
+      registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos: db ? new PostgresMinimoMaximoStore(db) : new MemoryMinimoMaximoStore(), audit });
       registerPedidosRoutes({ routes, permissions, auth, store: db ? new PostgresPedidoStore(db) : new MemoryPedidoStore(), audit });
       const tiposMeta = db ? new PostgresTipoMetaStore(db) : new MemoryTipoMetaStore();
       const metas = db ? new PostgresMetaStore(db) : new MemoryMetaStore();

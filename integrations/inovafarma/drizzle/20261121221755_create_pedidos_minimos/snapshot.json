@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "59c53b70-b299-483f-9761-4ba0724db25d",
+  "id": "12a19629-09f5-406c-9d74-4113ad2de125",
   "prevIds": [
     "f22415c9-4590-484c-9dba-aa7883f39386"
   ],
@@ -54,7 +54,7 @@
     },
     {
       "isRlsEnabled": false,
-      "name": "pedidos",
+      "name": "pedidos_minimos",
       "entityType": "tables",
       "schema": "inovafarma"
     },
@@ -759,62 +759,49 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "id",
+      "name": "produto_id",
       "entityType": "columns",
       "schema": "inovafarma",
-      "table": "pedidos"
+      "table": "pedidos_minimos"
     },
     {
-      "type": "text",
+      "type": "integer",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "status",
+      "name": "codigo_loja",
       "entityType": "columns",
       "schema": "inovafarma",
-      "table": "pedidos"
+      "table": "pedidos_minimos"
     },
     {
-      "type": "jsonb",
+      "type": "double precision",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "itens",
+      "name": "minimo",
       "entityType": "columns",
       "schema": "inovafarma",
-      "table": "pedidos"
+      "table": "pedidos_minimos"
     },
     {
-      "type": "text",
+      "type": "double precision",
       "typeSchema": null,
-      "notNull": true,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "criado_por_id",
+      "name": "maximo",
       "entityType": "columns",
       "schema": "inovafarma",
-      "table": "pedidos"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "criado_por_nome",
-      "entityType": "columns",
-      "schema": "inovafarma",
-      "table": "pedidos"
+      "table": "pedidos_minimos"
     },
     {
       "type": "integer",
@@ -827,20 +814,7 @@
       "name": "version",
       "entityType": "columns",
       "schema": "inovafarma",
-      "table": "pedidos"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "criado_em",
-      "entityType": "columns",
-      "schema": "inovafarma",
-      "table": "pedidos"
+      "table": "pedidos_minimos"
     },
     {
       "type": "timestamp",
@@ -853,7 +827,7 @@
       "name": "atualizado_em",
       "entityType": "columns",
       "schema": "inovafarma",
-      "table": "pedidos"
+      "table": "pedidos_minimos"
     },
     {
       "type": "text",
@@ -1615,34 +1589,6 @@
       "nameExplicit": true,
       "columns": [
         {
-          "value": "status",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "criado_em",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "pedidos_status_idx",
-      "entityType": "indexes",
-      "schema": "inovafarma",
-      "table": "pedidos"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
           "value": "codigo_loja",
           "isExpression": false,
           "asc": true,
@@ -1815,6 +1761,17 @@
     },
     {
       "columns": [
+        "produto_id",
+        "codigo_loja"
+      ],
+      "nameExplicit": false,
+      "name": "pedidos_minimos_pkey",
+      "entityType": "pks",
+      "schema": "inovafarma",
+      "table": "pedidos_minimos"
+    },
+    {
+      "columns": [
         "periodo_id",
         "codigo_loja"
       ],
@@ -1882,16 +1839,6 @@
       "name": "motivos_ajuste_pkey",
       "schema": "inovafarma",
       "table": "motivos_ajuste",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "name": "pedidos_pkey",
-      "schema": "inovafarma",
-      "table": "pedidos",
       "entityType": "pks"
     },
     {

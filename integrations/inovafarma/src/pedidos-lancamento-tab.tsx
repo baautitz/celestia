@@ -3,6 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from "@platform/ui/components/ale
 import { Button } from "@platform/ui/components/button";
 import { Checkbox } from "@platform/ui/components/checkbox";
 import { Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
+import { Input } from "@platform/ui/components/input";
 import { DatePicker } from "@platform/ui/components/date-picker";
 import { DateRangePicker } from "@platform/ui/components/date-range-picker";
 import { Label } from "@platform/ui/components/label";
@@ -10,7 +11,7 @@ import { Stack, Text } from "@platform/ui/components/layout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@platform/ui/components/select";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
-import { apiFetch } from "@platform/ui/lib/api";
+import { ApiError, apiFetch } from "@platform/ui/lib/api";
 import { formatNumber } from "@platform/ui/lib/format";
 import { FalhaAoCarregar, useContexto } from "./contexto";
 import { API } from "./inovafarma-api";
@@ -33,12 +34,18 @@ interface Contexto {
   laboratorios: Opcao[];
   grupos: Opcao[];
   secoes: Opcao[];
+  podeEditarMinimos: boolean;
 }
 
 interface LinhaLoja {
   codigoLoja: number;
   vendida: number;
   estoque: number;
+  minimo: number | null;
+  maximo: number | null;
+  sugestao: number;
+  /** 0 enquanto a Loja não tem mínimo/máximo gravado. */
+  version: number;
 }
 
 export interface ProdutoLancamento {
@@ -47,6 +54,8 @@ export interface ProdutoLancamento {
   codigoBarra: string | null;
   vendida: number;
   estoque: number;
+  minimo: number;
+  sugestao: number;
   lojas: LinhaLoja[];
 }
 
@@ -129,7 +138,40 @@ function FiltroLojas({ lojas, escolhidas, onChange }: { lojas: LojaOpcao[]; esco
   );
 }
 
-function Detalhe({ produto, contexto, lojasFiltro }: { produto: ProdutoLancamento; contexto: Contexto; lojasFiltro: number[] }) {
+/** Célula editável do mínimo ou do máximo da Loja: grava ao sair do campo, se mudou. */
+function CampoMinimoMaximo({ linha, produtoId, campo, rotulo, onSalvo }: { linha: LinhaLoja; produtoId: string; campo: "minimo" | "maximo"; rotulo: string; onSalvo: () => void }) {
+  const { feedback } = useUi();
+  const atual = linha[campo];
+  const gravar = async (texto: string) => {
+    const valor = texto.trim() === "" ? null : Number(texto.replace(",", "."));
+    if (valor === atual || (valor === null && campo === "minimo")) return;
+    if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
+      feedback.notifyError(new Error("Informe um valor maior ou igual a zero."));
+      onSalvo();
+      return;
+    }
+    const corpo = { produtoId, codigoLoja: linha.codigoLoja, minimo: campo === "minimo" ? valor : (linha.minimo ?? 0), maximo: campo === "maximo" ? valor : linha.maximo, version: linha.version };
+    try {
+      await apiFetch(`${BASE}/minimos`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao gravar o estoque mínimo."));
+      if (!(err instanceof ApiError)) return;
+    }
+    onSalvo();
+  };
+  return (
+    <Input
+      key={`${linha.version}-${atual}`}
+      type="text"
+      inputMode="decimal"
+      aria-label={rotulo}
+      defaultValue={atual ?? ""}
+      onBlur={(e) => void gravar(e.target.value)}
+    />
+  );
+}
+
+function Detalhe({ produto, contexto, lojasFiltro, onSalvo }: { produto: ProdutoLancamento; contexto: Contexto; lojasFiltro: number[]; onSalvo: () => void }) {
   const { feedback } = useUi();
   const novaConsulta = useLatestFetch();
   const [meses, setMeses] = useState<Mes[]>([]);
@@ -155,6 +197,13 @@ function Detalhe({ produto, contexto, lojasFiltro }: { produto: ProdutoLancament
     { key: "loja", label: "Loja", value: (l) => nomeLoja(l.codigoLoja) },
     { key: "estoque", label: "Estoque atual", format: "decimal", value: (l) => l.estoque },
     { key: "vendida", label: "Qtde vendida", format: "decimal", value: (l) => l.vendida },
+    contexto.podeEditarMinimos
+      ? { key: "minimo", label: "Estoque mínimo", render: (l) => <CampoMinimoMaximo linha={l} produtoId={produto.produtoId} campo="minimo" rotulo={`Estoque mínimo da Loja ${nomeLoja(l.codigoLoja)}`} onSalvo={onSalvo} />, mobileWide: true }
+      : { key: "minimo", label: "Estoque mínimo", format: "decimal", value: (l) => l.minimo ?? 0 },
+    contexto.podeEditarMinimos
+      ? { key: "maximo", label: "Estoque máximo", render: (l) => <CampoMinimoMaximo linha={l} produtoId={produto.produtoId} campo="maximo" rotulo={`Estoque máximo da Loja ${nomeLoja(l.codigoLoja)}`} onSalvo={onSalvo} />, mobileWide: true }
+      : { key: "maximo", label: "Estoque máximo", format: "decimal", value: (l) => l.maximo ?? 0 },
+    { key: "sugestao", label: "Sugestão", format: "decimal", value: (l) => l.sugestao },
   ];
   const colunasMes: DataTableColumn<Mes>[] = [
     { key: "mes", label: "Mês", value: (m) => mesBr(m.mes) },
@@ -196,6 +245,7 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
   // A seleção sobrevive aos filtros: guarda o produto inteiro, para o detalhe não depender da grade atual.
   const [selecionados, setSelecionados] = useState<ReadonlyMap<string, ProdutoLancamento>>(new Map());
   const [foco, setFoco] = useState<string | null>(null);
+  const [apenasMinimo, setApenasMinimo] = useState(false);
 
   const carregar = useCallback(async () => {
     const vale = novaConsulta();
@@ -205,6 +255,7 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
     if (laboratorio !== TODOS) params.set("laboratorio", laboratorio);
     if (grupo !== TODOS) params.set("grupo", grupo);
     if (secao !== TODOS) params.set("secao", secao);
+    if (apenasMinimo) params.set("apenasMinimo", "1");
     setCarregando(true);
     try {
       const r = await apiFetch<ProdutoLancamento[]>(`${BASE}/produtos?${params}`);
@@ -217,7 +268,7 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
     } finally {
       if (vale()) setCarregando(false);
     }
-  }, [modo, de, ate, lojas, laboratorio, grupo, secao, notificar, novaConsulta]);
+  }, [modo, de, ate, lojas, laboratorio, grupo, secao, apenasMinimo, notificar, novaConsulta]);
 
   useEffect(() => {
     void carregar();
@@ -260,6 +311,8 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
       { key: "codigoBarra", label: "Código de barras", value: (p) => p.codigoBarra ?? "", searchable: true },
       { key: "estoque", label: "Estoque atual", format: "decimal", value: (p) => p.estoque, sortable: true },
       { key: "vendida", label: "Qtde vendida", format: "decimal", value: (p) => p.vendida, sortable: true, firstSort: "desc" },
+      { key: "minimo", label: "Estoque mínimo", format: "decimal", value: (p) => p.minimo, sortable: true },
+      { key: "sugestao", label: "Sugestão", format: "decimal", value: (p) => p.sugestao, sortable: true },
   ];
 
   const emFoco = foco ? (produtos.find((p) => p.produtoId === foco) ?? selecionados.get(foco)) : undefined;
@@ -302,6 +355,10 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
           <FiltroOpcao rotulo="Grupo" opcoes={contexto.grupos} valor={grupo} onChange={setGrupo} />
           <FiltroOpcao rotulo="Seção" opcoes={contexto.secoes} valor={secao} onChange={setSecao} />
         </Stack>
+        <Stack direction="row" gap="field">
+          <Checkbox id="pedidos-apenas-minimo" checked={apenasMinimo} onCheckedChange={(v: boolean) => setApenasMinimo(v)} />
+          <Label htmlFor="pedidos-apenas-minimo">Apenas com estoque mínimo</Label>
+        </Stack>
       </Stack>
       <Stack direction="row" gap="group" align="center">
         <Text variant="caption" tone="muted">
@@ -321,7 +378,7 @@ function Lancamento({ contexto, notificar }: { contexto: Contexto; notificar: (e
         emptyMessage="Nenhuma venda no período e filtros escolhidos."
       />
       {emFoco ? (
-        <Detalhe produto={emFoco} contexto={contexto} lojasFiltro={lojas} />
+        <Detalhe produto={emFoco} contexto={contexto} lojasFiltro={lojas} onSalvo={() => void carregar()} />
       ) : (
         <Alert>
           <AlertTitle>Nenhum produto em foco</AlertTitle>
