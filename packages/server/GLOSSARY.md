@@ -118,6 +118,10 @@ The quantity of a product in a Loja right now, as `Produto_Estoque.Estoque` in t
 **Movimentação Mensal** (en: Monthly Movement):
 The quantity of a product sold (net sales rules) and bought (invoice entries) in each of the last twelve months, for the Lojas in the filter.
 
+**Cotação** (en: Quote):
+The price survey of a Pedido across the Fornecedores the buyer picks. Only the Fornecedor code is kept; the name is always read from the ERP (`Cadastro.Nome`), falling back to "Fornecedor <código>". The Pedido goes from rascunho to "aguardando preços", the server issues one Excel per Fornecedor (total quantity per product, empty Preço column, hidden ID tying the row to the Cotação, the Fornecedor and the product), and importing the filled Excel after a preview moves it to "cotado". A blank Preço means no offer.
+_Avoid_: Orçamento
+
 ### Metas
 
 **Indicador** (en: Indicator):
