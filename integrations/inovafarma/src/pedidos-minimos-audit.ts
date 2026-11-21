@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { PEDIDOS_PLUGIN } from "./pedidos-audit.js";
 import type { AuditService } from "./vinculo-audit.js";
 
-export const PEDIDOS_MINIMOS_PLUGIN = "inovafarma";
 export const PEDIDOS_MINIMOS_TARGET = "estoque_minimo";
 export const PEDIDOS_MINIMOS_ACTION = "estoque_minimo_update";
 
@@ -13,7 +13,7 @@ const texto = (v: z.infer<typeof Valores>) => `mínimo ${v.minimo}, máximo ${v.
 
 export function declarePedidosMinimosAudit(audit: AuditService): void {
   audit.declareAction({
-    plugin: PEDIDOS_MINIMOS_PLUGIN,
+    plugin: PEDIDOS_PLUGIN,
     action: PEDIDOS_MINIMOS_ACTION,
     schemaVersion: 1,
     schema: Atributos,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PEDIDOS_PLUGIN } from "./pedidos-audit.js";
 import type { AuditService } from "./vinculo-audit.js";
 
 export const COTACAO_ACTIONS = { iniciar: "pedido_cotacao_start", importar: "pedido_cotacao_import" } as const;
@@ -6,7 +7,7 @@ export const COTACAO_ACTIONS = { iniciar: "pedido_cotacao_start", importar: "ped
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 export function declareCotacaoAudit(audit: AuditService): void {
-  const base = { plugin: "inovafarma", schemaVersion: 1 };
+  const base = { plugin: PEDIDOS_PLUGIN, schemaVersion: 1 };
   audit.declareAction({
     ...base,
     action: COTACAO_ACTIONS.iniciar,

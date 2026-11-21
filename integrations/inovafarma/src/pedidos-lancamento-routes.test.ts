@@ -40,7 +40,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
         consultas.push({ sql, params });
         if (falha) throw new Error("boom");
         if (sql.includes("FROM Config")) return [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Norte" }] as T[];
-        if (sql.includes("c.DataNota")) return [{ produtoId: "p-1", codigoLoja: 1, recebida: 6 }] as T[];
+        if (sql.includes("c.DataNota")) return [{ produtoId: "p-1", codigoLoja: 1, recebida: 6, dia: "2999-01-01" }] as T[];
         if (sql.includes("Produto_Fabricante")) return [{ id: 7, nome: "EMS" }] as T[];
         if (sql.includes("Produto_Grupo")) return [{ id: 3, nome: "MEDICAMENTOS" }] as T[];
         if (sql.includes("Produto_Sessao")) return [{ id: 9, nome: "GENERICOS" }] as T[];
@@ -221,6 +221,18 @@ describe("Lançamento de Pedidos: a chegar", () => {
     expect(dipirona?.lojas.map((l) => l.aChegar)).toEqual([4, 4]);
     expect(dipirona?.aChegar).toBe(8);
     expect(produtos.find((x) => x.produtoId === "p-2")?.aChegar).toBe(0);
+  });
+
+  it("consulta as entradas de NF uma única vez, mesmo com vários Pedidos abertos", async () => {
+    const { get, pedidos, consultas } = boot();
+    for (const loja of [1, 2]) {
+      const p = await pedidos.criar({ itens: [item("p-1", [{ codigoLoja: loja, quantidade: 10 }])] }, { id: "u", nome: "U" });
+      await pedidos.iniciarCotacao(p.id, 1);
+      await pedidos.marcarCotado(p.id);
+      await pedidos.confirmar(p.id, { "p-1": 7 }, 3);
+    }
+    await get(consulta);
+    expect(consultas.filter((q) => q.sql.includes("@desde"))).toHaveLength(1);
   });
 
   it("não conta Pedido que ainda não foi confirmado nem o já recebido por inteiro", async () => {
