@@ -23,10 +23,6 @@ import { declarePedidosMinimosAudit } from "./pedidos-minimos-audit.js";
 import { MemoryMinimoMaximoStore } from "./pedidos-minimos-store.js";
 import { PostgresMinimoMaximoStore } from "./postgres-pedidos-minimos-store.js";
 import { registerPedidosLancamentoRoutes } from "./pedidos-lancamento-routes.js";
-import { declarePedidosListasAudit } from "./pedidos-listas-audit.js";
-import { registerPedidosListasRoutes } from "./pedidos-listas-routes.js";
-import { MemoryPedidosListasStore } from "./pedidos-listas-store.js";
-import { PostgresPedidosListasStore } from "./postgres-pedidos-listas-store.js";
 import { registerPedidosVisoesRoutes } from "./pedidos-visoes-routes.js";
 import { MemoryPedidosVisoesStore } from "./pedidos-visoes-store.js";
 import { PostgresPedidosVisoesStore } from "./postgres-pedidos-visoes-store.js";
@@ -108,7 +104,6 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       declareFuroEstoqueAudit(audit);
       declareTiposMetaAudit(audit);
       declareColunasDesempenhoAudit(audit);
-      declarePedidosListasAudit(audit);
       declareMetasAudit(audit);
       declareApuracaoAudit(audit);
       declarePedidosAudit(audit);
@@ -164,12 +159,10 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
         periods,
         audit,
       });
-      const pedidosListas = db ? new PostgresPedidosListasStore(db) : new MemoryPedidosListasStore();
-      registerPedidosListasRoutes({ routes, permissions, auth, store: pedidosListas, audit });
       registerPedidosVisoesRoutes({ routes, permissions, auth, store: db ? new PostgresPedidosVisoesStore(db) : new MemoryPedidosVisoesStore() });
       declarePedidosMinimosAudit(audit);
       const pedidos = db ? new PostgresPedidoStore(db) : new MemoryPedidoStore();
-      registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos: db ? new PostgresMinimoMaximoStore(db) : new MemoryMinimoMaximoStore(), audit, listas: pedidosListas, pedidos });
+      registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos: db ? new PostgresMinimoMaximoStore(db) : new MemoryMinimoMaximoStore(), audit, pedidos });
       registerPedidosRoutes({ routes, permissions, auth, store: pedidos, audit });
       const cotacoes = db ? new PostgresCotacaoStore(db) : new MemoryCotacaoStore();
       registerCotacaoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], pedidos, cotacoes, audit });

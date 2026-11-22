@@ -10,11 +10,10 @@ import type { MinimoMaximoStore } from "./pedidos-minimos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { COLUNA_DO_PRODUTO, idsPorTipo } from "./lista-produtos.js";
+import { EntradaLista, idValido } from "./tipos-meta.js";
 import { aChegarPorLinha, chaveDaLinha, conferir } from "./pedidos-conferencia.js";
 import { entradasDosPedidos } from "./pedidos-nf.js";
 import type { PedidoStore } from "./pedidos-store.js";
-import { listaPronta } from "./pedidos-listas.js";
-import type { PedidosListasStore } from "./pedidos-listas-store.js";
 import { lojasDoErp } from "./pre-vencidos-comum.js";
 
 export interface PedidosLancamentoRoutesDeps {
@@ -22,8 +21,6 @@ export interface PedidosLancamentoRoutesDeps {
   permissions: ModuleContext["permissions"];
   auth: MiddlewareHandler;
   erpClient: () => ErpQuery | undefined;
-  /** As listas de produtos de Pedidos: só as prontas viram filtro. */
-  listas: PedidosListasStore;
   minimos: MinimoMaximoStore;
   /** Os Pedidos do Celestia: os confirmados e ainda não recebidos por inteiro alimentam a coluna a chegar. */
   pedidos: PedidoStore;
@@ -37,29 +34,26 @@ const BASE = "/pedidos/lancamento";
 /** Meses da movimentação do produto, contando o atual. */
 const MESES_DA_MOVIMENTACAO = 12;
 
-const OPCOES_SQL = {
-  laboratorios: `
-    SELECT CAST(f.CodigoFabricante AS varchar(10)) AS id, LTRIM(RTRIM(f.NomeFabricante)) AS nome
-    FROM Produto_Fabricante f
-    WHERE f.Eliminado = 0 AND UPPER(LTRIM(RTRIM(f.NomeFabricante))) <> 'REVISAR'
-    ORDER BY f.NomeFabricante`,
-  grupos: `
-    SELECT CAST(g.CodigoGrupo AS varchar(10)) AS id, LTRIM(RTRIM(g.NomeGrupo)) AS nome
-    FROM Produto_Grupo g
-    WHERE g.Ativo = 1
-    ORDER BY g.NomeGrupo`,
-  secoes: `
-    SELECT CAST(s.CodigoSessao AS varchar(10)) AS id, LTRIM(RTRIM(s.NomeSessao)) AS nome
-    FROM Produto_Sessao s
-    ORDER BY s.NomeSessao`,
-} as const;
-
 const Lojas = z
   .string()
   .regex(/^\d+(,\d+)*$/, "Parâmetro 'lojas' deve ser uma lista de códigos separados por vírgula.")
   .transform((v) => v.split(",").map(Number))
   .optional();
-const CodigoOpcional = z.string().regex(/^\d+$/, "Código de filtro inválido.").transform(Number).optional();
+const ID_INVALIDO = "Uma entrada do Filtro de produtos tem um identificador inválido.";
+/** O "Filtro de produtos": as entradas (Produto, Grupo, Seção, Laboratório) em JSON na query, com o id validado pelo tipo. */
+const Entradas = z
+  .string()
+  .max(60_000)
+  .transform((v, ctx) => {
+    try {
+      return JSON.parse(v) as unknown;
+    } catch {
+      ctx.addIssue({ code: "custom", message: "Parâmetro 'entradas' deve ser um JSON válido." });
+      return z.NEVER;
+    }
+  })
+  .pipe(z.array(EntradaLista.pick({ tipo: true, id: true }).refine(idValido, ID_INVALIDO)).max(500))
+  .optional();
 const MENSAGEM_DATA = "Informe a data no formato AAAA-MM-DD.";
 
 const ConsultaProdutos = z
@@ -68,10 +62,7 @@ const ConsultaProdutos = z
     de: DiaDoCalendario(MENSAGEM_DATA),
     ate: DiaDoCalendario(MENSAGEM_DATA).optional(),
     lojas: Lojas,
-    laboratorio: CodigoOpcional,
-    grupo: CodigoOpcional,
-    secao: CodigoOpcional,
-    listas: z.string().max(2000).transform((v) => v.split(",").filter(Boolean)).optional(),
+    entradas: Entradas,
     apenasMinimo: z.enum(["1"]).optional(),
   })
   .refine((q) => q.modo === "apartir" || q.ate !== undefined, { error: "Informe a data final do período.", path: ["ate"] })
@@ -157,11 +148,11 @@ const movimentacaoSql = (filtroVenda: string, filtroCompra: string) => `
     SELECT CONVERT(varchar(7), v.DataVenda, 120) AS mes, vp.Quantidade AS vendida, NULL AS comprada
     ${vendasFromWhere(filtroVenda)}
     UNION ALL
-    SELECT CONVERT(varchar(7), c.DataEntrada, 120) AS mes, NULL AS vendida, cp.Quantidade AS comprada
+    SELECT CONVERT(varchar(7), c.DataNota, 120) AS mes, NULL AS vendida, cp.Quantidade AS comprada
     FROM Compra c
     JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
     JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
-    WHERE c.Eliminado = 0 AND c.DataEntrada >= @dataInicio AND c.DataEntrada <= @dataFim
+    WHERE c.Eliminado = 0 AND c.DataNota >= @dataInicio AND c.DataNota <= @dataFim
       AND CONVERT(varchar(36), p.rowguid) = @produtoId
       ${filtroCompra}
   ) m
@@ -203,7 +194,7 @@ const hojeNoErp = () => horaDoErp(new Date().toISOString()).slice(0, 10);
 const diaAnterior = (dia: string) => new Date(Date.parse(`${dia}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 
 /** Lançamento de Pedidos: filtros, grade de produtos por Loja e movimentação mensal. Só leitura no ERP. */
-export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, audit, listas, pedidos }: PedidosLancamentoRoutesDeps): void {
+export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, audit, pedidos }: PedidosLancamentoRoutesDeps): void {
   const recusa = (c: AuthContext) => (permissions.has(c.get("user")?.permissions, VER.key) ? null : c.json({ error: VER.deniedMessage }, 403));
 
   routes.get(`${BASE}/contexto`, auth, async (c: AuthContext) => {
@@ -212,11 +203,9 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
     try {
-      const opcoes = async (sql: string) => (await client.query<{ id: string; nome: string | null }>(sql)).map((r) => ({ id: String(r.id), nome: (r.nome ?? "").trim() }));
-      const [lojas, laboratorios, grupos, secoes] = await Promise.all([lojasDoErp(client), opcoes(OPCOES_SQL.laboratorios), opcoes(OPCOES_SQL.grupos), opcoes(OPCOES_SQL.secoes)]);
+      const lojas = await lojasDoErp(client);
       const hoje = hojeNoErp();
-      const prontas = (await listas.listar()).filter(listaPronta).map((l) => ({ id: l.id, nome: l.nome }));
-      return c.json({ hoje, ontem: diaAnterior(hoje), podeEditarMinimos: permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key), lojas, laboratorios, grupos, secoes, listas: prontas });
+      return c.json({ hoje, ontem: diaAnterior(hoje), podeEditarMinimos: permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key), lojas });
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }
@@ -229,20 +218,14 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     if (!consulta.success) return recusaDeValidacao(c, consulta.error);
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
-    const { modo, de, laboratorio, grupo, secao, lojas, apenasMinimo, listas: idsListas } = consulta.data;
+    const { modo, de, entradas: filtroEntradas, lojas, apenasMinimo } = consulta.data;
     const ate = modo === "apartir" ? hojeNoErp() : (consulta.data.ate ?? de);
     const params: Record<string, unknown> = { dataInicio: `${de} 00:00:00`, dataFim: `${ate} 23:59:59` };
     const filtros = [filtroDeLojas("v.CodigoEmpresa", lojas, params)];
-    for (const [valor, nome, coluna] of [[laboratorio, "laboratorio", "p.CodigoFabricante"], [grupo, "grupo", "p.CodigoGrupo"], [secao, "secao", "p.CodigoSessao"]] as const) {
-      if (valor === undefined) continue;
-      params[nome] = valor;
-      filtros.push(`AND ${coluna} = @${nome}`);
-    }
-    if (idsListas) {
-      // Várias listas são a união das entradas; escolhidas mas nenhuma pronta (apagadas ou vazias) não traz produto.
-      const entradas = (await listas.listar()).filter((l) => idsListas.includes(l.id) && listaPronta(l)).flatMap((l) => l.entradas);
-      const condicoes = idsPorTipo(entradas, params, "lista").map(([tipo, nomes]) => `${COLUNA_DO_PRODUTO[tipo]} IN (${nomes})`);
-      if (condicoes.length === 0) return c.json([]);
+    // As entradas do Filtro de produtos são
+    // unidas por OU, como nas colunas do Desempenho de Vendas: o produto casa com qualquer entrada.
+    if (filtroEntradas?.length) {
+      const condicoes = idsPorTipo(filtroEntradas, params, "ent").map(([tipo, nomes]) => `${COLUNA_DO_PRODUTO[tipo]} IN (${nomes})`);
       filtros.push(`AND (${condicoes.join(" OR ")})`);
     }
     try {
@@ -290,6 +273,8 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
       const linhas = await client.query<LinhaMes>(movimentacaoSql(filtroVenda, filtroCompra), params);
       return c.json(linhas.map((l) => ({ mes: l.mes, vendida: Number(l.vendida) || 0, comprada: Number(l.comprada) || 0 })));
     } catch (err: unknown) {
+      // A tela só mostra "ERP indisponível"; o motivo real (ex.: coluna inexistente) fica no log do servidor.
+      console.error("Pedidos: falha na movimentação mensal do ERP.", err);
       return c.json(erroDoErp(err), 503);
     }
   });

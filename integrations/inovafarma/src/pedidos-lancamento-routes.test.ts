@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { Hono, type MiddlewareHandler } from "hono";
 import { registerPedidosLancamentoRoutes } from "./pedidos-lancamento-routes";
 import { MemoryPedidoStore } from "./pedidos-store";
-import { MemoryPedidosListasStore } from "./pedidos-listas-store";
 import { MemoryMinimoMaximoStore } from "./pedidos-minimos-store";
 import { declarePedidosMinimosAudit } from "./pedidos-minimos-audit";
 import type { AuditService } from "./vinculo-audit";
@@ -16,7 +15,6 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
     c.set("user" as never, { sub: "ana", fullname: "Ana", permissions } as never);
     await next();
   };
-  const listas = new MemoryPedidosListasStore();
   const pedidos = new MemoryPedidoStore();
   const store = new MemoryMinimoMaximoStore();
   const resumos = new Map<string, (a: never) => string>();
@@ -31,7 +29,6 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
     routes: app,
     permissions: { has: (p, k) => Boolean(p?.includes(k)) },
     auth,
-    listas,
     pedidos,
     minimos: store,
     audit,
@@ -40,7 +37,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
         consultas.push({ sql, params });
         if (falha) throw new Error("boom");
         if (sql.includes("FROM Config")) return [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Norte" }] as T[];
-        if (sql.includes("c.DataNota")) return [{ produtoId: "p-1", codigoLoja: 1, recebida: 6, dia: "2999-01-01" }] as T[];
+        if (sql.includes("c.DataNota") && sql.includes("recebida")) return [{ produtoId: "p-1", codigoLoja: 1, recebida: 6, dia: "2999-01-01" }] as T[];
         if (sql.includes("Produto_Fabricante")) return [{ id: 7, nome: "EMS" }] as T[];
         if (sql.includes("Produto_Grupo")) return [{ id: 3, nome: "MEDICAMENTOS" }] as T[];
         if (sql.includes("Produto_Sessao")) return [{ id: 9, nome: "GENERICOS" }] as T[];
@@ -59,29 +56,22 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
   });
   const get = (path: string) => app.request(path);
   const put = (corpo: unknown) => app.request("/pedidos/lancamento/minimos", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
-  return { get, put, consultas, log, listas, pedidos };
+  return { get, put, consultas, log, pedidos };
 }
 
 describe("Lançamento de Pedidos: contexto", () => {
-  it("devolve as Lojas e as opções de filtro, mais ontem e hoje", async () => {
+  it("devolve as Lojas, mais ontem e hoje", async () => {
     const res = await boot().get("/pedidos/lancamento/contexto");
     expect(res.status).toBe(200);
     const corpo = (await res.json()) as Record<string, unknown>;
     expect(corpo.lojas).toEqual([{ codigo: 1, nome: "Centro" }, { codigo: 2, nome: "Norte" }]);
-    expect(corpo.laboratorios).toEqual([{ id: "7", nome: "EMS" }]);
-    expect(corpo.grupos).toEqual([{ id: "3", nome: "MEDICAMENTOS" }]);
-    expect(corpo.secoes).toEqual([{ id: "9", nome: "GENERICOS" }]);
+    expect(corpo).not.toHaveProperty("listas");
+    expect(corpo).not.toHaveProperty("laboratorios");
+    expect(corpo).not.toHaveProperty("grupos");
+    expect(corpo).not.toHaveProperty("secoes");
     expect(corpo.podeEditarMinimos).toBe(true);
     expect(corpo.ontem).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(corpo.hoje >= corpo.ontem).toBe(true);
-  });
-
-  it("oferece só as listas prontas (com entradas), por nome", async () => {
-    const { get, listas } = boot();
-    const pronta = await listas.criar({ nome: "Vitaminas", entradas: [{ tipo: "grupo", id: "44", nome: "VITAMINAS" }] });
-    await listas.criar({ nome: "Em montagem", entradas: [] });
-    const corpo = (await (await get("/pedidos/lancamento/contexto")).json()) as { listas: unknown };
-    expect(corpo.listas).toEqual([{ id: pronta.id, nome: "Vitaminas" }]);
   });
 
   it("recusa quem não tem a Permission", async () => {
@@ -93,34 +83,32 @@ describe("Lançamento de Pedidos: contexto", () => {
 describe("Lançamento de Pedidos: produtos", () => {
   it("agrupa por produto, com as linhas por Loja e o total vendido", async () => {
     const { get, consultas } = boot();
-    const res = await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&lojas=1,2&grupo=3");
+    const res = await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&lojas=1,2");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([
       { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 8, estoque: 10, minimo: 0, sugestao: 3, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }, { codigoLoja: 2, vendida: 3, estoque: 0, minimo: null, maximo: null, sugestao: 3, aChegar: 0, version: 0 }] },
       { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, minimo: 0, sugestao: 0, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }] },
     ]);
-    const { sql, params } = consultas[0] ?? { sql: "" };
-    expect(params).toMatchObject({ dataInicio: "2027-04-01 00:00:00", dataFim: "2027-04-02 23:59:59", loja0: 1, loja1: 2, grupo: 3 });
-    expect(sql).toContain("p.CodigoGrupo = @grupo");
+    const { params } = consultas[0] ?? {};
+    expect(params).toMatchObject({ dataInicio: "2027-04-01 00:00:00", dataFim: "2027-04-02 23:59:59", loja0: 1, loja1: 2 });
   });
 
-  it("filtra por várias listas prontas, unidas por OR, com os ids por parâmetro", async () => {
-    const { get, consultas, listas } = boot();
-    const a = await listas.criar({ nome: "A", entradas: [{ tipo: "grupo", id: "44", nome: "VITAMINAS" }] });
-    const b = await listas.criar({ nome: "B", entradas: [{ tipo: "laboratorio", id: "7", nome: "EMS" }, { tipo: "grupo", id: "45", nome: "X" }] });
-    const vazia = await listas.criar({ nome: "Vazia", entradas: [] });
-    const res = await get(`/pedidos/lancamento/produtos?modo=apartir&de=2027-04-01&listas=${a.id},${b.id},${vazia.id}`);
+  it("filtra pelo Filtro de produtos: entradas unidas por OR, com os ids por parâmetro", async () => {
+    const { get, consultas } = boot();
+    const entradas = [{ tipo: "grupo", id: "44", nome: "VITAMINAS" }, { tipo: "laboratorio", id: "7", nome: "EMS" }, { tipo: "produto", id: "0a1b2c3d-0000-4000-8000-000000000001", nome: "DIPIRONA" }];
+    const res = await get(`/pedidos/lancamento/produtos?modo=apartir&de=2027-04-01&entradas=${encodeURIComponent(JSON.stringify(entradas))}`);
     expect(res.status).toBe(200);
     const { sql, params } = consultas[0] ?? { sql: "" };
-    expect(sql).toContain("p.CodigoGrupo IN (@listagrupo0, @listagrupo1)");
-    expect(sql).toContain("p.CodigoFabricante IN (@listalaboratorio0)");
-    expect(params).toMatchObject({ listagrupo0: 44, listagrupo1: 45, listalaboratorio0: 7 });
+    expect(sql).toContain("(CONVERT(varchar(36), p.rowguid) IN (@entproduto0) OR p.CodigoGrupo IN (@entgrupo0) OR p.CodigoFabricante IN (@entlaboratorio0))");
+    expect(params).toMatchObject({ entgrupo0: 44, entlaboratorio0: 7, entproduto0: "0a1b2c3d-0000-4000-8000-000000000001" });
+    expect(sql).not.toContain("44");
   });
 
-  it("com listas escolhidas mas nenhuma pronta, não traz produto algum", async () => {
+  it("recusa entradas em JSON inválido ou com id fora do formato, sem consultar o ERP", async () => {
     const { get, consultas } = boot();
-    const res = await get("/pedidos/lancamento/produtos?modo=apartir&de=2027-04-01&listas=plp_sumiu");
-    expect(await res.json()).toEqual([]);
+    const q = (v: string) => get(`/pedidos/lancamento/produtos?modo=apartir&de=2027-04-01&entradas=${encodeURIComponent(v)}`);
+    expect((await q("não é json")).status).toBe(400);
+    expect((await q(JSON.stringify([{ tipo: "grupo", id: "1; DROP", nome: "X" }]))).status).toBe(400);
     expect(consultas.length).toBe(0);
   });
 

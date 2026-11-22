@@ -5,7 +5,7 @@ import { MemoryPedidosVisoesStore } from "./pedidos-visoes-store";
 import type { VisaoPedidos } from "./pedidos-visoes";
 
 const VER = "inovafarma:pedidos-lancamento:ver";
-const base = { nome: "Genéricos Centro", lojas: [1], listas: ["plp_1"], laboratorio: "7", grupo: null, secao: "9", apenasComMinimo: true, padrao: false };
+const base = { nome: "Genéricos Centro", lojas: [1], entradas: [{ tipo: "laboratorio", id: "7", nome: "EMS" }, { tipo: "secao", id: "9", nome: "GENERICOS" }], apenasComMinimo: true, padrao: false };
 
 function boot() {
   const app = new Hono();
@@ -28,7 +28,7 @@ describe("Visões salvas de Pedidos", () => {
   it("guarda os filtros, nunca a data, e só mostra as visões do próprio usuário", async () => {
     const { req } = boot();
     const criada = (await (await req("ana", "POST", "/pedidos/visoes", { ...base, de: "2027-01-01", ate: "2027-01-02" })).json()) as Record<string, unknown>;
-    expect(criada).toMatchObject({ nome: "Genéricos Centro", lojas: [1], listas: ["plp_1"], laboratorio: "7", grupo: null, secao: "9", apenasComMinimo: true });
+    expect(criada).toMatchObject({ nome: "Genéricos Centro", lojas: [1], entradas: base.entradas, apenasComMinimo: true });
     expect(criada).not.toHaveProperty("de");
     expect(criada).not.toHaveProperty("ate");
     expect(((await (await req("ana", "GET", "/pedidos/visoes")).json()) as VisaoPedidos[]).length).toBe(1);
