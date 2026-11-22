@@ -106,6 +106,17 @@ describe("Pedidos: Lançamento", () => {
     expect(celula.style.position).not.toBe("sticky");
   });
 
+  it("a linha do produto com o checkbox marcado ganha o destaque, e o desmarcar tira", async () => {
+    renderizar();
+    const caixa = await screen.findByLabelText("Selecionar AAS");
+    const linha = () => screen.getByText("AAS", { selector: "td" }).closest("tr") as HTMLElement;
+    expect(linha().getAttribute("data-marked")).toBeNull();
+    fireEvent.click(caixa);
+    await waitFor(() => expect(linha().getAttribute("data-marked")).toBe("true"));
+    fireEvent.click(screen.getByLabelText("Selecionar AAS"));
+    await waitFor(() => expect(linha().getAttribute("data-marked")).toBeNull());
+  });
+
   it("a movimentação mensal usa só a Loja selecionada, e todas quando o campo é desmarcado", async () => {
     renderizar();
     await screen.findByText("03/2027");

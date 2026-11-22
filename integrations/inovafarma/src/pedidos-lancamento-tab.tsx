@@ -1,6 +1,5 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { HeaderActions } from "@platform/ui/context/header-actions";
 import { Button } from "@platform/ui/components/button";
 import { Checkbox } from "@platform/ui/components/checkbox";
 import { Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
@@ -162,30 +161,34 @@ function comMinimoGravado(produto: ProdutoLancamento, gravado: MinimoGravado): P
 function CampoMinimoMaximo({ linha, produtoId, campo, rotulo, onSalvo }: { linha: LinhaLoja; produtoId: string; campo: "minimo" | "maximo"; rotulo: string; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void }) {
   const { feedback } = useUi();
   const atual = linha[campo];
+  // Valor recusado: o campo volta ao gravado sem recarregar a grade (e sem perder o foco da tabela).
+  const [volta, setVolta] = useState(0);
+  const recusar = (mensagem: string) => {
+    feedback.notifyError(new Error(mensagem));
+    setVolta((n) => n + 1);
+  };
   const gravar = async (texto: string) => {
     const valor = texto.trim() === "" ? null : Number(texto.replace(",", "."));
     if (valor === atual || (valor === null && campo === "minimo")) return;
-    if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
-      feedback.notifyError(new Error("Informe um valor maior ou igual a zero."));
-      onSalvo(produtoId);
-      return;
-    }
-    const corpo = { produtoId, codigoLoja: linha.codigoLoja, minimo: campo === "minimo" ? valor : (linha.minimo ?? 0), maximo: campo === "maximo" ? valor : linha.maximo, version: linha.version };
+    if (valor !== null && (!Number.isFinite(valor) || valor < 0)) return recusar("Informe um valor maior ou igual a zero.");
+    const minimo = campo === "minimo" ? valor : (linha.minimo ?? 0);
+    const maximo = campo === "maximo" ? valor : linha.maximo;
+    if (maximo !== null && minimo !== null && maximo < minimo) return recusar("O máximo não pode ser menor que o mínimo.");
+    const corpo = { produtoId, codigoLoja: linha.codigoLoja, minimo, maximo, version: linha.version };
     try {
       const gravado = await apiFetch<MinimoGravado>(`${BASE}/minimos`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
       // Só a linha editada muda: a grade não recarrega.
       onSalvo(produtoId, gravado);
-      return;
     } catch (err: unknown) {
-      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao gravar o estoque mínimo."));
-      if (!(err instanceof ApiError)) return;
+      // O servidor prefixa o campo ("maximo: ..."); a tela mostra só a mensagem.
+      recusar(err instanceof Error ? err.message.replace(/^[a-zA-Z]+: /, "") : "Erro ao gravar o estoque mínimo.");
+      // Só o conflito de `version` (409) pede os valores atuais, e a releitura é silenciosa.
+      if (err instanceof ApiError && err.status === 409) onSalvo(produtoId);
     }
-    // Conflito de `version` (409) ou recusa: aí sim recarrega, para mostrar o que está gravado.
-    onSalvo(produtoId);
   };
   return (
     <Input
-      key={`${linha.version}-${atual}`}
+      key={`${linha.version}-${atual}-${volta}`}
       type="text"
       inputMode="decimal"
       aria-label={rotulo}
@@ -422,7 +425,8 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
     setAplicados(r.value.filtros);
   };
 
-  const carregar = useCallback(async () => {
+  /** `silencioso`: releitura sem o efeito de carregando e sem soltar o produto em foco (ex.: após um conflito de version). */
+  const carregar = useCallback(async (silencioso = false) => {
     if (!aplicados) return;
     const { modo, de, ate, lojas, entradas, apenasMinimo } = aplicados;
     const vale = novaConsulta();
@@ -431,14 +435,16 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
     if (lojas.length) params.set("lojas", lojas.join(","));
     if (entradas.length) params.set("entradas", JSON.stringify(entradas.map(({ tipo, id }) => ({ tipo, id }))));
     if (apenasMinimo) params.set("apenasMinimo", "1");
-    setCarregando(true);
-    setAtivo(null);
+    if (!silencioso) {
+      setCarregando(true);
+      setAtivo(null);
+    }
     try {
       const r = await apiFetch<ProdutoLancamento[]>(`${BASE}/produtos?${params}`);
       if (vale()) setProdutos(r);
     } catch (err: unknown) {
       if (vale()) {
-        setProdutos([]);
+        if (!silencioso) setProdutos([]);
         notificar(err instanceof Error ? err : new Error("Erro ao carregar os produtos."));
       }
     } finally {
@@ -462,7 +468,7 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
   const aoGravarMinimo = useCallback(
     (produtoId: string, gravado?: MinimoGravado) => {
       if (!gravado) {
-        void carregar();
+        void carregar(true);
         return;
       }
       const aplicar = (p: ProdutoLancamento) => (p.produtoId === produtoId ? comMinimoGravado(p, gravado) : p);
@@ -511,12 +517,6 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
 
   return (
     <Stack gap="field" viewport>
-      <HeaderActions>
-        <Button type="button" variant="outline" onClick={() => void abrirFiltros()}>
-          <SlidersHorizontal />
-          Filtros
-        </Button>
-      </HeaderActions>
       <Stack direction="row" gap="group" align="center" shrink={false}>
         {abas}
         <Stack grow>
@@ -536,11 +536,18 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
           <DataTable
             scroll="fill"
             title="Produtos"
+            headerActions={
+              <Button type="button" variant="outline" onClick={() => void abrirFiltros()}>
+                <SlidersHorizontal />
+                Filtros
+              </Button>
+            }
             compact
             columns={colunas}
             rows={produtos}
             getRowId={idProduto}
             loading={carregando}
+            markedRow={(p) => selecionados.has(p.produtoId)}
             activeRowId={ativo}
             onActiveRowChange={setAtivo}
             onRowToggle={alternarLinha}
