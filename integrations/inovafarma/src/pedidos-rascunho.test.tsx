@@ -2,13 +2,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { HeaderActionsProvider } from "@platform/ui/context/header-actions";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { PedidosPage } from "./pedidos-page";
 
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
 
-const contexto = { hoje: "2027-04-10", ontem: "2027-04-09", lojas: [{ codigo: 1, nome: "Centro" }, { codigo: 2, nome: "Norte" }], laboratorios: [], grupos: [], secoes: [], listas: [] };
+const contexto = { hoje: "2027-04-10", ontem: "2027-04-09", lojas: [{ codigo: 1, nome: "Centro" }, { codigo: 2, nome: "Norte" }] };
 const dipirona = {
   produtoId: "p-1",
   nome: "DIPIRONA",
@@ -46,7 +47,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const renderizar = () => render(<UiProvider><PedidosPage /></UiProvider>, { wrapper: MemoryRouter });
+const renderizar = () => render(<UiProvider><HeaderActionsProvider><PedidosPage /></HeaderActionsProvider></UiProvider>, { wrapper: MemoryRouter });
 const chamadas = (metodo: string) => apiFetch.mock.calls.filter(([, init]) => init?.method === metodo);
 
 describe("Pedido em rascunho", () => {
