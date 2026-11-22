@@ -143,7 +143,7 @@ function Grid({ columns, gap = "section", ...props }: GridProps) {
     <div
       className={cn(
         "grid",
-        columns === "workspace" && "min-h-0 flex-1 @4xl:grid-rows-[minmax(0,1fr)_fit-content(26rem)]",
+        columns === "workspace" && "min-h-0 flex-1 @4xl:grid-rows-[minmax(0,1fr)_17rem]",
         columns === 2 ? "grid-cols-2" : columns === "split" || columns === "workspace" ? "grid-cols-1 @4xl:grid-cols-2" : "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4",
         gaps[gap]
       )}
