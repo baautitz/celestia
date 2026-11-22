@@ -1,4 +1,4 @@
-import { handleArrowNavigation, handleArrowNavigationFocus } from "./arrow-navigation";
+import { controlsOf, fieldOf, fieldsOf, handleArrowNavigation, handleArrowNavigationFocus } from "./arrow-navigation";
 import React, {
   createContext,
   useCallback,
@@ -253,6 +253,10 @@ export interface DataTableProps<TRow> {
   onActiveRowChange?: (id: string | null) => void;
   /** Espaço na linha ativa (ex.: marcar/desmarcar o checkbox dela). */
   onRowToggle?: (row: TRow) => void;
+  /** Cursor de linha (padrão: ligado): sempre há uma linha ativa e ↑/↓/Home/End/PageUp/PageDown a movem; `false` desliga (tabelas especiais). Sem efeito no mobile. */
+  rowCursor?: boolean;
+  /** A tabela pega o foco quando as linhas chegam (salvo se o foco já estiver num campo ou janela). Padrão: só quando `onActiveRowChange` é informado. */
+  autoFocusRows?: boolean;
   /**
    * Totalizador: valores por `key` de coluna, calculados por quem usa a tabela e formatados pelo `format` da coluna.
    * A função recebe as linhas da busca atual, de todas as páginas; o objeto serve ao modo `manual` e a tabelas sem busca.
@@ -265,7 +269,17 @@ export interface DataTableProps<TRow> {
   >;
 }
 /** Chave da coluna do botão de expandir na medição das colunas fixas. */
+/** Folga (px) que a rolagem pelo teclado deixa entre a célula ativa e a borda visível. */
+const SCROLL_MARGIN = 10;
 const EXPAND_KEY = "__expand";
+const ACTIONS_KEY = "__actions";
+/**
+ * Célula ativa do cursor: anel de 2px por dentro (não é cortado pelo overflow nem pela borda das células fixas), esmaecido
+ * sem foco e cheio quando o contêiner (`group/cur`) tem foco. Usa `data-[active-cell]` entre colchetes: o `shadcn/tailwind.css`
+ * define a variante `data-active`, que engole `data-active-cell:` e faz o Tailwind não gerar a classe.
+ */
+const ACTIVE_CELL_CLASS = "data-[active-cell]:inset-ring-2 data-[active-cell]:inset-ring-primary/40 group-focus-within/cur:data-[active-cell]:inset-ring-primary";
+const CELL_CONTROL = 'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), a[href], [role="combobox"], [role="checkbox"], [role="switch"]';
 
 /** Fundos opacos (mistura sobre `--background`) para as células fixas não deixarem o conteúdo rolado aparecer por baixo. */
 const FROZEN_HEAD_CLASS =
@@ -540,6 +554,8 @@ export function DataTable<TRow>({
   activeRowId,
   onActiveRowChange,
   onRowToggle,
+  rowCursor: rowCursorProp = true,
+  autoFocusRows,
   totals,
   totalsCompare,
 }: DataTableProps<TRow>) {
@@ -562,17 +578,19 @@ export function DataTable<TRow>({
   const isExpanded = (id: string) => expandedIds.has(id) !== (defaultExpanded || expandedBySearch);
   const [printing, setPrinting] = useState(false);
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
-  const rowCursor = onActiveRowChange !== undefined;
-  const selectedId = rowCursor ? (activeRowId ?? null) : localSelectedId;
+  const controlled = onActiveRowChange !== undefined;
+  const rowCursor = (rowCursorProp || controlled) && !isMobile;
+  const selectedId = controlled ? (activeRowId ?? null) : localSelectedId;
   const setSelectedId = (id: string | null) => {
     setLocalSelectedId(id);
     onActiveRowChange?.(id);
   };
+  const [activeCol, setActiveCol] = useState<string | null>(null);
   const nested = useContext(NestedTableContext);
   // Clicar fora da tabela tira o destaque da linha.
   // biome-ignore lint/correctness/useExhaustiveDependencies: setSelectedId só repassa ao pai.
   useEffect(() => {
-    if (selectedId === null || rowCursor) return;
+    if (selectedId === null || rowCursor || controlled) return;
     const clear = (e: PointerEvent) => {
       if (!containerRef.current?.contains(e.target as Node)) setSelectedId(null);
     };
@@ -792,7 +810,6 @@ export function DataTable<TRow>({
   let visible = sorted;
   const count = visible.length;
   const printRows = visible;
-  const firstVisibleId = visible[0] ? getRowId(visible[0]) : null;
   const virtualOn =
     (virtualize ?? (scroll === "fill" && count > VIRTUALIZE_MIN_ROWS)) && !pagination && !renderExpanded && !isMobile && !loading && count > 0;
   const [startIdx, setStartIdx] = useState(0);
@@ -803,38 +820,6 @@ export function DataTable<TRow>({
   const viewportH = viewH || 600;
   const winStart = virtualOn ? Math.max(0, Math.min(startIdx, count - 1) - VIRTUAL_OVERSCAN) : 0;
   const winEnd = virtualOn ? Math.min(count, Math.min(startIdx, count - 1) + Math.ceil(viewportH / rowH) + VIRTUAL_OVERSCAN) : count;
-  const activeVisible = selectedId !== null && visible.some((r) => getRowId(r) === selectedId);
-  // Cursor de linhas: sem linha ativa na lista (carga nova, busca), a primeira visível assume.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: setSelectedId só repassa ao pai.
-  useEffect(() => {
-    if (rowCursor && !loading && firstVisibleId !== null && !activeVisible) setSelectedId(firstVisibleId);
-  }, [rowCursor, loading, firstVisibleId, activeVisible]);
-  // A tabela pega o foco quando as linhas chegam, para as setas valerem sem clicar; não rouba de campo ou janela.
-  useEffect(() => {
-    if (!rowCursor || loading || rows.length === 0) return;
-    const el = document.activeElement;
-    if (el && el !== document.body && (el.matches("input, textarea, select, [contenteditable]") || el.closest('[role="dialog"], [data-arrow-root]'))) return;
-    cursorRootRef.current?.focus({ preventScroll: true });
-  }, [rowCursor, loading, rows]);
-  // A linha ativa acompanha o cursor dentro da área rolável.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: só quando o cursor se move.
-  useEffect(() => {
-    if (!rowCursor || selectedId === null) return;
-    const box = containerRef.current;
-    if (virtualOn && box) {
-      // Linha possivelmente fora da janela: ajusta a rolagem pela conta (cada linha tem `rowH`) e a janela acompanha.
-      const idx = visible.findIndex((r) => getRowId(r) === selectedId);
-      if (idx < 0) return;
-      const area = box.clientHeight > 0 ? box.clientHeight - headH : viewportH - headH;
-      const top = idx * rowH;
-      if (top < box.scrollTop) box.scrollTop = top;
-      else if (top + rowH > box.scrollTop + area) box.scrollTop = top + rowH - area;
-      setStartIdx(Math.floor(box.scrollTop / rowH));
-      return;
-    }
-    const tr = cursorRootRef.current?.querySelector(`tr[data-row-id="${CSS.escape(selectedId)}"]`);
-    if (tr && typeof tr.scrollIntoView === "function") tr.scrollIntoView({ block: "nearest" });
-  }, [rowCursor, selectedId]);
   // Janela de linhas: mede a altura da viewport, do cabeçalho e de uma linha; busca/ordenação voltam ao topo.
   // biome-ignore lint/correctness/useExhaustiveDependencies: remede quando a lista ou o modo mudam.
   useLayoutEffect(() => {
@@ -857,21 +842,6 @@ export function DataTable<TRow>({
     if (containerRef.current) containerRef.current.scrollTop = 0;
     setStartIdx(0);
   }, [query, sortKey, order]);
-  const cursorRootRef = useRef<HTMLDivElement>(null);
-  const handleRowCursorKey = (e: React.KeyboardEvent<HTMLElement>) => {
-    if (!rowCursor || e.altKey || e.ctrlKey || e.metaKey || e.nativeEvent.isComposing) return;
-    if ((e.target as Element).closest('input, textarea, select, [role="combobox"], [role="listbox"], [role="menu"]')) return;
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      const at = visible.findIndex((r) => getRowId(r) === selectedId);
-      const next = visible[Math.max(0, Math.min(visible.length - 1, at < 0 ? 0 : at + (e.key === "ArrowDown" ? 1 : -1)))];
-      if (next) setSelectedId(getRowId(next));
-      e.preventDefault();
-    } else if (e.key === " " && onRowToggle) {
-      const row = visible.find((r) => getRowId(r) === selectedId);
-      if (row) onRowToggle(row);
-      e.preventDefault();
-    }
-  };
   const totalsValues =
     typeof totals === "function" ? totals(printRows) : totals;
 
@@ -892,6 +862,262 @@ export function DataTable<TRow>({
     );
   }
 
+  const firstVisibleId = visible[0] ? getRowId(visible[0]) : null;
+  const cursorRootRef = useRef<HTMLDivElement>(null);
+  const activeVisible = selectedId !== null && visible.some((r) => getRowId(r) === selectedId);
+  // Cursor de linhas: sem linha ativa na lista (carga nova, busca), a primeira visível assume.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setSelectedId só repassa ao pai.
+  useEffect(() => {
+    if (rowCursor && !loading && firstVisibleId !== null && !activeVisible) setSelectedId(firstVisibleId);
+  }, [rowCursor, loading, firstVisibleId, activeVisible]);
+  // A tabela pega o foco quando as linhas chegam, para as setas valerem sem clicar; não rouba de campo ou janela.
+  useEffect(() => {
+    if (!rowCursor || !(autoFocusRows ?? controlled) || loading || rows.length === 0) return;
+    const el = document.activeElement;
+    if (el && el !== document.body && (el.matches("input, textarea, select, [contenteditable]") || el.closest('[role="dialog"], [data-arrow-root]'))) return;
+    cursorRootRef.current?.focus({ preventScroll: true });
+  }, [rowCursor, loading, rows, autoFocusRows, controlled]);
+  // A linha ativa acompanha o cursor dentro da área rolável.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: só quando o cursor se move.
+  useEffect(() => {
+    if (!rowCursor || selectedId === null) return;
+    const box = containerRef.current;
+    if (virtualOn && box) {
+      // Linha possivelmente fora da janela: ajusta a rolagem pela conta (cada linha tem `rowH`) e a janela acompanha.
+      const idx = visible.findIndex((r) => getRowId(r) === selectedId);
+      if (idx < 0) return;
+      const hBar = box.offsetHeight - box.clientHeight;
+      const area = (box.clientHeight > 0 ? box.clientHeight : viewportH) - headH - Math.max(0, hBar);
+      const top = idx * rowH;
+      if (top - SCROLL_MARGIN < box.scrollTop) box.scrollTop = idx === 0 ? 0 : top - SCROLL_MARGIN;
+      else if (top + rowH + SCROLL_MARGIN > box.scrollTop + area) box.scrollTop = idx === visible.length - 1 ? Math.max(box.scrollHeight - box.clientHeight, top + rowH + SCROLL_MARGIN - area) : top + rowH + SCROLL_MARGIN - area;
+      setStartIdx(Math.floor(box.scrollTop / rowH));
+      return;
+    }
+    const tr = cursorRootRef.current?.querySelector(`tr[data-row-id="${CSS.escape(selectedId)}"]`);
+    if (!tr) return;
+    if (box && box.scrollHeight > box.clientHeight) {
+      // Contêiner que rola: desconta o cabeçalho fixo e a barra horizontal, com uma folga; na última linha vai até o fim.
+      const boxRect = box.getBoundingClientRect();
+      const row = tr.getBoundingClientRect();
+      const head = box.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+      const hBar = Math.max(0, box.offsetHeight - box.clientHeight);
+      const topEdge = boxRect.top + head + SCROLL_MARGIN;
+      const bottomEdge = boxRect.bottom - hBar - SCROLL_MARGIN;
+      const last = tr === tr.parentElement?.lastElementChild;
+      if (row.top < topEdge) box.scrollTop -= topEdge - row.top;
+      else if (row.bottom > bottomEdge) box.scrollTop += row.bottom - bottomEdge;
+      if (last) box.scrollTop = box.scrollHeight - box.clientHeight;
+    } else if (typeof tr.scrollIntoView === "function") tr.scrollIntoView({ block: "nearest" });
+  }, [rowCursor, selectedId]);
+  const cellKeys = useMemo(() => [...columns.map((c) => c.key), ...(rowActions ? [ACTIONS_KEY] : [])], [columns, rowActions]);
+  const curCol = activeCol !== null && cellKeys.includes(activeCol) ? activeCol : (cellKeys[0] ?? null);
+  // A célula ativa acompanha o cursor na horizontal: descontando as colunas fixas, que ficam por cima da rolagem.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: só quando o cursor se move.
+  useLayoutEffect(() => {
+    if (!rowCursor || selectedId === null || curCol === null) return;
+    const box = containerRef.current;
+    const td = cursorRootRef.current?.querySelector(`tr[data-row-id="${CSS.escape(selectedId)}"] > td[data-col="${CSS.escape(curCol)}"]`);
+    if (!box || !td) return;
+    const idx = cellKeys.indexOf(curCol);
+    if (idx < frozenCount) return;
+    const boxRect = box.getBoundingClientRect();
+    const cell = td.getBoundingClientRect();
+    const edge = lastFrozenKey
+      ? (cursorRootRef.current?.querySelector(`tr[data-row-id="${CSS.escape(selectedId)}"] > td[data-col="${CSS.escape(lastFrozenKey)}"]`)?.getBoundingClientRect().right ?? boxRect.left)
+      : boxRect.left;
+    // Desconta a barra vertical e deixa uma folga; na última coluna vai até o fim real da rolagem.
+    const vBar = Math.max(0, box.offsetWidth - box.clientWidth);
+    const rightEdge = boxRect.right - vBar - SCROLL_MARGIN;
+    if (cell.left < edge + SCROLL_MARGIN) box.scrollLeft -= edge + SCROLL_MARGIN - cell.left;
+    else if (cell.right > rightEdge) box.scrollLeft += cell.right - rightEdge;
+    if (idx === cellKeys.length - 1) box.scrollLeft = Math.max(box.scrollLeft, box.scrollWidth - box.clientWidth);
+  }, [rowCursor, selectedId, curCol, winStart]);
+  // Cursor chegou numa célula pelo teclado: se ela tem campo de texto, o foco vai direto nele; senão volta ao contêiner.
+  const pendingFocus = useRef<{ pos: number; from: string } | null>(null);
+  const queueFocus = (pos = 0, from = `${selectedId}|${curCol}`) => {
+    pendingFocus.current = { pos, from };
+    setTimeout(() => {
+      pendingFocus.current = null;
+    }, 100);
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: só quando o cursor se move.
+  useLayoutEffect(() => {
+    const pending = pendingFocus.current;
+    if (!pending || !rowCursor || selectedId === null || curCol === null || pending.from === `${selectedId}|${curCol}`) return;
+    const td = cursorRootRef.current?.querySelector(`tr[data-row-id="${CSS.escape(selectedId)}"] > td[data-col="${CSS.escape(curCol)}"]`);
+    if (!td) return;
+    pendingFocus.current = null;
+    const fields = fieldsOf(td);
+    const field = fields[Math.min(pending.pos, fields.length - 1)];
+    if (field) {
+      field.focus({ preventScroll: true });
+      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) field.select();
+    } else if (cursorRootRef.current && document.activeElement !== cursorRootRef.current && cursorRootRef.current.contains(document.activeElement)) {
+      cursorRootRef.current.focus({ preventScroll: true });
+    }
+  }, [rowCursor, selectedId, curCol, winStart]);
+  const moveCol = (to: number) => {
+    const key = cellKeys[Math.max(0, Math.min(cellKeys.length - 1, to))];
+    if (key !== undefined) setActiveCol(key);
+  };
+  const enterCell = () => {
+    if (selectedId === null || curCol === null) return false;
+    const td = cursorRootRef.current?.querySelector(`tr[data-row-id="${CSS.escape(selectedId)}"] > td[data-col="${CSS.escape(curCol)}"]`);
+    const control = td?.querySelector<HTMLElement>(CELL_CONTROL);
+    if (!control) return false;
+    control.focus();
+    if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) control.select();
+    return true;
+  };
+  /** Teclas num campo de texto da célula: ↑/↓/Enter trocam de linha, ←/→ de célula só na ponta do texto, Esc desfaz. */
+  const handleFieldKey = (e: React.KeyboardEvent<HTMLElement>, field: HTMLInputElement | HTMLTextAreaElement, td: HTMLTableCellElement, tr: Element): void => {
+    const root = e.currentTarget;
+    const rowId = tr.getAttribute("data-row-id");
+    const col = td.getAttribute("data-col");
+    const at = visible.findIndex((r) => getRowId(r) === rowId);
+    const pos = fieldsOf(td).indexOf(field);
+    const toRow = (delta: number) => {
+      const next = visible[at + delta];
+      if (!next) return false;
+      queueFocus(pos, `${rowId}|${col}`);
+      setSelectedId(getRowId(next));
+      return true;
+    };
+    switch (e.key) {
+      case "Escape": {
+        const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value")?.set;
+        if (field.value !== field.defaultValue) {
+          setter?.call(field, field.defaultValue);
+          field.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        root.focus({ preventScroll: true });
+        e.preventDefault();
+        return;
+      }
+      case "ArrowUp":
+      case "ArrowDown":
+        if (e.ctrlKey || e.shiftKey) return;
+        toRow(e.key === "ArrowDown" ? 1 : -1);
+        e.preventDefault();
+        return;
+      case "Enter":
+        if (!toRow(e.shiftKey ? -1 : 1)) root.focus({ preventScroll: true });
+        e.preventDefault();
+        return;
+      case "ArrowLeft":
+      case "ArrowRight": {
+        if (e.ctrlKey || e.shiftKey) return;
+        const left = e.key === "ArrowLeft";
+        const { selectionStart: a, selectionEnd: b, value } = field;
+        const all = a === 0 && b === value.length;
+        const edge = a === null || b === null || all || (left ? a === 0 && b === 0 : a === value.length && b === value.length);
+        if (!edge) return;
+        const to = cellKeys.indexOf(col ?? "") + (left ? -1 : 1);
+        const key = cellKeys[to];
+        if (key === undefined) return;
+        queueFocus(0, `${rowId}|${col}`);
+        setActiveCol(key);
+        e.preventDefault();
+        return;
+      }
+    }
+  };
+  const handleRowCursorKey = (e: React.KeyboardEvent<HTMLElement>): boolean => {
+    if (!rowCursor || e.altKey || e.metaKey || e.nativeEvent.isComposing) return false;
+    const target = e.target as Element;
+    const ownTd = target !== e.currentTarget ? target.closest("td[data-col]") : null;
+    const ownTr = ownTd?.closest("tr[data-row-id]") ?? null;
+    const inThisTable = ownTd instanceof HTMLTableCellElement && ownTr !== null && ownTr.closest("[data-arrow-root]") === e.currentTarget;
+    if (arrowNavigation && inThisTable) {
+      const field = fieldOf(target);
+      if (field) {
+        handleFieldKey(e, field, ownTd, ownTr);
+        return true;
+      }
+      const inner = target.closest("button, a[href]");
+      const controls = controlsOf(ownTd);
+      if (inner && controls.includes(inner as HTMLElement)) {
+        if (e.key === "Escape") {
+          e.currentTarget.focus({ preventScroll: true });
+          e.preventDefault();
+          return true;
+        }
+        if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && !e.ctrlKey && !e.shiftKey) {
+          const delta = e.key === "ArrowRight" ? 1 : -1;
+          const next = controls[controls.indexOf(inner as HTMLElement) + delta];
+          if (next) next.focus();
+          else {
+            e.currentTarget.focus({ preventScroll: true });
+            if (delta > 0) moveCol(cellKeys.indexOf(ownTd.getAttribute("data-col") ?? "") + 1);
+          }
+          e.preventDefault();
+          return true;
+        }
+        if (e.key === "Enter" || e.key === " ") return true;
+        // Demais teclas de cursor (↑/↓, Home/End...): voltam ao contêiner e seguem como no cursor de célula.
+        e.currentTarget.focus({ preventScroll: true });
+      }
+    }
+    if (target.closest('input, textarea, select, [role="combobox"], [role="listbox"], [role="menu"]')) {
+      // Escape num controle da célula devolve o foco ao cursor de célula (nunca fecha janela por engano se um menu está aberto).
+      if (e.key === "Escape" && !target.closest('[aria-expanded="true"], [role="listbox"], [role="menu"]') && target.closest("td") && cursorRootRef.current) {
+        cursorRootRef.current.focus({ preventScroll: true });
+        e.preventDefault();
+      }
+      return false;
+    }
+    if (e.ctrlKey && e.key !== "Home" && e.key !== "End") return false;
+    const col0 = curCol === null ? 0 : cellKeys.indexOf(curCol);
+    const landing = () => arrowNavigation && queueFocus(0);
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      // Célula com vários controles (ex.: editar e excluir): → entra no primeiro; ← sai para a célula vizinha.
+      const td = selectedId !== null && curCol !== null ? cursorRootRef.current?.querySelector(`tr[data-row-id="${CSS.escape(selectedId)}"] > td[data-col="${CSS.escape(curCol)}"]`) : null;
+      const controls = td && arrowNavigation && target === e.currentTarget ? controlsOf(td) : [];
+      if (e.key === "ArrowRight" && controls.length > 1) {
+        controls[0]?.focus();
+        e.preventDefault();
+        return true;
+      }
+      landing();
+      moveCol(col0 + (e.key === "ArrowRight" ? 1 : -1));
+      e.preventDefault();
+      return true;
+    }
+    if (e.key === "Home" || e.key === "End") {
+      landing();
+      moveCol(e.key === "Home" ? 0 : cellKeys.length - 1);
+      if (e.ctrlKey) {
+        const next = visible[e.key === "Home" ? 0 : visible.length - 1];
+        if (next) setSelectedId(getRowId(next));
+      }
+      e.preventDefault();
+      return true;
+    }
+    if ((e.key === "Enter" || e.key === "F2") && target === e.currentTarget) {
+      if (enterCell()) e.preventDefault();
+      return true;
+    }
+    const step = { ArrowDown: 1, ArrowUp: -1, PageDown: 1, PageUp: -1 }[e.key];
+    if (step !== undefined) {
+      const at = visible.findIndex((r) => getRowId(r) === selectedId);
+      const area = (containerRef.current?.clientHeight || viewportH) - headH;
+      const size = e.key.startsWith("Page") ? Math.max(1, Math.floor(area / rowH) - 1) : 1;
+      const to = at < 0 ? 0 : at + (step ?? 0) * size;
+      const next = visible[Math.max(0, Math.min(visible.length - 1, to))];
+      landing();
+      if (next) setSelectedId(getRowId(next));
+      e.preventDefault();
+      return true;
+    }
+    if (e.key === " " && onRowToggle) {
+      const row = visible.find((r) => getRowId(r) === selectedId);
+      if (row) onRowToggle(row);
+      e.preventDefault();
+      return true;
+    }
+    return false;
+  };
   // Expandir ou recolher todas as linhas visíveis de uma vez; as de outras páginas ficam como estão.
   const allExpanded = visible.length > 0 && visible.every((row) => isExpanded(getRowId(row)));
   const toggleAll = () =>
@@ -999,7 +1225,8 @@ export function DataTable<TRow>({
       <span
         aria-hidden
         data-resize-handle={col.key}
-        className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize touch-none select-none hover:bg-primary/30"
+        title="Arraste para redimensionar"
+        className="absolute inset-y-1 right-0 z-10 w-1.5 cursor-col-resize touch-none select-none border-r border-border hover:border-r-2 hover:border-primary hover:bg-primary/20"
         onPointerDown={(e) => startResize(e, col)}
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => {
@@ -1195,7 +1422,7 @@ export function DataTable<TRow>({
   // Dentro da linha expandida de outra tabela: sem a moldura do Card (borda, fundo e respiro), para não empilhar cards.
   // `overflow-visible`: sem o respiro, o corte do Card esconderia a borda (`ring`, desenhada por fora) dos cards dos itens.
   return (
-    <Card ref={cardRef} style={widthVars} className={cn(compact && "[&_td]:px-2 [&_td]:py-0.5 [&_td]:text-[13px] [&_th]:h-8 [&_th]:text-[13px]", scroll === "page" && "overflow-clip", scroll === "fill" && "@4xl:h-full @4xl:min-h-0", nested && "overflow-visible py-0 ring-0 bg-transparent", className)}>
+    <Card ref={cardRef} style={widthVars} className={cn(compact && "[&_td]:px-2 [&_td]:py-0.5 [&_th]:h-8", scroll === "page" && "overflow-clip", scroll === "fill" && "@4xl:h-full @4xl:min-h-0", nested && "overflow-visible py-0 ring-0 bg-transparent", className)}>
       {(heading || description || search || print || headerActions) && (
         <CardHeader className="flex flex-col gap-4 @2xl:flex-row @2xl:items-center @2xl:justify-between">
           <div>
@@ -1330,11 +1557,11 @@ export function DataTable<TRow>({
         ) : (
           <>
             {/* biome-ignore lint/a11y/noStaticElementInteractions: keyboard/focus delegation container for arrow navigation across the real inputs inside the rows. */}
-            <div className={cn(bordered && "border border-border", rowCursor && "outline-none", scroll === "fill" && "@4xl:flex @4xl:min-h-0 @4xl:flex-1 @4xl:flex-col")} style={wide && HEAD_FOLLOWS_SCROLL ? ({ timelineScope: HEAD_TIMELINE } as React.CSSProperties) : undefined} data-arrow-root={arrowNavigation ? "" : undefined}
+            <div className={cn(bordered && "border border-border", rowCursor && "group/cur outline-none focus:outline-none focus-visible:outline-none", scroll === "fill" && "@4xl:flex @4xl:min-h-0 @4xl:flex-1 @4xl:flex-col")} style={wide && HEAD_FOLLOWS_SCROLL ? ({ timelineScope: HEAD_TIMELINE } as React.CSSProperties) : undefined} data-arrow-root={arrowNavigation ? "" : undefined}
               ref={cursorRootRef}
-              tabIndex={rowCursor ? -1 : undefined}
+              tabIndex={rowCursor ? 0 : undefined}
               onKeyUp={rowCursor && onRowToggle ? (e) => e.key === " " && !(e.target as Element).closest("input, textarea, select") && e.preventDefault() : undefined}
-              onKeyDown={arrowNavigation || rowCursor ? (e) => { handleRowCursorKey(e); if (arrowNavigation && !e.defaultPrevented) handleArrowNavigation(e); } : undefined}
+              onKeyDown={arrowNavigation || rowCursor ? (e) => { const owned = handleRowCursorKey(e); if (arrowNavigation && !owned && !e.defaultPrevented) handleArrowNavigation(e); } : undefined}
               onFocus={
                 arrowNavigation
                   ? (e) => {
@@ -1343,6 +1570,8 @@ export function DataTable<TRow>({
                       const target = e.target as Element;
                       const tr = target.matches("input, textarea") ? target.closest("tr[data-row-id]") : null;
                       if (tr && tr.closest("[data-arrow-root]") === e.currentTarget) setSelectedId(tr.getAttribute("data-row-id"));
+                      const td = rowCursor ? target.closest("td[data-col]") : null;
+                      if (td && td.closest("[data-arrow-root]") === e.currentTarget) setActiveCol(td.getAttribute("data-col"));
                     }
                   : undefined
               }>
@@ -1472,7 +1701,7 @@ export function DataTable<TRow>({
                       return (
                         <MemoRow
                           key={id}
-                          deps={[row, selected, expanded, columns, colWidths, frozenUntil, frozenLeft, striped, rowActions, renderExpanded, getRowId, highlightRow?.(row)]}
+                          deps={[row, selected, selected ? curCol : null, expanded, columns, colWidths, frozenUntil, frozenLeft, striped, rowActions, renderExpanded, getRowId, highlightRow?.(row)]}
                           render={() => (
                         <React.Fragment>
                           <TableRow
@@ -1481,6 +1710,8 @@ export function DataTable<TRow>({
                             data-state={selected ? "selected" : undefined}
                             aria-selected={selected}
                             onClick={(e) => {
+                              const clicked = (e.target as Element).closest("td[data-col]");
+                              if (rowCursor && clicked?.parentElement === e.currentTarget) setActiveCol(clicked.getAttribute("data-col"));
                               if ((e.target as Element).closest(INTERACTIVE_SELECTOR)) return;
                               // Arrastou para selecionar texto (copiar): não é um clique na linha.
                               if (window.getSelection()?.toString()) return;
@@ -1511,8 +1742,11 @@ export function DataTable<TRow>({
                               const cell = (
                                 <TableCell
                                   key={col.key}
+                                  data-col={col.key}
+                                  data-active-cell={rowCursor && selected && curCol === col.key ? "" : undefined}
                                   style={{ ...frozenStyle(col.key), ...widthStyle(col) }}
                                   className={cn(
+                                    ACTIVE_CELL_CLASS,
                                     columnCellClassName(col, row),
                                     colWidths[col.key] !== undefined && canResize(col) && "overflow-hidden text-ellipsis",
                                     boundaryClass(col.key),
@@ -1550,7 +1784,7 @@ export function DataTable<TRow>({
                               );
                             })}
                             {hasActions && (
-                              <TableCell className="text-center">
+                              <TableCell data-col={ACTIONS_KEY} data-active-cell={rowCursor && selected && curCol === ACTIONS_KEY ? "" : undefined} className={cn("text-center", ACTIVE_CELL_CLASS)}>
                                 {rowActions?.(row)}
                               </TableCell>
                             )}
