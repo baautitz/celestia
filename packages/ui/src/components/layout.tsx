@@ -110,7 +110,7 @@ function Stack({
         justify && justifies[justify],
         wrap && "flex-wrap",
         grow && "min-h-0 flex-1",
-        viewport && "@4xl:h-[calc(100svh-var(--spacing)*30)]",
+        viewport && "@4xl:h-[calc(100svh-var(--spacing)*35)]",
         span === "full" && "@4xl:col-span-2",
         !shrink && "shrink-0",
         height === "control" && "h-8",
@@ -347,7 +347,7 @@ function KpiCard({
 /** Marca quadrada da plataforma (sidebar). */
 function BrandMark({ children }: { children: React.ReactNode }) {
   return (
-    <span className="flex aspect-square size-8 items-center justify-center rounded-none bg-primary text-primary-foreground">
+    <span data-slot="brand-mark" className="flex aspect-square size-8 items-center justify-center rounded-none bg-primary text-primary-foreground">
       {children}
     </span>
   )
