@@ -136,7 +136,7 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
       const conteudo = await emBase64(arquivo);
       const previa = await apiFetch<Previa>(`${base}/${f.codigo}/previa`, json("POST", { arquivo: conteudo }));
       if (previa.erros.length > 0) {
-        await windows.open({ surface: "dialog", size: "default", title: `Planilha de ${f.nome}`, content: () => <ErrosDaPrevia erros={previa.erros} /> });
+        await windows.open({ surface: "dialog", size: "medium", title: `Planilha de ${f.nome}`, content: () => <ErrosDaPrevia erros={previa.erros} /> });
         return;
       }
       const resumo = [plural(previa.validas, "preço válido", "preços válidos"), plural(previa.semOferta, "linha sem oferta", "linhas sem oferta")];

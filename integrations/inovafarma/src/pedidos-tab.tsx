@@ -60,7 +60,7 @@ export function PedidosTab() {
   const cotar = async (pedido: Pedido) => {
     const iniciada = await windows.open<true>({
       surface: "dialog",
-      size: "default",
+      size: "medium",
       title: "Cotar Pedido",
       description: `Escolha os fornecedores do Pedido de ${dia(pedido.criadoEm)}`,
       content: () => <CotacaoFornecedoresWindow pedido={pedido} />,
