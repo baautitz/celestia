@@ -20,9 +20,11 @@ let visoes: unknown[];
 const dipirona = { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 5, estoque: 10, minimo: 0, sugestao: 0, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }] };
 const aas = { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, minimo: 8, sugestao: 5, aChegar: 7, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: 8, maximo: 20, sugestao: 5, aChegar: 7, version: 2 }] };
 let produtos: unknown[];
+let putResposta: Error | null = null;
 
 beforeEach(() => {
   produtos = [dipirona, aas];
+  putResposta = null;
   visoes = [];
   contextoAtual = contexto;
   Object.defineProperty(window, "matchMedia", {
@@ -30,7 +32,12 @@ beforeEach(() => {
     value: (query: string) => ({ matches: false, media: query, onchange: null, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false }),
   });
   apiFetch.mockReset();
-  apiFetch.mockImplementation(async (url: string) => {
+  apiFetch.mockImplementation(async (url: string, init?: { method?: string; body?: string }) => {
+    if (init?.method === "PUT") {
+      if (putResposta) throw putResposta;
+      const corpo = JSON.parse(init.body ?? "{}");
+      return { codigoLoja: corpo.codigoLoja, minimo: corpo.minimo, maximo: corpo.maximo, version: corpo.version + 1 };
+    }
     if (url.includes("/contexto")) return contextoAtual;
     if (url.includes("/pedidos/visoes")) return visoes;
     if (url.includes("/movimentacao")) return [{ mes: "2027-03", vendida: 12, comprada: 30 }];
@@ -138,7 +145,7 @@ describe("Pedidos: Lançamento", () => {
 
   it("edita o mínimo da Loja na célula e grava com a version", async () => {
     renderizar();
-    fireEvent.click(await screen.findByText("AAS", { selector: "td span" }));
+    fireEvent.click(await screen.findByText("AAS", { selector: "td" }));
     const campo = await screen.findByLabelText("Estoque mínimo da Loja Centro");
     await waitFor(() => expect((campo as HTMLInputElement).value).toBe("8"));
     fireEvent.change(campo, { target: { value: "12" } });
@@ -149,10 +156,53 @@ describe("Pedidos: Lançamento", () => {
     });
   });
 
+  it("gravar o mínimo atualiza só a linha, a partir da resposta do PUT, sem recarregar a grade", async () => {
+    renderizar();
+    fireEvent.click(await screen.findByText("AAS", { selector: "td" }));
+    const campo = await screen.findByLabelText("Estoque mínimo da Loja Centro");
+    await waitFor(() => expect((campo as HTMLInputElement).value).toBe("8"));
+    const consultas = () => apiFetch.mock.calls.filter(([u]) => String(u).includes("/pedidos/lancamento/produtos")).length;
+    const antes = consultas();
+    fireEvent.change(campo, { target: { value: "12" } });
+    fireEvent.blur(campo);
+    // Sugestão = vendida (1) + mínimo (12) - estoque (4) = 9, na linha do produto e na da Loja.
+    const linhaProduto = screen.getByText("AAS", { selector: "td" }).closest("tr") as HTMLElement;
+    await waitFor(() => {
+      expect(linhaProduto.querySelector('td[data-col="minimo"]')?.textContent).toBe("12,00");
+      expect(linhaProduto.querySelector('td[data-col="sugestao"]')?.textContent).toBe("9,00");
+    });
+    const linhaLoja = screen.getByLabelText("Estoque mínimo da Loja Centro").closest("tr") as HTMLElement;
+    expect(linhaLoja.querySelector('td[data-col="sugestao"]')?.textContent).toBe("9,00");
+    expect((screen.getByLabelText("Estoque mínimo da Loja Centro") as HTMLInputElement).value).toBe("12");
+    expect(consultas()).toBe(antes);
+    // A version devolvida vale para a próxima edição.
+    fireEvent.change(screen.getByLabelText("Estoque mínimo da Loja Centro"), { target: { value: "15" } });
+    fireEvent.blur(screen.getByLabelText("Estoque mínimo da Loja Centro"));
+    await waitFor(() => {
+      const puts = apiFetch.mock.calls.filter(([, init]) => init?.method === "PUT");
+      expect(puts).toHaveLength(2);
+      expect(JSON.parse(puts[1]?.[1].body).version).toBe(3);
+    });
+  });
+
+  it("um 409 ao gravar o mínimo recarrega a grade", async () => {
+    const { ApiError } = await import("@platform/ui/lib/api");
+    renderizar();
+    fireEvent.click(await screen.findByText("AAS", { selector: "td" }));
+    const campo = await screen.findByLabelText("Estoque mínimo da Loja Centro");
+    await waitFor(() => expect((campo as HTMLInputElement).value).toBe("8"));
+    const consultas = () => apiFetch.mock.calls.filter(([u]) => String(u).includes("/pedidos/lancamento/produtos")).length;
+    const antes = consultas();
+    putResposta = new ApiError("O estoque mínimo foi alterado por outra pessoa. A grade foi recarregada.", 409);
+    fireEvent.change(campo, { target: { value: "12" } });
+    fireEvent.blur(campo);
+    await waitFor(() => expect(consultas()).toBe(antes + 1));
+  });
+
   it("sem a Permission de editar, os valores aparecem só para leitura", async () => {
     contextoAtual = { ...contexto, podeEditarMinimos: false };
     renderizar();
-    fireEvent.click(await screen.findByText("AAS", { selector: "td span" }));
+    fireEvent.click(await screen.findByText("AAS", { selector: "td" }));
     await screen.findByText("Lojas: AAS");
     expect(screen.queryByLabelText("Estoque mínimo da Loja Centro")).toBeNull();
   });

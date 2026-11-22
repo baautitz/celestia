@@ -144,8 +144,22 @@ function FiltroLojas({ lojas, escolhidas, onChange }: { lojas: LojaOpcao[]; esco
   );
 }
 
+/** O que o servidor devolve ao gravar o mínimo/máximo de uma Loja. */
+interface MinimoGravado {
+  codigoLoja: number;
+  minimo: number;
+  maximo: number | null;
+  version: number;
+}
+
+/** Aplica o mínimo/máximo gravado na linha da Loja e refaz a sugestão e os totais do produto, sem consultar o ERP. */
+function comMinimoGravado(produto: ProdutoLancamento, gravado: MinimoGravado): ProdutoLancamento {
+  const lojas = produto.lojas.map((l) => (l.codigoLoja === gravado.codigoLoja ? { ...l, minimo: gravado.minimo, maximo: gravado.maximo, version: gravado.version, sugestao: Math.max(0, l.vendida + gravado.minimo - l.estoque) } : l));
+  return { ...produto, lojas, minimo: lojas.reduce((soma, l) => soma + (l.minimo ?? 0), 0), sugestao: lojas.reduce((soma, l) => soma + l.sugestao, 0) };
+}
+
 /** Célula editável do mínimo ou do máximo da Loja: grava ao sair do campo, se mudou. */
-function CampoMinimoMaximo({ linha, produtoId, campo, rotulo, onSalvo }: { linha: LinhaLoja; produtoId: string; campo: "minimo" | "maximo"; rotulo: string; onSalvo: () => void }) {
+function CampoMinimoMaximo({ linha, produtoId, campo, rotulo, onSalvo }: { linha: LinhaLoja; produtoId: string; campo: "minimo" | "maximo"; rotulo: string; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void }) {
   const { feedback } = useUi();
   const atual = linha[campo];
   const gravar = async (texto: string) => {
@@ -153,17 +167,21 @@ function CampoMinimoMaximo({ linha, produtoId, campo, rotulo, onSalvo }: { linha
     if (valor === atual || (valor === null && campo === "minimo")) return;
     if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
       feedback.notifyError(new Error("Informe um valor maior ou igual a zero."));
-      onSalvo();
+      onSalvo(produtoId);
       return;
     }
     const corpo = { produtoId, codigoLoja: linha.codigoLoja, minimo: campo === "minimo" ? valor : (linha.minimo ?? 0), maximo: campo === "maximo" ? valor : linha.maximo, version: linha.version };
     try {
-      await apiFetch(`${BASE}/minimos`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+      const gravado = await apiFetch<MinimoGravado>(`${BASE}/minimos`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+      // Só a linha editada muda: a grade não recarrega.
+      onSalvo(produtoId, gravado);
+      return;
     } catch (err: unknown) {
       feedback.notifyError(err instanceof Error ? err : new Error("Erro ao gravar o estoque mínimo."));
       if (!(err instanceof ApiError)) return;
     }
-    onSalvo();
+    // Conflito de `version` (409) ou recusa: aí sim recarrega, para mostrar o que está gravado.
+    onSalvo(produtoId);
   };
   return (
     <Input
@@ -180,7 +198,7 @@ function CampoMinimoMaximo({ linha, produtoId, campo, rotulo, onSalvo }: { linha
 /** Campo de mínimo/máximo estreito e à direita, para a tabela de Lojas caber sem rolagem lateral. */
 const CAMPO_LOJA = "[&_input]:w-14 [&_input]:px-1.5 [&_input]:text-right";
 
-const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo }: { produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: () => void }) {
+const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo }: { produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void }) {
   const { feedback } = useUi();
   const novaConsulta = useLatestFetch();
   const [meses, setMeses] = useState<Mes[]>([]);
@@ -219,14 +237,14 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo 
   const colunasLoja = useMemo<DataTableColumn<LinhaLoja>[]>(() => {
     const nomeLoja = (codigo: number) => contexto.lojas.find((l) => l.codigo === codigo)?.nome || `Loja ${codigo}`;
     return [
-    { key: "loja", label: "Loja", truncateAt: 14, value: (l) => nomeLoja(l.codigoLoja) },
+    { key: "loja", label: "Loja", value: (l) => nomeLoja(l.codigoLoja) },
     { key: "estoque", label: "Estoque", tooltip: "Estoque atual", format: "decimal", value: (l) => l.estoque },
     { key: "vendida", label: "Vendida", tooltip: "Qtde vendida", format: "decimal", value: (l) => l.vendida },
     contexto.podeEditarMinimos
-      ? { key: "minimo", label: "Mín.", tooltip: "Estoque mínimo", render: (l) => <CampoMinimoMaximo linha={l} produtoId={produtoId} campo="minimo" rotulo={`Estoque mínimo da Loja ${nomeLoja(l.codigoLoja)}`} onSalvo={onSalvo} />, cellClassName: CAMPO_LOJA, mobileWide: true }
+      ? { key: "minimo", label: "Mín.", tooltip: "Estoque mínimo", format: "decimal", render: (l) => <CampoMinimoMaximo linha={l} produtoId={produtoId} campo="minimo" rotulo={`Estoque mínimo da Loja ${nomeLoja(l.codigoLoja)}`} onSalvo={onSalvo} />, cellClassName: CAMPO_LOJA, mobileWide: true }
       : { key: "minimo", label: "Mín.", tooltip: "Estoque mínimo", format: "decimal", value: (l) => l.minimo ?? 0 },
     contexto.podeEditarMinimos
-      ? { key: "maximo", label: "Máx.", tooltip: "Estoque máximo", render: (l) => <CampoMinimoMaximo linha={l} produtoId={produtoId} campo="maximo" rotulo={`Estoque máximo da Loja ${nomeLoja(l.codigoLoja)}`} onSalvo={onSalvo} />, cellClassName: CAMPO_LOJA, mobileWide: true }
+      ? { key: "maximo", label: "Máx.", tooltip: "Estoque máximo", format: "decimal", render: (l) => <CampoMinimoMaximo linha={l} produtoId={produtoId} campo="maximo" rotulo={`Estoque máximo da Loja ${nomeLoja(l.codigoLoja)}`} onSalvo={onSalvo} />, cellClassName: CAMPO_LOJA, mobileWide: true }
       : { key: "maximo", label: "Máx.", tooltip: "Estoque máximo", format: "decimal", value: (l) => l.maximo ?? 0 },
     { key: "sugestao", label: "Sug.", tooltip: "Sugestão", format: "decimal", value: (l) => l.sugestao },
     { key: "aChegar", label: "A chegar", format: "decimal", value: (l) => l.aChegar },
@@ -441,7 +459,21 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
     });
   }, []);
   const alternarLinha = useCallback((p: ProdutoLancamento) => alternar(p, !selecionados.has(p.produtoId)), [alternar, selecionados]);
-  const recarregar = useCallback(() => void carregar(), [carregar]);
+  const aoGravarMinimo = useCallback(
+    (produtoId: string, gravado?: MinimoGravado) => {
+      if (!gravado) {
+        void carregar();
+        return;
+      }
+      const aplicar = (p: ProdutoLancamento) => (p.produtoId === produtoId ? comMinimoGravado(p, gravado) : p);
+      setProdutos((atual) => atual.map(aplicar));
+      setSelecionados((atual) => {
+        const marcado = atual.get(produtoId);
+        return marcado ? new Map(atual).set(produtoId, aplicar(marcado)) : atual;
+      });
+    },
+    [carregar],
+  );
 
   const gerarPedido = async () => {
     // A quantidade vem digitada na janela; o produto entra com todas as Lojas que ele tem na consulta.
@@ -466,7 +498,7 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
         render: (p) => <Checkbox aria-label={`Selecionar ${p.nome}`} checked={selecionados.has(p.produtoId)} onCheckedChange={(v: boolean) => alternar(p, v)} />,
         mobileRole: "hidden",
       },
-      { key: "nome", label: "Produto", value: (p) => p.nome, searchable: true, sortable: true, truncateAt: 40, mobileRole: "primary" },
+      { key: "nome", label: "Produto", value: (p) => p.nome, searchable: true, sortable: true, mobileRole: "primary" },
       { key: "estoque", label: "Estoque", tooltip: "Estoque atual", format: "decimal", value: (p) => p.estoque, sortable: true },
       { key: "vendida", label: "Vendida", tooltip: "Qtde vendida", format: "decimal", value: (p) => p.vendida, sortable: true, firstSort: "desc" },
       { key: "minimo", label: "Mínimo", tooltip: "Estoque mínimo", format: "decimal", value: (p) => p.minimo, sortable: true },
@@ -478,7 +510,7 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
   const emFoco = useMemo(() => (ativo ? produtos.find((p) => p.produtoId === ativo) : undefined), [ativo, produtos]);
 
   return (
-    <Stack gap="section" viewport>
+    <Stack gap="field" viewport>
       <HeaderActions>
         <Button type="button" variant="outline" onClick={() => void abrirFiltros()}>
           <SlidersHorizontal />
@@ -499,7 +531,7 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
           Gerar pedido
         </Button>
       </Stack>
-      <Grid columns="workspace" gap="section">
+      <Grid columns="workspace" gap="tight">
         <Stack grow>
           <DataTable
             scroll="fill"
@@ -516,7 +548,7 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
             emptyMessage="Nenhuma venda no período e filtros escolhidos."
           />
         </Stack>
-        <Detalhe produto={emFoco} contexto={contexto} lojasFiltro={aplicados?.lojas ?? padrao.lojas} onSalvo={recarregar} />
+        <Detalhe produto={emFoco} contexto={contexto} lojasFiltro={aplicados?.lojas ?? padrao.lojas} onSalvo={aoGravarMinimo} />
       </Grid>
     </Stack>
   );
