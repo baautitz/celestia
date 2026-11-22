@@ -114,6 +114,10 @@ export interface DataTableColumn<TRow> {
   group?: string;
   /** Mantém o conteúdo numa linha só, também na impressão (ex.: nomes que encareceriam a altura da linha). */
   nowrap?: boolean;
+  /** `false` tira a alça de redimensionar desta coluna (a tabela redimensiona por padrão, ver `resizableColumns`). */
+  resizable?: boolean;
+  /** Largura máxima da célula no desktop, em caracteres (`ch`): o texto maior é cortado com reticências e o valor completo aparece em `title`. */
+  truncateAt?: number;
   /** Valor bruto da célula; usado para formato, busca, ordenação e título do MobileCard. */
   value?: (row: TRow) => CellValue;
   /** Conteúdo customizado (badges etc.); tem precedência sobre `value`/`format` na célula. */
@@ -183,6 +187,10 @@ export interface DataTableProps<TRow> {
   skeletonRows?: number;
   /** Texto, ou função recebendo a quantidade de linhas após a busca. */
   title?: string | ((count: number) => string);
+  /** Conteúdo à direita do cabeçalho do card (ex.: um checkbox de escopo), junto da busca e da impressão. */
+  headerActions?: React.ReactNode;
+  /** Linhas e cabeçalho mais baixos, com texto menor: cabem mais linhas na tela (ex.: grades de trabalho). */
+  compact?: boolean;
   description?: string;
   emptyMessage?: string;
   rowActions?: (row: TRow) => React.ReactNode;
@@ -194,8 +202,16 @@ export interface DataTableProps<TRow> {
    * `page`: a tabela cresce com as linhas e quem rola é a página (sem rolagem vertical dentro da tabela).
    * Bom para tabelas expansíveis, que senão viram uma rolagem dentro da outra. O cabeçalho gruda abaixo da barra
    * superior ao rolar a página, salvo quando a tabela não cabe na largura e rola na horizontal. Padrão: `table`.
+   * `fill`: a partir de `@4xl` a tabela ocupa a altura que o pai der (célula de `Grid columns="workspace"`) e só o corpo rola;
+   * abaixo disso, igual a `table`.
    */
-  scroll?: "table" | "page";
+  scroll?: "table" | "page" | "fill";
+  /**
+   * Janela de linhas: só as visíveis (mais uma folga) ficam no DOM; o resto vira espaçadores com a altura delas.
+   * Padrão: ligado com `scroll="fill"` e mais de 200 linhas. Pressupõe linhas de altura uniforme (a da primeira
+   * linha medida); não vale com `renderExpanded`, paginação ou no mobile.
+   */
+  virtualize?: boolean;
   actionsLabel?: string;
   actionsHeadClassName?: string;
   actionsSkeletonClassName?: string;
@@ -222,8 +238,21 @@ export interface DataTableProps<TRow> {
   highlightRow?: (row: TRow) => boolean;
   /** `key` da última coluna presa à esquerda na rolagem horizontal; ela e as anteriores ficam fixas. Não afeta a impressão. */
   frozenUntil?: string;
+  /** Alça no cabeçalho para o usuário arrastar a largura de cada coluna (duplo clique restaura); só no desktop. Padrão: `true`. */
+  resizableColumns?: boolean;
+  /** Identifica a tabela para lembrar as larguras escolhidas entre visitas (localStorage); sem ele, valem só enquanto a tabela está aberta. */
+  resizeKey?: string;
   /** Ligado por padrão: setas movem o foco entre os campos de valor das células, como numa planilha (↑/↓ e Enter trocam de linha); chaves e botões ficam fora. Passe `false` para desligar. */
   arrowNavigation?: boolean;
+  /**
+   * Linha ativa (cursor) controlada por quem usa a tabela; informar `onActiveRowChange` liga o teclado nas linhas:
+   * ↑/↓ movem a linha ativa, Espaço chama `onRowToggle`, a primeira linha visível fica ativa sozinha e a tabela
+   * pega o foco ao carregar (salvo se o foco já estiver num campo ou janela).
+   */
+  activeRowId?: string | null;
+  onActiveRowChange?: (id: string | null) => void;
+  /** Espaço na linha ativa (ex.: marcar/desmarcar o checkbox dela). */
+  onRowToggle?: (row: TRow) => void;
   /**
    * Totalizador: valores por `key` de coluna, calculados por quem usa a tabela e formatados pelo `format` da coluna.
    * A função recebe as linhas da busca atual, de todas as páginas; o objeto serve ao modo `manual` e a tabelas sem busca.
@@ -455,6 +484,18 @@ function totalCellText(
  * Linha do corpo memorizada: selecionar ou expandir uma linha só redesenha as linhas cujo `deps` mudou
  * (a que ganhou e a que perdeu o destaque), não a tabela inteira. `deps` lista tudo de que a linha depende.
  */
+const VIRTUALIZE_MIN_ROWS = 200;
+const VIRTUAL_OVERSCAN = 10;
+
+/** Linha vazia que ocupa o lugar das linhas fora da janela. */
+function VirtualSpacer({ height, span }: { height: number; span: number }) {
+  return (
+    <tr aria-hidden data-virtual-spacer="">
+      <td colSpan={span} style={{ height, padding: 0, border: 0 }} />
+    </tr>
+  );
+}
+
 const MemoRow = React.memo(
   function MemoRow({ render }: { render: () => React.ReactNode; deps: readonly unknown[] }) {
     return <>{render()}</>;
@@ -470,12 +511,15 @@ export function DataTable<TRow>({
   loading = false,
   skeletonRows = 4,
   title,
+  headerActions,
+  compact = false,
   description,
   emptyMessage = "Nenhum registro encontrado.",
   rowActions,
   renderExpanded,
   defaultExpanded = false,
   scroll = "table",
+  virtualize,
   actionsLabel = "Ações",
   actionsHeadClassName = "text-center w-20",
   actionsSkeletonClassName = "h-8 w-8 mx-auto",
@@ -490,7 +534,12 @@ export function DataTable<TRow>({
   striped = false,
   highlightRow,
   frozenUntil,
+  resizableColumns = true,
+  resizeKey,
   arrowNavigation = true,
+  activeRowId,
+  onActiveRowChange,
+  onRowToggle,
   totals,
   totalsCompare,
 }: DataTableProps<TRow>) {
@@ -499,6 +548,7 @@ export function DataTable<TRow>({
     [allColumns, visibleColumns],
   );
   const isMobile = useIsMobile();
+  const searchFields = search?.fields;
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<string | undefined>(undefined);
   const [order, setOrder] = useState<"asc" | "desc">("asc");
@@ -511,17 +561,24 @@ export function DataTable<TRow>({
   const [expandedBySearch, setExpandedBySearch] = useState(false);
   const isExpanded = (id: string) => expandedIds.has(id) !== (defaultExpanded || expandedBySearch);
   const [printing, setPrinting] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
+  const rowCursor = onActiveRowChange !== undefined;
+  const selectedId = rowCursor ? (activeRowId ?? null) : localSelectedId;
+  const setSelectedId = (id: string | null) => {
+    setLocalSelectedId(id);
+    onActiveRowChange?.(id);
+  };
   const nested = useContext(NestedTableContext);
   // Clicar fora da tabela tira o destaque da linha.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setSelectedId só repassa ao pai.
   useEffect(() => {
-    if (selectedId === null) return;
+    if (selectedId === null || rowCursor) return;
     const clear = (e: PointerEvent) => {
       if (!containerRef.current?.contains(e.target as Node)) setSelectedId(null);
     };
     document.addEventListener("pointerdown", clear);
     return () => document.removeEventListener("pointerdown", clear);
-  }, [selectedId]);
+  }, [selectedId, rowCursor]);
   const containerRef = useRef<HTMLDivElement>(null);
   // O cabeçalho só gruda na página enquanto a tabela cabe na largura: larga demais, o contêiner rola na horizontal.
   const [fitsWidth, setFitsWidth] = useState(true);
@@ -706,30 +763,115 @@ export function DataTable<TRow>({
   const text = (col: DataTableColumn<TRow>, row: TRow): string =>
     formatValue(col.value?.(row), col.format);
 
-  let visible = rows;
-  if (!manual) {
-    // Busca por palavras (acentos e um erro de digitação tolerados), da mais relevante à menos.
-    // Uma ordenação escolhida no cabeçalho prevalece; como é estável, a relevância desempata.
-    const searchCols = columns.filter((c) => c.searchable);
-    visible = rankBySearch(visible, query, (row) => [
-      ...searchCols.map((c) => String(c.value?.(row) ?? "")),
-      ...(search?.fields?.(row) ?? []),
-    ]);
-    const sortCol = columns.find((c) => c.key === sortKey);
-    if (sortCol?.value) {
-      const get = sortCol.value;
-      const dir = order === "asc" ? 1 : -1;
-      visible = [...visible].sort((a, b) => {
-        const x = get(a);
-        const y = get(b);
-        if (typeof x === "number" && typeof y === "number")
-          return (x - y) * dir;
-        return String(x ?? "").localeCompare(String(y ?? ""), "pt-BR") * dir;
-      });
+  // Memorizado: mover o cursor ou marcar uma linha redesenha a tabela, mas não reordena/busca de novo milhares de linhas.
+  const sorted = useMemo(() => {
+    let visible = rows;
+    if (!manual) {
+      // Busca por palavras (acentos e um erro de digitação tolerados), da mais relevante à menos.
+      // Uma ordenação escolhida no cabeçalho prevalece; como é estável, a relevância desempata.
+      const searchCols = columns.filter((c) => c.searchable);
+      visible = rankBySearch(visible, query, (row) => [
+        ...searchCols.map((c) => String(c.value?.(row) ?? "")),
+        ...(searchFields?.(row) ?? []),
+      ]);
+      const sortCol = columns.find((c) => c.key === sortKey);
+      if (sortCol?.value) {
+        const get = sortCol.value;
+        const dir = order === "asc" ? 1 : -1;
+        visible = [...visible].sort((a, b) => {
+          const x = get(a);
+          const y = get(b);
+          if (typeof x === "number" && typeof y === "number")
+            return (x - y) * dir;
+          return String(x ?? "").localeCompare(String(y ?? ""), "pt-BR") * dir;
+        });
+      }
     }
-  }
+    return visible;
+  }, [rows, columns, manual, query, sortKey, order, searchFields]);
+  let visible = sorted;
   const count = visible.length;
   const printRows = visible;
+  const firstVisibleId = visible[0] ? getRowId(visible[0]) : null;
+  const virtualOn =
+    (virtualize ?? (scroll === "fill" && count > VIRTUALIZE_MIN_ROWS)) && !pagination && !renderExpanded && !isMobile && !loading && count > 0;
+  const [startIdx, setStartIdx] = useState(0);
+  const [viewH, setViewH] = useState(0);
+  const [measured, setMeasured] = useState<{ row: number; head: number } | null>(null);
+  const rowH = measured?.row ?? (compact ? 29 : 41);
+  const headH = measured?.head ?? 32;
+  const viewportH = viewH || 600;
+  const winStart = virtualOn ? Math.max(0, Math.min(startIdx, count - 1) - VIRTUAL_OVERSCAN) : 0;
+  const winEnd = virtualOn ? Math.min(count, Math.min(startIdx, count - 1) + Math.ceil(viewportH / rowH) + VIRTUAL_OVERSCAN) : count;
+  const activeVisible = selectedId !== null && visible.some((r) => getRowId(r) === selectedId);
+  // Cursor de linhas: sem linha ativa na lista (carga nova, busca), a primeira visível assume.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setSelectedId só repassa ao pai.
+  useEffect(() => {
+    if (rowCursor && !loading && firstVisibleId !== null && !activeVisible) setSelectedId(firstVisibleId);
+  }, [rowCursor, loading, firstVisibleId, activeVisible]);
+  // A tabela pega o foco quando as linhas chegam, para as setas valerem sem clicar; não rouba de campo ou janela.
+  useEffect(() => {
+    if (!rowCursor || loading || rows.length === 0) return;
+    const el = document.activeElement;
+    if (el && el !== document.body && (el.matches("input, textarea, select, [contenteditable]") || el.closest('[role="dialog"], [data-arrow-root]'))) return;
+    cursorRootRef.current?.focus({ preventScroll: true });
+  }, [rowCursor, loading, rows]);
+  // A linha ativa acompanha o cursor dentro da área rolável.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: só quando o cursor se move.
+  useEffect(() => {
+    if (!rowCursor || selectedId === null) return;
+    const box = containerRef.current;
+    if (virtualOn && box) {
+      // Linha possivelmente fora da janela: ajusta a rolagem pela conta (cada linha tem `rowH`) e a janela acompanha.
+      const idx = visible.findIndex((r) => getRowId(r) === selectedId);
+      if (idx < 0) return;
+      const area = box.clientHeight > 0 ? box.clientHeight - headH : viewportH - headH;
+      const top = idx * rowH;
+      if (top < box.scrollTop) box.scrollTop = top;
+      else if (top + rowH > box.scrollTop + area) box.scrollTop = top + rowH - area;
+      setStartIdx(Math.floor(box.scrollTop / rowH));
+      return;
+    }
+    const tr = cursorRootRef.current?.querySelector(`tr[data-row-id="${CSS.escape(selectedId)}"]`);
+    if (tr && typeof tr.scrollIntoView === "function") tr.scrollIntoView({ block: "nearest" });
+  }, [rowCursor, selectedId]);
+  // Janela de linhas: mede a altura da viewport, do cabeçalho e de uma linha; busca/ordenação voltam ao topo.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: remede quando a lista ou o modo mudam.
+  useLayoutEffect(() => {
+    const box = containerRef.current;
+    if (!virtualOn || !box) return;
+    const row = box.querySelector<HTMLElement>("tbody tr[data-row-id]")?.offsetHeight ?? 0;
+    const head = box.querySelector<HTMLElement>("thead")?.offsetHeight ?? 0;
+    if (row > 0 && head > 0) setMeasured((m) => (m && m.row === row && m.head === head ? m : { row, head }));
+    setViewH(box.clientHeight);
+  }, [virtualOn, compact, count]);
+  useEffect(() => {
+    const box = containerRef.current;
+    if (!virtualOn || !box || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setViewH(box.clientHeight));
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [virtualOn]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: só ao mudar a busca ou a ordenação.
+  useEffect(() => {
+    if (containerRef.current) containerRef.current.scrollTop = 0;
+    setStartIdx(0);
+  }, [query, sortKey, order]);
+  const cursorRootRef = useRef<HTMLDivElement>(null);
+  const handleRowCursorKey = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (!rowCursor || e.altKey || e.ctrlKey || e.metaKey || e.nativeEvent.isComposing) return;
+    if ((e.target as Element).closest('input, textarea, select, [role="combobox"], [role="listbox"], [role="menu"]')) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      const at = visible.findIndex((r) => getRowId(r) === selectedId);
+      const next = visible[Math.max(0, Math.min(visible.length - 1, at < 0 ? 0 : at + (e.key === "ArrowDown" ? 1 : -1)))];
+      if (next) setSelectedId(getRowId(next));
+      e.preventDefault();
+    } else if (e.key === " " && onRowToggle) {
+      const row = visible.find((r) => getRowId(r) === selectedId);
+      if (row) onRowToggle(row);
+      e.preventDefault();
+    }
+  };
   const totalsValues =
     typeof totals === "function" ? totals(printRows) : totals;
 
@@ -798,6 +940,74 @@ export function DataTable<TRow>({
       onSortChange?.(key, null);
     }
   };
+
+  const MIN_COLUMN_WIDTH = 60;
+  const storageKey = resizeKey ? `celestia:datatable-widths:${resizeKey}` : undefined;
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+    if (!storageKey) return {};
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
+      return saved && typeof saved === "object" ? (saved as Record<string, number>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const cardRef = useRef<HTMLDivElement>(null);
+  const cssVar = (key: string) => `--cw-${key.replace(/[^\w-]/g, "_")}`;
+  const canResize = (col: DataTableColumn<TRow>) => resizableColumns && col.resizable !== false;
+  /** A largura vem de uma variável CSS no Card: arrastar só troca a variável, sem redesenhar linhas. */
+  const widthStyle = (col: DataTableColumn<TRow>): React.CSSProperties | undefined =>
+    canResize(col) ? { width: `var(${cssVar(col.key)})`, minWidth: `var(${cssVar(col.key)})`, maxWidth: `var(${cssVar(col.key)})` } : undefined;
+  const widthVars = Object.fromEntries(Object.entries(colWidths).map(([k, w]) => [cssVar(k), `${w}px`])) as React.CSSProperties;
+  const persistWidths = (next: Record<string, number>) => {
+    setColWidths(next);
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {
+      // sem armazenamento: as larguras valem só nesta sessão.
+    }
+  };
+  const startResize = (e: React.PointerEvent<HTMLElement>, col: DataTableColumn<TRow>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const card = cardRef.current;
+    const th = e.currentTarget.parentElement;
+    if (!card || !th) return;
+    const startX = e.clientX;
+    const startWidth = th.getBoundingClientRect().width;
+    let width = startWidth;
+    const move = (ev: PointerEvent) => {
+      width = Math.max(MIN_COLUMN_WIDTH, Math.round(startWidth + ev.clientX - startX));
+      card.style.setProperty(cssVar(col.key), `${width}px`);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      persistWidths({ ...colWidths, [col.key]: width });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const resetWidth = (col: DataTableColumn<TRow>) => {
+    cardRef.current?.style.removeProperty(cssVar(col.key));
+    const { [col.key]: _removed, ...rest } = colWidths;
+    persistWidths(rest);
+  };
+  const resizeHandle = (col: DataTableColumn<TRow>) =>
+    canResize(col) ? (
+      <span
+        aria-hidden
+        data-resize-handle={col.key}
+        className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize touch-none select-none hover:bg-primary/30"
+        onPointerDown={(e) => startResize(e, col)}
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          resetWidth(col);
+        }}
+      />
+    ) : null;
 
   const hasActions = Boolean(rowActions);
   const primaryCol =
@@ -926,8 +1136,9 @@ export function DataTable<TRow>({
                       <TableHead
                         key={col.key}
                         ref={measure ? setHeadRef(col.key) : undefined}
-                        style={frozenStyle(col.key, true)}
+                        style={{ ...frozenStyle(col.key, true), ...widthStyle(col) }}
                         className={cn(
+                          canResize(col) && "relative",
                           col.sortable && "cursor-pointer select-none",
                           isNumericColumn(col) && "text-right",
                           isCenteredColumn(col) && "text-center",
@@ -967,6 +1178,7 @@ export function DataTable<TRow>({
                         ) : (
                           <HeaderLabel col={col} />
                         )}
+                        {resizeHandle(col)}
                       </TableHead>
                     ))}
                     {hasActions && part !== "frozen" && (
@@ -983,8 +1195,8 @@ export function DataTable<TRow>({
   // Dentro da linha expandida de outra tabela: sem a moldura do Card (borda, fundo e respiro), para não empilhar cards.
   // `overflow-visible`: sem o respiro, o corte do Card esconderia a borda (`ring`, desenhada por fora) dos cards dos itens.
   return (
-    <Card className={cn(scroll === "page" && "overflow-clip", nested && "overflow-visible py-0 ring-0 bg-transparent", className)}>
-      {(heading || description || search || print) && (
+    <Card ref={cardRef} style={widthVars} className={cn(compact && "[&_td]:px-2 [&_td]:py-0.5 [&_td]:text-[13px] [&_th]:h-8 [&_th]:text-[13px]", scroll === "page" && "overflow-clip", scroll === "fill" && "@4xl:h-full @4xl:min-h-0", nested && "overflow-visible py-0 ring-0 bg-transparent", className)}>
+      {(heading || description || search || print || headerActions) && (
         <CardHeader className="flex flex-col gap-4 @2xl:flex-row @2xl:items-center @2xl:justify-between">
           <div>
             {heading && (
@@ -998,10 +1210,11 @@ export function DataTable<TRow>({
               </p>
             )}
           </div>
-          {(search || printButton) && (
+          {(search || printButton || headerActions) && (
             <div
               className={cn("flex items-center gap-2", isMobile && "w-full")}
             >
+              {headerActions}
               {printButton}
               {search && (
                 <InputGroup
@@ -1043,7 +1256,7 @@ export function DataTable<TRow>({
           )}
         </CardHeader>
       )}
-      <CardContent className={nested ? "px-0" : undefined}>
+      <CardContent className={cn(nested && "px-0", scroll === "fill" && "@4xl:flex @4xl:min-h-0 @4xl:flex-1 @4xl:flex-col")}>
         {isMobile ? (
           <div className="flex flex-col gap-3">
             {renderExpanded && !loading && visible.length > 0 && (
@@ -1117,8 +1330,11 @@ export function DataTable<TRow>({
         ) : (
           <>
             {/* biome-ignore lint/a11y/noStaticElementInteractions: keyboard/focus delegation container for arrow navigation across the real inputs inside the rows. */}
-            <div className={bordered ? "border border-border" : undefined} style={wide && HEAD_FOLLOWS_SCROLL ? ({ timelineScope: HEAD_TIMELINE } as React.CSSProperties) : undefined} data-arrow-root={arrowNavigation ? "" : undefined}
-              onKeyDown={arrowNavigation ? handleArrowNavigation : undefined}
+            <div className={cn(bordered && "border border-border", rowCursor && "outline-none", scroll === "fill" && "@4xl:flex @4xl:min-h-0 @4xl:flex-1 @4xl:flex-col")} style={wide && HEAD_FOLLOWS_SCROLL ? ({ timelineScope: HEAD_TIMELINE } as React.CSSProperties) : undefined} data-arrow-root={arrowNavigation ? "" : undefined}
+              ref={cursorRootRef}
+              tabIndex={rowCursor ? -1 : undefined}
+              onKeyUp={rowCursor && onRowToggle ? (e) => e.key === " " && !(e.target as Element).closest("input, textarea, select") && e.preventDefault() : undefined}
+              onKeyDown={arrowNavigation || rowCursor ? (e) => { handleRowCursorKey(e); if (arrowNavigation && !e.defaultPrevented) handleArrowNavigation(e); } : undefined}
               onFocus={
                 arrowNavigation
                   ? (e) => {
@@ -1175,7 +1391,14 @@ export function DataTable<TRow>({
               )}
               <Table
                 containerRef={containerRef}
-                onContainerScroll={wide ? syncScroll : undefined}
+                onContainerScroll={
+                  wide || virtualOn
+                    ? (e) => {
+                        if (wide) syncScroll(e);
+                        if (virtualOn) setStartIdx(Math.floor(e.currentTarget.scrollTop / rowH));
+                      }
+                    : undefined
+                }
                 containerStyle={
                   wide
                     ? ({
@@ -1191,7 +1414,9 @@ export function DataTable<TRow>({
                         pageScroll && "overflow-visible!",
                         wide && "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
                       )
-                    : undefined
+                    : scroll === "fill"
+                      ? "@4xl:min-h-0 @4xl:flex-1 @4xl:max-h-none"
+                      : undefined
                 }
               >
                 <TableHeader
@@ -1237,7 +1462,9 @@ export function DataTable<TRow>({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    visible.map((row) => {
+                    <>
+                    {winStart > 0 && <VirtualSpacer height={winStart * rowH} span={columns.length + (hasActions ? 1 : 0)} />}
+                    {(virtualOn ? visible.slice(winStart, winEnd) : visible).map((row) => {
                       const id = getRowId(row);
                       const expanded =
                         renderExpanded !== undefined && isExpanded(id);
@@ -1245,7 +1472,7 @@ export function DataTable<TRow>({
                       return (
                         <MemoRow
                           key={id}
-                          deps={[row, selected, expanded, columns, frozenUntil, frozenLeft, striped, rowActions, renderExpanded, getRowId, highlightRow?.(row)]}
+                          deps={[row, selected, expanded, columns, colWidths, frozenUntil, frozenLeft, striped, rowActions, renderExpanded, getRowId, highlightRow?.(row)]}
                           render={() => (
                         <React.Fragment>
                           <TableRow
@@ -1257,7 +1484,7 @@ export function DataTable<TRow>({
                               if ((e.target as Element).closest(INTERACTIVE_SELECTOR)) return;
                               // Arrastou para selecionar texto (copiar): não é um clique na linha.
                               if (window.getSelection()?.toString()) return;
-                              setSelectedId(selected ? null : id);
+                              setSelectedId(rowCursor || !selected ? id : null);
                               // Linha expansível: o clique em qualquer ponto dela também expande/recolhe.
                               if (renderExpanded) toggleExpanded(id);
                             }}
@@ -1284,9 +1511,10 @@ export function DataTable<TRow>({
                               const cell = (
                                 <TableCell
                                   key={col.key}
-                                  style={frozenStyle(col.key)}
+                                  style={{ ...frozenStyle(col.key), ...widthStyle(col) }}
                                   className={cn(
                                     columnCellClassName(col, row),
+                                    colWidths[col.key] !== undefined && canResize(col) && "overflow-hidden text-ellipsis",
                                     boundaryClass(col.key),
                                     frozenClass(col.key),
                                     col.key === lastFrozenKey &&
@@ -1294,7 +1522,17 @@ export function DataTable<TRow>({
                                     trend && "cursor-help",
                                   )}
                                 >
-                                  {cellContent(col, row)}
+                                  {col.truncateAt && !col.render ? (
+                                    <span
+                                      className="block truncate"
+                                      style={{ maxWidth: `${col.truncateAt}ch` }}
+                                      title={String(col.value?.(row) ?? "") || undefined}
+                                    >
+                                      {cellContent(col, row)}
+                                    </span>
+                                  ) : (
+                                    cellContent(col, row)
+                                  )}
                                 </TableCell>
                               );
                               // A célula inteira é o gatilho do tooltip compartilhado da tabela.
@@ -1334,7 +1572,9 @@ export function DataTable<TRow>({
                           )}
                         />
                       );
-                    })
+                    })}
+                    {virtualOn && winEnd < count && <VirtualSpacer height={(count - winEnd) * rowH} span={columns.length + (hasActions ? 1 : 0)} />}
+                    </>
                   )}
                 </TableBody>
                 {totalsValues && !loading && visible.length > 0 && (

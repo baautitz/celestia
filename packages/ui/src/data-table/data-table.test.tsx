@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DataTable } from "./data-table";
@@ -903,5 +904,91 @@ describe("DataTable desempenho", () => {
     rerender(<DataTable columns={cols} rows={[ana, { ...bia, nome: "Bianca" }]} getRowId={id} frozenUntil="nome" />);
     // Só a linha alterada redesenha.
     expect(renders - antes).toBe(1);
+  });
+});
+
+describe("DataTable cursor de linhas", () => {
+  it("a primeira linha fica ativa, as setas a movem e o Espaço chama onRowToggle", () => {
+    const toggled: string[] = [];
+    const Harness = () => {
+      const [ativo, setAtivo] = useState<string | null>(null);
+      return <DataTable columns={[{ key: "n", label: "N", value: (r: { id: string }) => r.id }]} rows={[{ id: "a" }, { id: "b" }]} getRowId={(r) => r.id} activeRowId={ativo} onActiveRowChange={setAtivo} onRowToggle={(r) => toggled.push(r.id)} />;
+    };
+    render(<Harness />);
+    const rows = () => screen.getAllByRole("row").slice(1);
+    expect(rows()[0]?.getAttribute("aria-selected")).toBe("true");
+    const root = document.querySelector("[data-arrow-root]") as HTMLElement;
+    fireEvent.keyDown(root, { key: "ArrowDown" });
+    expect(rows()[1]?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(root, { key: " " });
+    expect(toggled).toEqual(["b"]);
+  });
+
+  it("mover o cursor só redesenha as duas linhas afetadas, não a tabela inteira", () => {
+    setViewport(1280);
+    const data = Array.from({ length: 50 }, (_, i) => ({ id: String(i) }));
+    let renders = 0;
+    const cols = [{ key: "n", label: "N", render: (r: { id: string }) => { renders++; return r.id; } }];
+    const getId = (r: { id: string }) => r.id;
+    function Cursor() {
+      const [ativo, setAtivo] = useState<string | null>("0");
+      return <DataTable columns={cols} rows={data} getRowId={getId} activeRowId={ativo} onActiveRowChange={setAtivo} />;
+    }
+    render(<Cursor />);
+    const root = defined(document.querySelector("[tabindex]") as HTMLElement | null, "the table root");
+    renders = 0;
+    fireEvent.keyDown(root, { key: "ArrowDown" });
+    expect(renders).toBeLessThanOrEqual(4);
+  });
+});
+
+describe("DataTable truncateAt", () => {
+  it("limita a largura da célula e expõe o valor completo em title", () => {
+    const nome = "ABS SEMPRE LIVRE ADAPT PLUS SUAVE SEM ABAS 16UNID";
+    const rows = [{ id: "1", nome }];
+    render(<DataTable columns={[{ key: "nome", label: "Produto", value: (r: { nome: string }) => r.nome, truncateAt: 20 }]} rows={rows} getRowId={(r) => r.id} />);
+    const cell = screen.getByTitle(nome);
+    expect(cell.style.maxWidth).toBe("20ch");
+  });
+});
+
+describe("DataTable colunas redimensionáveis", () => {
+  const rows = [{ id: "1", nome: "A", qtd: 1 }];
+  const cols = [
+    { key: "nome", label: "Produto", value: (r: { nome: string }) => r.nome, sortable: true },
+    { key: "qtd", label: "Qtd", value: (r: { qtd: number }) => r.qtd, resizable: false },
+  ];
+  const tabela = (extra?: { resizableColumns?: boolean; resizeKey?: string }) => (
+    <DataTable columns={cols} rows={rows} getRowId={(r) => r.id} {...extra} />
+  );
+
+  it("arrastar a alça define a largura (mínimo 60px), duplo clique restaura e a coluna com resizable false não tem alça", () => {
+    const { container } = render(tabela());
+    expect(document.querySelector("[data-resize-handle=qtd]")).toBeNull();
+    const handle = defined(document.querySelector<HTMLElement>("[data-resize-handle=nome]"), "the handle");
+    const card = defined(container.querySelector<HTMLElement>("[data-slot=card]"), "the card");
+    fireEvent.pointerDown(handle, { clientX: 100 });
+    fireEvent.pointerMove(window, { clientX: 400 });
+    fireEvent.pointerUp(window);
+    expect(card.style.getPropertyValue("--cw-nome")).toMatch(/^\d+px$/);
+    expect(Number.parseInt(card.style.getPropertyValue("--cw-nome"), 10)).toBeGreaterThanOrEqual(60);
+    fireEvent.doubleClick(handle);
+    expect(card.style.getPropertyValue("--cw-nome")).toBe("");
+  });
+
+  it("clicar na alça não ordena a coluna", () => {
+    render(tabela());
+    fireEvent.click(defined(document.querySelector<HTMLElement>("[data-resize-handle=nome]"), "the handle"));
+    expect(screen.getByRole("columnheader", { name: /Produto/ }).getAttribute("aria-sort")).toBeNull();
+  });
+
+  it("resizableColumns false remove todas as alças; resizeKey lembra a largura", () => {
+    const { unmount } = render(tabela({ resizableColumns: false }));
+    expect(document.querySelectorAll("[data-resize-handle]")).toHaveLength(0);
+    unmount();
+    localStorage.setItem("celestia:datatable-widths:t", JSON.stringify({ nome: 222 }));
+    const { container } = render(tabela({ resizeKey: "t" }));
+    expect(defined(container.querySelector<HTMLElement>("[data-slot=card]"), "the card").style.getPropertyValue("--cw-nome")).toBe("222px");
+    localStorage.clear();
   });
 });
