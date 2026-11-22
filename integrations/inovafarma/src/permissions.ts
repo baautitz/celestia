@@ -112,4 +112,24 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite ver as Metas do Colaborador vinculado ao Usuário, na Exibição escolhida no Tipo de Meta.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para ver as próprias Metas.",
   },
+  "pedidos-lancamento:ver": {
+    label: "Pedidos: Lançamento",
+    description: "Permite abrir o Lançamento de Pedidos e ver as vendas, o estoque e as compras dos produtos por Loja.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver o Lançamento de Pedidos.",
+  },
+  "pedidos-pedidos:gerir": {
+    label: "Pedidos: Gerir Pedidos",
+    description: "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar e cancelar Pedidos em rascunho, cotar com fornecedores e conferir o recebimento pela NF.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir os Pedidos.",
+  },
+  "pedidos-pedidos:confirmar": {
+    label: "Pedidos: Confirmar Pedidos",
+    description: "Permite escolher o fornecedor de cada produto, confirmar o Pedido cotado e gerar o PDF por fornecedor.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para confirmar Pedidos.",
+  },
+  "pedidos-minimos:editar": {
+    label: "Pedidos: Editar estoque mínimo e máximo",
+    description: "Permite editar o estoque mínimo e máximo dos produtos por Loja na grade do Lançamento de Pedidos.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para editar o estoque mínimo e máximo.",
+  },
 });

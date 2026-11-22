@@ -4,6 +4,18 @@ import type React from "react";
 const FIELD =
   'input:not([disabled]):not([readonly]):not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([tabindex="-1"]):not([aria-hidden="true"]), textarea:not([disabled]):not([readonly])';
 
+/** Controles clicáveis da célula (botões de ação, links): o cursor de célula os percorre um a um com ←/→. */
+const BUTTONISH = 'button:not([disabled]):not([role="checkbox"]):not([role="switch"]):not([role="combobox"]):not([tabindex="-1"]), a[href]';
+
+export const controlsOf = (cell: Element): HTMLElement[] =>
+  Array.from(cell.querySelectorAll<HTMLElement>(BUTTONISH)).filter((el) => el.closest("td") === cell);
+
+/** Campo de texto da célula que o elemento é (ou null). */
+export const fieldOf = (el: Element): HTMLInputElement | HTMLTextAreaElement | null =>
+  (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && el.matches(FIELD) ? el : null;
+
+export const fieldsOf = (cell: Element): HTMLElement[] => focusablesOf(cell);
+
 const focusablesOf = (cell: Element): HTMLElement[] =>
   Array.from(cell.querySelectorAll<HTMLElement>(FIELD)).filter((el) => el.closest("td") === cell);
 

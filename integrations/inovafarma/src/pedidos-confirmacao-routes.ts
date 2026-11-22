@@ -1,0 +1,121 @@
+import type { MiddlewareHandler } from "hono";
+import { z } from "zod";
+import type { ModuleContext } from "@platform/core/module";
+import { nomesSql } from "./cotacao-routes.js";
+import type { CotacaoStore } from "./cotacao-store.js";
+import { ator, Codigo, CodigoEmTexto, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext } from "./metas-comum.js";
+import type { ErpQuery } from "./metas-comum.js";
+import { PEDIDO_TARGET, PEDIDOS_PLUGIN } from "./pedidos-audit.js";
+import { conferir, statusDoPedido } from "./pedidos-conferencia.js";
+import { CONFIRMACAO_ACTIONS } from "./pedidos-confirmacao-audit.js";
+import { entradasDoPedido } from "./pedidos-nf.js";
+import { gerarPdf, itensDoFornecedor } from "./pedido-pdf.js";
+import type { Pedido } from "./pedidos.js";
+import type { PedidoStore } from "./pedidos-store.js";
+import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
+import type { AuditService } from "./vinculo-audit.js";
+
+export interface ConfirmacaoRoutesDeps {
+  routes: ModuleContext["routes"];
+  permissions: Pick<ModuleContext["permissions"], "has">;
+  auth: MiddlewareHandler;
+  erpClient: () => ErpQuery | undefined;
+  pedidos: PedidoStore;
+  cotacoes: CotacaoStore;
+  audit: AuditService;
+}
+
+const BASE = "/pedidos/pedidos/:id";
+const NAO_ENCONTRADO = "Pedido não encontrado.";
+const DESATUALIZADO = versaoDesatualizada("O Pedido foi alterado por outra pessoa ou já não está cotado. A tela foi recarregada.");
+const SEM_NOME = "Não foi possível consultar o nome do fornecedor no ERP. O PDF não foi gerado; tente novamente em instantes.";
+const EM_RECEBIMENTO = ["confirmado", "parcialmente_recebido", "recebido"];
+
+const Confirmacao = z.object({ escolhas: z.record(z.string().min(1).max(36), Codigo), version: Version });
+
+/** Confirmação do Pedido cotado, PDF por fornecedor e conferência com as entradas de NF do ERP. */
+export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient, pedidos, cotacoes, audit }: ConfirmacaoRoutesDeps): void {
+  const confirmar = INOVAFARMA_PERMISSIONS.ref("pedidos-pedidos:confirmar");
+  const gerir = INOVAFARMA_PERMISSIONS.ref("pedidos-pedidos:gerir");
+
+  const registrar = (c: AuthContext, action: string, pedido: Pedido, attributes: Record<string, unknown>) =>
+    audit.record({ plugin: PEDIDOS_PLUGIN, action, actor: ator(c), target: { type: PEDIDO_TARGET, id: pedido.id }, attributes });
+
+  /** Pedido da rota; a recusa quando falta a Permission ou o Pedido não existe. */
+  const doPedido = async (c: AuthContext, exigida: typeof confirmar) => {
+    if (!permissions.has(c.get("user")?.permissions, exigida.key)) return { recusa: c.json({ error: exigida.deniedMessage }, 403) } as const;
+    const pedido = await pedidos.pedido(c.req.param("id") ?? "");
+    return pedido ? ({ pedido } as const) : ({ recusa: c.json({ error: NAO_ENCONTRADO }, 404) } as const);
+  };
+
+  routes.post(`${BASE}/confirmar`, auth, async (c: AuthContext) => {
+    const achado = await doPedido(c, confirmar);
+    if ("recusa" in achado) return achado.recusa;
+    const lido = Confirmacao.safeParse(await c.req.json().catch(() => null));
+    if (!lido.success) return recusaDeValidacao(c, lido.error);
+    const { escolhas, version } = lido.data;
+    const { pedido } = achado;
+    if (pedido.status !== "cotado") return c.json(DESATUALIZADO, 409);
+    const lista = await cotacoes.listar(pedido.id);
+    const precoDe = (produtoId: string, codigo: number) => lista.find((x) => x.codigoFornecedor === codigo)?.precos?.[produtoId] ?? null;
+    const produtos = new Set(pedido.itens.map((i) => i.produtoId));
+    if (Object.keys(escolhas).some((id) => !produtos.has(id))) return c.json({ error: "Há produto fora do Pedido na escolha." }, 400);
+    for (const i of pedido.itens) {
+      const ofertado = lista.some((x) => (x.precos?.[i.produtoId] ?? null) !== null);
+      const escolhido = escolhas[i.produtoId];
+      if (!ofertado) continue;
+      if (escolhido === undefined) return c.json({ error: `Escolha o fornecedor de ${i.nome}.` }, 400);
+      if (precoDe(i.produtoId, escolhido) === null) return c.json({ error: `O fornecedor escolhido não ofereceu preço para ${i.nome}.` }, 400);
+    }
+    if (Object.keys(escolhas).some((id) => !lista.some((x) => (x.precos?.[id] ?? null) !== null))) return c.json({ error: "Há produto sem oferta na escolha." }, 400);
+    const confirmado = await pedidos.confirmar(pedido.id, escolhas, version);
+    if (!confirmado) return c.json(DESATUALIZADO, 409);
+    await registrar(c, CONFIRMACAO_ACTIONS.confirmar, confirmado, { produtos: Object.keys(escolhas).length, fornecedores: new Set(Object.values(escolhas)).size });
+    return c.json(confirmado);
+  });
+
+  routes.get(`${BASE}/pdf/:codigo`, auth, async (c: AuthContext) => {
+    const achado = await doPedido(c, confirmar);
+    if ("recusa" in achado) return achado.recusa;
+    const { pedido } = achado;
+    if (!EM_RECEBIMENTO.includes(pedido.status)) return c.json({ error: "Confirme o Pedido antes de gerar o PDF." }, 409);
+    const codigo = CodigoEmTexto.safeParse(c.req.param("codigo"));
+    const cotacao = codigo.success ? (await cotacoes.listar(pedido.id)).find((x) => x.codigoFornecedor === codigo.data) : undefined;
+    const itens = cotacao?.precos ? itensDoFornecedor(pedido, cotacao.codigoFornecedor, cotacao.precos) : [];
+    if (!cotacao || itens.length === 0) return c.json({ error: "Nenhum produto do Pedido foi escolhido neste fornecedor." }, 404);
+    // O nome vem sempre do ERP: sem ele o PDF seria enviado ao fornecedor errado ou sem identificação.
+    const nome = await nomeDoFornecedor(erpClient(), cotacao.codigoFornecedor);
+    if (!nome) return c.json({ error: SEM_NOME }, 422);
+    const arquivo = await gerarPdf({ fornecedor: nome, data: new Date(pedido.confirmadoEm ?? pedido.criadoEm).toLocaleDateString("pt-BR"), itens });
+    return c.json({ nome: `pedido-${cotacao.codigoFornecedor}.pdf`, conteudo: arquivo.toString("base64") });
+  });
+
+  routes.post(`${BASE}/conferir`, auth, async (c: AuthContext) => {
+    const achado = await doPedido(c, gerir);
+    if ("recusa" in achado) return achado.recusa;
+    const { pedido } = achado;
+    if (!EM_RECEBIMENTO.includes(pedido.status)) return c.json({ error: "Confirme o Pedido antes de conferir com a NF." }, 409);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    try {
+      const linhas = conferir(pedido, await entradasDoPedido(client, pedido));
+      const status = statusDoPedido(linhas);
+      const atual = status === pedido.status ? pedido : ((await pedidos.registrarRecebimento(pedido.id, status)) ?? pedido);
+      await registrar(c, CONFIRMACAO_ACTIONS.conferir, atual, { status });
+      return c.json({ pedido: atual, linhas });
+    } catch (err: unknown) {
+      return c.json(erroDoErp(err), 503);
+    }
+  });
+}
+
+/** O nome do fornecedor no ERP; null quando o ERP falha ou não o devolve. */
+async function nomeDoFornecedor(client: ErpQuery | undefined, codigo: number): Promise<string | null> {
+  if (!client) return null;
+  try {
+    const [r] = await client.query<{ nome: string | null }>(nomesSql(1), { c0: codigo });
+    return r?.nome?.trim() || null;
+  } catch {
+    return null;
+  }
+}

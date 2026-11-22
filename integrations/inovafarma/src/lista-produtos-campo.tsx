@@ -49,7 +49,7 @@ type Busca = { estado: "parado" } | { estado: "carregando" } | { estado: "pronto
  * Lista de Produtos no construtor do Tipo de Meta: o resumo em uma linha e o botão "Montar Lista", que abre a janela
  * larga com a busca e a tabela. Confere uma vez, ao abrir o construtor, quais entradas gravadas saíram do ERP.
  */
-export function ListaProdutosCampo({ entradas, onChange, erro }: { entradas: EntradaLista[]; onChange: (entradas: EntradaLista[]) => void; erro?: string | null }) {
+export function ListaProdutosCampo({ entradas, onChange, erro, rotulo = "Lista de Produtos" }: { entradas: EntradaLista[]; onChange: (entradas: EntradaLista[]) => void; erro?: string | null; rotulo?: string }) {
   const { windows } = useUi();
   const [ausentes, setAusentes] = useState<ReadonlySet<string>>(new Set());
 
@@ -85,7 +85,7 @@ export function ListaProdutosCampo({ entradas, onChange, erro }: { entradas: Ent
 
   return (
     <Stack gap="field">
-      <Label>Lista de Produtos</Label>
+      <Label>{rotulo}</Label>
       <Stack direction="row" gap="field" align="center" justify="between" wrap>
         <Stack direction="row" gap="field" align="center" wrap>
           <Text>{resumirLista(entradas)}</Text>

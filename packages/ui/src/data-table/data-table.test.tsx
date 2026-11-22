@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DataTable } from "./data-table";
@@ -744,7 +745,7 @@ describe("linha selecionada", () => {
 
   it("destaca a linha clicada, troca ao clicar em outra e desmarca ao clicar de novo", async () => {
     setViewport(1280);
-    render(<DataTable columns={columns} rows={data} getRowId={(r) => r.id} />);
+    render(<DataTable rowCursor={false} columns={columns} rows={data} getRowId={(r) => r.id} />);
     const alfa = defined(screen.getByText("Alfa").closest("tr"), "the Alfa row");
     const beta = defined(screen.getByText("Beta").closest("tr"), "the Beta row");
 
@@ -764,7 +765,7 @@ describe("linha selecionada", () => {
     render(
       <>
         <p>Fora</p>
-        <DataTable columns={columns} rows={data} getRowId={(r) => r.id} />
+        <DataTable rowCursor={false} columns={columns} rows={data} getRowId={(r) => r.id} />
       </>,
     );
     const alfa = defined(screen.getByText("Alfa").closest("tr"), "the Alfa row");
@@ -778,6 +779,7 @@ describe("linha selecionada", () => {
     setViewport(1280);
     render(
       <DataTable
+        rowCursor={false}
         columns={columns}
         rows={data}
         getRowId={(r) => r.id}
@@ -806,6 +808,7 @@ describe("tabela aninhada no celular", () => {
     setViewport(500);
     render(
       <DataTable
+        rowCursor={false}
         columns={columns}
         rows={rows}
         getRowId={(r) => r.id}
@@ -859,8 +862,11 @@ describe("DataTable arrowNavigation", () => {
     expect(screen.getByLabelText("A Bia").closest("tr")?.getAttribute("data-state")).toBe("selected");
     fireEvent.keyDown(defined(document.activeElement, "the focused element"), { key: "ArrowUp" });
     expect(document.activeElement).toBe(a1);
-    // ← e → sempre trocam de célula, mesmo com o cursor no meio do texto.
+    // ← e → só trocam de célula na ponta do texto; no meio, o cursor anda no texto.
     a1.setSelectionRange(1, 1);
+    fireEvent.keyDown(a1, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(a1);
+    a1.setSelectionRange(2, 2);
     fireEvent.keyDown(a1, { key: "ArrowRight" });
     expect(document.activeElement).toBe(screen.getByLabelText("B Ana"));
     fireEvent.keyDown(defined(document.activeElement, "the focused element"), { key: "ArrowLeft" });
@@ -870,6 +876,103 @@ describe("DataTable arrowNavigation", () => {
     fireEvent.keyDown(a1, { key: "ArrowRight" });
     fireEvent.keyDown(defined(document.activeElement, "the focused element"), { key: "Enter" });
     expect(document.activeElement).toBe(screen.getByLabelText("B Bia"));
+  });
+
+  it("Esc desfaz o texto digitado e devolve o foco ao contêiner; Enter segue para a linha de baixo", () => {
+    setViewport(1280);
+    render(<DataTable columns={colunasEditaveis} rows={linhas} getRowId={(r) => r.id} />);
+    const a1 = screen.getByLabelText("A Ana") as HTMLInputElement;
+    a1.focus();
+    fireEvent.change(a1, { target: { value: "zzz" } });
+    fireEvent.keyDown(a1, { key: "Enter" });
+    expect(document.activeElement).toBe(screen.getByLabelText("A Bia"));
+    const b = screen.getByLabelText("A Bia") as HTMLInputElement;
+    fireEvent.change(b, { target: { value: "yyy" } });
+    fireEvent.keyDown(b, { key: "Escape" });
+    expect(b.value).toBe(b.defaultValue);
+    expect(document.activeElement).toBe(document.querySelector("[data-arrow-root]"));
+  });
+
+  it("o cursor de célula que chega a uma célula com campo de texto foca o campo", () => {
+    setViewport(1280);
+    render(<DataTable columns={colunasEditaveis} rows={linhas} getRowId={(r) => r.id} />);
+    const root = defined(document.querySelector("[data-arrow-root]") as HTMLElement | null, "root");
+    root.focus();
+    fireEvent.keyDown(root, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByLabelText("A Ana"));
+    expect(document.querySelector("[data-active-cell]")?.getAttribute("data-col")).toBe("a");
+  });
+
+  it("chegar a uma célula com botões já foca o primeiro (o último, vindo da direita); ←/→ percorrem e saem; ↑/↓ mantêm a coluna; Enter ativa", () => {
+    setViewport(1280);
+    const editar = vi.fn();
+    const cols = [
+      { key: "nome", label: "Nome", value: (r: Linha) => r.nome },
+      { key: "acoes", label: "Ações", render: (r: Linha) => (<><button type="button" onClick={() => editar(r.id)}>Editar {r.nome}</button><button type="button">Excluir {r.nome}</button></>) },
+      { key: "fim", label: "Fim", value: () => "x" },
+    ];
+    render(<DataTable columns={cols} rows={linhas} getRowId={(r) => r.id} />);
+    const root = defined(document.querySelector("[data-arrow-root]") as HTMLElement | null, "root");
+    const ativa = () => document.querySelector("[data-active-cell]")?.getAttribute("data-col");
+    root.focus();
+    // Da esquerda: já cai no primeiro botão.
+    fireEvent.keyDown(root, { key: "ArrowRight" });
+    const editarAna = screen.getByText("Editar Ana");
+    expect(document.activeElement).toBe(editarAna);
+    expect(ativa()).toBe("acoes");
+    fireEvent.keyDown(editarAna, { key: "ArrowRight" });
+    const excluirAna = screen.getByText("Excluir Ana");
+    expect(document.activeElement).toBe(excluirAna);
+    fireEvent.keyDown(excluirAna, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(editarAna);
+    // Enter ativa o controle focado.
+    fireEvent.click(editarAna);
+    expect(editar).toHaveBeenCalledWith("1");
+    // ↓ mantém a coluna e foca o botão da linha de baixo.
+    fireEvent.keyDown(editarAna, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(screen.getByText("Editar Bia"));
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(editarAna);
+    // Depois do último, sai para a célula seguinte; voltando da direita, cai no último botão.
+    fireEvent.keyDown(editarAna, { key: "ArrowRight" });
+    fireEvent.keyDown(excluirAna, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(root);
+    expect(ativa()).toBe("fim");
+    fireEvent.keyDown(root, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(excluirAna);
+    // Esc volta ao cursor de célula.
+    fireEvent.keyDown(excluirAna, { key: "Escape" });
+    expect(document.activeElement).toBe(root);
+    expect(ativa()).toBe("acoes");
+  });
+
+  it("célula cortada mostra o texto inteiro no title ao passar o mouse; sem corte, não", () => {
+    setViewport(1280);
+    render(<DataTable columns={[{ key: "n", label: "Nome completo", value: (r: Linha) => r.nome }]} rows={linhas} getRowId={(r) => r.id} />);
+    const td = defined(document.querySelector("td[data-col=n]") as HTMLElement | null, "td");
+    const th = defined(document.querySelector("th") as HTMLElement | null, "th");
+    fireEvent.mouseOver(td);
+    expect(td.title).toBe("");
+    Object.defineProperty(td, "scrollWidth", { configurable: true, value: 120 });
+    Object.defineProperty(td, "clientWidth", { configurable: true, value: 60 });
+    fireEvent.mouseOver(td);
+    expect(td.title).toBe("Ana");
+    Object.defineProperty(th, "scrollWidth", { configurable: true, value: 120 });
+    Object.defineProperty(th, "clientWidth", { configurable: true, value: 60 });
+    fireEvent.mouseOver(th);
+    expect(th.title).toBe("Nome completo");
+    Object.defineProperty(td, "scrollWidth", { configurable: true, value: 50 });
+    fireEvent.mouseOver(td);
+    expect(td.hasAttribute("title")).toBe(false);
+  });
+
+  it("checkbox sozinho na célula fica centralizado, com padding simétrico", () => {
+    setViewport(1280);
+    // biome-ignore lint/a11y/useSemanticElements: imita o Checkbox do base-ui (botão com role=checkbox).
+    render(<DataTable columns={[{ key: "s", label: "", render: () => <button type="button" role="checkbox" aria-checked="false" aria-label="Marcar" /> }]} rows={linhas} getRowId={(r) => r.id} />);
+    const td = defined(document.querySelector("td[data-col=s]") as HTMLElement | null, "td");
+    expect(td.className).toContain("[&_[role=checkbox]:only-child]:mx-auto");
+    expect(td.className).not.toMatch(/(^|\s)pr-0|:pr-0/);
   });
 
   it("pode ser desligada com arrowNavigation={false}", () => {
@@ -903,5 +1006,217 @@ describe("DataTable desempenho", () => {
     rerender(<DataTable columns={cols} rows={[ana, { ...bia, nome: "Bianca" }]} getRowId={id} frozenUntil="nome" />);
     // Só a linha alterada redesenha.
     expect(renders - antes).toBe(1);
+  });
+
+  it("com o cursor (padrão) sempre há uma linha ativa: clicar move e clicar de novo mantém", async () => {
+    setViewport(1280);
+    const data: Row[] = [{ id: "1", name: "Alfa" }, { id: "2", name: "Beta" }];
+    render(<DataTable columns={columns} rows={data} getRowId={(r) => r.id} />);
+    const alfa = defined(screen.getByText("Alfa").closest("tr"), "the Alfa row");
+    const beta = defined(screen.getByText("Beta").closest("tr"), "the Beta row");
+    expect(alfa.getAttribute("aria-selected")).toBe("true");
+    await userEvent.click(beta);
+    expect(beta.getAttribute("aria-selected")).toBe("true");
+    await userEvent.click(beta);
+    expect(beta.getAttribute("aria-selected")).toBe("true");
+    expect(alfa.getAttribute("aria-selected")).toBe("false");
+  });
+});
+
+describe("DataTable cursor de linhas", () => {
+  it("a primeira linha fica ativa, as setas a movem e o Espaço chama onRowToggle", () => {
+    const toggled: string[] = [];
+    const Harness = () => {
+      const [ativo, setAtivo] = useState<string | null>(null);
+      return <DataTable columns={[{ key: "n", label: "N", value: (r: { id: string }) => r.id }]} rows={[{ id: "a" }, { id: "b" }]} getRowId={(r) => r.id} activeRowId={ativo} onActiveRowChange={setAtivo} onRowToggle={(r) => toggled.push(r.id)} />;
+    };
+    render(<Harness />);
+    const rows = () => screen.getAllByRole("row").slice(1);
+    expect(rows()[0]?.getAttribute("aria-selected")).toBe("true");
+    const root = document.querySelector("[data-arrow-root]") as HTMLElement;
+    fireEvent.keyDown(root, { key: "ArrowDown" });
+    expect(rows()[1]?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(root, { key: " " });
+    expect(toggled).toEqual(["b"]);
+  });
+
+  it("por padrão, sem props de cursor, a tabela tem linha ativa, setas/Home/End movem e não rouba o foco", () => {
+    setViewport(1280);
+    const data = ["a", "b", "c"].map((id) => ({ id }));
+    render(<DataTable columns={[{ key: "n", label: "N", value: (r: { id: string }) => r.id }]} rows={data} getRowId={(r) => r.id} />);
+    const rowsEl = () => screen.getAllByRole("row").slice(1);
+    const root = defined(document.querySelector("[data-arrow-root]") as HTMLElement | null, "the table root");
+    expect(root.tabIndex).toBe(0);
+    expect(document.activeElement).not.toBe(root);
+    expect(rowsEl()[0]?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(root, { key: "ArrowDown" });
+    expect(rowsEl()[1]?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(root, { key: "End", ctrlKey: true });
+    expect(rowsEl()[2]?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(root, { key: "PageUp" });
+    expect(rowsEl()[0]?.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("rowCursor={false} desliga o cursor", () => {
+    setViewport(1280);
+    render(<DataTable rowCursor={false} columns={[{ key: "n", label: "N", value: (r: { id: string }) => r.id }]} rows={[{ id: "a" }]} getRowId={(r) => r.id} />);
+    expect(screen.getAllByRole("row")[1]?.getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("cursor 2D: setas laterais movem a célula ativa, Home/End e Ctrl+Home/End, só a célula tem contorno", () => {
+    setViewport(1280);
+    const data = ["a", "b"].map((id) => ({ id }));
+    const cols = [
+      { key: "x", label: "X", value: (r: { id: string }) => r.id },
+      { key: "y", label: "Y", value: (r: { id: string }) => r.id },
+      { key: "z", label: "Z", value: (r: { id: string }) => r.id },
+    ];
+    render(<DataTable columns={cols} rows={data} getRowId={(r) => r.id} />);
+    const root = defined(document.querySelector("[data-arrow-root]") as HTMLElement | null, "root");
+    const active = () => Array.from(document.querySelectorAll("[data-active-cell]")).map((c) => `${c.parentElement?.getAttribute("data-row-id")}:${c.getAttribute("data-col")}`);
+    expect(active()).toEqual(["a:x"]);
+    fireEvent.keyDown(root, { key: "ArrowRight" });
+    fireEvent.keyDown(root, { key: "ArrowDown" });
+    expect(active()).toEqual(["b:y"]);
+    fireEvent.keyDown(root, { key: "End" });
+    expect(active()).toEqual(["b:z"]);
+    fireEvent.keyDown(root, { key: "Home" });
+    expect(active()).toEqual(["b:x"]);
+    fireEvent.keyDown(root, { key: "End", ctrlKey: true });
+    expect(active()).toEqual(["b:z"]);
+    fireEvent.keyDown(root, { key: "Home", ctrlKey: true });
+    expect(active()).toEqual(["a:x"]);
+    expect(root.className).not.toMatch(/ring|focus:outline-(?!none)/);
+    // Anel de 2px por dentro; `data-[active-cell]` entre colchetes porque `data-active-cell:` é engolido pela variante `data-active` do shadcn.
+    const cls = document.querySelector("[data-active-cell]")?.className ?? "";
+    expect(cls).toContain("data-[active-cell]:inset-ring-2");
+    expect(cls).toContain("group-focus-within/cur:data-[active-cell]:inset-ring-primary");
+    expect(cls).not.toMatch(/(^|\s)data-active-cell:/);
+  });
+
+  it("rola na horizontal até a célula ativa, descontando a coluna fixa", () => {
+    setViewport(1280);
+    const cols = ["x", "y", "z"].map((k) => ({ key: k, label: k, value: (r: { id: string }) => r.id }));
+    render(<DataTable columns={cols} rows={[{ id: "a" }]} getRowId={(r) => r.id} frozenUntil="x" />);
+    const root = defined(document.querySelector("[data-arrow-root]") as HTMLElement | null, "root");
+    const box = defined(root.querySelector("div[class*=overflow]") as HTMLElement | null, "scroll box");
+    const rect = (l: number, r: number) => ({ left: l, right: r, top: 0, bottom: 0, width: r - l, height: 0, x: l, y: 0, toJSON: () => ({}) }) as DOMRect;
+    box.getBoundingClientRect = () => rect(0, 300);
+    const td = (k: string) => defined(document.querySelector(`td[data-col="${k}"]`) as HTMLElement | null, k);
+    td("x").getBoundingClientRect = () => rect(0, 100);
+    td("y").getBoundingClientRect = () => rect(50, 150);
+    td("z").getBoundingClientRect = () => rect(280, 380);
+    fireEvent.keyDown(root, { key: "ArrowRight" });
+    // Com a folga de 10px: coluna fixa (100) + 10 - 50.
+    expect(box.scrollLeft).toBe(-60);
+    box.scrollLeft = 0;
+    fireEvent.keyDown(root, { key: "ArrowRight" });
+    expect(box.scrollLeft).toBe(90);
+  });
+
+  it("a rolagem do teclado desconta a barra vertical e vai até o fim real na última coluna", () => {
+    setViewport(1280);
+    const cols = ["x", "y"].map((k) => ({ key: k, label: k, value: (r: { id: string }) => r.id }));
+    render(<DataTable columns={cols} rows={[{ id: "a" }]} getRowId={(r) => r.id} />);
+    const root = defined(document.querySelector("[data-arrow-root]") as HTMLElement | null, "root");
+    const box = defined(root.querySelector("div[class*=overflow]") as HTMLElement | null, "scroll box");
+    const rect = (l: number, r: number) => ({ left: l, right: r, top: 0, bottom: 0, width: r - l, height: 0, x: l, y: 0, toJSON: () => ({}) }) as DOMRect;
+    box.getBoundingClientRect = () => rect(0, 300);
+    Object.defineProperty(box, "offsetWidth", { configurable: true, value: 300 });
+    Object.defineProperty(box, "clientWidth", { configurable: true, value: 285 }); // barra de 15px
+    Object.defineProperty(box, "scrollWidth", { configurable: true, value: 500 });
+    defined(document.querySelector('td[data-col="y"]') as HTMLElement | null, "y").getBoundingClientRect = () => rect(200, 295);
+    fireEvent.keyDown(root, { key: "ArrowRight" });
+    // Fim real da rolagem (500 - 285), maior que o necessário pela conta da borda (295 - (300 - 15 - 10)).
+    expect(box.scrollLeft).toBe(215);
+  });
+
+  it("a rolagem vertical do teclado desconta o cabeçalho e a barra horizontal e vai até a última linha", () => {
+    setViewport(1280);
+    const data = ["a", "b", "c"].map((id) => ({ id }));
+    render(<DataTable columns={[{ key: "n", label: "N", value: (r: { id: string }) => r.id }]} rows={data} getRowId={(r) => r.id} />);
+    const root = defined(document.querySelector("[data-arrow-root]") as HTMLElement | null, "root");
+    const box = defined(root.querySelector("div[class*=overflow]") as HTMLElement | null, "scroll box");
+    const r = (t: number, b: number) => ({ left: 0, right: 0, top: t, bottom: b, width: 0, height: b - t, x: 0, y: t, toJSON: () => ({}) }) as DOMRect;
+    box.getBoundingClientRect = () => r(0, 200);
+    defined(box.querySelector("thead") as HTMLElement | null, "thead").getBoundingClientRect = () => r(0, 30);
+    Object.defineProperty(box, "offsetHeight", { configurable: true, value: 200 });
+    Object.defineProperty(box, "clientHeight", { configurable: true, value: 185 }); // barra de 15px
+    Object.defineProperty(box, "scrollHeight", { configurable: true, value: 300 });
+    const tr = (id: string) => defined(document.querySelector(`tr[data-row-id="${id}"]`) as HTMLElement | null, id);
+    tr("b").getBoundingClientRect = () => r(160, 190); // passa de 200 - 15 - 10 = 175
+    fireEvent.keyDown(root, { key: "ArrowDown" });
+    expect(box.scrollTop).toBe(15);
+    tr("c").getBoundingClientRect = () => r(170, 200);
+    fireEvent.keyDown(root, { key: "ArrowDown" });
+    expect(box.scrollTop).toBe(115); // última linha: fim real (300 - 185)
+  });
+
+  it("mover o cursor só redesenha as duas linhas afetadas, não a tabela inteira", () => {
+    setViewport(1280);
+    const data = Array.from({ length: 50 }, (_, i) => ({ id: String(i) }));
+    let renders = 0;
+    const cols = [{ key: "n", label: "N", render: (r: { id: string }) => { renders++; return r.id; } }];
+    const getId = (r: { id: string }) => r.id;
+    function Cursor() {
+      const [ativo, setAtivo] = useState<string | null>("0");
+      return <DataTable columns={cols} rows={data} getRowId={getId} activeRowId={ativo} onActiveRowChange={setAtivo} />;
+    }
+    render(<Cursor />);
+    const root = defined(document.querySelector("[tabindex]") as HTMLElement | null, "the table root");
+    renders = 0;
+    fireEvent.keyDown(root, { key: "ArrowDown" });
+    expect(renders).toBeLessThanOrEqual(4);
+  });
+});
+
+describe("DataTable truncateAt", () => {
+  it("limita a largura da célula e expõe o valor completo em title", () => {
+    const nome = "ABS SEMPRE LIVRE ADAPT PLUS SUAVE SEM ABAS 16UNID";
+    const rows = [{ id: "1", nome }];
+    render(<DataTable columns={[{ key: "nome", label: "Produto", value: (r: { nome: string }) => r.nome, truncateAt: 20 }]} rows={rows} getRowId={(r) => r.id} />);
+    const cell = screen.getByTitle(nome);
+    expect(cell.style.maxWidth).toBe("20ch");
+  });
+});
+
+describe("DataTable colunas redimensionáveis", () => {
+  const rows = [{ id: "1", nome: "A", qtd: 1 }];
+  const cols = [
+    { key: "nome", label: "Produto", value: (r: { nome: string }) => r.nome, sortable: true },
+    { key: "qtd", label: "Qtd", value: (r: { qtd: number }) => r.qtd, resizable: false },
+  ];
+  const tabela = (extra?: { resizableColumns?: boolean; resizeKey?: string }) => (
+    <DataTable columns={cols} rows={rows} getRowId={(r) => r.id} {...extra} />
+  );
+
+  it("arrastar a alça define a largura (mínimo 60px), duplo clique restaura e a coluna com resizable false não tem alça", () => {
+    const { container } = render(tabela());
+    expect(document.querySelector("[data-resize-handle=qtd]")).toBeNull();
+    const handle = defined(document.querySelector<HTMLElement>("[data-resize-handle=nome]"), "the handle");
+    const card = defined(container.querySelector<HTMLElement>("[data-slot=card]"), "the card");
+    fireEvent.pointerDown(handle, { clientX: 100 });
+    fireEvent.pointerMove(window, { clientX: 400 });
+    fireEvent.pointerUp(window);
+    expect(card.style.getPropertyValue("--cw-nome")).toMatch(/^\d+px$/);
+    expect(Number.parseInt(card.style.getPropertyValue("--cw-nome"), 10)).toBeGreaterThanOrEqual(60);
+    fireEvent.doubleClick(handle);
+    expect(card.style.getPropertyValue("--cw-nome")).toBe("");
+  });
+
+  it("clicar na alça não ordena a coluna", () => {
+    render(tabela());
+    fireEvent.click(defined(document.querySelector<HTMLElement>("[data-resize-handle=nome]"), "the handle"));
+    expect(screen.getByRole("columnheader", { name: /Produto/ }).getAttribute("aria-sort")).toBeNull();
+  });
+
+  it("resizableColumns false remove todas as alças; resizeKey lembra a largura", () => {
+    const { unmount } = render(tabela({ resizableColumns: false }));
+    expect(document.querySelectorAll("[data-resize-handle]")).toHaveLength(0);
+    unmount();
+    localStorage.setItem("celestia:datatable-widths:t", JSON.stringify({ nome: 222 }));
+    const { container } = render(tabela({ resizeKey: "t" }));
+    expect(defined(container.querySelector<HTMLElement>("[data-slot=card]"), "the card").style.getPropertyValue("--cw-nome")).toBe("222px");
+    localStorage.clear();
   });
 });

@@ -5,6 +5,7 @@ import type { MetaApurada } from "./apuracao-store.js";
 import type { BaixaDoPeriodo } from "./baixas-do-periodo.js";
 import type { ItemCongelado } from "./baixas-congeladas-store.js";
 import type { MedidaColuna } from "./colunas-desempenho.js";
+import type { ItemPedido } from "./pedidos.js";
 import type { EntradaLista, Exibicao, ListaTipo, RegraPremio } from "./tipos-meta.js";
 
 /** Um schema Postgres por Module. */
@@ -230,4 +231,79 @@ export const preVencidosCorrecoesBaixa = inovafarmaSchema.table(
     atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("pre_vencidos_correcoes_baixa_linha_idx").on(t.codigoLoja, t.vendaId, t.produtoId)],
+);
+
+/** Pedidos de compra: uma entidade com estados; os itens (produto, nome e quantidade por Loja) ficam no próprio Pedido. */
+export const pedidos = inovafarmaSchema.table(
+  "pedidos",
+  {
+    id: text("id").primaryKey(),
+    status: text("status").notNull(),
+    itens: jsonb("itens").$type<ItemPedido[]>().notNull(),
+    /** `produtoId` -> código do fornecedor escolhido na confirmação. */
+    escolhas: jsonb("escolhas").$type<Record<string, number>>().notNull().default({}),
+    confirmadoEm: timestamp("confirmado_em"),
+    /** Referência lógica a `iam.users`, sem FK entre Modules. */
+    criadoPorId: text("criado_por_id").notNull(),
+    criadoPorNome: text("criado_por_nome").notNull(),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [index("pedidos_status_idx").on(t.status, t.criadoEm)],
+);
+
+/** Cotação do Pedido: uma linha por fornecedor participante (só o código; o nome vem sempre do ERP). */
+export const pedidosCotacoes = inovafarmaSchema.table(
+  "pedidos_cotacoes",
+  {
+    /** Pedido da cotação (`pedidos.id`). */
+    pedidoId: text("pedido_id").notNull(),
+    /** Código do Fornecedor no ERP, sem FK. */
+    codigoFornecedor: integer("codigo_fornecedor").notNull(),
+    /** Preço por produto (`produtoId` -> preço; null = sem oferta); null enquanto a planilha não foi importada. */
+    precos: jsonb("precos").$type<Record<string, number | null>>(),
+    /** Posição em que o fornecedor foi escolhido. */
+    ordem: integer("ordem").notNull(),
+    importadoEm: timestamp("importado_em"),
+    version: integer("version").notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.pedidoId, t.codigoFornecedor] })],
+);
+
+/** Estoque Mínimo e máximo por produto e Loja (valores do Celestia, nunca do ERP). */
+export const pedidosMinimos = inovafarmaSchema.table(
+  "pedidos_minimos",
+  {
+    /** Identificador opaco do produto (`Produto.rowguid`), sem FK. */
+    produtoId: text("produto_id").notNull(),
+    /** Código da Loja no ERP, sem FK. */
+    codigoLoja: integer("codigo_loja").notNull(),
+    minimo: doublePrecision("minimo").notNull(),
+    maximo: doublePrecision("maximo"),
+    version: integer("version").notNull().default(1),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.produtoId, t.codigoLoja] })],
+);
+
+/** Visões salvas do Lançamento de Pedidos: privadas por Usuário e sem a data. */
+export const pedidosVisoes = inovafarmaSchema.table(
+  "pedidos_visoes",
+  {
+    id: text("id").primaryKey(),
+    /** Referência lógica a `iam.users`, sem FK entre Modules. */
+    usuarioId: text("usuario_id").notNull(),
+    nome: text("nome").notNull(),
+    lojas: integer("lojas").array().notNull().default(sql`'{}'::integer[]`),
+    /** O "Filtro de produtos": entradas validadas por `EntradaLista`, ids do ERP, sem FK. */
+    entradas: jsonb("entradas").$type<EntradaLista[]>().notNull().default(sql`'[]'::jsonb`),
+    apenasComMinimo: boolean("apenas_com_minimo").notNull().default(false),
+    padrao: boolean("padrao").notNull().default(false),
+    version: integer("version").notNull().default(1),
+  },
+  (t) => [
+    uniqueIndex("pedidos_visoes_usuario_nome_unique").on(t.usuarioId, sql`lower(${t.nome})`),
+    uniqueIndex("pedidos_visoes_usuario_padrao_unique").on(t.usuarioId).where(sql`${t.padrao}`),
+  ],
 );

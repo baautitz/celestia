@@ -88,7 +88,7 @@ function boot() {
   // O Usuário vem do cabeçalho: "gil" gerencia os Tipos de Meta, "ana" não.
   const auth: MiddlewareHandler = async (c, next) => {
     const sub = c.req.header("x-user") ?? "";
-    c.set("user" as never, { sub, fullname: sub, permissions: sub === "gil" ? [MANAGE] : [] } as never);
+    c.set("user" as never, { sub, fullname: sub, permissions: sub === "gil" ? [MANAGE] : sub === "lanc" ? ["inovafarma:pedidos-lancamento:ver"] : [] } as never);
     await next();
   };
   const metas = new MemoryMetaStore();
@@ -291,6 +291,12 @@ describe("Tipo de Meta de Lista de Produtos", () => {
     expect((await req("gil", "GET", "/tipos-meta/lista/busca?q=EMS")).status).toBe(400);
     expect((await req("gil", "GET", "/tipos-meta/lista/busca?tipo=marca&q=EMS")).status).toBe(400);
     expect((await req("ana", "GET", "/tipos-meta/lista/busca?tipo=grupo&q=VIT")).status).toBe(403);
+  });
+
+  it("deixa a busca e a conferência para quem só tem o Lançamento de Pedidos", async () => {
+    const { req } = boot();
+    expect((await req("lanc", "GET", "/tipos-meta/lista/busca?tipo=grupo&q=VIT")).status).toBe(200);
+    expect((await req("lanc", "POST", "/tipos-meta/lista/conferir", { entradas: [{ tipo: "grupo", id: "44" }] })).status).toBe(200);
   });
 
   it("confere quais entradas não existem mais no ERP", async () => {

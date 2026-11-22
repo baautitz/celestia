@@ -73,6 +73,10 @@ interface StackProps extends Omit<React.ComponentProps<"div">, "className" | "st
   divided?: boolean
   /** Largura máxima de leitura (`max-w-sm`). */
   narrow?: boolean
+  /** Ocupa a altura visível da tela abaixo do cabeçalho (a partir de `@4xl`); abaixo disso, a página rola. Filhos com `grow` dividem o espaço. */
+  viewport?: boolean
+  /** Dentro de `Grid columns="workspace"`: ocupa as duas colunas a partir de `@4xl`. */
+  span?: "full"
 }
 
 function Stack({
@@ -90,6 +94,8 @@ function Stack({
   surface,
   divided,
   narrow,
+  viewport,
+  span,
   ...props
 }: StackProps) {
   return (
@@ -103,7 +109,9 @@ function Stack({
         align && aligns[align],
         justify && justifies[justify],
         wrap && "flex-wrap",
-        grow && "flex-1",
+        grow && "min-h-0 flex-1",
+        viewport && "@4xl:h-[calc(100svh-var(--spacing)*35)]",
+        span === "full" && "@4xl:col-span-2",
         !shrink && "shrink-0",
         height === "control" && "h-8",
         (surface === "card" || surface === "muted") && "border border-foreground/10",
@@ -121,8 +129,9 @@ function Stack({
 
 interface GridProps extends Omit<React.ComponentProps<"div">, "className" | "style"> {
   /** `2` = duas colunas fixas; `split` = uma coluna abaixo de `lg` e duas a partir dele; `cards` = 1/2/3/4 colunas responsivas;
+   * `workspace` = como `split`, mas preenche a altura do pai (`grow`) a partir de `@4xl`, com duas linhas: a primeira (duas colunas iguais) ocupa o que sobra; a segunda tem a altura do conteúdo, até 26rem; use `Stack span="full"` no bloco da segunda linha e `DataTable scroll="fill"` nas tabelas.
    * `masonry` = como `split`, mas cada bloco segue logo abaixo do anterior na coluna, sem alinhar linhas (blocos de alturas diferentes). */
-  columns: 2 | "split" | "cards" | "masonry"
+  columns: 2 | "split" | "cards" | "masonry" | "workspace"
   gap?: Gap
 }
 
@@ -134,7 +143,8 @@ function Grid({ columns, gap = "section", ...props }: GridProps) {
     <div
       className={cn(
         "grid",
-        columns === 2 ? "grid-cols-2" : columns === "split" ? "grid-cols-1 @4xl:grid-cols-2" : "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4",
+        columns === "workspace" && "min-h-0 flex-1 @4xl:grid-rows-[minmax(0,1fr)_17rem]",
+        columns === 2 ? "grid-cols-2" : columns === "split" || columns === "workspace" ? "grid-cols-1 @4xl:grid-cols-2" : "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4",
         gaps[gap]
       )}
       {...props}
@@ -337,7 +347,7 @@ function KpiCard({
 /** Marca quadrada da plataforma (sidebar). */
 function BrandMark({ children }: { children: React.ReactNode }) {
   return (
-    <span className="flex aspect-square size-8 items-center justify-center rounded-none bg-primary text-primary-foreground">
+    <span data-slot="brand-mark" className="flex aspect-square size-8 items-center justify-center rounded-none bg-primary text-primary-foreground">
       {children}
     </span>
   )

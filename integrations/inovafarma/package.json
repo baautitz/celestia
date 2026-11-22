@@ -20,12 +20,15 @@
     "@platform/core": "workspace:*",
     "@platform/ui": "workspace:*",
     "drizzle-orm": "catalog:",
+    "exceljs": "catalog:",
     "hono": "catalog:",
+    "pdfkit": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@testing-library/react": "catalog:",
     "@types/node": "catalog:",
+    "@types/pdfkit": "catalog:",
     "@types/pg": "catalog:",
     "@types/react": "catalog:",
     "lucide-react": "catalog:",
