@@ -75,3 +75,53 @@ describe("DataTable com milhares de linhas", () => {
     expect(document.querySelector('tr[data-row-id="p5"]')).toBeNull();
   });
 });
+
+describe("DataTable virtualizada: larguras estáveis", () => {
+  it("rolar a janela não muda as larguras aplicadas às colunas", () => {
+    window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false, onchange: null })) as typeof window.matchMedia;
+    // Geometria simulada: o cabeçalho mede 100px; um texto (sonda) mede 8px por caractere.
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+      const width = this.tagName === "TH" ? 100 : this.tagName === "DIV" && this.style.visibility === "hidden" ? (this.textContent?.length ?? 0) * 8 : 0;
+      return { width, height: 0, top: 0, left: 0, right: width, bottom: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    };
+    try {
+      const rows = Array.from({ length: 500 }, (_, i) => ({ id: `r${i}`, nome: i === 450 ? "UM NOME BEM MAIS LONGO DO QUE OS OUTROS" : `P${i}` }));
+      render(<div style={{ height: 600 }}><DataTable scroll="fill" compact title="T" columns={[{ key: "nome", label: "Nome", value: (r: { nome: string }) => r.nome }]} rows={rows} getRowId={(r) => r.id} /></div>);
+      const th = () => screen.getAllByRole("columnheader").find((h) => h.getAttribute("data-col") === "nome") as HTMLElement;
+      const width = () => (th().closest('[data-slot="card"]') as HTMLElement).style.getPropertyValue("--cw-nome");
+      const before = width();
+      // A maior célula está fora da janela inicial, mas já conta na largura travada.
+      const w = "UM NOME BEM MAIS LONGO DO QUE OS OUTROS".length * 8;
+      expect(before).toBe(`${Math.ceil(w + 16 + Math.max(16, w * 0.08))}px`);
+      const box = document.querySelector('[data-slot="table-container"]') as HTMLElement;
+      for (const top of [5000, 12000, 14000]) {
+        box.scrollTop = top;
+        fireEvent.scroll(box);
+        expect(width()).toBe(before);
+      }
+      expect(document.querySelector('[data-slot="table"]')?.className).toContain("table-fixed");
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = original;
+    }
+  });
+
+  it("número formatado negativo longe da janela nunca é cortado: a largura o cobre e a coluna não tem reticências", () => {
+    window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false, onchange: null })) as typeof window.matchMedia;
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+      const width = this.tagName === "TH" ? 40 : this.tagName === "DIV" && this.style.visibility === "hidden" ? (this.textContent?.length ?? 0) * 8 : 0;
+      return { width, height: 0, top: 0, left: 0, right: width, bottom: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    };
+    try {
+      const rows = Array.from({ length: 500 }, (_, i) => ({ id: `r${i}`, v: i === 480 ? -1190.5 : i }));
+      render(<div style={{ height: 600 }}><DataTable scroll="fill" compact title="T" columns={[{ key: "v", label: "V", format: "decimal" as const, value: (r: { v: number }) => r.v }]} rows={rows} getRowId={(r) => r.id} /></div>);
+      const width = Number.parseFloat(((document.querySelector('[data-slot="card"]') as HTMLElement).style.getPropertyValue("--cw-v")));
+      const texto = "-1.190,50";
+      expect(width).toBeGreaterThanOrEqual(texto.length * 8 + 16 + 16);
+      expect(document.querySelector("td[data-col=v]")?.className).not.toContain("text-ellipsis");
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = original;
+    }
+  });
+});

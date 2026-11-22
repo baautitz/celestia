@@ -187,7 +187,7 @@ export interface DataTableProps<TRow> {
   skeletonRows?: number;
   /** Texto, ou função recebendo a quantidade de linhas após a busca. */
   title?: string | ((count: number) => string);
-  /** Conteúdo à direita do cabeçalho do card (ex.: um checkbox de escopo), junto da busca e da impressão. */
+  /** Conteúdo à direita do cabeçalho do card, depois da busca e da impressão (ex.: um botão de filtros ou um checkbox de escopo). */
   headerActions?: React.ReactNode;
   /** Linhas e cabeçalho mais baixos, com texto menor: cabem mais linhas na tela (ex.: grades de trabalho). */
   compact?: boolean;
@@ -236,6 +236,8 @@ export interface DataTableProps<TRow> {
   striped?: boolean;
   /** Destaca a linha com um tom âmbar suave (ex.: alteração ainda não gravada). A seleção por clique vence o destaque. */
   highlightRow?: (row: TRow) => boolean;
+  /** Marca a linha com um fundo verde suave (ex.: produto com o checkbox marcado), sem relação com o cursor. */
+  markedRow?: (row: TRow) => boolean;
   /** `key` da última coluna presa à esquerda na rolagem horizontal; ela e as anteriores ficam fixas. Não afeta a impressão. */
   frozenUntil?: string;
   /** Alça no cabeçalho para o usuário arrastar a largura de cada coluna (duplo clique restaura); só no desktop. Padrão: `true`. */
@@ -288,6 +290,8 @@ const FROZEN_CELL_CLASS =
   "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--primary)_5%,var(--background))] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--primary)_15%,var(--background))]!";
 /** Linha destacada: o âmbar vale também nas células fixas, que têm fundo opaco próprio. */
 const HIGHLIGHT_ROW_CLASS = "data-[highlight=true]:bg-amber-500/10";
+/** Linha marcada pelo caller (ex.: checkbox marcado): fundo verde suave, diferente do azul do cursor, que vence quando os dois coincidem. */
+const MARKED_ROW_CLASS = "data-[marked=true]:bg-emerald-500/10";
 const FROZEN_HIGHLIGHT_CELL_CLASS = "group-data-[highlight=true]/row:bg-[color-mix(in_oklab,var(--color-amber-500)_10%,var(--background))]";
 const FROZEN_STRIPED_CELL_CLASS =
   "group-even/row:bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))]";
@@ -510,6 +514,24 @@ function VirtualSpacer({ height, span }: { height: number; span: number }) {
   );
 }
 
+/**
+ * Célula (ou cabeçalho) cortada pela largura: o texto inteiro vai no `title`. Só ao passar o mouse ou ao ativar a célula,
+ * então não custa nada na renderização e vale para as linhas virtualizadas.
+ */
+function titleWhenClipped(cell: Element | null): void {
+  if (!(cell instanceof HTMLElement) || !cell.matches("td, th")) return;
+  const clipped = cell.scrollWidth > cell.clientWidth || Array.from(cell.querySelectorAll<HTMLElement>("*")).some((el) => el.scrollWidth > el.clientWidth && el.clientWidth > 0);
+  if (clipped) {
+    if (cell.title === "" || cell.dataset.autoTitle !== undefined) {
+      cell.title = (cell.textContent ?? "").trim();
+      cell.dataset.autoTitle = "";
+    }
+  } else if (cell.dataset.autoTitle !== undefined) {
+    cell.removeAttribute("title");
+    delete cell.dataset.autoTitle;
+  }
+}
+
 const MemoRow = React.memo(
   function MemoRow({ render }: { render: () => React.ReactNode; deps: readonly unknown[] }) {
     return <>{render()}</>;
@@ -547,6 +569,7 @@ export function DataTable<TRow>({
   print,
   striped = false,
   highlightRow,
+  markedRow,
   frozenUntil,
   resizableColumns = true,
   resizeKey,
@@ -919,6 +942,7 @@ export function DataTable<TRow>({
     const box = containerRef.current;
     const td = cursorRootRef.current?.querySelector(`tr[data-row-id="${CSS.escape(selectedId)}"] > td[data-col="${CSS.escape(curCol)}"]`);
     if (!box || !td) return;
+    titleWhenClipped(td);
     const idx = cellKeys.indexOf(curCol);
     if (idx < frozenCount) return;
     const boxRect = box.getBoundingClientRect();
@@ -949,8 +973,13 @@ export function DataTable<TRow>({
     if (!td) return;
     pendingFocus.current = null;
     const fields = fieldsOf(td);
-    const field = fields[Math.min(pending.pos, fields.length - 1)];
-    if (field) {
+    const field = fields[pending.pos < 0 ? fields.length - 1 : Math.min(pending.pos, fields.length - 1)];
+    const controls = controlsOf(td);
+    // Sem campo de texto, a célula com botões/links foca o primeiro (ou o último, vindo da direita: pos < 0).
+    const control = controls[pending.pos < 0 ? controls.length - 1 : Math.min(pending.pos, controls.length - 1)];
+    if (!field && control) {
+      control.focus({ preventScroll: true });
+    } else if (field) {
       field.focus({ preventScroll: true });
       if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) field.select();
     } else if (cursorRootRef.current && document.activeElement !== cursorRootRef.current && cursorRootRef.current.contains(document.activeElement)) {
@@ -1048,8 +1077,12 @@ export function DataTable<TRow>({
           const next = controls[controls.indexOf(inner as HTMLElement) + delta];
           if (next) next.focus();
           else {
-            e.currentTarget.focus({ preventScroll: true });
-            if (delta > 0) moveCol(cellKeys.indexOf(ownTd.getAttribute("data-col") ?? "") + 1);
+            // Fim dos controles: sai para a célula vizinha, que já recebe o foco no seu primeiro (→) ou último (←) controle.
+            const from = `${ownTr.getAttribute("data-row-id")}|${ownTd.getAttribute("data-col")}`;
+            const to = cellKeys.indexOf(ownTd.getAttribute("data-col") ?? "") + delta;
+            if (cellKeys[to] === undefined) return true;
+            queueFocus(delta > 0 ? 0 : -1, from);
+            moveCol(to);
           }
           e.preventDefault();
           return true;
@@ -1079,7 +1112,7 @@ export function DataTable<TRow>({
         e.preventDefault();
         return true;
       }
-      landing();
+      if (arrowNavigation) queueFocus(e.key === "ArrowRight" ? 0 : -1);
       moveCol(col0 + (e.key === "ArrowRight" ? 1 : -1));
       e.preventDefault();
       return true;
@@ -1168,6 +1201,7 @@ export function DataTable<TRow>({
   };
 
   const MIN_COLUMN_WIDTH = 60;
+  const MAX_COLUMN_WIDTH = 640;
   const storageKey = resizeKey ? `celestia:datatable-widths:${resizeKey}` : undefined;
   const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
     if (!storageKey) return {};
@@ -1179,12 +1213,19 @@ export function DataTable<TRow>({
     }
   });
   const cardRef = useRef<HTMLDivElement>(null);
+  // Tabela virtualizada: as larguras das colunas são medidas uma vez (cabeçalho, linhas da janela e as maiores células de
+  // TODAS as linhas) e travadas com `table-layout: fixed`; rolar a janela nunca muda o layout.
+  const [lockedW, setLockedW] = useState<Record<string, number> | null>(null);
+  const lockedStyle = (key: string): React.CSSProperties | undefined => {
+    const w = lockedW?.[key];
+    return w === undefined ? undefined : { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` };
+  };
   const cssVar = (key: string) => `--cw-${key.replace(/[^\w-]/g, "_")}`;
   const canResize = (col: DataTableColumn<TRow>) => resizableColumns && col.resizable !== false;
   /** A largura vem de uma variável CSS no Card: arrastar só troca a variável, sem redesenhar linhas. */
   const widthStyle = (col: DataTableColumn<TRow>): React.CSSProperties | undefined =>
-    canResize(col) ? { width: `var(${cssVar(col.key)})`, minWidth: `var(${cssVar(col.key)})`, maxWidth: `var(${cssVar(col.key)})` } : undefined;
-  const widthVars = Object.fromEntries(Object.entries(colWidths).map(([k, w]) => [cssVar(k), `${w}px`])) as React.CSSProperties;
+    canResize(col) ? { width: `var(${cssVar(col.key)})`, minWidth: `var(${cssVar(col.key)})`, maxWidth: `var(${cssVar(col.key)})` } : lockedStyle(col.key);
+  const widthVars = Object.fromEntries([...Object.entries(lockedW ?? {}), ...Object.entries(colWidths)].map(([k, w]) => [cssVar(k), `${w}px`])) as React.CSSProperties;
   const persistWidths = (next: Record<string, number>) => {
     setColWidths(next);
     if (!storageKey) return;
@@ -1245,6 +1286,66 @@ export function DataTable<TRow>({
   );
   const cellContent = (col: DataTableColumn<TRow>, row: TRow) =>
     col.render ? col.render(row) : text(col, row);
+  const columnsSignature = `${columns.map((c) => `${c.key}:${c.truncateAt ?? ""}`).join(",")}|${hasActions}`;
+  // Novos dados, colunas ou modo: volta ao layout automático para remedir (nunca ao rolar).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: remede só quando os dados, as colunas ou o modo mudam.
+  useLayoutEffect(() => {
+    setLockedW(null);
+  }, [virtualOn, sorted, columnsSignature]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mede uma vez por travamento.
+  useLayoutEffect(() => {
+    const box = containerRef.current;
+    if (!virtualOn || lockedW !== null || !box) return;
+    const heads = Array.from(box.querySelectorAll<HTMLElement>("thead th[data-col]"));
+    if (!heads.some((h) => h.getBoundingClientRect().width > 0)) return;
+    // Larguras naturais (conteúdo do cabeçalho e das linhas da janela): sem o `w-full`, que esticaria as colunas.
+    const table = box.querySelector("table");
+    const previousWidth = table?.style.width ?? "";
+    if (table) table.style.width = "auto";
+    const natural = new Map(heads.map((h) => [h, h.getBoundingClientRect().width]));
+    if (table) table.style.width = previousWidth;
+    const probe = document.createElement("div");
+    probe.className = "text-xs";
+    // Mesma fonte da célula (família, peso, algarismos tabulares): medir com outra fonte corta o número.
+    const sample = box.querySelector<HTMLElement>("tbody td[data-col]");
+    if (sample) {
+      const cs = getComputedStyle(sample);
+      probe.style.font = cs.font;
+      probe.style.fontVariantNumeric = cs.fontVariantNumeric;
+      probe.style.letterSpacing = cs.letterSpacing;
+    }
+    probe.style.cssText += ";position:absolute;visibility:hidden;white-space:nowrap;left:0;top:0";
+    box.appendChild(probe);
+    const next: Record<string, number> = {};
+    for (const th of heads) {
+      const key = th.getAttribute("data-col") ?? "";
+      if (colWidths[key] !== undefined) continue;
+      let width = natural.get(th) ?? 0;
+      const col = columns.find((c) => c.key === key);
+      if (col && !col.render) {
+        // As maiores células de todas as linhas (por tamanho do texto) definem a largura, não só as da janela.
+        const longest: string[] = [];
+        for (const row of visible) {
+          const raw = text(col, row);
+          const t = col.truncateAt ? raw.slice(0, col.truncateAt) : raw;
+          if (longest.length < 12 || t.length > (longest[longest.length - 1]?.length ?? 0)) {
+            longest.push(t);
+            longest.sort((a, b) => b.length - a.length);
+            if (longest.length > 12) longest.pop();
+          }
+        }
+        for (const t of longest) {
+          probe.textContent = t;
+          // Texto formatado + padding horizontal da célula (16px) + folga (16px ou 8%).
+          const w = probe.getBoundingClientRect().width;
+          width = Math.max(width, w + 16 + Math.max(16, w * 0.08));
+        }
+      }
+      next[key] = Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.ceil(width)));
+    }
+    probe.remove();
+    setLockedW(next);
+  }, [virtualOn, lockedW]);
   /** Comparação no MobileCard; a impressão usa só `cellContent`. */
   const mobileCell = (col: DataTableColumn<TRow>, row: TRow) => {
     const trend = cellTrend(col, row);
@@ -1362,6 +1463,7 @@ export function DataTable<TRow>({
                     {partColumns(part).map((col) => (
                       <TableHead
                         key={col.key}
+                        data-col={col.key}
                         ref={measure ? setHeadRef(col.key) : undefined}
                         style={{ ...frozenStyle(col.key, true), ...widthStyle(col) }}
                         className={cn(
@@ -1410,6 +1512,8 @@ export function DataTable<TRow>({
                     ))}
                     {hasActions && part !== "frozen" && (
                       <TableHead
+                        data-col={ACTIONS_KEY}
+                        style={lockedStyle(ACTIONS_KEY)}
                         className={cn(actionsHeadClassName, HEADER_EDGE_CLASS)}
                       >
                         {actionsLabel}
@@ -1441,7 +1545,6 @@ export function DataTable<TRow>({
             <div
               className={cn("flex items-center gap-2", isMobile && "w-full")}
             >
-              {headerActions}
               {printButton}
               {search && (
                 <InputGroup
@@ -1479,6 +1582,7 @@ export function DataTable<TRow>({
                   </InputGroupAddon>
                 </InputGroup>
               )}
+              {headerActions}
             </div>
           )}
         </CardHeader>
@@ -1619,6 +1723,8 @@ export function DataTable<TRow>({
                 </div>
               )}
               <Table
+                className={lockedW ? "table-fixed" : undefined}
+                onMouseOver={(e) => titleWhenClipped((e.target as Element).closest("td, th"))}
                 containerRef={containerRef}
                 onContainerScroll={
                   wide || virtualOn
@@ -1644,7 +1750,7 @@ export function DataTable<TRow>({
                         wide && "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
                       )
                     : scroll === "fill"
-                      ? "@4xl:min-h-0 @4xl:flex-1 @4xl:max-h-none"
+                      ? cn("@4xl:min-h-0 @4xl:flex-1 @4xl:max-h-none", virtualOn && "[scrollbar-gutter:stable]")
                       : undefined
                 }
               >
@@ -1701,12 +1807,13 @@ export function DataTable<TRow>({
                       return (
                         <MemoRow
                           key={id}
-                          deps={[row, selected, selected ? curCol : null, expanded, columns, colWidths, frozenUntil, frozenLeft, striped, rowActions, renderExpanded, getRowId, highlightRow?.(row)]}
+                          deps={[row, selected, selected ? curCol : null, expanded, columns, colWidths, lockedW, frozenUntil, frozenLeft, striped, rowActions, renderExpanded, getRowId, highlightRow?.(row), markedRow?.(row)]}
                           render={() => (
                         <React.Fragment>
                           <TableRow
                             data-row-id={id}
                             data-highlight={highlightRow?.(row) ? "true" : undefined}
+                            data-marked={markedRow?.(row) ? "true" : undefined}
                             data-state={selected ? "selected" : undefined}
                             aria-selected={selected}
                             onClick={(e) => {
@@ -1726,6 +1833,7 @@ export function DataTable<TRow>({
                               renderExpanded && "cursor-pointer",
                               striped && "even:bg-muted/20",
                               HIGHLIGHT_ROW_CLASS,
+                              MARKED_ROW_CLASS,
                               SELECTED_ROW_CLASS,
                             )}
                           >
@@ -1748,7 +1856,7 @@ export function DataTable<TRow>({
                                   className={cn(
                                     ACTIVE_CELL_CLASS,
                                     columnCellClassName(col, row),
-                                    colWidths[col.key] !== undefined && canResize(col) && "overflow-hidden text-ellipsis",
+                                    ((colWidths[col.key] !== undefined && canResize(col)) || (lockedW?.[col.key] !== undefined && !col.format)) && "overflow-hidden text-ellipsis",
                                     boundaryClass(col.key),
                                     frozenClass(col.key),
                                     col.key === lastFrozenKey &&
@@ -1784,7 +1892,7 @@ export function DataTable<TRow>({
                               );
                             })}
                             {hasActions && (
-                              <TableCell data-col={ACTIONS_KEY} data-active-cell={rowCursor && selected && curCol === ACTIONS_KEY ? "" : undefined} className={cn("text-center", ACTIVE_CELL_CLASS)}>
+                              <TableCell data-col={ACTIONS_KEY} data-active-cell={rowCursor && selected && curCol === ACTIONS_KEY ? "" : undefined} style={lockedStyle(ACTIONS_KEY)} className={cn("text-center", ACTIVE_CELL_CLASS)}>
                                 {rowActions?.(row)}
                               </TableCell>
                             )}

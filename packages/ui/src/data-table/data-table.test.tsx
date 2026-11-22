@@ -903,7 +903,7 @@ describe("DataTable arrowNavigation", () => {
     expect(document.querySelector("[data-active-cell]")?.getAttribute("data-col")).toBe("a");
   });
 
-  it("célula com dois botões: → e ← percorrem os controles antes de sair da célula; Enter ativa", () => {
+  it("chegar a uma célula com botões já foca o primeiro (o último, vindo da direita); ←/→ percorrem e saem; ↑/↓ mantêm a coluna; Enter ativa", () => {
     setViewport(1280);
     const editar = vi.fn();
     const cols = [
@@ -913,24 +913,57 @@ describe("DataTable arrowNavigation", () => {
     ];
     render(<DataTable columns={cols} rows={linhas} getRowId={(r) => r.id} />);
     const root = defined(document.querySelector("[data-arrow-root]") as HTMLElement | null, "root");
+    const ativa = () => document.querySelector("[data-active-cell]")?.getAttribute("data-col");
     root.focus();
+    // Da esquerda: já cai no primeiro botão.
     fireEvent.keyDown(root, { key: "ArrowRight" });
+    const editarAna = screen.getByText("Editar Ana");
+    expect(document.activeElement).toBe(editarAna);
+    expect(ativa()).toBe("acoes");
+    fireEvent.keyDown(editarAna, { key: "ArrowRight" });
+    const excluirAna = screen.getByText("Excluir Ana");
+    expect(document.activeElement).toBe(excluirAna);
+    fireEvent.keyDown(excluirAna, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(editarAna);
+    // Enter ativa o controle focado.
+    fireEvent.click(editarAna);
+    expect(editar).toHaveBeenCalledWith("1");
+    // ↓ mantém a coluna e foca o botão da linha de baixo.
+    fireEvent.keyDown(editarAna, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(screen.getByText("Editar Bia"));
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(editarAna);
+    // Depois do último, sai para a célula seguinte; voltando da direita, cai no último botão.
+    fireEvent.keyDown(editarAna, { key: "ArrowRight" });
+    fireEvent.keyDown(excluirAna, { key: "ArrowRight" });
     expect(document.activeElement).toBe(root);
-    expect(document.querySelector("[data-active-cell]")?.getAttribute("data-col")).toBe("acoes");
-    fireEvent.keyDown(root, { key: "ArrowRight" });
-    const editarBtn = screen.getByText("Editar Ana");
-    expect(document.activeElement).toBe(editarBtn);
-    fireEvent.keyDown(editarBtn, { key: " " });
-    expect(document.querySelectorAll('[data-state="selected"]').length).toBeLessThanOrEqual(1);
-    fireEvent.keyDown(editarBtn, { key: "ArrowRight" });
-    const excluir = screen.getByText("Excluir Ana");
-    expect(document.activeElement).toBe(excluir);
-    fireEvent.keyDown(excluir, { key: "ArrowLeft" });
-    expect(document.activeElement).toBe(editarBtn);
-    fireEvent.keyDown(editarBtn, { key: "ArrowRight" });
-    fireEvent.keyDown(excluir, { key: "ArrowRight" });
+    expect(ativa()).toBe("fim");
+    fireEvent.keyDown(root, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(excluirAna);
+    // Esc volta ao cursor de célula.
+    fireEvent.keyDown(excluirAna, { key: "Escape" });
     expect(document.activeElement).toBe(root);
-    expect(document.querySelector("[data-active-cell]")?.getAttribute("data-col")).toBe("fim");
+    expect(ativa()).toBe("acoes");
+  });
+
+  it("célula cortada mostra o texto inteiro no title ao passar o mouse; sem corte, não", () => {
+    setViewport(1280);
+    render(<DataTable columns={[{ key: "n", label: "Nome completo", value: (r: Linha) => r.nome }]} rows={linhas} getRowId={(r) => r.id} />);
+    const td = defined(document.querySelector("td[data-col=n]") as HTMLElement | null, "td");
+    const th = defined(document.querySelector("th") as HTMLElement | null, "th");
+    fireEvent.mouseOver(td);
+    expect(td.title).toBe("");
+    Object.defineProperty(td, "scrollWidth", { configurable: true, value: 120 });
+    Object.defineProperty(td, "clientWidth", { configurable: true, value: 60 });
+    fireEvent.mouseOver(td);
+    expect(td.title).toBe("Ana");
+    Object.defineProperty(th, "scrollWidth", { configurable: true, value: 120 });
+    Object.defineProperty(th, "clientWidth", { configurable: true, value: 60 });
+    fireEvent.mouseOver(th);
+    expect(th.title).toBe("Nome completo");
+    Object.defineProperty(td, "scrollWidth", { configurable: true, value: 50 });
+    fireEvent.mouseOver(td);
+    expect(td.hasAttribute("title")).toBe(false);
   });
 
   it("checkbox sozinho na célula fica centralizado, com padding simétrico", () => {
