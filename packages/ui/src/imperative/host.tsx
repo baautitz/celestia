@@ -95,12 +95,12 @@ function ManagedWindow({ entry, controller }: {
                 <DialogFooter ref={setFooter} className="p-4 border-t shrink-0 gap-2 empty:hidden" />
               </DialogContent>
             ) : (
-              <DialogContent className={DIALOG_WIDTH[options.size ?? "medium"]} showCloseButton={options.dismissible !== false}>
+              <DialogContent className={`${DIALOG_WIDTH[options.size ?? "medium"]} max-h-[90svh] grid-rows-[auto_minmax(0,1fr)_auto]`} showCloseButton={options.dismissible !== false}>
                 <DialogHeader>
                   <DialogTitle>{title}</DialogTitle>
                   {options.description && <DialogDescription>{options.description}</DialogDescription>}
                 </DialogHeader>
-                {body}
+                <div className="-m-1 min-h-0 overflow-x-hidden overflow-y-auto p-1">{body}</div>
                 <DialogFooter ref={setFooter} className="gap-2 empty:hidden" />
               </DialogContent>
             )}
