@@ -24,13 +24,21 @@ export function CotacaoFornecedoresWindow({ pedido }: { pedido: Pedido }) {
   const novaConsulta = useLatestFetch();
   const [busca, setBusca] = useState("");
   const [lista, setLista] = useState<FornecedorErp[]>([]);
-  const [escolhidos, setEscolhidos] = useState<Map<number, string>>(new Map());
+  const [escolhidos, setEscolhidos] = useState<Map<number, string>>(
+    // Começa com as distribuidoras escolhidas nas linhas do Pedido (o nome vem da lista do ERP).
+    () => new Map(pedido.itens.flatMap((i) => i.quantidades.flatMap((q) => (q.codigoFornecedor ? [[q.codigoFornecedor, `Distribuidora ${q.codigoFornecedor}`] as const] : [])))),
+  );
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     const vale = novaConsulta();
     apiFetch<FornecedorErp[]>(`${API}/pedidos/fornecedores?busca=${encodeURIComponent(busca.trim())}`)
-      .then((r) => vale() && setLista(r))
+      .then((r) => {
+        if (!vale()) return;
+        setLista(r);
+        // Troca o nome provisório das pré-escolhidas pelo nome do ERP.
+        setEscolhidos((atual) => new Map([...atual].map(([codigo, nome]) => [codigo, r.find((f) => f.codigo === codigo)?.nome ?? nome])));
+      })
       .catch((err: unknown) => vale() && feedback.notifyError(err instanceof Error ? err : new Error("Erro ao carregar os fornecedores.")));
   }, [busca, novaConsulta, feedback]);
 
@@ -58,6 +66,19 @@ export function CotacaoFornecedoresWindow({ pedido }: { pedido: Pedido }) {
   return (
     <>
       <Stack gap="section">
+        {escolhidos.size > 0 && (
+          <Stack gap="field">
+            <Text variant="caption" tone="muted">
+              Escolhidos
+            </Text>
+            {[...escolhidos].map(([codigo, nome]) => (
+              <Stack key={codigo} direction="row" gap="field">
+                <Checkbox aria-label={`Escolhido ${nome}`} checked onCheckedChange={() => alternar({ codigo, nome }, false)} />
+                <Text>{nome}</Text>
+              </Stack>
+            ))}
+          </Stack>
+        )}
         <Stack gap="field">
           <Label htmlFor="cotacao-busca-fornecedor">Buscar fornecedor</Label>
           <Input id="cotacao-busca-fornecedor" value={busca} onChange={(e) => setBusca(e.target.value)} />
