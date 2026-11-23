@@ -108,8 +108,8 @@ export function PedidosVisoesBarra({ visoes, selecionada, filtros, onAplicar, on
   };
 
   return (
-    <Stack direction="row" gap="group" align="end" wrap>
-      <Stack gap="field">
+    <Stack direction="row" gap="group" align="end">
+      <Stack grow gap="field">
         <Label>Visão</Label>
         <Select value={selecionada ?? NENHUMA} onValueChange={(v) => onAplicar(visoes.find((x) => x.id === v) ?? null)}>
           <SelectTrigger aria-label="Visão">
