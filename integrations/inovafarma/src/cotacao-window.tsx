@@ -206,7 +206,8 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
           const escolhido = escolhas[p.produtoId] === f.codigo;
           return (
             <Button type="button" variant={escolhido ? "default" : "outline"} aria-pressed={escolhido} aria-label={`Escolher ${f.nome} para ${p.nome}`} onClick={() => setTrocas((t) => ({ ...t, [p.produtoId]: f.codigo }))}>
-              {valor}
+              {/* No botão escolhido (fundo escuro) o texto herda a cor do botão: o verde do menor preço não tem contraste. */}
+              {escolhido ? <Text title={v === menor ? "Menor preço" : undefined}>{preco(v)}</Text> : valor}
             </Button>
           );
         },
