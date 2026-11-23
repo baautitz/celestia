@@ -14,7 +14,7 @@ export interface ItemPedido {
   produtoId: string;
   nome: string;
   codigoBarra: string | null;
-  quantidades: { codigoLoja: number; quantidade: number }[];
+  quantidades: { codigoLoja: number; quantidade: number; /** Distribuidora escolhida na grade de Lojas (pré-escolha; a cotação não a usa). */ codigoFornecedor?: number | null }[];
 }
 
 export interface Pedido {
@@ -46,7 +46,7 @@ export function PedidoRascunhoWindow({ itens, lojas, pedido }: Props) {
 
   const salvar = async () => {
     const dados = {
-      itens: itens.map((i) => ({ ...i, quantidades: i.quantidades.map((q) => ({ codigoLoja: q.codigoLoja, quantidade: Number(digitado[`${i.produtoId}:${q.codigoLoja}`] || 0) })) })),
+      itens: itens.map((i) => ({ ...i, quantidades: i.quantidades.map((q) => ({ ...q, quantidade: Number(digitado[`${i.produtoId}:${q.codigoLoja}`] || 0) })) })),
     };
     setEnviando(true);
     try {

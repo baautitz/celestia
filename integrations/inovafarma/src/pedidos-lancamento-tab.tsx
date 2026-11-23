@@ -2,7 +2,7 @@ import { memo, type ReactNode, useCallback, useEffect, useMemo, useState } from 
 import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
 import { Checkbox } from "@platform/ui/components/checkbox";
-import { Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
+import { Combobox, ComboboxInput, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
 import { Input } from "@platform/ui/components/input";
 import { DatePicker } from "@platform/ui/components/date-picker";
 import { DateRangePicker } from "@platform/ui/components/date-range-picker";
@@ -198,10 +198,66 @@ function CampoMinimoMaximo({ linha, produtoId, campo, rotulo, onSalvo }: { linha
   );
 }
 
+/** Chave da quantidade a pedir de um produto numa Loja. */
+const chaveQtd = (produtoId: string, codigoLoja: number) => `${produtoId}:${codigoLoja}`;
+
+/** Célula editável da quantidade a pedir da Loja: confirma ao sair do campo. */
+function CampoPedir({ valor, rotulo, onChange }: { valor: number | undefined; rotulo: string; onChange: (valor: number) => void }) {
+  return (
+    <Input
+      key={valor ?? ""}
+      type="text"
+      inputMode="decimal"
+      aria-label={rotulo}
+      defaultValue={valor ?? ""}
+      onBlur={(e) => {
+        const n = e.target.value.trim() === "" ? 0 : Number(e.target.value.replace(",", "."));
+        if (!Number.isFinite(n) || n < 0) {
+          e.target.value = String(valor ?? "");
+          return;
+        }
+        if (n !== (valor ?? 0)) onChange(n);
+      }}
+    />
+  );
+}
+
+interface Distribuidora {
+  codigo: number;
+  nome: string;
+}
+
+/** Célula da distribuidora da Loja: busca na lista do ERP e guarda o código escolhido. */
+function CampoDistribuidora({ valor, lista, rotulo, onChange }: { valor: number | undefined; lista: Distribuidora[]; rotulo: string; onChange: (codigo: number | null) => void }) {
+  return (
+    <Combobox
+      autoHighlight
+      items={lista}
+      value={lista.find((d) => d.codigo === valor) ?? null}
+      onValueChange={(d: Distribuidora | null) => onChange(d?.codigo ?? null)}
+      itemToStringLabel={(d: Distribuidora) => d.nome}
+      itemToStringValue={(d: Distribuidora) => String(d.codigo)}
+      isItemEqualToValue={(a: Distribuidora, b: Distribuidora) => a.codigo === b.codigo}
+    >
+      <ComboboxInput aria-label={rotulo} placeholder="Distribuidora" showClear inTableCell />
+      <ComboboxContent wide>
+        <ComboboxEmpty>Nenhuma distribuidora encontrada.</ComboboxEmpty>
+        <ComboboxList>
+          {(d: Distribuidora) => (
+            <ComboboxItem key={d.codigo} value={d}>
+              {d.nome}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  );
+}
+
 /** Campo de mínimo/máximo estreito e à direita, para a tabela de Lojas caber sem rolagem lateral. */
 const CAMPO_LOJA = "[&_input]:w-14 [&_input]:px-1.5 [&_input]:text-right";
 
-const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo }: { produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void }) {
+const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora }: { produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void; quantidades: Map<string, number>; onQuantidade: (produto: ProdutoLancamento, codigoLoja: number, quantidade: number) => void; distribuidoras: Map<string, number>; listaDistribuidoras: Distribuidora[]; onDistribuidora: (produto: ProdutoLancamento, codigoLoja: number, codigo: number | null) => void }) {
   const { feedback } = useUi();
   const novaConsulta = useLatestFetch();
   const [meses, setMeses] = useState<Mes[]>([]);
@@ -251,8 +307,10 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo 
       : { key: "maximo", label: "Máx.", tooltip: "Estoque máximo", format: "decimal", value: (l) => l.maximo ?? 0 },
     { key: "sugestao", label: "Sug.", tooltip: "Sugestão", format: "decimal", value: (l) => l.sugestao },
     { key: "aChegar", label: "A chegar", format: "decimal", value: (l) => l.aChegar },
+    { key: "pedir", label: "Pedir", tooltip: "Quantidade a pedir", format: "decimal", render: (l) => <CampoPedir valor={quantidades.get(chaveQtd(produtoId, l.codigoLoja))} rotulo={`Quantidade a pedir da Loja ${nomeLoja(l.codigoLoja)}`} onChange={(q) => produto && onQuantidade(produto, l.codigoLoja, q)} />, cellClassName: CAMPO_LOJA, mobileWide: true },
+    { key: "distribuidora", label: "Distribuidora", render: (l) => <CampoDistribuidora valor={distribuidoras.get(chaveQtd(produtoId, l.codigoLoja))} lista={listaDistribuidoras} rotulo={`Distribuidora da Loja ${nomeLoja(l.codigoLoja)}`} onChange={(c) => produto && onDistribuidora(produto, l.codigoLoja, c)} />, mobileWide: true },
     ];
-  }, [contexto.lojas, contexto.podeEditarMinimos, produtoId, onSalvo]);
+  }, [contexto.lojas, contexto.podeEditarMinimos, produtoId, produto, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora]);
   const colunasMes = COLUNAS_MES;
   const vazio = "Selecione um produto para ver o estoque e as vendas por Loja e a movimentação mensal.";
   return (
@@ -464,6 +522,39 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
       return proximo;
     });
   }, []);
+  // Quantidade a pedir digitada na grade de Lojas; digitar marca o produto.
+  const [quantidades, setQuantidades] = useState<Map<string, number>>(() => new Map());
+  const definirQuantidade = useCallback(
+    (p: ProdutoLancamento, codigoLoja: number, quantidade: number) => {
+      setQuantidades((atual) => {
+        const proximo = new Map(atual);
+        if (quantidade > 0) proximo.set(chaveQtd(p.produtoId, codigoLoja), quantidade);
+        else proximo.delete(chaveQtd(p.produtoId, codigoLoja));
+        return proximo;
+      });
+      if (quantidade > 0) alternar(p, true);
+    },
+    [alternar],
+  );
+  const [distribuidoras, setDistribuidoras] = useState<Map<string, number>>(() => new Map());
+  const [listaDistribuidoras, setListaDistribuidoras] = useState<Distribuidora[]>([]);
+  useEffect(() => {
+    apiFetch<Distribuidora[]>(`${API}/pedidos/fornecedores?busca=`)
+      .then(setListaDistribuidoras)
+      .catch((err: unknown) => notificar(err instanceof Error ? err : new Error("Erro ao carregar as distribuidoras.")));
+  }, [notificar]);
+  const definirDistribuidora = useCallback(
+    (p: ProdutoLancamento, codigoLoja: number, codigo: number | null) => {
+      setDistribuidoras((atual) => {
+        const proximo = new Map(atual);
+        if (codigo !== null) proximo.set(chaveQtd(p.produtoId, codigoLoja), codigo);
+        else proximo.delete(chaveQtd(p.produtoId, codigoLoja));
+        return proximo;
+      });
+      if (codigo !== null) alternar(p, true);
+    },
+    [alternar],
+  );
   const alternarLinha = useCallback((p: ProdutoLancamento) => alternar(p, !selecionados.has(p.produtoId)), [alternar, selecionados]);
   const aoGravarMinimo = useCallback(
     (produtoId: string, gravado?: MinimoGravado) => {
@@ -483,7 +574,7 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
 
   const gerarPedido = async () => {
     // A quantidade vem digitada na janela; o produto entra com todas as Lojas que ele tem na consulta.
-    const itens: ItemPedido[] = [...selecionados.values()].map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: p.lojas.map((l) => ({ codigoLoja: l.codigoLoja, quantidade: 0 })) }));
+    const itens: ItemPedido[] = [...selecionados.values()].map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: p.lojas.map((l) => ({ codigoLoja: l.codigoLoja, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? 0, codigoFornecedor: distribuidoras.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? null })) }));
     const resultado = await windows.open<unknown>({
       surface: "dialog",
       size: "full",
@@ -493,6 +584,8 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
     });
     if (resultado.status === "confirmed") {
       setSelecionados(new Map());
+      setQuantidades(new Map());
+      setDistribuidoras(new Map());
     }
   };
 
@@ -555,7 +648,7 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
             emptyMessage="Nenhuma venda no período e filtros escolhidos."
           />
         </Stack>
-        <Detalhe produto={emFoco} contexto={contexto} lojasFiltro={aplicados?.lojas ?? padrao.lojas} onSalvo={aoGravarMinimo} />
+        <Detalhe produto={emFoco} contexto={contexto} lojasFiltro={aplicados?.lojas ?? padrao.lojas} onSalvo={aoGravarMinimo} quantidades={quantidades} onQuantidade={definirQuantidade} distribuidoras={distribuidoras} listaDistribuidoras={listaDistribuidoras} onDistribuidora={definirDistribuidora} />
       </Grid>
     </Stack>
   );

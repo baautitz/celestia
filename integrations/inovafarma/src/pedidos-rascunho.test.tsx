@@ -38,6 +38,7 @@ beforeEach(() => {
   apiFetch.mockImplementation(async (url: string, init?: RequestInit) => {
     if (url.includes("/contexto")) return contexto;
     if (url.includes("/pedidos/visoes")) return [];
+    if (url.includes("/pedidos/fornecedores")) return [{ codigo: 7, nome: "DISTRIBUIDORA SETE" }];
     if (url.includes("/movimentacao")) return [];
     if (url.includes("/pedidos/lancamento/produtos")) return [dipirona];
     if (url.endsWith("/pedidos/pedidos") && init?.method === "POST") return { ...rascunho, version: 1 };
@@ -63,8 +64,20 @@ describe("Pedido em rascunho", () => {
     const [url, init] = chamadas("POST")[0] as [string, RequestInit];
     expect(url).toBe("/api/m/inovafarma/pedidos/pedidos");
     expect(JSON.parse(String(init.body))).toEqual({
-      itens: [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidades: [{ codigoLoja: 1, quantidade: 12 }, { codigoLoja: 2, quantidade: 0 }] }],
+      itens: [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidades: [{ codigoLoja: 1, quantidade: 12, codigoFornecedor: null }, { codigoLoja: 2, quantidade: 0, codigoFornecedor: null }] }],
     });
+  });
+
+  it("digitar a quantidade a pedir na grade de Lojas marca o produto e preenche o rascunho", async () => {
+    renderizar();
+    const caixa = (await screen.findByLabelText("Selecionar DIPIRONA")) as HTMLInputElement;
+    fireEvent.click(await screen.findByText("DIPIRONA"));
+    const campo = await screen.findByLabelText("Quantidade a pedir da Loja Centro");
+    fireEvent.change(campo, { target: { value: "5" } });
+    fireEvent.blur(campo);
+    await waitFor(() => expect(screen.getByLabelText("Selecionar DIPIRONA").getAttribute("aria-checked") ?? String(caixa.checked)).toBe("true"));
+    fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
+    expect(((await screen.findByLabelText("DIPIRONA: Centro")) as HTMLInputElement).value).toBe("5");
   });
 
   it("lista os Pedidos, edita o rascunho com a versão e cancela depois de confirmar", async () => {
