@@ -27,7 +27,7 @@ export class PostgresPedidoStore implements PedidoStore {
   }
 
   async atualizarRascunho(id: string, dados: DadosPedido, expectedVersion: number): Promise<Pedido | null> {
-    return this.mudar(id, expectedVersion, { itens: dados.itens });
+    return this.mudar(id, expectedVersion, { itens: dados.itens }, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
   async cancelarRascunho(id: string, expectedVersion: number): Promise<Pedido | null> {

@@ -18,7 +18,7 @@ export interface PedidosRoutesDeps {
 
 const BASE = "/pedidos/pedidos";
 const NAO_ENCONTRADO = "Pedido não encontrado.";
-const DESATUALIZADO = versaoDesatualizada("O Pedido foi alterado por outra pessoa ou já não é um rascunho. A lista foi recarregada.");
+const DESATUALIZADO = versaoDesatualizada("O Pedido foi alterado por outra pessoa ou já não pode ser editado. A lista foi recarregada.");
 const Edicao = DadosPedido.and(z.object({ version: Version }));
 const Cancelamento = z.object({ version: Version });
 

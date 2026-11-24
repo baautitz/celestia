@@ -41,7 +41,7 @@ export class MemoryPedidoStore implements PedidoStore {
   }
 
   async atualizarRascunho(id: string, dados: DadosPedido, expectedVersion: number): Promise<Pedido | null> {
-    return this.mudar(id, expectedVersion, dados);
+    return this.mudar(id, expectedVersion, dados, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
   async cancelarRascunho(id: string, expectedVersion: number): Promise<Pedido | null> {

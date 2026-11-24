@@ -14,6 +14,8 @@ import { PedidoLancamentoWindow } from "./pedidos-lancamento-tab";
 import { useLatestFetch } from "./use-latest-fetch";
 import { API } from "./inovafarma-api";
 
+/** Situações em que o Pedido ainda pode ser editado. */
+const EDITAVEIS: Pedido["status"][] = ["aguardando_precos", "cotado"];
 const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguardando_precos: "Aguardando preços", cotado: "Cotado", confirmado: "Confirmado", parcialmente_recebido: "Parcialmente recebido", recebido: "Recebido", cancelado: "Cancelado" };
 const dia = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
 
@@ -50,7 +52,7 @@ export function PedidosTab() {
     await windows.open<Pedido>({
       surface: "dialog",
       size: "screen",
-      title: "Editar rascunho",
+      title: pedido.status === "rascunho" ? "Editar rascunho" : "Editar Pedido",
       description: `Pedido de ${dia(pedido.criadoEm)}`,
       content: () => <PedidoLancamentoWindow pedido={pedido} />,
     });
@@ -78,7 +80,7 @@ export function PedidosTab() {
   const verCotacao = async (pedido: Pedido) => {
     await windows.open({
       surface: "dialog",
-      size: "full",
+      size: "screen",
       title: "Cotação",
       description: `Pedido de ${dia(pedido.criadoEm)}`,
       content: () => <CotacaoWindow pedidoId={pedido.id} lojas={contexto?.lojas ?? []} />,
@@ -124,20 +126,27 @@ export function PedidosTab() {
         rowActions={(p) =>
           p.status === "rascunho" ? (
             <Stack direction="row" gap="tight">
-              <Button size="icon" variant="ghost" aria-label={`Cotar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cotar(p)}>
-                <ClipboardList />
-              </Button>
               <Button size="icon" variant="ghost" aria-label={`Editar Pedido de ${dia(p.criadoEm)}`} onClick={() => void editar(p)}>
                 <Pencil />
+              </Button>
+              <Button size="icon" variant="ghost" aria-label={`Cotar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cotar(p)}>
+                <ClipboardList />
               </Button>
               <Button size="icon" variant="ghost" aria-label={`Cancelar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cancelar(p)}>
                 <Ban />
               </Button>
             </Stack>
           ) : p.status === "cancelado" ? null : (
+            <Stack direction="row" gap="tight">
+              {EDITAVEIS.includes(p.status) && (
+                <Button size="icon" variant="ghost" aria-label={`Editar Pedido de ${dia(p.criadoEm)}`} onClick={() => void editar(p)}>
+                  <Pencil />
+                </Button>
+              )}
             <Button size="icon" variant="ghost" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
               <Scale />
             </Button>
+            </Stack>
           )
         }
       />
