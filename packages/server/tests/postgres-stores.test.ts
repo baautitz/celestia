@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
@@ -51,8 +52,9 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
       ]);
       // `audit` pode já ter sido aplicado por `audit-postgres.test.ts` quando vitest roda os arquivos em paralelo.
       for (const item of firstRun.filter((m) => m.moduleId !== "audit")) {
-        // O iam tem a inicial, as de Dispositivos (criar, permissões do Gestor, remover o tipo e mover para a CA), a que troca Excluir por Inativar Usuários, a das Preferências do Usuário, a do índice único em lower(username), a das Sessões e a do bloqueio por inatividade; o erp tem a inicial e a que apaga a tabela legada; o audit tem a inicial e a do Dispositivo; o inovafarma tem a inicial, as duas das colunas do Desempenho de Vendas (criar a tabela e as medidas), a das Lojas, a dos Lançamentos de Pré-vencidos, a das Avaliações, a do Furo de Estoque, as cinco das Metas (Tipos de Meta, Montar Metas, Apuração, Prêmio do Participante e Lista de Produtos no Tipo de Meta), a dos Itens de Pré-vencido, a que remove os Lançamentos, a das Baixas congeladas e a das Correções de Baixa; o closing_period tem a inicial e a que passa as datas para `date` e impede faixas coincidentes; os demais só a inicial.
-        expect(item.applied).toHaveLength(item.moduleId === "iam" ? 10 : item.moduleId === "erp" || item.moduleId === "audit" || item.moduleId === "closing_period" ? 2 : item.moduleId === "inovafarma" ? 17 : 1);
+        // Cada migration é uma pasta; o esperado é a contagem delas, para o teste não quebrar a cada migration nova.
+        const esperado = readdirSync(defined(plan.find((m) => m.moduleId === item.moduleId)).folder, { withFileTypes: true }).filter((e) => e.isDirectory()).length;
+        expect(item.applied).toHaveLength(esperado);
         expect(item.applied[0]).toMatch(/^\d{14}_create_/);
       }
 
