@@ -86,7 +86,7 @@ describe("Furo de Estoque", () => {
       [200, 3, 9, 1],
     ]);
     expect(lista[0]).toMatchObject({ data: "2027-04-10 15:36", operacao: "-", observacaoErp: "VENCIDOS MES 04", justificativa: null });
-    expect(JSON.stringify(lista)).not.toContain("codigoProduto");
+    expect(JSON.stringify(lista)).toContain("codigoProduto");
   });
 
   it("o gestor só vê e justifica Ajustes das suas Lojas; sem Permission, 403", async () => {

@@ -53,7 +53,7 @@ const GRUPO_AJUSTE = 1;
 
 /**
  * Itens dos Ajustes de Estoque. O sinal vem de `Operacao` no cabeçalho (`+` entrada, `-` saída);
- * a data, de `Lancamento`. O código do produto no ERP fica fora: a API só fala em `produtoId`.
+ * a data, de `Lancamento`. O item traz `produtoId` (opaco) e `codigoProduto` (o código no ERP).
  */
 const ajustesSql = (filtro: string) => `
   SELECT m.CodigoMovimento AS codigoMovimento, m.CodigoEmpresa AS codigoLoja, l.DataLancamento AS data, m.Operacao AS operacao,
