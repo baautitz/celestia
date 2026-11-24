@@ -73,12 +73,27 @@ const EdicaoMinimo = z
   .object({ produtoId: z.string().min(1, "Informe o produto.").max(36), codigoLoja: z.number().int().min(1), minimo: Quantidade, maximo: Quantidade.nullable(), version: Version.or(z.literal(0)) })
   .refine((e) => e.maximo === null || e.maximo >= e.minimo, { error: "O máximo não pode ser menor que o mínimo.", path: ["maximo"] });
 
+const MAX_PRODUTOS_ENTRADAS = 200;
+const ConsultaEntradas = z.object({
+  produtoIds: z
+    .string()
+    .min(1, "Informe os produtos.")
+    .transform((v) => v.split(",").filter(Boolean))
+    .pipe(z.array(z.string().min(1).max(36)).min(1, "Informe os produtos.").max(MAX_PRODUTOS_ENTRADAS, "Produtos demais na consulta.")),
+});
+
+const ConsultaUltimasCompras = z.object({ produtoId: z.string().min(1, "Informe o produto.").max(36) });
+
 const ConsultaMovimentacao = z.object({ produtoId: z.string().min(1, "Informe o produto.").max(36), lojas: Lojas });
 
 interface LinhaVenda {
   produtoId: string;
   nome: string | null;
   codigoBarra: string | null;
+  fabricante: string | null;
+  formula: string | null;
+  grupo: string | null;
+  secao: string | null;
   codigoLoja: number;
   vendida: number | null;
   estoque: number | null;
@@ -101,6 +116,10 @@ interface ProdutoLancamento {
   produtoId: string;
   nome: string;
   codigoBarra: string | null;
+  fabricante: string;
+  formula: string;
+  grupo: string;
+  secao: string;
   vendida: number;
   estoque: number;
   minimo: number;
@@ -130,6 +149,7 @@ function filtroDeLojas(coluna: string, lojas: number[] | undefined, params: Reco
  */
 const produtosSql = (filtroVenda: string) => `
   SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra,
+         LTRIM(RTRIM(fa.NomeFabricante)) AS fabricante, LTRIM(RTRIM(fo.NomeFormula)) AS formula, LTRIM(RTRIM(gr.NomeGrupo)) AS grupo, LTRIM(RTRIM(se.NomeSessao)) AS secao,
          g.codigoLoja AS codigoLoja, g.vendida AS vendida,
          CAST((SELECT TOP 1 pe.Estoque FROM Produto_Estoque pe WHERE pe.CodigoProduto = g.codigoProduto AND pe.CodigoEmpresa = g.codigoLoja) AS float) AS estoque
   FROM (
@@ -138,6 +158,10 @@ const produtosSql = (filtroVenda: string) => `
     GROUP BY vp.CodigoProduto, v.CodigoEmpresa
   ) g
   JOIN Produto p ON p.CodigoProduto = g.codigoProduto
+  LEFT JOIN Produto_Fabricante fa ON fa.CodigoFabricante = p.CodigoFabricante
+  LEFT JOIN Produto_Formula fo ON fo.CodigoFormula = p.CodigoFormula
+  LEFT JOIN Produto_Grupo gr ON gr.CodigoGrupo = p.CodigoGrupo
+  LEFT JOIN Produto_Sessao se ON se.CodigoSessao = p.CodigoSessao
   ORDER BY p.NomeProduto, g.codigoLoja
 `;
 
@@ -159,6 +183,38 @@ const movimentacaoSql = (filtroVenda: string, filtroCompra: string) => `
   GROUP BY mes
   ORDER BY mes
 `;
+
+/** Quantas distribuidoras (as de entrada mais recente) a janela de uma Loja já traz preenchidas. */
+const MAX_ENTRADAS_POR_LOJA = 3;
+/** As distribuidoras que já deram entrada de NF nos produtos (todo o histórico), por Loja, a mais recente primeiro. */
+const entradasSql = (produtos: string) => `
+  SELECT produtoId, codigoLoja, codigoFornecedor
+  FROM (
+    SELECT x.produtoId, x.codigoLoja, x.codigoFornecedor, ROW_NUMBER() OVER (PARTITION BY x.produtoId, x.codigoLoja ORDER BY x.ultima DESC) AS n
+    FROM (
+      SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, c.CodigoEmpresa AS codigoLoja, f.CodigoFornecedor AS codigoFornecedor, MAX(c.DataNota) AS ultima
+      FROM Compra c
+      JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
+      JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
+      JOIN Fornecedor f ON f.CodigoCadastro = c.CodigoCadastro
+      WHERE c.Eliminado = 0 AND CONVERT(varchar(36), p.rowguid) IN (${produtos})
+      GROUP BY CONVERT(varchar(36), p.rowguid), c.CodigoEmpresa, f.CodigoFornecedor
+    ) x
+  ) y
+  WHERE y.n <= ${MAX_ENTRADAS_POR_LOJA}
+  ORDER BY y.produtoId, y.codigoLoja, y.n`;
+
+/** O valor unitário da última compra (entrada de NF) do produto em cada Loja. */
+const ULTIMAS_COMPRAS_SQL = `
+  SELECT codigoLoja, CAST(preco AS float) AS preco
+  FROM (
+    SELECT c.CodigoEmpresa AS codigoLoja, cp.Preco AS preco, ROW_NUMBER() OVER (PARTITION BY c.CodigoEmpresa ORDER BY c.DataNota DESC, c.CodigoCompra DESC) AS n
+    FROM Compra c
+    JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
+    JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
+    WHERE c.Eliminado = 0 AND CONVERT(varchar(36), p.rowguid) = @produtoId
+  ) x
+  WHERE x.n = 1`;
 
 /** Nome para o Audit Log; se o ERP falhar, o que se tem (o código), sem barrar a gravação. */
 async function nomeDoProduto(client: ErpQuery | undefined, produtoId: string): Promise<string> {
@@ -239,7 +295,7 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
         const definido = definidos.get(`${l.produtoId}|${l.codigoLoja}`);
         // Sugestão: só apoio ao comprador, nunca negativa.
         const loja = { codigoLoja: Number(l.codigoLoja), vendida, estoque, minimo: definido?.minimo ?? null, maximo: definido?.maximo ?? null, sugestao: Math.max(0, vendida + (definido?.minimo ?? 0) - estoque), aChegar: chegando.get(chaveDaLinha(l.produtoId, Number(l.codigoLoja))) ?? 0, version: definido?.version ?? 0 };
-        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, vendida: 0, estoque: 0, minimo: 0, sugestao: 0, aChegar: 0, lojas: [] };
+        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, fabricante: l.fabricante ?? "", formula: l.formula ?? "", grupo: l.grupo ?? "", secao: l.secao ?? "", vendida: 0, estoque: 0, minimo: 0, sugestao: 0, aChegar: 0, lojas: [] };
         produto.vendida += vendida;
         produto.estoque += estoque;
         produto.minimo += loja.minimo ?? 0;
@@ -275,6 +331,43 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     } catch (err: unknown) {
       // A tela só mostra "ERP indisponível"; o motivo real (ex.: coluna inexistente) fica no log do servidor.
       console.error("Pedidos: falha na movimentação mensal do ERP.", err);
+      return c.json(erroDoErp(err), 503);
+    }
+  });
+
+  routes.get(`${BASE}/ultimas-compras`, auth, async (c: AuthContext) => {
+    const negado = recusa(c);
+    if (negado) return negado;
+    const consulta = ConsultaUltimasCompras.safeParse(c.req.query());
+    if (!consulta.success) return recusaDeValidacao(c, consulta.error);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    try {
+      const linhas = await client.query<{ codigoLoja: number; preco: number | null }>(ULTIMAS_COMPRAS_SQL, { produtoId: consulta.data.produtoId });
+      return c.json(linhas.map((l) => ({ codigoLoja: Number(l.codigoLoja), preco: Number(l.preco) || 0 })));
+    } catch (err: unknown) {
+      console.error("Pedidos: falha na última compra do ERP.", err);
+      return c.json(erroDoErp(err), 503);
+    }
+  });
+
+  routes.get(`${BASE}/entradas`, auth, async (c: AuthContext) => {
+    const negado = recusa(c);
+    if (negado) return negado;
+    const consulta = ConsultaEntradas.safeParse(c.req.query());
+    if (!consulta.success) return recusaDeValidacao(c, consulta.error);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    const { produtoIds } = consulta.data;
+    const params: Record<string, unknown> = {};
+    produtoIds.forEach((id, i) => {
+      params[`p${i}`] = id;
+    });
+    try {
+      const linhas = await client.query<{ produtoId: string; codigoLoja: number; codigoFornecedor: number }>(entradasSql(produtoIds.map((_, i) => `@p${i}`).join(", ")), params);
+      return c.json(linhas.map((l) => ({ produtoId: l.produtoId, codigoLoja: Number(l.codigoLoja), codigoFornecedor: Number(l.codigoFornecedor) })));
+    } catch (err: unknown) {
+      console.error("Pedidos: falha nas entradas de NF do ERP.", err);
       return c.json(erroDoErp(err), 503);
     }
   });

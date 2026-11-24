@@ -38,9 +38,11 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
         if (falha) throw new Error("boom");
         if (sql.includes("FROM Config")) return [{ codigoEmpresa: 1, nome: "Centro" }, { codigoEmpresa: 2, nome: "Norte" }] as T[];
         if (sql.includes("c.DataNota") && sql.includes("recebida")) return [{ produtoId: "p-1", codigoLoja: 1, recebida: 6, dia: "2999-01-01" }] as T[];
-        if (sql.includes("Produto_Fabricante")) return [{ id: 7, nome: "EMS" }] as T[];
-        if (sql.includes("Produto_Grupo")) return [{ id: 3, nome: "MEDICAMENTOS" }] as T[];
-        if (sql.includes("Produto_Sessao")) return [{ id: 9, nome: "GENERICOS" }] as T[];
+        if (sql.includes("AS preco")) return [{ codigoLoja: 1, preco: 9.12 }] as T[];
+        if (sql.includes("AS codigoFornecedor")) return [{ produtoId: "p-1", codigoLoja: 1, codigoFornecedor: 7 }] as T[];
+        if (sql.includes("Produto_Fabricante") && !sql.includes("AS estoque")) return [{ id: 7, nome: "EMS" }] as T[];
+        if (sql.includes("Produto_Grupo") && !sql.includes("AS estoque")) return [{ id: 3, nome: "MEDICAMENTOS" }] as T[];
+        if (sql.includes("Produto_Sessao") && !sql.includes("AS estoque")) return [{ id: 9, nome: "GENERICOS" }] as T[];
         if (sql.includes("estoque"))
           return [
             { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", codigoLoja: 1, vendida: 5, estoque: 10 },
@@ -86,8 +88,8 @@ describe("Lançamento de Pedidos: produtos", () => {
     const res = await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&lojas=1,2");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([
-      { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", vendida: 8, estoque: 10, minimo: 0, sugestao: 3, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }, { codigoLoja: 2, vendida: 3, estoque: 0, minimo: null, maximo: null, sugestao: 3, aChegar: 0, version: 0 }] },
-      { produtoId: "p-2", nome: "AAS", codigoBarra: null, vendida: 1, estoque: 4, minimo: 0, sugestao: 0, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }] },
+      { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", fabricante: "", formula: "", grupo: "", secao: "", vendida: 8, estoque: 10, minimo: 0, sugestao: 3, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }, { codigoLoja: 2, vendida: 3, estoque: 0, minimo: null, maximo: null, sugestao: 3, aChegar: 0, version: 0 }] },
+      { produtoId: "p-2", nome: "AAS", codigoBarra: null, fabricante: "", formula: "", grupo: "", secao: "", vendida: 1, estoque: 4, minimo: 0, sugestao: 0, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }] },
     ]);
     const { params } = consultas[0] ?? {};
     expect(params).toMatchObject({ dataInicio: "2027-04-01 00:00:00", dataFim: "2027-04-02 23:59:59", loja0: 1, loja1: 2 });
@@ -102,6 +104,24 @@ describe("Lançamento de Pedidos: produtos", () => {
     expect(sql).toContain("(CONVERT(varchar(36), p.rowguid) IN (@entproduto0) OR p.CodigoGrupo IN (@entgrupo0) OR p.CodigoFabricante IN (@entlaboratorio0))");
     expect(params).toMatchObject({ entgrupo0: 44, entlaboratorio0: 7, entproduto0: "0a1b2c3d-0000-4000-8000-000000000001" });
     expect(sql).not.toContain("44");
+  });
+
+  it("traz o valor da última compra do produto em cada Loja", async () => {
+    const { get, consultas } = boot();
+    const res = await get("/pedidos/lancamento/ultimas-compras?produtoId=p-1");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([{ codigoLoja: 1, preco: 9.12 }]);
+    expect(consultas[0]?.params).toEqual({ produtoId: "p-1" });
+    expect((await get("/pedidos/lancamento/ultimas-compras")).status).toBe(400);
+  });
+
+  it("traz as distribuidoras que já deram entrada nos produtos, por Loja", async () => {
+    const { get, consultas } = boot();
+    const res = await get("/pedidos/lancamento/entradas?produtoIds=p-1,p-2");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([{ produtoId: "p-1", codigoLoja: 1, codigoFornecedor: 7 }]);
+    expect(consultas[0]?.params).toMatchObject({ p0: "p-1", p1: "p-2" });
+    expect((await get("/pedidos/lancamento/entradas")).status).toBe(400);
   });
 
   it("recusa entradas em JSON inválido ou com id fora do formato, sem consultar o ERP", async () => {
