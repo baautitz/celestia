@@ -327,7 +327,7 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo,
   }, [idFoco]);
 
   const produtoId = produto?.produtoId ?? "";
-  const colunasLoja = useMemo<DataTableColumn<LinhaLoja>[]>(() => {
+  const colunasLoja = useMemo<{ estatisticas: DataTableColumn<LinhaLoja>[]; pedido: DataTableColumn<LinhaLoja>[] }>(() => {
     const nomeLoja = (codigo: number) => contexto.lojas.find((l) => l.codigo === codigo)?.nome || `Loja ${codigo}`;
     const loja: DataTableColumn<LinhaLoja> = { key: "loja", label: "Loja", value: (l) => nomeLoja(l.codigoLoja) };
     const estatisticas: DataTableColumn<LinhaLoja>[] = [
