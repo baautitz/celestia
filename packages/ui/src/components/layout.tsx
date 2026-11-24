@@ -117,7 +117,7 @@ function Stack({
         wrap && "flex-wrap",
         grow && "min-h-0 flex-1",
         viewport === true && "@4xl:h-[calc(100svh-var(--spacing)*35)]",
-        viewport === "modal" && "@4xl:h-[calc(90svh-var(--spacing)*32)]",
+        viewport === "modal" && "@4xl:h-[calc(90svh-var(--spacing)*46)]",
         span === "full" && "@4xl:col-span-2",
         scroll === true && "@4xl:min-h-0 @4xl:overflow-y-auto",
         scroll === "clip" && "@4xl:min-h-0 @4xl:overflow-hidden",
