@@ -40,6 +40,7 @@ beforeEach(() => {
     }
     if (url.includes("/contexto")) return contextoAtual;
     if (url.includes("/pedidos/visoes")) return visoes;
+    if (url.includes("/lancamento/entradas") || url.includes("/lancamento/ultimas-compras")) return [];
     if (url.includes("/movimentacao")) return [{ mes: "2027-03", vendida: 12, comprada: 30 }];
     return produtos;
   });
@@ -78,26 +79,26 @@ describe("Pedidos: Lançamento", () => {
 
   it("o cursor começa na primeira linha e as Lojas e a movimentação seguem o cursor, não os marcados", async () => {
     renderizar();
-    expect(await screen.findByText("Lojas: DIPIRONA")).toBeDefined();
+    expect(await screen.findByText("Movimentação mensal: DIPIRONA")).toBeDefined();
     expect(await screen.findByText("03/2027")).toBeDefined();
     fireEvent.click(await screen.findByLabelText("Selecionar AAS"));
     expect(screen.getByText("1 produto selecionado")).toBeDefined();
-    expect(screen.getByText("Lojas: DIPIRONA")).toBeDefined();
+    expect(screen.getByText("Movimentação mensal: DIPIRONA")).toBeDefined();
   });
 
   it("as setas movem o cursor da grade e o Espaço marca e desmarca a linha ativa", async () => {
     renderizar();
-    await screen.findByText("Lojas: DIPIRONA");
+    await screen.findByText("Movimentação mensal: DIPIRONA");
     const grade = (await screen.findByLabelText("Selecionar DIPIRONA")).closest("[data-arrow-root]") as HTMLElement;
     await waitFor(() => expect(document.activeElement).toBe(grade));
     fireEvent.keyDown(grade, { key: "ArrowDown" });
-    expect(await screen.findByText("Lojas: AAS")).toBeDefined();
+    expect(await screen.findByText("Movimentação mensal: AAS")).toBeDefined();
     fireEvent.keyDown(grade, { key: " " });
     expect(await screen.findByText("1 produto selecionado")).toBeDefined();
     fireEvent.keyDown(grade, { key: " " });
     expect(await screen.findByText("0 produtos selecionados")).toBeDefined();
     fireEvent.keyDown(grade, { key: "ArrowUp" });
-    expect(await screen.findByText("Lojas: DIPIRONA")).toBeDefined();
+    expect(await screen.findByText("Movimentação mensal: DIPIRONA")).toBeDefined();
   });
 
   it("não congela a coluna Produto: ela rola com as demais", async () => {
@@ -109,7 +110,7 @@ describe("Pedidos: Lançamento", () => {
   it("a linha do produto com o checkbox marcado ganha o destaque, e o desmarcar tira", async () => {
     renderizar();
     const caixa = await screen.findByLabelText("Selecionar AAS");
-    const linha = () => screen.getByText("AAS", { selector: "td" }).closest("tr") as HTMLElement;
+    const linha = () => screen.getByText("AAS", { selector: "td, td span" }).closest("tr") as HTMLElement;
     expect(linha().getAttribute("data-marked")).toBeNull();
     fireEvent.click(caixa);
     await waitFor(() => expect(linha().getAttribute("data-marked")).toBe("true"));
@@ -133,13 +134,15 @@ describe("Pedidos: Lançamento", () => {
     fireEvent.click(await screen.findByLabelText("Selecionar DIPIRONA"));
     fireEvent.change(screen.getByPlaceholderText("Buscar produto"), { target: { value: "AAS" } });
     await waitFor(() => expect(screen.getByText("1 produto selecionado")).toBeDefined());
-    expect(await screen.findByText("Lojas: AAS")).toBeDefined();
+    expect(await screen.findByText("Movimentação mensal: AAS")).toBeDefined();
   });
 
   it("mostra o mínimo e a sugestão de cada produto na grade", async () => {
     renderizar();
     await screen.findByLabelText("Selecionar AAS");
-    expect(screen.getAllByText("Sugestão").length).toBeGreaterThan(0);
+    fireEvent.click(await screen.findByText("AAS", { selector: "td, td span" }));
+    await screen.findByLabelText("Estoque mínimo da Loja Centro");
+    expect(screen.getAllByText("Sug.").length).toBeGreaterThan(0);
     expect(screen.getAllByText("A chegar").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Mín.").length).toBeGreaterThan(0);
   });
@@ -156,7 +159,7 @@ describe("Pedidos: Lançamento", () => {
 
   it("edita o mínimo da Loja na célula e grava com a version", async () => {
     renderizar();
-    fireEvent.click(await screen.findByText("AAS", { selector: "td" }));
+    fireEvent.click(await screen.findByText("AAS", { selector: "td, td span" }));
     const campo = await screen.findByLabelText("Estoque mínimo da Loja Centro");
     await waitFor(() => expect((campo as HTMLInputElement).value).toBe("8"));
     fireEvent.change(campo, { target: { value: "12" } });
@@ -169,21 +172,16 @@ describe("Pedidos: Lançamento", () => {
 
   it("gravar o mínimo atualiza só a linha, a partir da resposta do PUT, sem recarregar a grade", async () => {
     renderizar();
-    fireEvent.click(await screen.findByText("AAS", { selector: "td" }));
+    fireEvent.click(await screen.findByText("AAS", { selector: "td, td span" }));
     const campo = await screen.findByLabelText("Estoque mínimo da Loja Centro");
     await waitFor(() => expect((campo as HTMLInputElement).value).toBe("8"));
     const consultas = () => apiFetch.mock.calls.filter(([u]) => String(u).includes("/pedidos/lancamento/produtos")).length;
     const antes = consultas();
     fireEvent.change(campo, { target: { value: "12" } });
     fireEvent.blur(campo);
-    // Sugestão = vendida (1) + mínimo (12) - estoque (4) = 9, na linha do produto e na da Loja.
-    const linhaProduto = screen.getByText("AAS", { selector: "td" }).closest("tr") as HTMLElement;
-    await waitFor(() => {
-      expect(linhaProduto.querySelector('td[data-col="minimo"]')?.textContent).toBe("12,00");
-      expect(linhaProduto.querySelector('td[data-col="sugestao"]')?.textContent).toBe("9,00");
-    });
+    // Sugestão = vendida (1) + mínimo (12) - estoque (4) = 9, na linha da Loja.
     const linhaLoja = screen.getByLabelText("Estoque mínimo da Loja Centro").closest("tr") as HTMLElement;
-    expect(linhaLoja.querySelector('td[data-col="sugestao"]')?.textContent).toBe("9,00");
+    await waitFor(() => expect(linhaLoja.querySelector('td[data-col="sugestao"]')?.textContent).toBe("9,00"));
     expect((screen.getByLabelText("Estoque mínimo da Loja Centro") as HTMLInputElement).value).toBe("12");
     expect(consultas()).toBe(antes);
     // A version devolvida vale para a próxima edição.
@@ -199,7 +197,7 @@ describe("Pedidos: Lançamento", () => {
   it("um 409 ao gravar o mínimo recarrega a grade", async () => {
     const { ApiError } = await import("@platform/ui/lib/api");
     renderizar();
-    fireEvent.click(await screen.findByText("AAS", { selector: "td" }));
+    fireEvent.click(await screen.findByText("AAS", { selector: "td, td span" }));
     const campo = await screen.findByLabelText("Estoque mínimo da Loja Centro");
     await waitFor(() => expect((campo as HTMLInputElement).value).toBe("8"));
     const consultas = () => apiFetch.mock.calls.filter(([u]) => String(u).includes("/pedidos/lancamento/produtos")).length;
@@ -213,8 +211,8 @@ describe("Pedidos: Lançamento", () => {
   it("sem a Permission de editar, os valores aparecem só para leitura", async () => {
     contextoAtual = { ...contexto, podeEditarMinimos: false };
     renderizar();
-    fireEvent.click(await screen.findByText("AAS", { selector: "td" }));
-    await screen.findByText("Lojas: AAS");
+    fireEvent.click(await screen.findByText("AAS", { selector: "td, td span" }));
+    await screen.findByText("Movimentação mensal: AAS");
     expect(screen.queryByLabelText("Estoque mínimo da Loja Centro")).toBeNull();
   });
 
@@ -230,7 +228,7 @@ describe("Pedidos: tela", () => {
   it("mostra a grade, as Lojas e a movimentação mensal de uma vez, sem filtros na tela", async () => {
     renderizar();
     fireEvent.click(await screen.findByLabelText("Selecionar DIPIRONA"));
-    expect(await screen.findByText("Lojas: DIPIRONA")).toBeDefined();
+    expect(await screen.findByText("Movimentação mensal: DIPIRONA")).toBeDefined();
     expect(await screen.findByText("Movimentação mensal: DIPIRONA")).toBeDefined();
     expect(screen.queryByLabelText("Modo da data")).toBeNull();
     expect(screen.getByRole("button", { name: "Gerar pedido" })).toBeDefined();

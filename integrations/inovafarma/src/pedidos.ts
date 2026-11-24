@@ -7,7 +7,7 @@ export type PedidoStatus = (typeof PEDIDO_STATUS)[number];
 
 const MAX_QUANTIDADE = 1_000_000;
 
-const QuantidadeLoja = z.object({ codigoLoja: Codigo, quantidade: z.number().int("A quantidade deve ser inteira.").min(0, "A quantidade não pode ser negativa.").max(MAX_QUANTIDADE, "Quantidade acima do limite."), codigoFornecedor: Codigo.nullable().optional() });
+const QuantidadeLoja = z.object({ codigoLoja: Codigo, quantidade: z.number().int("A quantidade deve ser inteira.").min(0, "A quantidade não pode ser negativa.").max(MAX_QUANTIDADE, "Quantidade acima do limite."), codigosFornecedor: z.array(Codigo).max(30, "Distribuidoras demais na linha.").optional() });
 
 const ItemPedido = z
   .object({

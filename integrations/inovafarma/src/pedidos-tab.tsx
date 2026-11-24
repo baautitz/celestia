@@ -5,12 +5,12 @@ import { Stack } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import { CotacaoFornecedoresWindow } from "./cotacao-fornecedores-window";
 import { CotacaoWindow } from "./cotacao-window";
 import { FalhaAoCarregar, useContexto } from "./contexto";
 import { json } from "./inovafarma-api";
 import type { LojaOpcao } from "./loja-opcao";
-import { PEDIDOS_BASE, PedidoRascunhoWindow, type Pedido } from "./pedido-rascunho-window";
+import { PEDIDOS_BASE, type Pedido } from "./pedido-rascunho-window";
+import { PedidoLancamentoWindow } from "./pedidos-lancamento-tab";
 import { useLatestFetch } from "./use-latest-fetch";
 import { API } from "./inovafarma-api";
 
@@ -49,24 +49,30 @@ export function PedidosTab() {
   const editar = async (pedido: Pedido) => {
     await windows.open<Pedido>({
       surface: "dialog",
-      size: "full",
+      size: "screen",
       title: "Editar rascunho",
       description: `Pedido de ${dia(pedido.criadoEm)}`,
-      content: () => <PedidoRascunhoWindow itens={pedido.itens} lojas={contexto?.lojas ?? []} pedido={pedido} />,
+      content: () => <PedidoLancamentoWindow pedido={pedido} />,
     });
     void carregar();
   };
 
   const cotar = async (pedido: Pedido) => {
-    const iniciada = await windows.open<true>({
-      surface: "dialog",
-      size: "medium",
-      title: "Cotar Pedido",
-      description: `Escolha os fornecedores do Pedido de ${dia(pedido.criadoEm)}`,
-      content: () => <CotacaoFornecedoresWindow pedido={pedido} />,
-    });
+    // As distribuidoras já foram decididas no Lançamento: a cotação parte das que estão nas linhas do Pedido.
+    const fornecedores = [...new Set(pedido.itens.flatMap((i) => i.quantidades.flatMap((q) => q.codigosFornecedor ?? [])))];
+    if (fornecedores.length === 0) {
+      feedback.notifyError(new Error("Escolha a distribuidora de ao menos uma Loja, pelo Editar, antes de cotar."));
+      return;
+    }
+    try {
+      await apiFetch(`${PEDIDOS_BASE}/${pedido.id}/cotacao`, json("POST", { fornecedores, version: pedido.version }));
+      feedback.notify({ type: "success", title: "Cotação iniciada. Baixe a planilha de cada fornecedor." });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao iniciar a cotação."));
+      return;
+    }
     void carregar();
-    if (iniciada.status === "confirmed") await verCotacao(pedido);
+    await verCotacao(pedido);
   };
 
   const verCotacao = async (pedido: Pedido) => {
@@ -100,9 +106,9 @@ export function PedidosTab() {
   if (falha && pedidos.length === 0) return <FalhaAoCarregar titulo="Não foi possível carregar os Pedidos" descricao={falha} onTentarNovamente={() => void carregar()} />;
 
   const colunas: DataTableColumn<Pedido>[] = [
-    { key: "criadoEm", label: "Criado em", format: "date", value: (p) => p.criadoEm, sortable: true, firstSort: "desc" },
+    { key: "criadoEm", label: "Criado em", format: "date", width: 120, value: (p) => p.criadoEm, sortable: true, firstSort: "desc" },
     { key: "criadoPor", label: "Criado por", value: (p) => p.criadoPorNome, searchable: true, mobileRole: "primary" },
-    { key: "produtos", label: "Produtos", format: "decimal", value: (p) => p.itens.length },
+    { key: "produtos", label: "Produtos", format: "decimal", width: 100, value: (p) => p.itens.length },
     { key: "status", label: "Situação", value: (p) => STATUS[p.status], searchable: true },
   ];
   return (

@@ -40,6 +40,8 @@ beforeEach(() => {
     if (url.includes("/pedidos/visoes")) return [];
     if (url.includes("/pedidos/fornecedores")) return [{ codigo: 7, nome: "DISTRIBUIDORA SETE" }];
     if (url.includes("/movimentacao")) return [];
+    if (url.includes("/pedidos/lancamento/ultimas-compras")) return [];
+    if (url.includes("/pedidos/lancamento/entradas")) return [{ produtoId: "p-1", codigoLoja: 1, codigoFornecedor: 7 }];
     if (url.includes("/pedidos/lancamento/produtos")) return [dipirona];
     if (url.endsWith("/pedidos/pedidos") && init?.method === "POST") return { ...rascunho, version: 1 };
     if (url.endsWith("/pedidos/pedidos")) return [rascunho];
@@ -57,14 +59,14 @@ describe("Pedido em rascunho", () => {
     const gerar = await screen.findByRole("button", { name: "Gerar pedido" });
     expect((gerar as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(await screen.findByLabelText("Selecionar DIPIRONA"));
+    fireEvent.change(await screen.findByLabelText("Quantidade a pedir da Loja Centro"), { target: { value: "12" } });
+    fireEvent.blur(screen.getByLabelText("Quantidade a pedir da Loja Centro"));
     fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
-    fireEvent.change(await screen.findByLabelText("DIPIRONA: Centro"), { target: { value: "12" } });
-    fireEvent.click(screen.getByRole("button", { name: "Gerar rascunho" }));
     await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
     const [url, init] = chamadas("POST")[0] as [string, RequestInit];
     expect(url).toBe("/api/m/inovafarma/pedidos/pedidos");
     expect(JSON.parse(String(init.body))).toEqual({
-      itens: [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidades: [{ codigoLoja: 1, quantidade: 12, codigoFornecedor: null }, { codigoLoja: 2, quantidade: 0, codigoFornecedor: null }] }],
+      itens: [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidades: [{ codigoLoja: 1, quantidade: 12, codigosFornecedor: [7] }, { codigoLoja: 2, quantidade: 0, codigosFornecedor: [] }] }],
     });
   });
 
@@ -77,7 +79,24 @@ describe("Pedido em rascunho", () => {
     fireEvent.blur(campo);
     await waitFor(() => expect(screen.getByLabelText("Selecionar DIPIRONA").getAttribute("aria-checked") ?? String(caixa.checked)).toBe("true"));
     fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
-    expect(((await screen.findByLabelText("DIPIRONA: Centro")) as HTMLInputElement).value).toBe("5");
+    await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
+    expect(JSON.parse(String((chamadas("POST")[0] as [string, RequestInit])[1].body)).itens[0].quantidades[0]).toMatchObject({ codigoLoja: 1, quantidade: 5 });
+  });
+
+  it("a janela das distribuidoras da Loja já traz a que deu entrada no produto, e o rascunho a leva", async () => {
+    renderizar();
+    fireEvent.click(await screen.findByText("DIPIRONA"));
+    fireEvent.click(await screen.findByRole("button", { name: "Distribuidoras da Loja Centro" }));
+    const janela = await screen.findByRole("dialog");
+    expect(await within(janela).findByText("DISTRIBUIDORA SETE")).toBeDefined();
+    fireEvent.click(within(janela).getByRole("button", { name: "Concluir" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Distribuidoras da Loja Centro" }).textContent).toBe("DISTRIBUIDORA SETE"));
+    fireEvent.change(screen.getByLabelText("Quantidade a pedir da Loja Centro"), { target: { value: "4" } });
+    fireEvent.blur(screen.getByLabelText("Quantidade a pedir da Loja Centro"));
+    fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
+    await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
+    const [, init] = chamadas("POST")[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).itens[0].quantidades[0]).toEqual({ codigoLoja: 1, quantidade: 4, codigosFornecedor: [7] });
   });
 
   it("lista os Pedidos, edita o rascunho com a versão e cancela depois de confirmar", async () => {
@@ -85,12 +104,19 @@ describe("Pedido em rascunho", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Pedidos" }));
     expect(await screen.findByText("Gil")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Editar Pedido de 10/04/2027" }));
-    fireEvent.change(await screen.findByLabelText("DIPIRONA: Centro"), { target: { value: "7" } });
-    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+    // A mesma tela do Lançamento, já com o que o rascunho tem.
+    const janela = await screen.findByRole("dialog");
+    const campo = await within(janela).findByLabelText("Quantidade a pedir da Loja Centro");
+    await waitFor(() => expect((campo as HTMLInputElement).value).toBe("10"));
+    fireEvent.change(campo, { target: { value: "7" } });
+    fireEvent.blur(campo);
+    fireEvent.click(within(janela).getByRole("button", { name: "Salvar rascunho" }));
     await waitFor(() => expect(chamadas("PUT")).toHaveLength(1));
     const [url, init] = chamadas("PUT")[0] as [string, RequestInit];
     expect(url).toBe("/api/m/inovafarma/pedidos/pedidos/ped_1");
-    expect(JSON.parse(String(init.body))).toMatchObject({ version: 1, itens: [{ quantidades: [{ codigoLoja: 1, quantidade: 7 }] }] });
+    const corpo = JSON.parse(String(init.body));
+    expect(corpo.version).toBe(1);
+    expect(corpo.itens[0].quantidades[0]).toMatchObject({ codigoLoja: 1, quantidade: 7 });
 
     fireEvent.click(await screen.findByRole("button", { name: "Cancelar Pedido de 10/04/2027" }));
     fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancelar Pedido" }));

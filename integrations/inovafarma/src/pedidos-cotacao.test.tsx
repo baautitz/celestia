@@ -9,8 +9,9 @@ import { PedidosPage } from "./pedidos-page";
 const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("@platform/ui/lib/api", async (original) => ({ ...(await original<typeof import("@platform/ui/lib/api")>()), apiFetch }));
 
-const itens = [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidades: [{ codigoLoja: 1, quantidade: 10 }] }];
-const pedido = (status: string, version = 1) => ({ id: "ped_1", status, itens, criadoPorId: "u1", criadoPorNome: "Gil", version, criadoEm: "2027-04-10T12:00:00.000Z", atualizadoEm: "2027-04-10T12:00:00.000Z" });
+const itens = [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidades: [{ codigoLoja: 1, quantidade: 10, codigosFornecedor: [7] }] }];
+let semDistribuidora = false;
+const pedido = (status: string, version = 1) => ({ id: "ped_1", status, itens: semDistribuidora ? itens.map((i) => ({ ...i, quantidades: i.quantidades.map(({ codigoLoja, quantidade }) => ({ codigoLoja, quantidade })) })) : itens, criadoPorId: "u1", criadoPorNome: "Gil", version, criadoEm: "2027-04-10T12:00:00.000Z", atualizadoEm: "2027-04-10T12:00:00.000Z" });
 const fornecedores = [{ codigo: 7, nome: "ALFA DISTRIBUIDORA" }, { codigo: 9, nome: "BETA" }];
 const detalhe = (importados: boolean) => ({
   pedido: { id: "ped_1", status: importados ? "cotado" : "aguardando_precos", version: 2 },
@@ -33,6 +34,7 @@ beforeEach(() => {
     value: (query: string) => ({ matches: false, media: query, onchange: null, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false }),
   });
   situacao = "rascunho";
+  semDistribuidora = false;
   corpoCotacao = null;
   Object.assign(URL, { createObjectURL: () => "blob:x", revokeObjectURL: () => undefined });
   apiFetch.mockReset();
@@ -59,24 +61,23 @@ const renderizar = () => render(<UiProvider><HeaderActionsProvider><PedidosPage 
 const chamadas = (metodo: string) => apiFetch.mock.calls.filter(([, init]) => init?.method === metodo);
 
 describe("Cotação por fornecedor", () => {
-  it("escolhe os fornecedores pelo nome do ERP e inicia a cotação do rascunho com a versão", async () => {
+  it("inicia a cotação do rascunho direto, com as distribuidoras das linhas e a versão", async () => {
     renderizar();
     fireEvent.click(await screen.findByRole("tab", { name: "Pedidos" }));
     fireEvent.click(await screen.findByRole("button", { name: "Cotar Pedido de 10/04/2027" }));
-    fireEvent.click(await screen.findByLabelText("Selecionar ALFA DISTRIBUIDORA"));
-    fireEvent.click(screen.getByRole("button", { name: "Iniciar cotação" }));
     await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
     const [url, init] = chamadas("POST")[0] as [string, RequestInit];
     expect(url).toBe("/api/m/inovafarma/pedidos/pedidos/ped_1/cotacao");
     expect(JSON.parse(String(init.body))).toEqual({ fornecedores: [7], version: 1 });
   });
 
-  it("não inicia sem fornecedor escolhido", async () => {
+  it("não inicia a cotação sem distribuidora nas linhas", async () => {
+    semDistribuidora = true;
     renderizar();
     fireEvent.click(await screen.findByRole("tab", { name: "Pedidos" }));
     fireEvent.click(await screen.findByRole("button", { name: "Cotar Pedido de 10/04/2027" }));
-    await screen.findByLabelText("Selecionar BETA");
-    expect((screen.getByRole("button", { name: "Iniciar cotação" }) as HTMLButtonElement).disabled).toBe(true);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(chamadas("POST")).toHaveLength(0);
   });
 
   it("importa a planilha preenchida depois de conferir a prévia e destaca o menor preço", async () => {

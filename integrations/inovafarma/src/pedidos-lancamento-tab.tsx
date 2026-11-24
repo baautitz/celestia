@@ -1,8 +1,8 @@
-import { memo, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
 import { Checkbox } from "@platform/ui/components/checkbox";
-import { Combobox, ComboboxInput, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
+import { Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
 import { Input } from "@platform/ui/components/input";
 import { DatePicker } from "@platform/ui/components/date-picker";
 import { DateRangePicker } from "@platform/ui/components/date-range-picker";
@@ -15,10 +15,11 @@ import { WindowActions, WindowCancelButton, useWindow } from "@platform/ui/imper
 import { ApiError, apiFetch } from "@platform/ui/lib/api";
 import { formatNumber } from "@platform/ui/lib/format";
 import { FalhaAoCarregar, useContexto } from "./contexto";
-import { API } from "./inovafarma-api";
+import { API, json } from "./inovafarma-api";
 import { ListaProdutosCampo } from "./lista-produtos-campo";
 import type { EntradaLista } from "./tipos-meta";
-import { PedidoRascunhoWindow, type ItemPedido } from "./pedido-rascunho-window";
+import { DistribuidorasLinhaWindow, type Distribuidora } from "./distribuidoras-linha-window";
+import { PEDIDOS_BASE, type ItemPedido, type Pedido } from "./pedido-rascunho-window";
 import type { LojaOpcao } from "./loja-opcao";
 import { useLatestFetch } from "./use-latest-fetch";
 import type { VisaoPedidos } from "./pedidos-visoes";
@@ -29,7 +30,6 @@ const BASE = `${API}/pedidos/lancamento`;
 const ESPERA_DETALHE_MS = 180;
 const idProduto = (p: ProdutoLancamento) => p.produtoId;
 const idLoja = (l: LinhaLoja) => String(l.codigoLoja);
-const idMes = (m: Mes) => m.mes;
 const BUSCA_PRODUTO = { placeholder: "Buscar produto" };
 
 interface Contexto {
@@ -56,6 +56,10 @@ export interface ProdutoLancamento {
   produtoId: string;
   nome: string;
   codigoBarra: string | null;
+  fabricante?: string;
+  formula?: string;
+  grupo?: string;
+  secao?: string;
   vendida: number;
   estoque: number;
   minimo: number;
@@ -80,10 +84,28 @@ const paraIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padS
 /** `AAAA-MM` como `MM/AAAA`. */
 const mesBr = (mes: string) => mes.split("-").reverse().join("/");
 
-const COLUNAS_MES: DataTableColumn<Mes>[] = [
-  { key: "mes", label: "Mês", value: (m) => mesBr(m.mes) },
-  { key: "vendida", label: "Venda", format: "decimal", value: (m) => m.vendida },
-  { key: "comprada", label: "Compra", format: "decimal", value: (m) => m.comprada },
+/** A movimentação mensal em duas linhas (Venda e Compra), com um mês por coluna. */
+interface LinhaMovimento {
+  tipo: "vendida" | "comprada";
+  rotulo: string;
+}
+const LINHAS_MOVIMENTO: LinhaMovimento[] = [
+  { tipo: "vendida", rotulo: "Venda" },
+  { tipo: "comprada", rotulo: "Compra" },
+];
+const idMovimento = (l: LinhaMovimento) => l.tipo;
+/** Os 12 meses até o de `hoje` (`AAAA-MM-DD`), do mais antigo ao atual; o mês sem movimento vale zero. */
+const ultimosMeses = (hoje: string, meses: Mes[]): Mes[] => {
+  const [ano = 0, mes = 1] = hoje.split("-").map(Number);
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(Date.UTC(ano, mes - 12 + i, 1));
+    const chave = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    return meses.find((m) => m.mes === chave) ?? { mes: chave, vendida: 0, comprada: 0 };
+  });
+};
+const colunasMovimento = (meses: Mes[]): DataTableColumn<LinhaMovimento>[] => [
+  { key: "tipo", label: "", value: (l) => l.rotulo },
+  ...meses.map((m): DataTableColumn<LinhaMovimento> => ({ key: m.mes, label: mesBr(m.mes), format: "decimal", value: (l) => m[l.tipo] })),
 ];
 
 type FiltrosAplicados = { modo: Modo; de: string; ate: string; lojas: number[]; entradas: EntradaLista[]; apenasMinimo: boolean };
@@ -198,6 +220,8 @@ function CampoMinimoMaximo({ linha, produtoId, campo, rotulo, onSalvo }: { linha
   );
 }
 
+/** Quanto falta para o estoque mínimo da Loja: o que o campo Pedir traz antes de digitar. */
+const faltaParaMinimo = (l: LinhaLoja) => Math.max(0, Math.ceil((l.minimo ?? 0) - l.estoque));
 /** Chave da quantidade a pedir de um produto numa Loja. */
 const chaveQtd = (produtoId: string, codigoLoja: number) => `${produtoId}:${codigoLoja}`;
 
@@ -222,50 +246,40 @@ function CampoPedir({ valor, rotulo, onChange }: { valor: number | undefined; ro
   );
 }
 
-interface Distribuidora {
-  codigo: number;
-  nome: string;
-}
-
-/** Célula da distribuidora da Loja: busca na lista do ERP e guarda o código escolhido. */
-function CampoDistribuidora({ valor, lista, rotulo, onChange }: { valor: number | undefined; lista: Distribuidora[]; rotulo: string; onChange: (codigo: number | null) => void }) {
+/** Célula das distribuidoras da Loja: o resumo e o botão que abre a janela de busca e lista. */
+function CampoDistribuidoras({ produtoId, codigoLoja, nomeLoja, valor, lista, onChange }: { produtoId: string; codigoLoja: number; nomeLoja: string; valor: number[] | undefined; lista: Distribuidora[]; onChange: (codigos: number[]) => void }) {
+  const { windows } = useUi();
+  const resumo = !valor || valor.length === 0 ? "Escolher" : valor.length === 1 ? (lista.find((d) => d.codigo === valor[0])?.nome ?? `Distribuidora ${valor[0]}`) : `${valor.length} distribuidoras`;
+  const abrir = async () => {
+    const resultado = await windows.open<number[]>({
+      surface: "dialog",
+      size: "large",
+      title: "Distribuidoras",
+      description: `Loja ${nomeLoja}. Começa com as que já deram entrada neste produto.`,
+      content: () => <DistribuidorasLinhaWindow produtoId={produtoId} codigoLoja={codigoLoja} inicial={valor} lista={lista} />,
+    });
+    if (resultado.status === "confirmed") onChange(resultado.value);
+  };
   return (
-    <Combobox
-      autoHighlight
-      items={lista}
-      value={lista.find((d) => d.codigo === valor) ?? null}
-      onValueChange={(d: Distribuidora | null) => onChange(d?.codigo ?? null)}
-      itemToStringLabel={(d: Distribuidora) => d.nome}
-      itemToStringValue={(d: Distribuidora) => String(d.codigo)}
-      isItemEqualToValue={(a: Distribuidora, b: Distribuidora) => a.codigo === b.codigo}
-    >
-      <ComboboxInput aria-label={rotulo} placeholder="Distribuidora" showClear inTableCell />
-      <ComboboxContent wide>
-        <ComboboxEmpty>Nenhuma distribuidora encontrada.</ComboboxEmpty>
-        <ComboboxList>
-          {(d: Distribuidora) => (
-            <ComboboxItem key={d.codigo} value={d}>
-              {d.nome}
-            </ComboboxItem>
-          )}
-        </ComboboxList>
-      </ComboboxContent>
-    </Combobox>
+    <Button type="button" variant="outline" aria-label={`Distribuidoras da Loja ${nomeLoja}`} onClick={() => void abrir()}>
+      {resumo}
+    </Button>
   );
 }
 
 /** Campo de mínimo/máximo estreito e à direita, para a tabela de Lojas caber sem rolagem lateral. */
 const CAMPO_LOJA = "[&_input]:w-14 [&_input]:px-1.5 [&_input]:text-right";
 
-const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora }: { produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void; quantidades: Map<string, number>; onQuantidade: (produto: ProdutoLancamento, codigoLoja: number, quantidade: number) => void; distribuidoras: Map<string, number>; listaDistribuidoras: Distribuidora[]; onDistribuidora: (produto: ProdutoLancamento, codigoLoja: number, codigo: number | null) => void }) {
+const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora }: { produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void; quantidades: Map<string, number>; onQuantidade: (produto: ProdutoLancamento, codigoLoja: number, quantidade: number) => void; distribuidoras: Map<string, number[]>; listaDistribuidoras: Distribuidora[]; onDistribuidora: (produto: ProdutoLancamento, codigoLoja: number, codigos: number[]) => void }) {
   const { feedback } = useUi();
   const novaConsulta = useLatestFetch();
   const [meses, setMeses] = useState<Mes[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [lojaAtiva, setLojaAtiva] = useState<string | null>(null);
   const [apenasLoja, setApenasLoja] = useState(true);
+  const [ultimasCompras, setUltimasCompras] = useState<Map<number, number>>(() => new Map());
 
-  const codigoLoja = apenasLoja && produto?.lojas.some((l) => String(l.codigoLoja) === lojaAtiva) ? lojaAtiva : null;
+  const codigoLoja = apenasLoja && produto && contexto.lojas.some((l) => String(l.codigo) === lojaAtiva) ? lojaAtiva : null;
   const consultaLojas = codigoLoja ? codigoLoja : lojasFiltro.join(",");
   const idFoco = produto?.produtoId;
   useEffect(() => {
@@ -292,43 +306,70 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo,
     return () => clearTimeout(espera);
   }, [idFoco, consultaLojas, feedback, novaConsulta]);
 
+  // O valor unitário da última compra em cada Loja, do produto em foco (mesma pausa do cursor da movimentação).
+  useEffect(() => {
+    if (!idFoco) {
+      setUltimasCompras(new Map());
+      return;
+    }
+    let atual = true;
+    const espera = setTimeout(() => {
+      apiFetch<{ codigoLoja: number; preco: number }[]>(`${BASE}/ultimas-compras?produtoId=${encodeURIComponent(idFoco)}`)
+        .then((r) => atual && setUltimasCompras(new Map(r.map((l) => [l.codigoLoja, l.preco]))))
+        .catch(() => atual && setUltimasCompras(new Map()));
+    }, ESPERA_DETALHE_MS);
+    return () => {
+      atual = false;
+      clearTimeout(espera);
+    };
+  }, [idFoco]);
+
   const produtoId = produto?.produtoId ?? "";
   const colunasLoja = useMemo<DataTableColumn<LinhaLoja>[]>(() => {
     const nomeLoja = (codigo: number) => contexto.lojas.find((l) => l.codigo === codigo)?.nome || `Loja ${codigo}`;
-    return [
-    { key: "loja", label: "Loja", value: (l) => nomeLoja(l.codigoLoja) },
+    const loja: DataTableColumn<LinhaLoja> = { key: "loja", label: "Loja", value: (l) => nomeLoja(l.codigoLoja) };
+    const estatisticas: DataTableColumn<LinhaLoja>[] = [
+    loja,
     { key: "estoque", label: "Estoque", tooltip: "Estoque atual", format: "decimal", value: (l) => l.estoque },
     { key: "vendida", label: "Vendida", tooltip: "Qtde vendida", format: "decimal", value: (l) => l.vendida },
     contexto.podeEditarMinimos
       ? { key: "minimo", label: "Mín.", tooltip: "Estoque mínimo", format: "decimal", render: (l) => <CampoMinimoMaximo linha={l} produtoId={produtoId} campo="minimo" rotulo={`Estoque mínimo da Loja ${nomeLoja(l.codigoLoja)}`} onSalvo={onSalvo} />, cellClassName: CAMPO_LOJA, mobileWide: true }
       : { key: "minimo", label: "Mín.", tooltip: "Estoque mínimo", format: "decimal", value: (l) => l.minimo ?? 0 },
-    contexto.podeEditarMinimos
-      ? { key: "maximo", label: "Máx.", tooltip: "Estoque máximo", format: "decimal", render: (l) => <CampoMinimoMaximo linha={l} produtoId={produtoId} campo="maximo" rotulo={`Estoque máximo da Loja ${nomeLoja(l.codigoLoja)}`} onSalvo={onSalvo} />, cellClassName: CAMPO_LOJA, mobileWide: true }
-      : { key: "maximo", label: "Máx.", tooltip: "Estoque máximo", format: "decimal", value: (l) => l.maximo ?? 0 },
     { key: "sugestao", label: "Sug.", tooltip: "Sugestão", format: "decimal", value: (l) => l.sugestao },
     { key: "aChegar", label: "A chegar", format: "decimal", value: (l) => l.aChegar },
-    { key: "pedir", label: "Pedir", tooltip: "Quantidade a pedir", format: "decimal", render: (l) => <CampoPedir valor={quantidades.get(chaveQtd(produtoId, l.codigoLoja))} rotulo={`Quantidade a pedir da Loja ${nomeLoja(l.codigoLoja)}`} onChange={(q) => produto && onQuantidade(produto, l.codigoLoja, q)} />, cellClassName: CAMPO_LOJA, mobileWide: true },
-    { key: "distribuidora", label: "Distribuidora", render: (l) => <CampoDistribuidora valor={distribuidoras.get(chaveQtd(produtoId, l.codigoLoja))} lista={listaDistribuidoras} rotulo={`Distribuidora da Loja ${nomeLoja(l.codigoLoja)}`} onChange={(c) => produto && onDistribuidora(produto, l.codigoLoja, c)} />, mobileWide: true },
+    { key: "ultimaCompra", label: "Últ. compra", tooltip: "Valor unitário da última compra", format: "currency", value: (l) => ultimasCompras.get(l.codigoLoja) ?? null },
     ];
-  }, [contexto.lojas, contexto.podeEditarMinimos, produtoId, produto, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora]);
-  const colunasMes = COLUNAS_MES;
+    const pedido: DataTableColumn<LinhaLoja>[] = [
+    loja,
+    { key: "pedir", label: "Pedir", tooltip: "Quantidade a pedir", format: "decimal", render: (l) => <CampoPedir valor={quantidades.get(chaveQtd(produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)} rotulo={`Quantidade a pedir da Loja ${nomeLoja(l.codigoLoja)}`} onChange={(q) => produto && onQuantidade(produto, l.codigoLoja, q)} />, cellClassName: CAMPO_LOJA, mobileWide: true },
+    { key: "distribuidora", label: "Distribuidora", render: (l) => <CampoDistribuidoras produtoId={produtoId} codigoLoja={l.codigoLoja} nomeLoja={nomeLoja(l.codigoLoja)} valor={distribuidoras.get(chaveQtd(produtoId, l.codigoLoja))} lista={listaDistribuidoras} onChange={(c) => produto && onDistribuidora(produto, l.codigoLoja, c)} />, mobileWide: true },
+    ];
+    return { estatisticas, pedido };
+  }, [contexto.lojas, contexto.podeEditarMinimos, ultimasCompras, produtoId, produto, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora]);
+  // Todas as Lojas, mesmo as sem venda nem estoque do produto (zeradas).
+  const todasLojas = useMemo<LinhaLoja[]>(() => {
+    if (!produto) return [];
+    return contexto.lojas.map((l) => produto.lojas.find((x) => x.codigoLoja === l.codigo) ?? { codigoLoja: l.codigo, vendida: 0, estoque: 0, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 });
+  }, [produto, contexto.lojas]);
+  const colunasMes = useMemo(() => colunasMovimento(ultimosMeses(contexto.hoje, meses)), [contexto.hoje, meses]);
   const vazio = "Selecione um produto para ver o estoque e as vendas por Loja e a movimentação mensal.";
   return (
     <>
       <Stack grow>
-        <DataTable scroll="fill" compact title={produto ? `Lojas: ${produto.nome}` : "Lojas"} columns={colunasLoja} rows={produto?.lojas ?? []} getRowId={idLoja} activeRowId={lojaAtiva} onActiveRowChange={setLojaAtiva} emptyMessage={produto ? "Nenhuma Loja." : vazio} />
+        <DataTable scroll="fill" compact title={produto ? `Lojas: ${produto.nome}` : "Lojas"} columns={colunasLoja.pedido} rows={todasLojas} getRowId={idLoja} activeRowId={lojaAtiva} onActiveRowChange={setLojaAtiva} emptyMessage={produto ? "Nenhuma Loja." : vazio} />
       </Stack>
-      <Stack grow span="full">
-        <DataTable
-          scroll="fill"
-          compact
-          headerActions={
-            <Stack direction="row" gap="field" align="center" shrink={false}>
-              <Checkbox id="pedidos-apenas-loja" checked={apenasLoja} onCheckedChange={(v: boolean) => setApenasLoja(v)} />
-              <Label htmlFor="pedidos-apenas-loja">Apenas a Loja selecionada</Label>
-            </Stack>
-          }
-          title={produto ? `Movimentação mensal: ${produto.nome}` : "Movimentação mensal"} columns={colunasMes} rows={meses} getRowId={idMes} loading={carregando} emptyMessage={produto ? "Sem vendas nem compras nos últimos 12 meses." : vazio} />
+      <Stack span="full" scroll="clip" surface="card" gap="section">
+        <Stack direction="row" gap="group" align="center" justify="between" shrink={false}>
+          <Text weight="semibold">{produto ? `Movimentação mensal: ${produto.nome}` : "Movimentação mensal"}</Text>
+          <Stack direction="row" gap="field" align="center" shrink={false}>
+            <Checkbox id="pedidos-apenas-loja" checked={apenasLoja} onCheckedChange={(v: boolean) => setApenasLoja(v)} />
+            <Label htmlFor="pedidos-apenas-loja">Apenas a Loja selecionada</Label>
+          </Stack>
+        </Stack>
+        <Stack grow scroll gap="section">
+          <DataTable embedded compact skeletonRows={2} columns={colunasMes} rows={produto ? LINHAS_MOVIMENTO : []} getRowId={idMovimento} loading={carregando} emptyMessage={produto ? "Sem vendas nem compras nos últimos 12 meses." : vazio} />
+          <DataTable embedded compact columns={colunasLoja.estatisticas} rows={todasLojas} getRowId={idLoja} activeRowId={lojaAtiva} onActiveRowChange={setLojaAtiva} emptyMessage={produto ? "Nenhuma Loja." : vazio} />
+        </Stack>
       </Stack>
     </>
   );
@@ -344,6 +385,17 @@ export function PedidosLancamentoTab({ abas }: { abas: ReactNode }) {
     ) : null;
   }
   return <Lancamento contexto={contexto} notificar={feedback.notifyError} abas={abas} />;
+}
+
+/** O Lançamento num modal para editar um rascunho: a mesma tela, já com os produtos, quantidades e distribuidoras do Pedido. */
+export function PedidoLancamentoWindow({ pedido }: { pedido: Pedido }) {
+  const { resolve } = useWindow<Pedido>();
+  const { feedback } = useUi();
+  const { contexto, falha, carregar } = useContexto<Contexto>(`${BASE}/contexto`, "Erro ao carregar o Lançamento de Pedidos.");
+  if (!contexto) {
+    return falha ? <FalhaAoCarregar titulo="Não foi possível carregar o Lançamento de Pedidos" descricao={falha} onTentarNovamente={() => void carregar()} /> : null;
+  }
+  return <Lancamento contexto={contexto} notificar={feedback.notifyError} abas={null} edicao={{ pedido, aoSalvar: resolve }} />;
 }
 
 interface ResultadoFiltros {
@@ -438,8 +490,14 @@ function FiltrosSheet({ contexto, inicial, visoesIniciais, visaoInicial }: { con
   );
 }
 
-function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notificar: (e: Error) => void; abas: ReactNode }) {
-  const { windows } = useUi();
+/** Edição de um rascunho: o Pedido aberto e o que fazer depois de salvar (fechar a janela). */
+interface EdicaoPedido {
+  pedido: Pedido;
+  aoSalvar: (salvo: Pedido) => void;
+}
+
+function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto; notificar: (e: Error) => void; abas: ReactNode; edicao?: EdicaoPedido }) {
+  const { windows, feedback } = useUi();
   const novaConsulta = useLatestFetch();
   const [visoes, setVisoes] = useState<VisaoPedidos[]>([]);
   const [visao, setVisao] = useState<string | null>(null);
@@ -528,15 +586,14 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
     (p: ProdutoLancamento, codigoLoja: number, quantidade: number) => {
       setQuantidades((atual) => {
         const proximo = new Map(atual);
-        if (quantidade > 0) proximo.set(chaveQtd(p.produtoId, codigoLoja), quantidade);
-        else proximo.delete(chaveQtd(p.produtoId, codigoLoja));
+        proximo.set(chaveQtd(p.produtoId, codigoLoja), quantidade);
         return proximo;
       });
       if (quantidade > 0) alternar(p, true);
     },
     [alternar],
   );
-  const [distribuidoras, setDistribuidoras] = useState<Map<string, number>>(() => new Map());
+  const [distribuidoras, setDistribuidoras] = useState<Map<string, number[]>>(() => new Map());
   const [listaDistribuidoras, setListaDistribuidoras] = useState<Distribuidora[]>([]);
   useEffect(() => {
     apiFetch<Distribuidora[]>(`${API}/pedidos/fornecedores?busca=`)
@@ -544,17 +601,34 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
       .catch((err: unknown) => notificar(err instanceof Error ? err : new Error("Erro ao carregar as distribuidoras.")));
   }, [notificar]);
   const definirDistribuidora = useCallback(
-    (p: ProdutoLancamento, codigoLoja: number, codigo: number | null) => {
-      setDistribuidoras((atual) => {
-        const proximo = new Map(atual);
-        if (codigo !== null) proximo.set(chaveQtd(p.produtoId, codigoLoja), codigo);
-        else proximo.delete(chaveQtd(p.produtoId, codigoLoja));
-        return proximo;
-      });
-      if (codigo !== null) alternar(p, true);
+    (p: ProdutoLancamento, codigoLoja: number, codigos: number[]) => {
+      setDistribuidoras((atual) => new Map(atual).set(chaveQtd(p.produtoId, codigoLoja), codigos));
+      if (codigos.length > 0) alternar(p, true);
     },
     [alternar],
   );
+  // Na edição do rascunho, começa com os produtos, quantidades e distribuidoras do Pedido (os dados de estoque vêm do ERP).
+  const pedidoEditado = edicao?.pedido;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: só na abertura da janela.
+  useEffect(() => {
+    if (!pedidoEditado) return;
+    const qtds = new Map<string, number>();
+    const dists = new Map<string, number[]>();
+    for (const i of pedidoEditado.itens) {
+      for (const q of i.quantidades) {
+        qtds.set(chaveQtd(i.produtoId, q.codigoLoja), q.quantidade);
+        dists.set(chaveQtd(i.produtoId, q.codigoLoja), q.codigosFornecedor ?? []);
+      }
+    }
+    setQuantidades(qtds);
+    setDistribuidoras(dists);
+    const vazio = (i: ItemPedido): ProdutoLancamento => ({ produtoId: i.produtoId, nome: i.nome, codigoBarra: i.codigoBarra, vendida: 0, estoque: 0, minimo: 0, sugestao: 0, aChegar: 0, lojas: [] });
+    const filtro = JSON.stringify(pedidoEditado.itens.map((i) => ({ tipo: "produto", id: i.produtoId })));
+    const params = new URLSearchParams({ modo: "apartir", de: contexto.ontem, entradas: filtro });
+    apiFetch<ProdutoLancamento[]>(`${BASE}/produtos?${params}`)
+      .catch(() => [] as ProdutoLancamento[])
+      .then((achados) => setSelecionados(new Map(pedidoEditado.itens.map((i) => [i.produtoId, achados.find((p) => p.produtoId === i.produtoId) ?? vazio(i)]))));
+  }, []);
   const alternarLinha = useCallback((p: ProdutoLancamento) => alternar(p, !selecionados.has(p.produtoId)), [alternar, selecionados]);
   const aoGravarMinimo = useCallback(
     (produtoId: string, gravado?: MinimoGravado) => {
@@ -573,43 +647,84 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
   );
 
   const gerarPedido = async () => {
-    // A quantidade vem digitada na janela; o produto entra com todas as Lojas que ele tem na consulta.
-    const itens: ItemPedido[] = [...selecionados.values()].map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: p.lojas.map((l) => ({ codigoLoja: l.codigoLoja, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? 0, codigoFornecedor: distribuidoras.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? null })) }));
-    const resultado = await windows.open<unknown>({
-      surface: "dialog",
-      size: "full",
-      title: "Gerar pedido",
-      description: "Digite a quantidade de cada produto por Loja. O Pedido fica em rascunho.",
-      content: () => <PedidoRascunhoWindow itens={itens} lojas={contexto.lojas} />,
-    });
-    if (resultado.status === "confirmed") {
+    // A quantidade já foi digitada na grade de Lojas; só entram os produtos com alguma quantidade a pedir.
+    const itens: ItemPedido[] = [...selecionados.values()]
+      .map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: p.lojas.map((l) => ({ codigoLoja: l.codigoLoja, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l), codigosFornecedor: distribuidoras.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? [] })) }))
+      .filter((i) => i.quantidades.some((q) => q.quantidade > 0));
+    if (itens.length === 0) {
+      notificar(new Error("Informe a quantidade a pedir de ao menos um produto."));
+      return;
+    }
+    try {
+      if (edicao) {
+        const salvo = await apiFetch<Pedido>(`${PEDIDOS_BASE}/${edicao.pedido.id}`, json("PUT", { itens, version: edicao.pedido.version }));
+        feedback.notify({ type: "success", title: "Rascunho salvo." });
+        edicao.aoSalvar(salvo);
+        return;
+      }
+      await apiFetch(PEDIDOS_BASE, json("POST", { itens }));
+      feedback.notify({ type: "success", title: "Pedido gerado em rascunho." });
       setSelecionados(new Map());
       setQuantidades(new Map());
       setDistribuidoras(new Map());
+    } catch (err: unknown) {
+      notificar(err instanceof Error ? err : new Error(edicao ? "Erro ao salvar o rascunho." : "Erro ao gerar o Pedido."));
     }
   };
 
   // Estável entre movimentos do cursor: só muda ao marcar produtos (a coluna de seleção lê `selecionados`).
+  // A ordem por seleção vale pelo que estava marcado ao clicar no cabeçalho: marcar depois não sobe a linha junto.
+  const [ordemSelecao, setOrdemSelecao] = useState<ReadonlySet<string>>(new Set());
   const colunas = useMemo<DataTableColumn<ProdutoLancamento>[]>(() => [
       {
         key: "selecionar",
         label: "",
-        render: (p) => <Checkbox aria-label={`Selecionar ${p.nome}`} checked={selecionados.has(p.produtoId)} onCheckedChange={(v: boolean) => alternar(p, v)} />,
+        render: (p) => (
+          <Stack direction="row" justify="center">
+            <Checkbox aria-label={`Selecionar ${p.nome}`} checked={selecionados.has(p.produtoId)} onCheckedChange={(v: boolean) => alternar(p, v)} />
+          </Stack>
+        ),
+        width: 28,
+        centered: true,
+        value: (p) => (ordemSelecao.has(p.produtoId) ? 1 : 0),
+        sortable: true,
+        firstSort: "desc",
+        cellClassName: "px-0!",
         mobileRole: "hidden",
       },
-      { key: "nome", label: "Produto", value: (p) => p.nome, searchable: true, sortable: true, mobileRole: "primary" },
-      { key: "estoque", label: "Estoque", tooltip: "Estoque atual", format: "decimal", value: (p) => p.estoque, sortable: true },
-      { key: "vendida", label: "Vendida", tooltip: "Qtde vendida", format: "decimal", value: (p) => p.vendida, sortable: true, firstSort: "desc" },
-      { key: "minimo", label: "Mínimo", tooltip: "Estoque mínimo", format: "decimal", value: (p) => p.minimo, sortable: true },
-      { key: "sugestao", label: "Sugestão", format: "decimal", value: (p) => p.sugestao, sortable: true },
-      { key: "aChegar", label: "A chegar", format: "decimal", value: (p) => p.aChegar, sortable: true },
+      { key: "nome", label: "Produto", value: (p) => p.nome, searchable: true, sortable: true, truncateAt: 32, mobileRole: "primary" },
+      { key: "fabricante", label: "Fabricante", value: (p) => p.fabricante ?? "", sortable: true, searchable: true, truncateAt: 16 },
+      { key: "formula", label: "Fórmula", value: (p) => p.formula ?? "", sortable: true, truncateAt: 16 },
+      { key: "grupo", label: "Grupo", value: (p) => p.grupo ?? "", sortable: true, truncateAt: 14 },
+      { key: "secao", label: "Seção", value: (p) => p.secao ?? "", sortable: true, truncateAt: 14 },
       { key: "codigoBarra", label: "Cód. barras", tooltip: "Código de barras", value: (p) => p.codigoBarra ?? "", searchable: true },
-  ], [selecionados, alternar]);
+  ], [selecionados, ordemSelecao, alternar]);
 
   const emFoco = useMemo(() => (ativo ? produtos.find((p) => p.produtoId === ativo) : undefined), [ativo, produtos]);
 
+  // Ao focar um produto, as Lojas já vêm com as distribuidoras que deram entrada nele (uma consulta por produto; o que o usuário já escolheu fica).
+  const idEmFoco = emFoco?.produtoId;
+  const jaConsultados = useRef(new Set<string>());
+  useEffect(() => {
+    if (!idEmFoco || jaConsultados.current.has(idEmFoco)) return;
+    jaConsultados.current.add(idEmFoco);
+    apiFetch<{ produtoId: string; codigoLoja: number; codigoFornecedor: number }[]>(`${BASE}/entradas?produtoIds=${encodeURIComponent(idEmFoco)}`)
+      .then((entradas) =>
+        setDistribuidoras((atual) => {
+          const proximo = new Map(atual);
+          for (const e of entradas) {
+            const chave = chaveQtd(e.produtoId, e.codigoLoja);
+            if (atual.has(chave)) continue;
+            proximo.set(chave, [...(proximo.get(chave) ?? []), e.codigoFornecedor]);
+          }
+          return proximo;
+        }),
+      )
+      .catch(() => jaConsultados.current.delete(idEmFoco));
+  }, [idEmFoco]);
+
   return (
-    <Stack gap="field" viewport>
+    <Stack gap="field" viewport={edicao ? "modal" : true}>
       <Stack direction="row" gap="group" align="center" shrink={false}>
         {abas}
         <Stack grow>
@@ -621,7 +736,7 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
           {formatNumber(selecionados.size)} {selecionados.size === 1 ? "produto selecionado" : "produtos selecionados"}
         </Text>
         <Button type="button" disabled={selecionados.size === 0} onClick={() => void gerarPedido()}>
-          Gerar pedido
+          {edicao ? "Salvar rascunho" : "Gerar pedido"}
         </Button>
       </Stack>
       <Grid columns="workspace" gap="tight">
@@ -645,6 +760,7 @@ function Lancamento({ contexto, notificar, abas }: { contexto: Contexto; notific
             onActiveRowChange={setAtivo}
             onRowToggle={alternarLinha}
             search={BUSCA_PRODUTO}
+            onSortChange={(chave) => chave === "selecionar" && setOrdemSelecao(new Set(selecionados.keys()))}
             emptyMessage="Nenhuma venda no período e filtros escolhidos."
           />
         </Stack>

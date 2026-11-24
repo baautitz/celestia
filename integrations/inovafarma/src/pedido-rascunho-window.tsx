@@ -14,7 +14,7 @@ export interface ItemPedido {
   produtoId: string;
   nome: string;
   codigoBarra: string | null;
-  quantidades: { codigoLoja: number; quantidade: number; /** Distribuidora escolhida na grade de Lojas (pré-escolha; a cotação não a usa). */ codigoFornecedor?: number | null }[];
+  quantidades: { codigoLoja: number; quantidade: number; /** Distribuidoras escolhidas na grade de Lojas (a Cotação abre com elas marcadas). */ codigosFornecedor?: number[] }[];
 }
 
 export interface Pedido {
