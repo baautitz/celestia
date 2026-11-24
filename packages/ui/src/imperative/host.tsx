@@ -65,6 +65,7 @@ const FOCAVEIS = "input:not([disabled]):not([type='hidden']), button:not([disabl
  */
 function focarJanela(id: string) {
   setTimeout(() => {
+    if (typeof document === "undefined") return // o ambiente de testes já foi desmontado
     const janela = document.querySelector<HTMLElement>(`[data-window="${CSS.escape(id)}"]`)
     if (!janela || janela.contains(document.activeElement)) return
     const primeiro = [...janela.querySelectorAll<HTMLElement>(FOCAVEIS)].find((el) => el.getAttribute("aria-hidden") !== "true" && el.closest("[hidden]") === null)
