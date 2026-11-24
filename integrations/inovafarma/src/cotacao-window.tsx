@@ -22,6 +22,7 @@ interface FornecedorCotacao {
 
 interface ProdutoCotacao {
   produtoId: string;
+  codigoProduto?: number | null;
   nome: string;
   quantidade: number;
   /** Código do fornecedor -> preço; null = sem oferta. */
@@ -281,6 +282,7 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
   const nomeLoja = (codigo: number) => lojas.find((l) => l.codigo === codigo)?.nome ?? `Loja ${codigo}`;
 
   const colunas: DataTableColumn<ProdutoCotacao>[] = [
+    { key: "codigo", label: "Código", value: (p) => p.codigoProduto ?? "", searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
     { key: "nome", label: "Produto", value: (p) => p.nome, searchable: true, mobileRole: "primary" },
     { key: "quantidade", label: "Qtde pedida", format: "decimal", value: (p) => p.quantidade },
     // Cada distribuidora é um grupo de duas colunas, numa linha só por produto: Preço (escolhe; o tooltip traz a última compra) e Qtde (editável).
@@ -371,6 +373,7 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
           <DataTable
             title="Conferência com a NF"
             columns={[
+              { key: "codigo", label: "Código", value: (l: LinhaConferida) => detalhe.produtos.find((p) => p.produtoId === l.produtoId)?.codigoProduto ?? "", searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
               { key: "nome", label: "Produto", value: (l: LinhaConferida) => l.nome, searchable: true, mobileRole: "primary" },
               { key: "loja", label: "Loja", value: (l: LinhaConferida) => nomeLoja(l.codigoLoja) },
               { key: "pedida", label: "Pedida", format: "decimal", value: (l: LinhaConferida) => l.pedida },

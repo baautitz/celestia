@@ -55,6 +55,8 @@ interface LinhaLoja {
 
 export interface ProdutoLancamento {
   produtoId: string;
+  /** Código do produto no ERP (o `produtoId` é o identificador opaco). */
+  codigoProduto?: number | null;
   nome: string;
   codigoBarra: string | null;
   fabricante?: string;
@@ -772,6 +774,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
         cellClassName: "px-0!",
         mobileRole: "hidden",
       },
+      { key: "codigo", label: "Código", value: (p) => p.codigoProduto ?? "", searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
       { key: "nome", label: "Produto", value: (p) => p.nome, searchable: true, sortable: true, truncateAt: 32, mobileRole: "primary" },
       { key: "fabricante", label: "Fabricante", value: (p) => p.fabricante ?? "", sortable: true, searchable: true, truncateAt: 16 },
       { key: "formula", label: "Fórmula", value: (p) => p.formula ?? "", sortable: true, truncateAt: 16 },

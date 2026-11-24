@@ -52,7 +52,7 @@ export const nomesSql = (codigos: number) => `
   WHERE f.CodigoFornecedor IN (${Array.from({ length: codigos }, (_, i) => `@c${i}`).join(", ")})`;
 
 const produtosSql = (n: number) => `
-  SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, LTRIM(RTRIM(fa.NomeFabricante)) AS fabricante  FROM Produto p
+  SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, p.CodigoProduto AS codigoProduto, LTRIM(RTRIM(fa.NomeFabricante)) AS fabricante  FROM Produto p
   LEFT JOIN Produto_Fabricante fa ON fa.CodigoFabricante = p.CodigoFabricante
   WHERE CONVERT(varchar(36), p.rowguid) IN (${Array.from({ length: n }, (_, i) => `@p${i}`).join(", ")})`;
 
@@ -107,12 +107,14 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     const lista = pedido.status === "aguardando_precos" || pedido.status === "cotado" ? await cotacoes.acrescentar(pedido.id, naLinhas) : await cotacoes.listar(pedido.id);
     const nomeDe = await nomes(lista.map((c) => c.codigoFornecedor));
     const anteriores = await ultimasCompras(erpClient(), pedido, lista.map((c) => c.codigoFornecedor));
+    const detalhes = await detalhesDosProdutos(erpClient(), pedido);
     return {
       pedido: { id: pedido.id, status: pedido.status, version: pedido.version, escolhas: pedido.escolhas },
       podeConfirmar,
       fornecedores: lista.map((c) => ({ codigo: c.codigoFornecedor, nome: nomeDe.get(c.codigoFornecedor) ?? fallback(c.codigoFornecedor), importado: c.precos !== null, importadoEm: c.importadoEm, version: c.version })),
       produtos: pedido.itens.map((i) => ({
         produtoId: i.produtoId,
+        codigoProduto: detalhes.get(i.produtoId)?.codigoProduto ?? null,
         nome: i.nome,
         codigoBarra: i.codigoBarra,
         quantidade: totalDoItem(i),
@@ -280,12 +282,12 @@ async function ultimasCompras(client: ErpQuery | undefined, pedido: Pedido, forn
   return mapa;
 }
 
-async function detalhesDosProdutos(client: ErpQuery | undefined, pedido: Pedido): Promise<Map<string, { fabricante: string | null }>> {
-  const mapa = new Map<string, { fabricante: string | null }>();
+async function detalhesDosProdutos(client: ErpQuery | undefined, pedido: Pedido): Promise<Map<string, { fabricante: string | null; codigoProduto: number | null }>> {
+  const mapa = new Map<string, { fabricante: string | null; codigoProduto: number | null }>();
   if (!client) return mapa;
   try {
     const params = Object.fromEntries(pedido.itens.map((i, n) => [`p${n}`, i.produtoId]));
-    for (const r of await client.query<{ produtoId: string; fabricante: string | null }>(produtosSql(pedido.itens.length), params)) mapa.set(String(r.produtoId), { fabricante: plano(r.fabricante) });
+    for (const r of await client.query<{ produtoId: string; codigoProduto: number | null; fabricante: string | null }>(produtosSql(pedido.itens.length), params)) mapa.set(String(r.produtoId), { fabricante: plano(r.fabricante), codigoProduto: r.codigoProduto == null ? null : Number(r.codigoProduto) });
   } catch {
     // A planilha ainda serve ao fornecedor sem estas colunas.
   }

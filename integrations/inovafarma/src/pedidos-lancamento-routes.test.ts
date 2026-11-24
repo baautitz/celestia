@@ -88,8 +88,8 @@ describe("Lançamento de Pedidos: produtos", () => {
     const res = await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&lojas=1,2");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([
-      { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", fabricante: "", formula: "", grupo: "", secao: "", vendida: 8, estoque: 10, minimo: 0, sugestao: 3, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }, { codigoLoja: 2, vendida: 3, estoque: 0, minimo: null, maximo: null, sugestao: 3, aChegar: 0, version: 0 }] },
-      { produtoId: "p-2", nome: "AAS", codigoBarra: null, fabricante: "", formula: "", grupo: "", secao: "", vendida: 1, estoque: 4, minimo: 0, sugestao: 0, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }] },
+      { produtoId: "p-1", codigoProduto: null, nome: "DIPIRONA", codigoBarra: "789", fabricante: "", formula: "", grupo: "", secao: "", vendida: 8, estoque: 10, minimo: 0, sugestao: 3, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 5, estoque: 10, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }, { codigoLoja: 2, vendida: 3, estoque: 0, minimo: null, maximo: null, sugestao: 3, aChegar: 0, version: 0 }] },
+      { produtoId: "p-2", codigoProduto: null, nome: "AAS", codigoBarra: null, fabricante: "", formula: "", grupo: "", secao: "", vendida: 1, estoque: 4, minimo: 0, sugestao: 0, aChegar: 0, lojas: [{ codigoLoja: 1, vendida: 1, estoque: 4, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }] },
     ]);
     const { params } = consultas[0] ?? {};
     expect(params).toMatchObject({ dataInicio: "2027-04-01 00:00:00", dataFim: "2027-04-02 23:59:59", loja0: 1, loja1: 2 });

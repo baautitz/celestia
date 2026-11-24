@@ -57,7 +57,7 @@ const GRUPO_AJUSTE = 1;
  */
 const ajustesSql = (filtro: string) => `
   SELECT m.CodigoMovimento AS codigoMovimento, m.CodigoEmpresa AS codigoLoja, l.DataLancamento AS data, m.Operacao AS operacao,
-         CONVERT(varchar(36), p.rowguid) AS produtoId, LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra,
+         CONVERT(varchar(36), p.rowguid) AS produtoId, p.CodigoProduto AS codigoProduto, LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra,
          CAST(CASE m.Operacao WHEN '-' THEN -mp.Quantidade ELSE mp.Quantidade END AS float) AS quantidade,
          CAST(mp.PrecoCusto AS float) AS precoCusto,
          CAST(CASE m.Operacao WHEN '-' THEN -mp.TotalCusto ELSE mp.TotalCusto END AS float) AS totalCusto,
@@ -81,6 +81,7 @@ interface LinhaAjuste {
   data: Date | string;
   operacao: string;
   produtoId: string;
+  codigoProduto: number | null;
   nome: string | null;
   codigoBarra: string | null;
   quantidade: number | null;
@@ -93,6 +94,7 @@ interface LinhaAjuste {
 
 export interface ItemAjuste {
   produtoId: string;
+  codigoProduto: number | null;
   nome: string;
   codigoBarra: string | null;
   quantidade: number;
@@ -139,7 +141,7 @@ export function agruparAjustes(linhas: LinhaAjuste[]): AjusteEstoque[] {
       };
       ajustes.set(codigo, ajuste);
     }
-    const item = { produtoId: r.produtoId, nome: r.nome ?? "", codigoBarra: r.codigoBarra, quantidade: Number(r.quantidade) || 0, precoCusto: Number(r.precoCusto) || 0, totalCusto: Number(r.totalCusto) || 0 };
+    const item = { produtoId: r.produtoId, codigoProduto: r.codigoProduto == null ? null : Number(r.codigoProduto), nome: r.nome ?? "", codigoBarra: r.codigoBarra, quantidade: Number(r.quantidade) || 0, precoCusto: Number(r.precoCusto) || 0, totalCusto: Number(r.totalCusto) || 0 };
     ajuste.itens.push(item);
     ajuste.quantidade += item.quantidade;
     ajuste.totalCusto += item.totalCusto;

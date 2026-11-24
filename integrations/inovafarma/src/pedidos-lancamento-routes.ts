@@ -88,6 +88,7 @@ const ConsultaMovimentacao = z.object({ produtoId: z.string().min(1, "Informe o 
 
 interface LinhaVenda {
   produtoId: string;
+  codigoProduto: number | null;
   nome: string | null;
   codigoBarra: string | null;
   fabricante: string | null;
@@ -114,6 +115,7 @@ interface LojaLancamento {
 
 interface ProdutoLancamento {
   produtoId: string;
+  codigoProduto: number | null;
   nome: string;
   codigoBarra: string | null;
   fabricante: string;
@@ -148,7 +150,7 @@ function filtroDeLojas(coluna: string, lojas: number[] | undefined, params: Reco
  * parâmetro, nunca no SQL.
  */
 const produtosSql = (filtroVenda: string) => `
-  SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra,
+  SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, p.CodigoProduto AS codigoProduto, LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra,
          LTRIM(RTRIM(fa.NomeFabricante)) AS fabricante, LTRIM(RTRIM(fo.NomeFormula)) AS formula, LTRIM(RTRIM(gr.NomeGrupo)) AS grupo, LTRIM(RTRIM(se.NomeSessao)) AS secao,
          g.codigoLoja AS codigoLoja, g.vendida AS vendida,
          CAST((SELECT TOP 1 pe.Estoque FROM Produto_Estoque pe WHERE pe.CodigoProduto = g.codigoProduto AND pe.CodigoEmpresa = g.codigoLoja) AS float) AS estoque
@@ -295,7 +297,7 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
         const definido = definidos.get(`${l.produtoId}|${l.codigoLoja}`);
         // Sugestão: só apoio ao comprador, nunca negativa.
         const loja = { codigoLoja: Number(l.codigoLoja), vendida, estoque, minimo: definido?.minimo ?? null, maximo: definido?.maximo ?? null, sugestao: Math.max(0, vendida + (definido?.minimo ?? 0) - estoque), aChegar: chegando.get(chaveDaLinha(l.produtoId, Number(l.codigoLoja))) ?? 0, version: definido?.version ?? 0 };
-        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, fabricante: l.fabricante ?? "", formula: l.formula ?? "", grupo: l.grupo ?? "", secao: l.secao ?? "", vendida: 0, estoque: 0, minimo: 0, sugestao: 0, aChegar: 0, lojas: [] };
+        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, codigoProduto: l.codigoProduto == null ? null : Number(l.codigoProduto), nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, fabricante: l.fabricante ?? "", formula: l.formula ?? "", grupo: l.grupo ?? "", secao: l.secao ?? "", vendida: 0, estoque: 0, minimo: 0, sugestao: 0, aChegar: 0, lojas: [] };
         produto.vendida += vendida;
         produto.estoque += estoque;
         produto.minimo += loja.minimo ?? 0;
@@ -304,8 +306,6 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
         produto.lojas.push(loja);
         porProduto.set(l.produtoId, produto);
       }
-      const todos = [...porProduto.values()];
-      return c.json(apenasMinimo ? todos.filter((p) => p.lojas.some((l) => (l.minimo ?? 0) > 0)) : todos);
       // A Loja com mínimo gravado mas sem venda no período não vem do ERP: entra com o que está gravado (e a version dele),
       // senão a grade a mostraria vazia e a próxima edição seria recusada como conflito.
       for (const produto of porProduto.values()) {
@@ -318,6 +318,8 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
           produto.aChegar += chegando.get(chaveDaLinha(d.produtoId, d.codigoLoja)) ?? 0;
         }
       }
+      const todos = [...porProduto.values()];
+      return c.json(apenasMinimo ? todos.filter((p) => p.lojas.some((l) => (l.minimo ?? 0) > 0)) : todos);
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }

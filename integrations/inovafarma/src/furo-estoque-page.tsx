@@ -38,6 +38,7 @@ interface Contexto {
 
 interface Item {
   produtoId: string;
+  codigoProduto: number | null;
   nome: string;
   codigoBarra: string | null;
   quantidade: number;
@@ -210,6 +211,7 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
   ];
 
   const colunasItens: DataTableColumn<Item>[] = [
+    { key: "codigo", label: "Código", value: (i) => i.codigoProduto ?? "", searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
     { key: "nome", label: "Produto", value: (i) => i.nome },
     { key: "codigoBarra", label: "Código de barras", value: (i) => i.codigoBarra ?? "", cellClassName: "font-mono text-xs" },
     { key: "quantidade", label: "Qtde", value: (i) => i.quantidade, format: "number" },
