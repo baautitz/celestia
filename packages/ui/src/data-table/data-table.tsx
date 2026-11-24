@@ -1501,12 +1501,12 @@ export function DataTable<TRow>({
                             <HeaderLabel col={col} />
                             {sortKey === col.key ? (
                               order === "asc" ? (
-                                <ArrowUp className="size-3" />
+                                <ArrowUp className="size-4" />
                               ) : (
-                                <ArrowDown className="size-3" />
+                                <ArrowDown className="size-4" />
                               )
                             ) : (
-                              <ArrowUpDown className="size-3 text-muted-foreground" />
+                              <ArrowUpDown className="size-4 text-muted-foreground" />
                             )}
                           </div>
                         ) : (
