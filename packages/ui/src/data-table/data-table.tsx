@@ -118,6 +118,8 @@ export interface DataTableColumn<TRow> {
   resizable?: boolean;
   /** Largura máxima da célula no desktop, em caracteres (`ch`): o texto maior é cortado com reticências e o valor completo aparece em `title`. */
   truncateAt?: number;
+  /** Largura fixa em px (ex.: coluna só de checkbox, quadrada e centralizada). Não redimensiona. */
+  width?: number;
   /** Valor bruto da célula; usado para formato, busca, ordenação e título do MobileCard. */
   value?: (row: TRow) => CellValue;
   /** Conteúdo customizado (badges etc.); tem precedência sobre `value`/`format` na célula. */
@@ -206,6 +208,8 @@ export interface DataTableProps<TRow> {
    * abaixo disso, igual a `table`.
    */
   scroll?: "table" | "page" | "fill";
+  /** Sem a moldura do Card (borda, fundo e respiro), para ficar dentro de um card de quem usa a tabela. */
+  embedded?: boolean;
   /**
    * Janela de linhas: só as visíveis (mais uma folga) ficam no DOM; o resto vira espaçadores com a altura delas.
    * Padrão: ligado com `scroll="fill"` e mais de 200 linhas. Pressupõe linhas de altura uniforme (a da primeira
@@ -555,6 +559,7 @@ export function DataTable<TRow>({
   renderExpanded,
   defaultExpanded = false,
   scroll = "table",
+  embedded = false,
   virtualize,
   actionsLabel = "Ações",
   actionsHeadClassName = "text-center w-20",
@@ -609,7 +614,7 @@ export function DataTable<TRow>({
     onActiveRowChange?.(id);
   };
   const [activeCol, setActiveCol] = useState<string | null>(null);
-  const nested = useContext(NestedTableContext);
+  const nested = useContext(NestedTableContext) || embedded;
   // Clicar fora da tabela tira o destaque da linha.
   // biome-ignore lint/correctness/useExhaustiveDependencies: setSelectedId só repassa ao pai.
   useEffect(() => {
@@ -1221,10 +1226,10 @@ export function DataTable<TRow>({
     return w === undefined ? undefined : { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` };
   };
   const cssVar = (key: string) => `--cw-${key.replace(/[^\w-]/g, "_")}`;
-  const canResize = (col: DataTableColumn<TRow>) => resizableColumns && col.resizable !== false;
+  const canResize = (col: DataTableColumn<TRow>) => resizableColumns && col.resizable !== false && col.width === undefined;
   /** A largura vem de uma variável CSS no Card: arrastar só troca a variável, sem redesenhar linhas. */
   const widthStyle = (col: DataTableColumn<TRow>): React.CSSProperties | undefined =>
-    canResize(col) ? { width: `var(${cssVar(col.key)})`, minWidth: `var(${cssVar(col.key)})`, maxWidth: `var(${cssVar(col.key)})` } : lockedStyle(col.key);
+    col.width !== undefined ? { width: `${col.width}px`, minWidth: `${col.width}px`, maxWidth: `${col.width}px` } : canResize(col) ? { width: `var(${cssVar(col.key)})`, minWidth: `var(${cssVar(col.key)})`, maxWidth: `var(${cssVar(col.key)})` } : lockedStyle(col.key);
   const widthVars = Object.fromEntries([...Object.entries(lockedW ?? {}), ...Object.entries(colWidths)].map(([k, w]) => [cssVar(k), `${w}px`])) as React.CSSProperties;
   const persistWidths = (next: Record<string, number>) => {
     setColWidths(next);
@@ -1471,7 +1476,7 @@ export function DataTable<TRow>({
                           col.sortable && "cursor-pointer select-none",
                           isNumericColumn(col) && "text-right",
                           isCenteredColumn(col) && "text-center",
-                          hasFixedWidth(col) && FIXED_COLUMN_WIDTH_CLASS,
+                          hasFixedWidth(col) && col.width === undefined && FIXED_COLUMN_WIDTH_CLASS,
                           boundaryClass(col.key),
                           frozenClass(col.key, true),
                           headerEdgeClass(col.key),
@@ -1602,7 +1607,9 @@ export function DataTable<TRow>({
                   fields={fieldCols.map((c) => ({
                     label: mobileLabel(c),
                     value: (
-                      <Skeleton className={c.skeletonClassName ?? "h-4 w-20"} />
+                      <div className="flex min-h-lh items-center">
+                        <Skeleton className={c.skeletonClassName ?? "h-4 w-20"} />
+                      </div>
                     ),
                   }))}
                 />
@@ -1771,9 +1778,12 @@ export function DataTable<TRow>({
                         {renderExpanded && <TableCell />}
                         {columns.map((c) => (
                           <TableCell key={c.key}>
-                            <Skeleton
-                              className={c.skeletonClassName ?? "h-4 w-full"}
-                            />
+                            {/* Uma linha de texto de altura (`lh`): a linha do esqueleto tem a altura da linha de dados, sem a tabela "pular". */}
+                            <div className="flex min-h-lh items-center">
+                              <Skeleton
+                                className={c.skeletonClassName ?? "h-4 w-full"}
+                              />
+                            </div>
                           </TableCell>
                         ))}
                         {hasActions && (
