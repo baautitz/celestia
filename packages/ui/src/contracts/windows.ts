@@ -12,7 +12,8 @@ export type WindowResult<TResult> =
 
 /** `drawer`: sheet que sobe de baixo, para ações no celular. */
 export type WindowSurface = "dialog" | "sheet" | "drawer" | "confirmation"
-export type WindowSize = "small" | "medium" | "large" | "full"
+/** `screen`: 90% da largura e da altura da tela (telas de trabalho inteiras num modal). */
+export type WindowSize = "small" | "medium" | "large" | "full" | "screen"
 
 /** `content` é opaco para o controller; o host decide como renderizá-lo. */
 export interface OpenWindowOptions<TContent = unknown> {

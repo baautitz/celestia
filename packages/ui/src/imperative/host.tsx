@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { ComponentType, ReactNode } from "react"
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../components/alert-dialog.tsx"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/dialog.tsx"
@@ -15,6 +15,46 @@ const DIALOG_WIDTH: Record<WindowSize, string> = {
   medium: "sm:max-w-lg",
   large: "sm:max-w-3xl",
   full: "flex h-svh max-w-full flex-col gap-0 p-0 sm:h-auto sm:max-h-[90svh] sm:max-w-6xl",
+  screen: "flex h-svh max-w-full flex-col gap-0 p-0 sm:h-[90svh] sm:w-[90vw] sm:max-w-[90vw]",
+}
+
+/** O elemento focado ao abrir a janela, com o que o identifica caso a tela o redesenhe enquanto a janela está aberta. */
+interface FocoAnterior {
+  el: HTMLElement
+  id: string
+  rotulo: string | null
+}
+
+function capturarFoco(): FocoAnterior | null {
+  const el = document.activeElement
+  if (!(el instanceof HTMLElement) || el === document.body) return null
+  return { el, id: el.id, rotulo: el.getAttribute("aria-label") }
+}
+
+/**
+ * Devolve o foco ao que o tinha antes de a janela abrir (Esc, Cancelar ou concluir). Se a tela redesenhou o elemento
+ * (ex.: a tabela recarrega ao fechar), procura o equivalente por id ou rótulo por até 1s, sem tirar o foco de quem já o tomou.
+ */
+function restaurarFoco(anterior: FocoAnterior | null) {
+  if (!anterior) return
+  let tentativas = 0
+  const tentar = () => {
+    const atual = document.activeElement
+    if (atual && atual !== document.body && !atual.closest("[role='dialog'], [role='alertdialog']") ) return
+    const alvo = anterior.el.isConnected
+      ? anterior.el
+      : anterior.id
+        ? document.getElementById(anterior.id)
+        : anterior.rotulo
+          ? document.querySelector<HTMLElement>(`[aria-label="${CSS.escape(anterior.rotulo)}"]`)
+          : null
+    if (alvo) {
+      alvo.focus()
+      return
+    }
+    if (++tentativas < 10) setTimeout(tentar, 100)
+  }
+  setTimeout(tentar, 0)
 }
 
 /** Conteúdo de uma janela: componente sem props (quem abre fecha sobre os dados). */
@@ -34,6 +74,8 @@ function ManagedWindow({ entry, controller }: {
   const { id, options } = entry
   const [footer, setFooter] = useState<HTMLDivElement | null>(null)
   const [titleOverride, setTitle] = useState<ReactNode>(null)
+  const [focoAnterior] = useState(capturarFoco)
+  useEffect(() => () => restaurarFoco(focoAnterior), [focoAnterior])
   const title = titleOverride ?? options.title
   const handle = useMemo<WindowHandle>(() => ({
     setTitle,
@@ -85,13 +127,13 @@ function ManagedWindow({ entry, controller }: {
           </Sheet>
         ) : (
           <Dialog open onOpenChange={onOpenChange}>
-            {options.size === "full" ? (
-              <DialogContent className={DIALOG_WIDTH.full}>
+            {options.size === "full" || options.size === "screen" ? (
+              <DialogContent className={DIALOG_WIDTH[options.size]}>
                 <DialogHeader className="p-4 border-b shrink-0">
                   <DialogTitle>{title}</DialogTitle>
                   {options.description && <DialogDescription>{options.description}</DialogDescription>}
                 </DialogHeader>
-                <div className="flex-1 min-h-0 overflow-y-auto p-4">{body}</div>
+                <div className="@container flex-1 min-h-0 overflow-y-auto p-4">{body}</div>
                 <DialogFooter ref={setFooter} className="p-4 border-t shrink-0 gap-2 empty:hidden" />
               </DialogContent>
             ) : (

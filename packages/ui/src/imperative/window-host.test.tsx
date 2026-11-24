@@ -45,6 +45,17 @@ function setup() {
 }
 
 describe("host de janelas (UiProvider)", () => {
+  it("devolve o foco ao botão que abriu a janela depois do Escape", async () => {
+    setup();
+    const abrir = screen.getByRole("button", { name: "Abrir janela" });
+    abrir.focus();
+    fireEvent.click(abrir);
+    const dialog = await screen.findByRole("dialog", { name: "Minha janela" });
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(abrir));
+  });
+
   it("abre uma janela, publica as acoes no rodape e resolve com o valor", async () => {
     const results = setup();
     fireEvent.click(screen.getByRole("button", { name: "Abrir janela" }));
