@@ -176,7 +176,12 @@ interface MinimoGravado {
 
 /** Aplica o mínimo/máximo gravado na linha da Loja e refaz a sugestão e os totais do produto, sem consultar o ERP. */
 function comMinimoGravado(produto: ProdutoLancamento, gravado: MinimoGravado): ProdutoLancamento {
-  const lojas = produto.lojas.map((l) => (l.codigoLoja === gravado.codigoLoja ? { ...l, minimo: gravado.minimo, maximo: gravado.maximo, version: gravado.version, sugestao: Math.max(0, l.vendida + gravado.minimo - l.estoque) } : l));
+  // A Loja sem venda no período não vem na lista do produto (a grade a mostra com linha vazia): ao gravar, ela entra com a version nova,
+  // senão a próxima edição mandaria a version 0 e o servidor recusaria como conflito.
+  const base = produto.lojas.some((l) => l.codigoLoja === gravado.codigoLoja)
+    ? produto.lojas
+    : [...produto.lojas, { codigoLoja: gravado.codigoLoja, vendida: 0, estoque: 0, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 }];
+  const lojas = base.map((l) => (l.codigoLoja === gravado.codigoLoja ? { ...l, minimo: gravado.minimo, maximo: gravado.maximo, version: gravado.version, sugestao: Math.max(0, l.vendida + gravado.minimo - l.estoque) } : l));
   return { ...produto, lojas, minimo: lojas.reduce((soma, l) => soma + (l.minimo ?? 0), 0), sugestao: lojas.reduce((soma, l) => soma + l.sugestao, 0) };
 }
 

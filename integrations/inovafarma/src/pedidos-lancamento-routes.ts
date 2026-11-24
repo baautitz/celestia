@@ -306,6 +306,18 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
       }
       const todos = [...porProduto.values()];
       return c.json(apenasMinimo ? todos.filter((p) => p.lojas.some((l) => (l.minimo ?? 0) > 0)) : todos);
+      // A Loja com mínimo gravado mas sem venda no período não vem do ERP: entra com o que está gravado (e a version dele),
+      // senão a grade a mostraria vazia e a próxima edição seria recusada como conflito.
+      for (const produto of porProduto.values()) {
+        for (const d of definidos.values()) {
+          if (d.produtoId !== produto.produtoId || produto.lojas.some((l) => l.codigoLoja === d.codigoLoja)) continue;
+          if (lojas && lojas.length > 0 && !lojas.includes(d.codigoLoja)) continue;
+          produto.lojas.push({ codigoLoja: d.codigoLoja, vendida: 0, estoque: 0, minimo: d.minimo, maximo: d.maximo, sugestao: Math.max(0, d.minimo), aChegar: chegando.get(chaveDaLinha(d.produtoId, d.codigoLoja)) ?? 0, version: d.version });
+          produto.minimo += d.minimo;
+          produto.sugestao += Math.max(0, d.minimo);
+          produto.aChegar += chegando.get(chaveDaLinha(d.produtoId, d.codigoLoja)) ?? 0;
+        }
+      }
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }
