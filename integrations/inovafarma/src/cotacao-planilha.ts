@@ -44,7 +44,22 @@ const idDaLinha = ({ pedidoId, codigoFornecedor }: AlvoPlanilha, produtoId: stri
 const diaBr = (iso: string) => iso.split("-").reverse().join("/");
 const AMARELO = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF2B3" } } as const;
 
-export async function gerarPlanilha({ linhas, fornecedor, pedidoEm, ...alvo }: AlvoPlanilha & { linhas: LinhaPlanilha[]; fornecedor: string; pedidoEm: string }): Promise<Buffer> {
+/** Nome de aba do Excel: até 31 caracteres, sem `[]:*?/\`, e único no arquivo. */
+function nomeDaAba(nome: string, usados: Set<string>): string {
+  const base = nome.replace(/[[\]:*?/\\]/g, " ").trim().slice(0, 31) || "Loja";
+  let aba = base;
+  for (let n = 2; usados.has(aba.toLowerCase()); n++) aba = `${base.slice(0, 31 - String(n).length - 1)} ${n}`;
+  usados.add(aba.toLowerCase());
+  return aba;
+}
+
+/** Quantidade por Loja de uma distribuidora: uma aba por Loja depois da cotação (a importação só lê a primeira aba). */
+export interface LojaDaPlanilha {
+  loja: string;
+  linhas: { codigoBarra: string | null; nome: string; quantidade: number }[];
+}
+
+export async function gerarPlanilha({ linhas, fornecedor, pedidoEm, porLoja, ...alvo }: AlvoPlanilha & { linhas: LinhaPlanilha[]; fornecedor: string; pedidoEm: string; porLoja?: LojaDaPlanilha[] }): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Cotação");
   ws.getCell("A1").value = "Cotação de preços";
@@ -75,6 +90,20 @@ export async function gerarPlanilha({ linhas, fornecedor, pedidoEm, ...alvo }: A
   ws.views = [{ state: "frozen", ySplit: LINHA_CABECALHO }];
   // Planilha travada, sem senha: só as células de preço mudam; o ID oculto e a quantidade ficam protegidos.
   await ws.protect("", { selectLockedCells: true, selectUnlockedCells: true, formatColumns: true, formatRows: true });
+  const usados = new Set(["cotação"]);
+  for (const l of porLoja ?? []) {
+    const aba = wb.addWorksheet(nomeDaAba(l.loja, usados));
+    aba.getCell("A1").value = `Loja: ${l.loja}`;
+    aba.getCell("A1").font = { bold: true, size: 14 };
+    aba.getCell("A2").value = `Distribuidora: ${fornecedor} · Pedido de ${diaBr(pedidoEm)}`;
+    aba.getRow(4).values = ["EAN", "Produto", "Qtde"];
+    aba.getRow(4).font = { bold: true };
+    for (const x of l.linhas) aba.addRow([x.codigoBarra ?? "", x.nome, x.quantidade]);
+    aba.getColumn(1).width = 16;
+    aba.getColumn(2).width = 44;
+    aba.getColumn(3).width = 10;
+    aba.views = [{ state: "frozen", ySplit: 4 }];
+  }
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 

@@ -8,7 +8,7 @@ import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-ta
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
-import { CotacaoDownloadsWindow } from "./cotacao-downloads-window";
+import { CotacaoDownloadsWindow, type ModoDownload } from "./cotacao-downloads-window";
 import { json } from "./inovafarma-api";
 import type { LojaOpcao } from "./loja-opcao";
 import { PEDIDOS_BASE } from "./pedido-rascunho-window";
@@ -179,9 +179,9 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
       .catch((err: unknown) => erro(err, "Erro ao carregar a cotação."));
   }, [base, erro]);
 
-  const baixarPlanilha = async (f: { codigo: number }) => {
+  const baixarPlanilha = async (f: { codigo: number }, modo: ModoDownload = "consolidado") => {
     try {
-      const { nome, conteudo } = await apiFetch<{ nome: string; conteudo: string }>(`${base}/${f.codigo}/planilha`);
+      const { nome, conteudo } = await apiFetch<{ nome: string; conteudo: string }>(`${base}/${f.codigo}/planilha${modo === "loja" ? "?modo=loja" : ""}`);
       baixar(nome, conteudo);
     } catch (err: unknown) {
       erro(err, "Erro ao gerar a planilha.");
@@ -224,7 +224,7 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
       size: "large",
       title: tipo === "PDF" ? "PDFs do Pedido por distribuidora" : "Planilhas por distribuidora",
       description: tipo === "PDF" ? "Pedido de compra de cada distribuidora, com os produtos e as quantidades confirmados." : "Uma planilha para cada distribuidora, só com os produtos pedidos a ela.",
-      content: () => <CotacaoDownloadsWindow distribuidoras={distribuidoras} tipo={tipo} baixar={(d) => (tipo === "PDF" ? baixarPdf(d) : baixarPlanilha(d))} />,
+      content: () => <CotacaoDownloadsWindow distribuidoras={distribuidoras} tipo={tipo} baixar={(d, modo) => (tipo === "PDF" ? baixarPdf(d, modo) : baixarPlanilha(d, modo))} />,
     });
   };
 
@@ -232,9 +232,9 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
     for (const arquivo of arquivos) await importar(arquivo);
   };
 
-  const baixarPdf = async (f: { codigo: number }) => {
+  const baixarPdf = async (f: { codigo: number }, modo: ModoDownload = "consolidado") => {
     try {
-      const { nome, conteudo } = await apiFetch<{ nome: string; conteudo: string }>(`${PEDIDOS_BASE}/${pedidoId}/pdf/${f.codigo}`);
+      const { nome, conteudo } = await apiFetch<{ nome: string; conteudo: string }>(`${PEDIDOS_BASE}/${pedidoId}/pdf/${f.codigo}${modo === "loja" ? "?modo=loja" : ""}`);
       baixar(nome, conteudo, "application/pdf");
     } catch (err: unknown) {
       erro(err, "Erro ao gerar o PDF.");

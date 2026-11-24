@@ -88,4 +88,18 @@ describe("planilha de cotação", () => {
     wb.addWorksheet("x").addRow(["a"]);
     expect(await lerPlanilha(Buffer.from(await wb.xlsx.writeBuffer()), alvo)).toMatchObject({ ok: false });
   });
+
+  it("separado por Loja, acrescenta uma aba por Loja depois da cotação, e a importação continua lendo a primeira", async () => {
+    const porLoja = [
+      { loja: "Centro", linhas: [{ codigoBarra: "789", nome: "DIPIRONA", quantidade: 10 }] },
+      { loja: "Centro/Norte: [A]", linhas: [{ codigoBarra: null, nome: "AAS", quantidade: 3 }] },
+    ];
+    const arquivo = await gerarPlanilha({ ...alvo, ...contexto, linhas, porLoja });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(arquivo as never);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(["Cotação", "Centro", "Centro Norte   A"]);
+    expect(defined(wb.worksheets[1], "a aba da Loja").getRow(5).values).toEqual([undefined, "789", "DIPIRONA", 10]);
+    const lida = await lerPlanilha(await preencher(arquivo, { 1: 9.5 }), alvo);
+    expect(lida).toMatchObject({ ok: true });
+  });
 });

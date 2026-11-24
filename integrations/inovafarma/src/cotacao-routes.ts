@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { COTACAO_ACTIONS } from "./cotacao-audit.js";
 import { nomeDoArquivo } from "./nome-arquivo.js";
+import { linhasPorLoja } from "./pedido-pdf.js";
+import { lojasDoErp } from "./pre-vencidos-comum.js";
 import { gerarPlanilha, identificarPlanilha, lerPlanilha, type PlanilhaLida } from "./cotacao-planilha.js";
 import type { Cotacao, CotacaoStore } from "./cotacao-store.js";
 import { ator, Codigo, CodigoEmTexto, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
@@ -195,14 +197,19 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     const detalhes = await detalhesDosProdutos(erpClient(), pedido);
     const anteriores = await ultimasCompras(erpClient(), pedido, [cotacao.codigoFornecedor]);
     const nomeFornecedor = (await nomes([cotacao.codigoFornecedor])).get(cotacao.codigoFornecedor) ?? fallback(cotacao.codigoFornecedor);
+    // `?modo=loja`: abas extras com a quantidade de cada Loja; a primeira aba (a que se importa) não muda.
+    const porLoja = c.req.query("modo") === "loja";
+    const nomesLojas = porLoja ? new Map((await lojasDoErp(erpClient())).map((l) => [l.codigo, l.nome])) : new Map<number, string>();
+    const lojasDaPlanilha = porLoja ? lojasDaDistribuidora(pedido, cotacao.codigoFornecedor, (codigo) => nomesLojas.get(codigo) ?? `Loja ${codigo}`) : undefined;
     const arquivo = await gerarPlanilha({
+      porLoja: lojasDaPlanilha,
       fornecedor: nomeFornecedor,
       pedidoEm: pedido.criadoEm.slice(0, 10),
       pedidoId: pedido.id,
       codigoFornecedor: cotacao.codigoFornecedor,
       linhas: itensDoFornecedor(pedido, cotacao.codigoFornecedor).map(({ item: i, quantidade }) => ({ produtoId: i.produtoId, codigoBarra: i.codigoBarra, nome: i.nome, fabricante: detalhes.get(i.produtoId)?.fabricante ?? null, quantidade, precoAnterior: anteriores.get(`${i.produtoId}|${cotacao.codigoFornecedor}`)?.preco ?? null, dataAnterior: anteriores.get(`${i.produtoId}|${cotacao.codigoFornecedor}`)?.dia ?? null })),
     });
-        return c.json({ nome: `${nomeDoArquivo(`Cotação ${nomeFornecedor} ${pedido.criadoEm.slice(0, 10)}`)}.xlsx`, conteudo: arquivo.toString("base64") });
+        return c.json({ nome: `${nomeDoArquivo(`Cotação ${nomeFornecedor} ${pedido.criadoEm.slice(0, 10)}${porLoja ? " por Loja" : ""}`)}.xlsx`, conteudo: arquivo.toString("base64") });
   });
 
   /** O arquivo enviado (multipart) já lido e conferido contra o Pedido; senão a recusa. */
@@ -252,7 +259,13 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
   });
 }
 
-/** Quantidade total do produto no Pedido, sem divisão por Loja. */
+/** As Lojas que o Pedido pede a esta distribuidora e, de cada uma, os produtos e quantidades (abas extras da planilha). */
+function lojasDaDistribuidora(pedido: Pedido, codigoFornecedor: number, nomeLoja: (codigo: number) => string) {
+  const porLoja = new Map<number, { codigoBarra: string | null; nome: string; quantidade: number }[]>();
+  for (const l of linhasPorLoja(pedido, codigoFornecedor)) porLoja.set(l.codigoLoja, [...(porLoja.get(l.codigoLoja) ?? []), { codigoBarra: l.codigoBarra, nome: l.nome, quantidade: l.quantidade }]);
+  return [...porLoja.entries()].sort(([a], [b]) => a - b).map(([codigo, linhas]) => ({ loja: nomeLoja(codigo), linhas }));
+}
+
 /**
  * A planilha de um fornecedor leva só o que o Pedido pede a ele: as linhas (produto, Loja) com esse fornecedor, somando as
  * quantidades. Pedido sem fornecedor nas linhas (anterior à escolha por linha) manda tudo a todos.

@@ -10,7 +10,8 @@ import { conferir, statusDoPedido, type LinhaConferida } from "./pedidos-confere
 import { CONFIRMACAO_ACTIONS } from "./pedidos-confirmacao-audit.js";
 import { entradasDoPedido, entradasDosPedidos } from "./pedidos-nf.js";
 import { nomeDoArquivo } from "./nome-arquivo.js";
-import { gerarPdf, itensDoFornecedor } from "./pedido-pdf.js";
+import { lojasDoErp } from "./pre-vencidos-comum.js";
+import { gerarPdf, itensDoFornecedor, itensDoFornecedorPorLoja } from "./pedido-pdf.js";
 import type { Pedido } from "./pedidos.js";
 import type { PedidoStore } from "./pedidos-store.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
@@ -149,8 +150,13 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     // O nome vem sempre do ERP: sem ele o PDF seria enviado ao fornecedor errado ou sem identificação.
     const nome = await nomeDoFornecedor(erpClient(), cotacao.codigoFornecedor);
     if (!nome) return c.json({ error: SEM_NOME }, 422);
-    const arquivo = await gerarPdf({ fornecedor: nome, data: new Date(pedido.confirmadoEm ?? pedido.criadoEm).toLocaleDateString("pt-BR"), itens });
-    return c.json({ nome: `${nomeDoArquivo(`Pedido ${nome} ${pedido.criadoEm.slice(0, 10)}`)}.pdf`, conteudo: arquivo.toString("base64") });
+    // `?modo=loja`: uma seção por Loja, com a quantidade que cada uma pediu (a quantidade confirmada pela distribuidora é um total, sem divisão por Loja).
+    const porLoja = c.req.query("modo") === "loja";
+    const nomesLojas = porLoja ? new Map((await lojasDoErp(erpClient())).map((l) => [l.codigo, l.nome])) : new Map<number, string>();
+    const lojas = porLoja && cotacao.precos ? itensDoFornecedorPorLoja(pedido, cotacao.codigoFornecedor, cotacao.precos, (codigo) => nomesLojas.get(codigo) ?? `Loja ${codigo}`) : undefined;
+    if (porLoja && !lojas?.length) return c.json({ error: "Nenhum produto do Pedido foi escolhido neste fornecedor." }, 404);
+    const arquivo = await gerarPdf({ fornecedor: nome, data: new Date(pedido.confirmadoEm ?? pedido.criadoEm).toLocaleDateString("pt-BR"), itens, lojas });
+    return c.json({ nome: `${nomeDoArquivo(`Pedido ${nome} ${pedido.criadoEm.slice(0, 10)}${porLoja ? " por Loja" : ""}`)}.pdf`, conteudo: arquivo.toString("base64") });
   });
 
   routes.post(`${BASE}/conferir`, auth, async (c: AuthContext) => {

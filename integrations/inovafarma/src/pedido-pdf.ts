@@ -25,18 +25,37 @@ export function itensDoFornecedor(pedido: Pick<Pedido, "itens" | "escolhas">, co
   });
 }
 
+/** As Lojas que o Pedido pede a este fornecedor, com os produtos e a quantidade de cada uma (só o que tem quantidade). */
+export function linhasPorLoja(pedido: Pick<Pedido, "itens">, codigoFornecedor: number): { codigoLoja: number; produtoId: string; nome: string; codigoBarra: string | null; quantidade: number }[] {
+  const porLinha = pedido.itens.some((i) => i.quantidades.some((q) => (q.codigosFornecedor ?? []).length > 0));
+  return pedido.itens.flatMap((i) =>
+    i.quantidades
+      .filter((q) => q.quantidade > 0 && (!porLinha || (q.codigosFornecedor ?? []).includes(codigoFornecedor)))
+      .map((q) => ({ codigoLoja: q.codigoLoja, produtoId: i.produtoId, nome: i.nome, codigoBarra: i.codigoBarra, quantidade: q.quantidade })),
+  );
+}
+
+/** O PDF por Loja: só os produtos escolhidos neste fornecedor e com preço dele, na quantidade que cada Loja pediu. */
+export function itensDoFornecedorPorLoja(pedido: Pick<Pedido, "itens" | "escolhas">, codigoFornecedor: number, precos: Record<string, number | null>, nomeLoja: (codigo: number) => string): { loja: string; itens: ItemDoPdf[] }[] {
+  const porLoja = new Map<number, ItemDoPdf[]>();
+  for (const l of linhasPorLoja(pedido, codigoFornecedor)) {
+    const preco = precos[l.produtoId];
+    if (pedido.escolhas[l.produtoId] !== codigoFornecedor || preco === null || preco === undefined) continue;
+    porLoja.set(l.codigoLoja, [...(porLoja.get(l.codigoLoja) ?? []), { nome: l.nome, quantidade: l.quantidade, preco }]);
+  }
+  return [...porLoja.entries()].sort(([a], [b]) => a - b).map(([codigo, itens]) => ({ loja: nomeLoja(codigo), itens }));
+}
+
 const moeda = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** PDF do Pedido para um fornecedor: produto, quantidade, preço e total. */
-export function gerarPdf({ fornecedor, data, itens }: { fornecedor: string; data: string; itens: ItemDoPdf[] }): Promise<Buffer> {
+/** PDF do Pedido para um fornecedor: produto, quantidade, preço e total; com `lojas`, uma seção (página) por Loja e o total geral no fim. */
+export function gerarPdf({ fornecedor, data, itens, lojas }: { fornecedor: string; data: string; itens: ItemDoPdf[]; lojas?: { loja: string; itens: ItemDoPdf[] }[] }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 40 });
     const partes: Buffer[] = [];
     doc.on("data", (p: Buffer) => partes.push(p));
     doc.on("end", () => resolve(Buffer.concat(partes)));
     doc.on("error", reject);
-    doc.fontSize(16).text(`Pedido de compra - ${fornecedor}`);
-    doc.fontSize(10).text(data).moveDown();
     const colunas = [40, 330, 400, 480] as const;
     const linha = (y: number, [nome, qtd, preco, total]: string[]) => {
       doc.text(nome ?? "", colunas[0], y, { width: 280, lineBreak: false });
@@ -44,18 +63,40 @@ export function gerarPdf({ fornecedor, data, itens }: { fornecedor: string; data
       doc.text(preco ?? "", colunas[2], y, { width: 70, align: "right" });
       doc.text(total ?? "", colunas[3], y, { width: 75, align: "right" });
     };
-    doc.font("Helvetica-Bold");
-    linha(doc.y, ["Produto", "Qtd.", "Preço", "Total"]);
-    doc.font("Helvetica").moveDown(0.5);
-    let soma = 0;
-    for (const i of itens) {
-      if (doc.y > 780) doc.addPage();
-      soma += i.quantidade * i.preco;
-      linha(doc.y, [i.nome, String(i.quantidade), moeda(i.preco), moeda(i.quantidade * i.preco)]);
-      doc.moveDown(0.3);
+    const tabela = (lista: ItemDoPdf[], rotuloTotal: string): number => {
+      doc.font("Helvetica-Bold");
+      linha(doc.y, ["Produto", "Qtd.", "Preço", "Total"]);
+      doc.font("Helvetica").moveDown(0.5);
+      let soma = 0;
+      for (const i of lista) {
+        if (doc.y > 780) doc.addPage();
+        soma += i.quantidade * i.preco;
+        linha(doc.y, [i.nome, String(i.quantidade), moeda(i.preco), moeda(i.quantidade * i.preco)]);
+        doc.moveDown(0.3);
+      }
+      doc.moveDown().font("Helvetica-Bold");
+      linha(doc.y, [rotuloTotal, "", "", moeda(soma)]);
+      doc.font("Helvetica");
+      return soma;
+    };
+    const cabecalho = (subtitulo?: string) => {
+      doc.fontSize(16).text(`Pedido de compra - ${fornecedor}`);
+      if (subtitulo) doc.fontSize(12).text(subtitulo);
+      doc.fontSize(10).text(data).moveDown();
+    };
+    if (!lojas) {
+      cabecalho();
+      tabela(itens, "Total");
+    } else {
+      let geral = 0;
+      lojas.forEach((l, n) => {
+        if (n > 0) doc.addPage();
+        cabecalho(`Loja: ${l.loja}`);
+        geral += tabela(l.itens, `Total da Loja`);
+      });
+      doc.moveDown(2).font("Helvetica-Bold");
+      linha(doc.y, ["Total geral", "", "", moeda(geral)]);
     }
-    doc.moveDown().font("Helvetica-Bold");
-    linha(doc.y, ["Total", "", "", moeda(soma)]);
     doc.end();
   });
 }
