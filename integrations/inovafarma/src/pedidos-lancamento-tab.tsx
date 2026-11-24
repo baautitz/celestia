@@ -772,7 +772,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
             <Checkbox aria-label={`Selecionar ${p.nome}`} checked={selecionados.has(p.produtoId)} onCheckedChange={(v: boolean) => alternar(p, v)} />
           </Stack>
         ),
-        width: 28,
+        width: 44,
         centered: true,
         value: (p) => (ordemSelecao.has(p.produtoId) ? 1 : 0),
         sortable: true,
