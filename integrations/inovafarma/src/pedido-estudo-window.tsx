@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@platform/ui/components/button";
 import { Checkbox } from "@platform/ui/components/checkbox";
 import { Grid, Stack, Text } from "@platform/ui/components/layout";
 import { SeriesChart } from "@platform/ui/components/series-chart";
@@ -64,6 +63,11 @@ interface LinhaLoja { codigoLoja: number; estoque: number; vendida: number; mini
 const serieDe = (i: number) => `s${i}`;
 const idLoja = (l: { codigoLoja: number }) => String(l.codigoLoja);
 const idDistribuidora = (l: { codigo: number }) => String(l.codigo);
+
+/** Marca ou desmarca todas as linhas de uma tabela; "–" quando só parte está marcada. */
+function MarcarTodos({ rotulo, marcados, total, onChange }: { rotulo: string; marcados: number; total: number; onChange: (todos: boolean) => void }) {
+  return <Checkbox aria-label={rotulo} checked={total > 0 && marcados === total} indeterminate={marcados > 0 && marcados < total} disabled={total === 0} onCheckedChange={(v: boolean) => onChange(v)} />;
+}
 
 function Indicador({ rotulo, valor, detalhe }: { rotulo: string; valor: string; detalhe: string }) {
   return (
@@ -187,7 +191,6 @@ export function EstudoProdutoWindow({ produto, lojas }: { produto: ProdutoDoEstu
   const traco = "—";
   const nLojas = lojasSel.size || lojas.length;
   const recorte = [lojasSel.size ? plural(lojasSel.size, "Loja", "Lojas") : null, distsSel.size ? plural(distsSel.size, "distribuidora", "distribuidoras") : null].filter(Boolean).join(" · ");
-  const limpar = lojasSel.size > 0 || distsSel.size > 0 ? <Button type="button" variant="outline" onClick={() => { setLojasSel(new Set()); setDistsSel(new Set()); }}>Limpar seleção</Button> : null;
   const semBloco = (titulo: string) => <Text tone="muted">{`Não foi possível carregar ${titulo} do ERP.`}</Text>;
   const carregando = !estudo && !falha;
 
@@ -214,13 +217,18 @@ export function EstudoProdutoWindow({ produto, lojas }: { produto: ProdutoDoEstu
             </Grid>
             <Stack gap="field">
               <Stack direction="row" align="center" justify="between" gap="group">
-                <Text weight="semibold">Lojas</Text>
-                {limpar}
+                <Stack direction="row" gap="field" align="center">
+                  <MarcarTodos rotulo="Selecionar todas as Lojas" marcados={lojasSel.size} total={lojas.length} onChange={(todos) => setLojasSel(new Set(todos ? lojas.map((l) => l.codigo) : []))} />
+                  <Text weight="semibold">Lojas</Text>
+                </Stack>
               </Stack>
               <DataTable embedded compact rowCursor={false} columns={colunasLoja} rows={linhasLoja} getRowId={idLoja} emptyMessage="Nenhuma Loja." />
             </Stack>
             <Stack gap="field">
-              <Text weight="semibold">{lojasSel.size ? `Distribuidoras: ${plural(lojasSel.size, "Loja", "Lojas")}` : "Distribuidoras"}</Text>
+              <Stack direction="row" gap="field" align="center">
+                <MarcarTodos rotulo="Selecionar todas as distribuidoras" marcados={distsSel.size} total={linhasDist.length} onChange={(todos) => setDistsSel(new Set(todos ? linhasDist.map((d) => d.codigo) : []))} />
+                <Text weight="semibold">{lojasSel.size ? `Distribuidoras: ${plural(lojasSel.size, "Loja", "Lojas")}` : "Distribuidoras"}</Text>
+              </Stack>
               {compras ? <DataTable embedded compact rowCursor={false} columns={colunasDist} rows={linhasDist} getRowId={idDistribuidora} emptyMessage="Sem entradas de NF neste recorte nos últimos 24 meses." /> : semBloco("as compras")}
             </Stack>
           </>
