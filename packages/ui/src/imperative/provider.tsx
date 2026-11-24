@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import type { ReactNode } from "react"
 import { AlertDialogAction, AlertDialogCancel } from "../components/alert-dialog.tsx"
+import { TooltipProvider } from "../components/tooltip.tsx"
 import { feedbackService } from "../adapters/feedback-toast.ts"
 import type { FeedbackService, NavigationService, Ui } from "../contracts/services.ts"
 import type { ConfirmOptions, FocusTarget, OpenWindowOptions } from "../contracts/windows.ts"
@@ -108,7 +109,10 @@ export function UiProvider({
   return (
     <UiContext.Provider value={ui}>
       {children}
-      <WindowHost controller={controller} windows={snapshot.windows} />
+      {/* As janelas ficam fora do TooltipProvider do app: sem este, o tooltip dentro delas espera o atraso padrão. */}
+      <TooltipProvider>
+        <WindowHost controller={controller} windows={snapshot.windows} />
+      </TooltipProvider>
     </UiContext.Provider>
   )
 }

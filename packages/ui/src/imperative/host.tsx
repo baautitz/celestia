@@ -57,6 +57,21 @@ function restaurarFoco(anterior: FocoAnterior | null) {
   setTimeout(tentar, 0)
 }
 
+const FOCAVEIS = "input:not([disabled]):not([type='hidden']), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])"
+
+/**
+ * Leva o foco para dentro da janela que acabou de abrir. Com uma janela já aberta atrás (as duas são irmãs no DOM), o foco
+ * ficaria no elemento da de trás; aqui vai para o primeiro campo ou botão da nova, ou para ela mesma se não houver.
+ */
+function focarJanela(id: string) {
+  setTimeout(() => {
+    const janela = document.querySelector<HTMLElement>(`[data-window="${CSS.escape(id)}"]`)
+    if (!janela || janela.contains(document.activeElement)) return
+    const primeiro = [...janela.querySelectorAll<HTMLElement>(FOCAVEIS)].find((el) => el.getAttribute("aria-hidden") !== "true" && el.closest("[hidden]") === null)
+    ;(primeiro ?? janela).focus()
+  }, 50)
+}
+
 /** Conteúdo de uma janela: componente sem props (quem abre fecha sobre os dados). */
 export type WindowContent = ComponentType
 
@@ -76,6 +91,7 @@ function ManagedWindow({ entry, controller }: {
   const [titleOverride, setTitle] = useState<ReactNode>(null)
   const [focoAnterior] = useState(capturarFoco)
   useEffect(() => () => restaurarFoco(focoAnterior), [focoAnterior])
+  useEffect(() => focarJanela(id), [id])
   const title = titleOverride ?? options.title
   const handle = useMemo<WindowHandle>(() => ({
     setTitle,
@@ -100,7 +116,7 @@ function ManagedWindow({ entry, controller }: {
       <WindowFooterContext.Provider value={footer}>
         {surface === "confirmation" ? (
           <AlertDialog open onOpenChange={onOpenChange}>
-            <AlertDialogContent>
+            <AlertDialogContent data-window={id}>
               <AlertDialogHeader>
                 <AlertDialogTitle>{title}</AlertDialogTitle>
                 {options.description && <AlertDialogDescription className="break-words">{options.description}</AlertDialogDescription>}
@@ -112,6 +128,7 @@ function ManagedWindow({ entry, controller }: {
         ) : surface === "sheet" || surface === "drawer" ? (
           <Sheet open onOpenChange={onOpenChange}>
             <SheetContent
+              data-window={id}
               side={surface === "drawer" ? "bottom" : "right"}
               className={surface === "drawer" ? "flex max-h-[85svh] flex-col p-0" : "flex flex-col p-0 sm:max-w-xl"}
             >
@@ -128,7 +145,7 @@ function ManagedWindow({ entry, controller }: {
         ) : (
           <Dialog open onOpenChange={onOpenChange}>
             {options.size === "full" || options.size === "screen" ? (
-              <DialogContent className={DIALOG_WIDTH[options.size]}>
+              <DialogContent data-window={id} className={DIALOG_WIDTH[options.size]}>
                 <DialogHeader className="p-4 border-b shrink-0">
                   <DialogTitle>{title}</DialogTitle>
                   {options.description && <DialogDescription>{options.description}</DialogDescription>}
@@ -137,7 +154,7 @@ function ManagedWindow({ entry, controller }: {
                 <DialogFooter ref={setFooter} className="p-4 border-t shrink-0 gap-2 empty:hidden" />
               </DialogContent>
             ) : (
-              <DialogContent className={`${DIALOG_WIDTH[options.size ?? "medium"]} max-h-[90svh] grid-rows-[auto_minmax(0,1fr)_auto]`} showCloseButton={options.dismissible !== false}>
+              <DialogContent data-window={id} className={`${DIALOG_WIDTH[options.size ?? "medium"]} max-h-[90svh] grid-rows-[auto_minmax(0,1fr)_auto]`} showCloseButton={options.dismissible !== false}>
                 <DialogHeader>
                   <DialogTitle>{title}</DialogTitle>
                   {options.description && <DialogDescription>{options.description}</DialogDescription>}

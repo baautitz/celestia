@@ -56,6 +56,45 @@ describe("host de janelas (UiProvider)", () => {
     await waitFor(() => expect(document.activeElement).toBe(abrir));
   });
 
+  it("leva o foco para a janela aberta por cima de outra, e o devolve à de trás ao fechar", async () => {
+    function Segunda() {
+      return <input aria-label="Campo da segunda" />;
+    }
+    function Primeira() {
+      const ui = useUi();
+      return (
+        <>
+          <input aria-label="Campo da primeira" />
+          <button type="button" onClick={() => void ui.windows.open({ surface: "dialog", title: "Segunda janela", content: Segunda })}>
+            Abrir a segunda
+          </button>
+        </>
+      );
+    }
+    function Abridor() {
+      const ui = useUi();
+      return (
+        <button type="button" onClick={() => void ui.windows.open({ surface: "dialog", title: "Primeira janela", content: Primeira })}>
+          Abrir a primeira
+        </button>
+      );
+    }
+    render(
+      <UiProvider>
+        <Abridor />
+      </UiProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Abrir a primeira" }));
+    await screen.findByRole("dialog", { name: "Primeira janela" });
+    const naPrimeira = await screen.findByLabelText("Campo da primeira");
+    naPrimeira.focus();
+    fireEvent.click(screen.getByRole("button", { name: "Abrir a segunda" }));
+    const campo = await screen.findByLabelText("Campo da segunda");
+    await waitFor(() => expect(document.activeElement).toBe(campo));
+    fireEvent.keyDown(campo, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByLabelText("Campo da segunda")).toBeNull());
+  });
+
   it("abre uma janela, publica as acoes no rodape e resolve com o valor", async () => {
     const results = setup();
     fireEvent.click(screen.getByRole("button", { name: "Abrir janela" }));
