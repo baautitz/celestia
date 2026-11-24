@@ -1,14 +1,14 @@
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
-import { nomesSql } from "./cotacao-routes.js";
+import { detalhesDosProdutos, nomesSql } from "./cotacao-routes.js";
 import type { CotacaoStore } from "./cotacao-store.js";
 import { ator, Codigo, CodigoEmTexto, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext } from "./metas-comum.js";
 import type { ErpQuery } from "./metas-comum.js";
 import { PEDIDO_TARGET, PEDIDOS_PLUGIN } from "./pedidos-audit.js";
-import { conferir, statusDoPedido } from "./pedidos-conferencia.js";
+import { conferir, statusDoPedido, type LinhaConferida } from "./pedidos-conferencia.js";
 import { CONFIRMACAO_ACTIONS } from "./pedidos-confirmacao-audit.js";
-import { entradasDoPedido } from "./pedidos-nf.js";
+import { entradasDoPedido, entradasDosPedidos } from "./pedidos-nf.js";
 import { nomeDoArquivo } from "./nome-arquivo.js";
 import { gerarPdf, itensDoFornecedor } from "./pedido-pdf.js";
 import type { Pedido } from "./pedidos.js";
@@ -49,6 +49,59 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     const pedido = await pedidos.pedido(c.req.param("id") ?? "");
     return pedido ? ({ pedido } as const) : ({ recusa: c.json({ error: NAO_ENCONTRADO }, 404) } as const);
   };
+
+  /** Andamento da entrada de cada Pedido confirmado, calculado ao vivo com as NFs do ERP (a lista não precisa abrir o Pedido). */
+  routes.get("/pedidos/pedidos/recebimentos", auth, async (c: AuthContext) => {
+    if (!permissions.has(c.get("user")?.permissions, gerir.key)) return c.json({ error: gerir.deniedMessage }, 403);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    try {
+      const abertos = (await pedidos.listar()).filter((p) => EM_RECEBIMENTO.includes(p.status));
+      const entradas = await entradasDosPedidos(client, abertos);
+      return c.json(
+        abertos.map((p) => {
+          const linhas = conferir(p, entradas.get(p) ?? new Map());
+          return {
+            pedidoId: p.id,
+            pedida: linhas.reduce((t, l) => t + l.pedida, 0),
+            recebida: linhas.reduce((t, l) => t + Math.min(l.recebida, l.pedida), 0),
+            produtos: produtosDe(linhas).length,
+            produtosOk: produtosDe(linhas).filter((l) => l.every(completa)).length,
+          };
+        }),
+      );
+    } catch (err: unknown) {
+      return c.json(erroDoErp(err), 503);
+    }
+  });
+
+  /** Linhas do Pedido com o recebido de cada Loja e a distribuidora escolhida do produto, para a janela de entrada. */
+  routes.get(`${BASE}/recebimento`, auth, async (c: AuthContext) => {
+    const achado = await doPedido(c, gerir);
+    if ("recusa" in achado) return achado.recusa;
+    const { pedido } = achado;
+    if (!EM_RECEBIMENTO.includes(pedido.status)) return c.json({ error: "Confirme o Pedido antes de acompanhar a entrada." }, 409);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    try {
+      const linhas = conferir(pedido, await entradasDoPedido(client, pedido));
+      const codigos = [...new Set(Object.values(pedido.escolhas))];
+      const nomes = new Map<number, string>();
+      if (codigos.length > 0) {
+        const params = Object.fromEntries(codigos.map((cod, i) => [`c${i}`, cod]));
+        for (const r of await client.query<{ codigo: number; nome: string | null }>(nomesSql(codigos.length), params)) nomes.set(Number(r.codigo), r.nome?.trim() || `Fornecedor ${r.codigo}`);
+      }
+      const detalhes = await detalhesDosProdutos(client, pedido);
+      return c.json({
+        linhas: linhas.map((l) => {
+          const codigoFornecedor = pedido.escolhas[l.produtoId] ?? 0;
+          return { ...l, codigoProduto: detalhes.get(l.produtoId)?.codigoProduto ?? null, codigoFornecedor, fornecedor: nomes.get(codigoFornecedor) ?? `Fornecedor ${codigoFornecedor}` };
+        }),
+      });
+    } catch (err: unknown) {
+      return c.json(erroDoErp(err), 503);
+    }
+  });
 
   routes.post(`${BASE}/confirmar`, auth, async (c: AuthContext) => {
     const achado = await doPedido(c, confirmar);
@@ -118,6 +171,13 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     }
   });
 }
+
+const completa = (l: LinhaConferida) => l.estado === "recebido" || l.estado === "excedente";
+const produtosDe = (linhas: LinhaConferida[]) => {
+  const porProduto = new Map<string, LinhaConferida[]>();
+  for (const l of linhas) porProduto.set(l.produtoId, [...(porProduto.get(l.produtoId) ?? []), l]);
+  return [...porProduto.values()];
+};
 
 /** O nome do fornecedor no ERP; null quando o ERP falha ou não o devolve. */
 async function nomeDoFornecedor(client: ErpQuery | undefined, codigo: number): Promise<string | null> {

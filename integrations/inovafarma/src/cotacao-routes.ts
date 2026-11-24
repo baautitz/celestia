@@ -282,7 +282,7 @@ async function ultimasCompras(client: ErpQuery | undefined, pedido: Pedido, forn
   return mapa;
 }
 
-async function detalhesDosProdutos(client: ErpQuery | undefined, pedido: Pedido): Promise<Map<string, { fabricante: string | null; codigoProduto: number | null }>> {
+export async function detalhesDosProdutos(client: ErpQuery | undefined, pedido: Pedido): Promise<Map<string, { fabricante: string | null; codigoProduto: number | null }>> {
   const mapa = new Map<string, { fabricante: string | null; codigoProduto: number | null }>();
   if (!client) return mapa;
   try {
