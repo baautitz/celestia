@@ -20,6 +20,7 @@
     "dev:server": "pnpm --filter @platform/server dev",
     "dev:ca": "pnpm --filter @platform/ca dev",
     "dev:web": "pnpm --filter @platform/web dev",
+    "kill": "node scripts/kill-dev.mjs",
     "dev:cert": "docker compose -f docker-compose.cert.yaml up",
     "lint": "pnpm -r run lint",
     "check": "pnpm check:ui && pnpm check:ui:test && pnpm check:plugins && pnpm lint && pnpm build && pnpm test",
