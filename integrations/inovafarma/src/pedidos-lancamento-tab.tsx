@@ -1,5 +1,5 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SlidersHorizontal, X } from "lucide-react";
+import { ChartColumn, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
 import { Checkbox } from "@platform/ui/components/checkbox";
 import { Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
@@ -19,6 +19,7 @@ import { API, json } from "./inovafarma-api";
 import { ListaProdutosCampo } from "./lista-produtos-campo";
 import type { EntradaLista } from "./tipos-meta";
 import { LojasAdicionarWindow } from "./lojas-adicionar-window";
+import { EstudoProdutoWindow } from "./pedido-estudo-window";
 import { DistribuidorasLinhaWindow, type Distribuidora } from "./distribuidoras-linha-window";
 import { PEDIDOS_BASE, type ItemPedido, type Pedido } from "./pedido-rascunho-window";
 import type { LojaOpcao } from "./loja-opcao";
@@ -367,6 +368,10 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo,
     const resultado = await windows.open<number[]>({ surface: "dialog", size: "medium", title: "Adicionar Lojas", description: "Escolha as Lojas que voltam para o Pedido.", content: () => <LojasAdicionarWindow removidas={removidasOpcoes} /> });
     if (resultado.status === "confirmed") onRemovidas(removidas.filter((c) => !resultado.value.includes(c)));
   };
+  const abrirEstudo = () => {
+    if (!produto) return;
+    void windows.open<void>({ surface: "dialog", size: "screen", title: `Estudo do produto: ${produto.nome}`, content: () => <EstudoProdutoWindow produto={produto} lojas={contexto.lojas} /> });
+  };
   const colunasMes = useMemo(() => colunasMovimento(ultimosMeses(contexto.hoje, meses)), [contexto.hoje, meses]);
   const vazio = "Selecione um produto para ver o estoque e as vendas por Loja e a movimentação mensal.";
   return (
@@ -378,6 +383,7 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo,
         <Stack direction="row" gap="group" align="center" justify="between" shrink={false}>
           <Text weight="semibold">{produto ? `Movimentação mensal: ${produto.nome}` : "Movimentação mensal"}</Text>
           <Stack direction="row" gap="field" align="center" shrink={false}>
+            <Button type="button" variant="outline" disabled={!produto} onClick={abrirEstudo}><ChartColumn />Estudo do produto</Button>
             <Checkbox id="pedidos-apenas-loja" checked={apenasLoja} onCheckedChange={(v: boolean) => setApenasLoja(v)} />
             <Label htmlFor="pedidos-apenas-loja">Apenas a Loja selecionada</Label>
           </Stack>
