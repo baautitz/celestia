@@ -349,7 +349,7 @@ export const ClosingPeriodsPage: React.FC = () => {
     if (!canEdit && !canClose && !canReopen && !canCancel) return null;
     return (
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
+        <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
           <MoreHorizontal />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

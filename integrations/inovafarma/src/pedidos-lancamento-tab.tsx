@@ -352,7 +352,7 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo,
     loja,
     { key: "pedir", label: "Pedir", tooltip: "Quantidade a pedir", format: "decimal", render: (l) => <CampoPedir valor={quantidades.get(chaveQtd(produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)} rotulo={`Quantidade a pedir da Loja ${nomeLoja(l.codigoLoja)}`} onChange={(q) => produto && onQuantidade(produto, l.codigoLoja, q)} />, cellClassName: CAMPO_LOJA, mobileWide: true },
     { key: "distribuidora", label: "Distribuidora", render: (l) => <CampoDistribuidoras produtoId={produtoId} codigoLoja={l.codigoLoja} nomeLoja={nomeLoja(l.codigoLoja)} valor={distribuidoras.get(chaveQtd(produtoId, l.codigoLoja))} lista={listaDistribuidoras} onChange={(c) => produto && onDistribuidora(produto, l.codigoLoja, c)} />, mobileWide: true },
-    { key: "remover", label: "", width: 40, centered: true, render: (l) => <Button type="button" variant="ghost" size="icon" aria-label={`Remover a Loja ${nomeLoja(l.codigoLoja)}`} onClick={() => onRemovidas([...removidas, l.codigoLoja])}><X /></Button>, mobileRole: "hidden" },
+    { key: "remover", label: "", width: 40, centered: true, render: (l) => <Button type="button" variant="outline" size="icon" aria-label={`Remover a Loja ${nomeLoja(l.codigoLoja)}`} onClick={() => onRemovidas([...removidas, l.codigoLoja])}><X /></Button>, mobileRole: "hidden" },
     ];
     return { estatisticas, pedido };
   }, [removidas, onRemovidas, contexto.lojas, contexto.podeEditarMinimos, ultimasCompras, produtoId, produto, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora]);

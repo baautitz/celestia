@@ -131,7 +131,7 @@ export function PedidosVisoesBarra({ visoes, selecionada, filtros, onAplicar, on
         Salvar visão
       </Button>
       {atual && (
-        <Button size="icon" variant="ghost" tone="destructive" aria-label={`Excluir a visão ${atual.nome}`} onClick={() => void excluir()}>
+        <Button size="icon" variant="outline" tone="destructive" aria-label={`Excluir a visão ${atual.nome}`} onClick={() => void excluir()}>
           <Trash2 />
         </Button>
       )}

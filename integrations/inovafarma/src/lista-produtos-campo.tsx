@@ -265,7 +265,7 @@ function ListaProdutosWindow({ inicial, ausentes }: { inicial: EntradaLista[]; a
             <Button
               type="button"
               size="icon"
-              variant="ghost"
+              variant="outline"
               tone="destructive"
               aria-label={`Remover ${TIPO_ENTRADA_LABEL[e.tipo]} ${e.nome}`}
               onClick={() => setEntradas((atuais) => atuais.filter((x) => chave(x) !== chave(e)))}

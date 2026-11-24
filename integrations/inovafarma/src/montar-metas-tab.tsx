@@ -369,7 +369,7 @@ function AcoesDaMeta({
       {!somenteLeitura && (
         <Button
           size="icon"
-          variant="ghost"
+          variant="outline"
           tone="destructive"
           aria-label={`Remover a Meta ${meta.tipo.nome}`}
           onClick={() => void remover()}
@@ -537,7 +537,7 @@ function MetaDoPeriodo({
         !somenteLeitura && temPremio && salvo(c.codigoColaborador) ? (
           <Button
             size="icon"
-            variant="ghost"
+            variant="outline"
             aria-label={`Alterar o Prêmio de ${c.nome}`}
             onClick={() => void alterarPremio(c)}
           >
@@ -754,7 +754,7 @@ function CelulaPremio({
         <Text variant="small">{resumoPremio(regra)}</Text>
         {proprio && <Badge variant="secondary">Próprio</Badge>}
         {!somenteLeitura && p && (
-          <Button size="icon" variant="ghost" aria-label={`Alterar o Prêmio de ${colaborador.nome} na Meta ${meta.tipo.nome}`} onClick={() => alterar(meta, colaborador)}>
+          <Button size="icon" variant="outline" aria-label={`Alterar o Prêmio de ${colaborador.nome} na Meta ${meta.tipo.nome}`} onClick={() => alterar(meta, colaborador)}>
             <Pencil />
           </Button>
         )}

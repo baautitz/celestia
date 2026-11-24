@@ -293,7 +293,7 @@ export const IAMDevicesPage: React.FC = () => {
           <Stack direction="row" justify="end" gap="tight">
             {hasPermission("system:devices:revoke") && d.status === "active" && (
               <Button
-                variant="ghost"
+                variant="outline"
                 tone="destructive"
                 size="icon"
                 aria-label="Revogar Dispositivo"
@@ -304,7 +304,7 @@ export const IAMDevicesPage: React.FC = () => {
               </Button>
             )}
             {currentUser?.isAdmin && d.status === "revoked" && (
-              <Button variant="ghost" tone="destructive" size="icon" aria-label="Excluir Dispositivo" title="Excluir Dispositivo" onClick={() => void handleDelete(d)}>
+              <Button variant="outline" tone="destructive" size="icon" aria-label="Excluir Dispositivo" title="Excluir Dispositivo" onClick={() => void handleDelete(d)}>
                 <Trash2 />
               </Button>
             )}

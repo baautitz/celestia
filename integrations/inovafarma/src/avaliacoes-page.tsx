@@ -265,10 +265,10 @@ function AvaliacoesDaLoja({ contexto }: { contexto: Contexto }) {
               aberto
                 ? (a) => (
                     <Stack direction="row" gap="tight">
-                      <Button size="icon" variant="ghost" aria-label={`Editar Avaliação de ${a.nomeColaborador}`} onClick={() => void abrir(a)}>
+                      <Button size="icon" variant="outline" aria-label={`Editar Avaliação de ${a.nomeColaborador}`} onClick={() => void abrir(a)}>
                         <Pencil />
                       </Button>
-                      <Button size="icon" variant="ghost" tone="destructive" aria-label={`Excluir Avaliação de ${a.nomeColaborador}`} onClick={() => void excluir(a)}>
+                      <Button size="icon" variant="outline" tone="destructive" aria-label={`Excluir Avaliação de ${a.nomeColaborador}`} onClick={() => void excluir(a)}>
                         <Trash2 />
                       </Button>
                     </Stack>

@@ -157,11 +157,11 @@ export function BaixasPreVencidosTab({ visualizacoes, periodos, lojasDaCorrecao 
   const acoesDaVenda = (b: Baixa) =>
     podeCorrigir(b) ? (
       <Stack direction="row" gap="tight">
-        <Button size="icon" variant="ghost" aria-label={`Corrigir a Baixa da venda ${b.vendaId}`} onClick={() => void corrigir(b)}>
+        <Button size="icon" variant="outline" aria-label={`Corrigir a Baixa da venda ${b.vendaId}`} onClick={() => void corrigir(b)}>
           <Pencil />
         </Button>
         {b.correcao && (
-          <Button size="icon" variant="ghost" tone="destructive" aria-label={`Desfazer a Correção da venda ${b.vendaId}`} onClick={() => void desfazer(b)}>
+          <Button size="icon" variant="outline" tone="destructive" aria-label={`Desfazer a Correção da venda ${b.vendaId}`} onClick={() => void desfazer(b)}>
             <Undo2 />
           </Button>
         )}

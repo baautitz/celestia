@@ -619,7 +619,7 @@ export function TipoMetaWindow({ tipo }: { tipo?: TipoMeta & { temMetas?: boolea
             <Button
               type="button"
               size="icon"
-              variant="ghost"
+              variant="outline"
               tone="destructive"
               aria-label={`Remover Faixa ${i + 1}`}
               disabled={faixas.fields.length === 1}

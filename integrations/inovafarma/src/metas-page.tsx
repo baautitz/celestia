@@ -117,7 +117,7 @@ function TiposDeMeta() {
         emptyMessage="Nenhum Tipo de Meta cadastrado."
         search={{ placeholder: "Buscar Tipo de Meta ou Indicador" }}
         rowActions={(t) => (
-          <Button size="icon" variant="ghost" aria-label={`Alterar Tipo de Meta ${t.nome}`} onClick={() => void abrir(t)}>
+          <Button size="icon" variant="outline" aria-label={`Alterar Tipo de Meta ${t.nome}`} onClick={() => void abrir(t)}>
             <Pencil />
           </Button>
         )}

@@ -311,7 +311,7 @@ export const ERPsPage: React.FC = () => {
 
   const rowMenu = (erp: Erp) => (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
+      <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
         <MoreHorizontal />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

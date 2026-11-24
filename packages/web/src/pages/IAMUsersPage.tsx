@@ -288,13 +288,13 @@ export const IAMUsersPage: React.FC = () => {
         rowActions={(u) => (
           <Stack direction="row" justify="end" gap="tight">
             {hasPermission("system:users:update") && (
-              <Button variant="ghost" size="icon" aria-label="Editar Usuário" title="Editar Usuário" onClick={() => openUserWindow(u)}>
+              <Button variant="outline" size="icon" aria-label="Editar Usuário" title="Editar Usuário" onClick={() => openUserWindow(u)}>
                 <Edit2 />
               </Button>
             )}
             {hasPermission("system:users:reset_password") && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 aria-label="Redefinir Senha"
                 title="Redefinir Senha"
@@ -305,7 +305,7 @@ export const IAMUsersPage: React.FC = () => {
             )}
             {hasPermission("system:users:deactivate") && (
               <Button
-                variant="ghost"
+                variant="outline"
                 tone={u.status === "active" ? "destructive" : "success"}
                 size="icon"
                 aria-label={u.status === "active" ? "Desativar Usuário" : "Ativar Usuário"}
@@ -316,7 +316,7 @@ export const IAMUsersPage: React.FC = () => {
               </Button>
             )}
             {currentUser?.isAdmin && currentUser.sub !== u.id && (
-              <Button variant="ghost" tone="destructive" size="icon" aria-label="Excluir Usuário" title="Excluir Usuário" onClick={() => void handleDelete(u)}>
+              <Button variant="outline" tone="destructive" size="icon" aria-label="Excluir Usuário" title="Excluir Usuário" onClick={() => void handleDelete(u)}>
                 <Trash2 />
               </Button>
             )}

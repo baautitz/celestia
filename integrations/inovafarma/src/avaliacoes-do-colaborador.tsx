@@ -82,7 +82,7 @@ export function OlhoAvaliacoes({ periodoId, codigoColaborador, nome, acesso, rot
       {rotulo}
     </Button>
   ) : (
-    <Button size="icon" variant="ghost" aria-label={aria} onClick={abrir}>
+    <Button size="icon" variant="outline" aria-label={aria} onClick={abrir}>
       <Eye />
     </Button>
   );

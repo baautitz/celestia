@@ -130,10 +130,10 @@ export function EstoquePreVencidosTab({ lojas, retroativa }: { lojas: LojaOpcao[
         search={{ placeholder: "Buscar produto" }}
         rowActions={(i) => (
           <Stack direction="row" gap="tight">
-            <Button size="icon" variant="ghost" aria-label={`Editar ${i.nomeProduto}`} onClick={() => void abrir(i)}>
+            <Button size="icon" variant="outline" aria-label={`Editar ${i.nomeProduto}`} onClick={() => void abrir(i)}>
               <Pencil />
             </Button>
-            <Button size="icon" variant="ghost" tone="destructive" aria-label={`Excluir ${i.nomeProduto}`} onClick={() => void excluir(i)}>
+            <Button size="icon" variant="outline" tone="destructive" aria-label={`Excluir ${i.nomeProduto}`} onClick={() => void excluir(i)}>
               <Trash2 />
             </Button>
           </Stack>

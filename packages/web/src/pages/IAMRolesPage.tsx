@@ -347,7 +347,7 @@ export const IAMRolesPage: React.FC = () => {
         emptyMessage="Nenhum grupo de acesso cadastrado."
         rowActions={(r) =>
           hasPermission("system:roles:update") ? (
-            <Button variant="ghost" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditWindow(r)}>
+            <Button variant="outline" size="icon" aria-label="Editar" title="Editar" onClick={() => openEditWindow(r)}>
               <Edit2 />
             </Button>
           ) : null

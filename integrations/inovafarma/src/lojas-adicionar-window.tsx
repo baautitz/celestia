@@ -25,7 +25,7 @@ export function LojasAdicionarWindow({ removidas }: { removidas: LojaOpcao[] }) 
       width: 40,
       centered: true,
       render: (l) => (
-        <Button type="button" variant="ghost" size="icon" aria-label={`Tirar ${nomeDe(l)} da lista`} onClick={() => setCodigos((atual) => atual.filter((c) => c !== l.codigo))}>
+        <Button type="button" variant="outline" size="icon" aria-label={`Tirar ${nomeDe(l)} da lista`} onClick={() => setCodigos((atual) => atual.filter((c) => c !== l.codigo))}>
           <Trash2 />
         </Button>
       ),

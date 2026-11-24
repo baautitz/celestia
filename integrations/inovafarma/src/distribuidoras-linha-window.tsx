@@ -62,7 +62,7 @@ export function DistribuidorasLinhaWindow({ produtoId, codigoLoja, inicial, list
       key: "remover",
       label: "",
       render: (d) => (
-        <Button type="button" variant="ghost" size="icon" aria-label={`Remover ${d.nome}`} onClick={() => setCodigos((atual) => atual.filter((c) => c !== d.codigo))}>
+        <Button type="button" variant="outline" size="icon" aria-label={`Remover ${d.nome}`} onClick={() => setCodigos((atual) => atual.filter((c) => c !== d.codigo))}>
           <Trash2 />
         </Button>
       ),

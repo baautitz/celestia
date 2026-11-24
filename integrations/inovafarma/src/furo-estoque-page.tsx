@@ -200,7 +200,7 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
         a.justificativa ? (
           <Stack direction="row" gap="tight" align="center" justify="center">
             <Badge variant="success">{a.justificativa.motivo}</Badge>
-            <Button size="icon" variant="ghost" aria-label={`Ver Justificativa do Ajuste ${a.codigoMovimento}`} onClick={() => void verJustificativa(a)}>
+            <Button size="icon" variant="outline" aria-label={`Ver Justificativa do Ajuste ${a.codigoMovimento}`} onClick={() => void verJustificativa(a)}>
               <Eye />
             </Button>
           </Stack>
@@ -311,11 +311,11 @@ function AjustesDoPeriodo({ contexto, motivos }: { contexto: Contexto; motivos: 
           aberto
             ? (a) => (
                 <Stack direction="row" gap="tight">
-                  <Button size="icon" variant="ghost" aria-label={a.justificativa ? `Alterar Justificativa do Ajuste ${a.codigoMovimento}` : `Justificar Ajuste ${a.codigoMovimento}`} onClick={() => void justificar(a)}>
+                  <Button size="icon" variant="outline" aria-label={a.justificativa ? `Alterar Justificativa do Ajuste ${a.codigoMovimento}` : `Justificar Ajuste ${a.codigoMovimento}`} onClick={() => void justificar(a)}>
                     {a.justificativa ? <Pencil /> : <MessageSquarePlus />}
                   </Button>
                   {a.justificativa && (
-                    <Button size="icon" variant="ghost" tone="destructive" aria-label={`Excluir Justificativa do Ajuste ${a.codigoMovimento}`} onClick={() => void excluir(a)}>
+                    <Button size="icon" variant="outline" tone="destructive" aria-label={`Excluir Justificativa do Ajuste ${a.codigoMovimento}`} onClick={() => void excluir(a)}>
                       <Trash2 />
                     </Button>
                   )}
@@ -374,7 +374,7 @@ function Motivos({ motivos, recarregar }: { motivos: Motivo[]; recarregar: () =>
         title="Motivos do Ajuste"
         description="Um Motivo inativo não aparece para novas Justificativas, mas continua nas que já o usam."
         rowActions={(m) => (
-          <Button size="icon" variant="ghost" aria-label={`Alterar Motivo ${m.nome}`} onClick={() => void abrir(m)}>
+          <Button size="icon" variant="outline" aria-label={`Alterar Motivo ${m.nome}`} onClick={() => void abrir(m)}>
             <Pencil />
           </Button>
         )}

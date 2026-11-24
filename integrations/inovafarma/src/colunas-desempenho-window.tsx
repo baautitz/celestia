@@ -246,10 +246,10 @@ export function ColunasDesempenhoWindow() {
         emptyMessage="Nenhuma coluna cadastrada."
         rowActions={(c) => (
           <Stack direction="row" gap="tight">
-            <Button size="icon" variant="ghost" aria-label={`Alterar a coluna ${c.nome}`} onClick={() => void abrir(c)}>
+            <Button size="icon" variant="outline" aria-label={`Alterar a coluna ${c.nome}`} onClick={() => void abrir(c)}>
               <Pencil />
             </Button>
-            <Button size="icon" variant="ghost" tone="destructive" aria-label={`Remover a coluna ${c.nome}`} onClick={() => void remover(c)}>
+            <Button size="icon" variant="outline" tone="destructive" aria-label={`Remover a coluna ${c.nome}`} onClick={() => void remover(c)}>
               <Trash2 />
             </Button>
           </Stack>
