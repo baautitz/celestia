@@ -84,7 +84,6 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "inovafarma", name: "motivos_ajuste" },
         { schema: "inovafarma", name: "pedidos" },
         { schema: "inovafarma", name: "pedidos_cotacoes" },
-        { schema: "inovafarma", name: "pedidos_listas" },
         { schema: "inovafarma", name: "pedidos_minimos" },
         { schema: "inovafarma", name: "pedidos_visoes" },
         { schema: "inovafarma", name: "pre_vencidos_baixas_congeladas" },
