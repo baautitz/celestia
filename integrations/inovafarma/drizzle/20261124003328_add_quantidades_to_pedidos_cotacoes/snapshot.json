@@ -1,0 +1,2359 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "54e9170a-e480-4c69-bf41-9f8cc27da310",
+  "prevIds": [
+    "d70b1feb-07b6-4b2d-a863-421bd3c313a6"
+  ],
+  "ddl": [
+    {
+      "name": "inovafarma",
+      "entityType": "schemas"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "apuracoes_metas",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "avaliacoes",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "colunas_desempenho",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "justificativas_ajuste",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "metas",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "metas_participantes",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "motivos_ajuste",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "pedidos",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "pedidos_cotacoes",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "pedidos_minimos",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "pedidos_visoes",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "pre_vencidos_baixas_congeladas",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "pre_vencidos_correcoes_baixa",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "pre_vencidos_itens",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "tipos_meta",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "vinculos_colaborador",
+      "entityType": "tables",
+      "schema": "inovafarma"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "periodo_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "apuracoes_metas"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "metas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "apuracoes_metas"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "apurado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "apuracoes_metas"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "periodo_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_colaborador",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "nome_colaborador",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_loja",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "descricao",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "valor_centavos",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "criado_por",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "nome",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ordem",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "entradas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "uniao",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[\"quantidade\",\"valor\",\"participacaoPercent\",\"cmvPercent\",\"ticketMedio\"]'",
+      "generated": null,
+      "identity": null,
+      "name": "medidas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "periodo_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_movimento",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_loja",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "motivo_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "observacao",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "criado_por",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "periodo_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "tipo_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "excluidos",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meta_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas_participantes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_colaborador",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas_participantes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "nome",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas_participantes"
+    },
+    {
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "alvo",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas_participantes"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "premio",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "metas_participantes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "motivos_ajuste"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "nome",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "motivos_ajuste"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "ativo",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "motivos_ajuste"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "motivos_ajuste"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "motivos_ajuste"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "motivos_ajuste"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "itens",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "escolhas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "confirmado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "criado_por_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "criado_por_nome",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "pedido_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_cotacoes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_fornecedor",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_cotacoes"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "precos",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_cotacoes"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "quantidades",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_cotacoes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ordem",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_cotacoes"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "importado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_cotacoes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_cotacoes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "produto_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_minimos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_loja",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_minimos"
+    },
+    {
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "minimo",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_minimos"
+    },
+    {
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "maximo",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_minimos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_minimos"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_minimos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "usuario_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "nome",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 1,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "lojas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "entradas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "apenas_com_minimo",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "padrao",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "periodo_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_baixas_congeladas"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_loja",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_baixas_congeladas"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ate",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_baixas_congeladas"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "baixas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_baixas_congeladas"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "itens",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_baixas_congeladas"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "congelado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_baixas_congeladas"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "periodo_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_loja",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "venda_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "produto_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "quantidade",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "motivo",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "autor_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "autor_nome",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_loja",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "produto_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_produto",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "nome_produto",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_barra",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "validade",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "quantidade",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "abrangencia_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "nome",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "indicador",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "exibicao",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "mostrar_premio",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sem_alvo",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "regra",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "alvo_padrao",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "lista",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "ativo",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "criado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "codigo_colaborador",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "usuario_id",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 1,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "lojas",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_por",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "periodo_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "codigo_loja",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "avaliacoes_periodo_idx",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "avaliacoes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "lower(\"nome\")",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "colunas_desempenho_nome_unique",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "periodo_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "justificativas_ajuste_periodo_idx",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "periodo_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "tipo_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "metas_periodo_tipo_unique",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "metas"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "lower(\"nome\")",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "motivos_ajuste_nome_unique",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "motivos_ajuste"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "criado_em",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "pedidos_status_idx",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "pedidos"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "usuario_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "lower(\"nome\")",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "pedidos_visoes_usuario_nome_unique",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "usuario_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"padrao\"",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "pedidos_visoes_usuario_padrao_unique",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "codigo_loja",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "ate",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "pre_vencidos_baixas_congeladas_loja_idx",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_baixas_congeladas"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "codigo_loja",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "venda_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "produto_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "pre_vencidos_correcoes_baixa_linha_idx",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "codigo_loja",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "abrangencia_em",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "pre_vencidos_itens_loja_idx",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "lower(\"nome\")",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "tipos_meta_nome_unique",
+      "entityType": "indexes",
+      "schema": "inovafarma",
+      "table": "tipos_meta"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "motivo_id"
+      ],
+      "schemaTo": "inovafarma",
+      "tableTo": "motivos_ajuste",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "justificativas_ajuste_motivo_id_motivos_ajuste_id_fkey",
+      "entityType": "fks",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "tipo_id"
+      ],
+      "schemaTo": "inovafarma",
+      "tableTo": "tipos_meta",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "metas_tipo_id_tipos_meta_id_fkey",
+      "entityType": "fks",
+      "schema": "inovafarma",
+      "table": "metas"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meta_id"
+      ],
+      "schemaTo": "inovafarma",
+      "tableTo": "metas",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "metas_participantes_meta_id_metas_id_fkey",
+      "entityType": "fks",
+      "schema": "inovafarma",
+      "table": "metas_participantes"
+    },
+    {
+      "columns": [
+        "meta_id",
+        "codigo_colaborador"
+      ],
+      "nameExplicit": false,
+      "name": "metas_participantes_pkey",
+      "entityType": "pks",
+      "schema": "inovafarma",
+      "table": "metas_participantes"
+    },
+    {
+      "columns": [
+        "pedido_id",
+        "codigo_fornecedor"
+      ],
+      "nameExplicit": false,
+      "name": "pedidos_cotacoes_pkey",
+      "entityType": "pks",
+      "schema": "inovafarma",
+      "table": "pedidos_cotacoes"
+    },
+    {
+      "columns": [
+        "produto_id",
+        "codigo_loja"
+      ],
+      "nameExplicit": false,
+      "name": "pedidos_minimos_pkey",
+      "entityType": "pks",
+      "schema": "inovafarma",
+      "table": "pedidos_minimos"
+    },
+    {
+      "columns": [
+        "periodo_id",
+        "codigo_loja"
+      ],
+      "nameExplicit": false,
+      "name": "pre_vencidos_baixas_congeladas_pkey",
+      "entityType": "pks",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_baixas_congeladas"
+    },
+    {
+      "columns": [
+        "periodo_id"
+      ],
+      "nameExplicit": false,
+      "name": "apuracoes_metas_pkey",
+      "schema": "inovafarma",
+      "table": "apuracoes_metas",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "avaliacoes_pkey",
+      "schema": "inovafarma",
+      "table": "avaliacoes",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "colunas_desempenho_pkey",
+      "schema": "inovafarma",
+      "table": "colunas_desempenho",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "justificativas_ajuste_pkey",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "metas_pkey",
+      "schema": "inovafarma",
+      "table": "metas",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "motivos_ajuste_pkey",
+      "schema": "inovafarma",
+      "table": "motivos_ajuste",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "pedidos_pkey",
+      "schema": "inovafarma",
+      "table": "pedidos",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "pedidos_visoes_pkey",
+      "schema": "inovafarma",
+      "table": "pedidos_visoes",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "pre_vencidos_correcoes_baixa_pkey",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_correcoes_baixa",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "pre_vencidos_itens_pkey",
+      "schema": "inovafarma",
+      "table": "pre_vencidos_itens",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "tipos_meta_pkey",
+      "schema": "inovafarma",
+      "table": "tipos_meta",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "codigo_colaborador"
+      ],
+      "nameExplicit": false,
+      "name": "vinculos_colaborador_pkey",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "codigo_movimento"
+      ],
+      "nullsNotDistinct": false,
+      "name": "justificativas_ajuste_codigo_movimento_unique",
+      "schema": "inovafarma",
+      "table": "justificativas_ajuste",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "usuario_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "vinculos_colaborador_usuario_id_unique",
+      "schema": "inovafarma",
+      "table": "vinculos_colaborador",
+      "entityType": "uniques"
+    }
+  ],
+  "renames": []
+}

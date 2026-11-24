@@ -9,6 +9,7 @@ import { PEDIDO_TARGET, PEDIDOS_PLUGIN } from "./pedidos-audit.js";
 import { conferir, statusDoPedido } from "./pedidos-conferencia.js";
 import { CONFIRMACAO_ACTIONS } from "./pedidos-confirmacao-audit.js";
 import { entradasDoPedido } from "./pedidos-nf.js";
+import { nomeDoArquivo } from "./nome-arquivo.js";
 import { gerarPdf, itensDoFornecedor } from "./pedido-pdf.js";
 import type { Pedido } from "./pedidos.js";
 import type { PedidoStore } from "./pedidos-store.js";
@@ -31,7 +32,8 @@ const DESATUALIZADO = versaoDesatualizada("O Pedido foi alterado por outra pesso
 const SEM_NOME = "Não foi possível consultar o nome do fornecedor no ERP. O PDF não foi gerado; tente novamente em instantes.";
 const EM_RECEBIMENTO = ["confirmado", "parcialmente_recebido", "recebido"];
 
-const Confirmacao = z.object({ escolhas: z.record(z.string().min(1).max(36), Codigo), version: Version });
+/** `quantidades`: por produto, a quantidade que o fornecedor escolhido vai atender (editada na comparação). */
+const Confirmacao = z.object({ escolhas: z.record(z.string().min(1).max(36), Codigo), quantidades: z.record(z.string().min(1).max(36), z.number().min(0).max(1_000_000)).optional(), version: Version });
 
 /** Confirmação do Pedido cotado, PDF por fornecedor e conferência com as entradas de NF do ERP. */
 export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient, pedidos, cotacoes, audit }: ConfirmacaoRoutesDeps): void {
@@ -53,7 +55,7 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     if ("recusa" in achado) return achado.recusa;
     const lido = Confirmacao.safeParse(await c.req.json().catch(() => null));
     if (!lido.success) return recusaDeValidacao(c, lido.error);
-    const { escolhas, version } = lido.data;
+    const { escolhas, quantidades, version } = lido.data;
     const { pedido } = achado;
     if (pedido.status !== "cotado") return c.json(DESATUALIZADO, 409);
     const lista = await cotacoes.listar(pedido.id);
@@ -68,8 +70,16 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
       if (precoDe(i.produtoId, escolhido) === null) return c.json({ error: `O fornecedor escolhido não ofereceu preço para ${i.nome}.` }, 400);
     }
     if (Object.keys(escolhas).some((id) => !lista.some((x) => (x.precos?.[id] ?? null) !== null))) return c.json({ error: "Há produto sem oferta na escolha." }, 400);
+    if (Object.keys(quantidades ?? {}).some((id) => escolhas[id] === undefined)) return c.json({ error: "Há quantidade de produto sem fornecedor escolhido." }, 400);
     const confirmado = await pedidos.confirmar(pedido.id, escolhas, version);
     if (!confirmado) return c.json(DESATUALIZADO, 409);
+    // A quantidade confirmada vai para o fornecedor escolhido do produto: é a que o PDF dele leva.
+    const porFornecedor = new Map<number, Record<string, number>>();
+    for (const [produtoId, quantidade] of Object.entries(quantidades ?? {})) {
+      const codigo = escolhas[produtoId];
+      if (codigo !== undefined) porFornecedor.set(codigo, { ...porFornecedor.get(codigo), [produtoId]: quantidade });
+    }
+    for (const [codigo, qtds] of porFornecedor) await cotacoes.definirQuantidades(pedido.id, codigo, qtds);
     await registrar(c, CONFIRMACAO_ACTIONS.confirmar, confirmado, { produtos: Object.keys(escolhas).length, fornecedores: new Set(Object.values(escolhas)).size });
     return c.json(confirmado);
   });
@@ -81,13 +91,13 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     if (!EM_RECEBIMENTO.includes(pedido.status)) return c.json({ error: "Confirme o Pedido antes de gerar o PDF." }, 409);
     const codigo = CodigoEmTexto.safeParse(c.req.param("codigo"));
     const cotacao = codigo.success ? (await cotacoes.listar(pedido.id)).find((x) => x.codigoFornecedor === codigo.data) : undefined;
-    const itens = cotacao?.precos ? itensDoFornecedor(pedido, cotacao.codigoFornecedor, cotacao.precos) : [];
+    const itens = cotacao?.precos ? itensDoFornecedor(pedido, cotacao.codigoFornecedor, cotacao.precos, cotacao.quantidades) : [];
     if (!cotacao || itens.length === 0) return c.json({ error: "Nenhum produto do Pedido foi escolhido neste fornecedor." }, 404);
     // O nome vem sempre do ERP: sem ele o PDF seria enviado ao fornecedor errado ou sem identificação.
     const nome = await nomeDoFornecedor(erpClient(), cotacao.codigoFornecedor);
     if (!nome) return c.json({ error: SEM_NOME }, 422);
     const arquivo = await gerarPdf({ fornecedor: nome, data: new Date(pedido.confirmadoEm ?? pedido.criadoEm).toLocaleDateString("pt-BR"), itens });
-    return c.json({ nome: `pedido-${cotacao.codigoFornecedor}.pdf`, conteudo: arquivo.toString("base64") });
+    return c.json({ nome: `${nomeDoArquivo(`Pedido ${nome} ${pedido.criadoEm.slice(0, 10)}`)}.pdf`, conteudo: arquivo.toString("base64") });
   });
 
   routes.post(`${BASE}/conferir`, auth, async (c: AuthContext) => {

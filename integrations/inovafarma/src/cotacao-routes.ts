@@ -2,7 +2,8 @@ import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { COTACAO_ACTIONS } from "./cotacao-audit.js";
-import { gerarPlanilha, lerPlanilha, type PlanilhaLida } from "./cotacao-planilha.js";
+import { nomeDoArquivo } from "./nome-arquivo.js";
+import { gerarPlanilha, identificarPlanilha, lerPlanilha, type PlanilhaLida } from "./cotacao-planilha.js";
 import type { Cotacao, CotacaoStore } from "./cotacao-store.js";
 import { ator, Codigo, CodigoEmTexto, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import { PEDIDO_TARGET, PEDIDOS_PLUGIN } from "./pedidos-audit.js";
@@ -51,10 +52,23 @@ export const nomesSql = (codigos: number) => `
   WHERE f.CodigoFornecedor IN (${Array.from({ length: codigos }, (_, i) => `@c${i}`).join(", ")})`;
 
 const produtosSql = (n: number) => `
-  SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, LTRIM(RTRIM(fa.NomeFabricante)) AS fabricante, CAST(p.Fracao AS varchar(20)) AS fracao
-  FROM Produto p
+  SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, LTRIM(RTRIM(fa.NomeFabricante)) AS fabricante  FROM Produto p
   LEFT JOIN Produto_Fabricante fa ON fa.CodigoFabricante = p.CodigoFabricante
   WHERE CONVERT(varchar(36), p.rowguid) IN (${Array.from({ length: n }, (_, i) => `@p${i}`).join(", ")})`;
+
+/** A última compra (entrada de NF) de cada produto de cada fornecedor: preço unitário e dia. */
+const ultimasComprasSql = (n: number, fornecedores: number[]) => `
+  SELECT produtoId, codigoFornecedor, preco, dia
+  FROM (
+    SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, f.CodigoFornecedor AS codigoFornecedor, CAST(cp.Preco AS float) AS preco, CONVERT(varchar(10), c.DataNota, 23) AS dia,
+      ROW_NUMBER() OVER (PARTITION BY p.rowguid, f.CodigoFornecedor ORDER BY c.DataNota DESC, c.CodigoCompra DESC) AS n
+    FROM Compra c
+    JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
+    JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
+    JOIN Fornecedor f ON f.CodigoCadastro = c.CodigoCadastro
+    WHERE c.Eliminado = 0 AND f.CodigoFornecedor IN (${fornecedores.map((c) => Math.trunc(c)).join(", ")}) AND CONVERT(varchar(36), p.rowguid) IN (${Array.from({ length: n }, (_, i) => `@p${i}`).join(", ")})
+  ) x
+  WHERE x.n = 1`;
 
 const fallback = (codigo: number) => `Fornecedor ${codigo}`;
 const plano = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
@@ -88,8 +102,11 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
   };
 
   const detalhe = async (pedido: Pedido, podeConfirmar: boolean) => {
-    const lista = await cotacoes.listar(pedido.id);
+    // Pedido editado depois de cotado: as distribuidoras novas das linhas entram na cotação.
+    const naLinhas = [...new Set(pedido.itens.flatMap((i) => i.quantidades.flatMap((q) => q.codigosFornecedor ?? [])))];
+    const lista = pedido.status === "aguardando_precos" || pedido.status === "cotado" ? await cotacoes.acrescentar(pedido.id, naLinhas) : await cotacoes.listar(pedido.id);
     const nomeDe = await nomes(lista.map((c) => c.codigoFornecedor));
+    const anteriores = await ultimasCompras(erpClient(), pedido, lista.map((c) => c.codigoFornecedor));
     return {
       pedido: { id: pedido.id, status: pedido.status, version: pedido.version, escolhas: pedido.escolhas },
       podeConfirmar,
@@ -99,6 +116,10 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
         nome: i.nome,
         codigoBarra: i.codigoBarra,
         quantidade: totalDoItem(i),
+        // O que o Pedido pede a cada fornecedor e o que ele confirmou na planilha (null = não mexeu na quantidade).
+        pedidas: Object.fromEntries(lista.map((c) => [c.codigoFornecedor, itensDoFornecedor(pedido, c.codigoFornecedor).find((x) => x.item.produtoId === i.produtoId)?.quantidade ?? 0])),
+        ofertadas: Object.fromEntries(lista.map((c) => [c.codigoFornecedor, c.quantidades?.[i.produtoId] ?? null])),
+        ultimas: Object.fromEntries(lista.map((c) => [c.codigoFornecedor, anteriores.get(`${i.produtoId}|${c.codigoFornecedor}`) ?? null])),
         precos: Object.fromEntries(lista.filter((c) => c.precos).map((c) => [c.codigoFornecedor, c.precos?.[i.produtoId] ?? null])),
       })),
     };
@@ -141,6 +162,20 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     return c.json(await detalhe(achado.pedido, podeConfirmar(c)));
   });
 
+  /** De quem é a planilha enviada: o código do fornecedor vem dentro do arquivo, e o cliente segue pelas rotas do fornecedor. */
+  routes.post(`${BASE}/identificar`, auth, async (c: AuthContext) => {
+    const achado = await doPedido(c);
+    if ("recusa" in achado) return achado.recusa;
+    const lido = Envio.safeParse(await c.req.json().catch(() => null));
+    if (!lido.success) return recusaDeValidacao(c, lido.error);
+    const arquivo = Buffer.from(lido.data.arquivo, "base64");
+    if (arquivo.length > MAX_ARQUIVO) return c.json({ error: "A planilha passa de 5 MB." }, 400);
+    const identificada = await identificarPlanilha(arquivo, achado.pedido.id);
+    if (!identificada.ok) return c.json({ error: identificada.erro }, 422);
+    if (!(await cotacoes.listar(achado.pedido.id)).some((x) => x.codigoFornecedor === identificada.codigoFornecedor)) return c.json({ error: "Esta planilha é de um fornecedor que não participa desta cotação." }, 404);
+    return c.json({ codigoFornecedor: identificada.codigoFornecedor });
+  });
+
   /** Pedido em cotação e o fornecedor participante da rota; senão a recusa. */
   const doFornecedor = async (c: AuthContext) => {
     const achado = await doPedido(c);
@@ -156,12 +191,16 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     if ("recusa" in achado) return achado.recusa;
     const { pedido, cotacao } = achado;
     const detalhes = await detalhesDosProdutos(erpClient(), pedido);
+    const anteriores = await ultimasCompras(erpClient(), pedido, [cotacao.codigoFornecedor]);
+    const nomeFornecedor = (await nomes([cotacao.codigoFornecedor])).get(cotacao.codigoFornecedor) ?? fallback(cotacao.codigoFornecedor);
     const arquivo = await gerarPlanilha({
+      fornecedor: nomeFornecedor,
+      pedidoEm: pedido.criadoEm.slice(0, 10),
       pedidoId: pedido.id,
       codigoFornecedor: cotacao.codigoFornecedor,
-      linhas: pedido.itens.map((i) => ({ produtoId: i.produtoId, codigoBarra: i.codigoBarra, nome: i.nome, fabricante: detalhes.get(i.produtoId)?.fabricante ?? null, fracao: detalhes.get(i.produtoId)?.fracao ?? null, quantidade: totalDoItem(i) })),
+      linhas: itensDoFornecedor(pedido, cotacao.codigoFornecedor).map(({ item: i, quantidade }) => ({ produtoId: i.produtoId, codigoBarra: i.codigoBarra, nome: i.nome, fabricante: detalhes.get(i.produtoId)?.fabricante ?? null, quantidade, precoAnterior: anteriores.get(`${i.produtoId}|${cotacao.codigoFornecedor}`)?.preco ?? null, dataAnterior: anteriores.get(`${i.produtoId}|${cotacao.codigoFornecedor}`)?.dia ?? null })),
     });
-    return c.json({ nome: `cotacao-${cotacao.codigoFornecedor}.xlsx`, conteudo: arquivo.toString("base64") });
+        return c.json({ nome: `${nomeDoArquivo(`Cotação ${nomeFornecedor} ${pedido.criadoEm.slice(0, 10)}`)}.xlsx`, conteudo: arquivo.toString("base64") });
   });
 
   /** O arquivo enviado (multipart) já lido e conferido contra o Pedido; senão a recusa. */
@@ -178,7 +217,10 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     const semMatch = lida.linhas.filter((l) => !produtosDoPedido.has(l.produtoId)).map((l) => ({ linha: l.linha }));
     const validas = lida.linhas.filter((l) => produtosDoPedido.has(l.produtoId) && !l.erro);
     const ofertas = validas.filter((l) => l.preco !== null);
-    return { corpo, previa: { validas: ofertas.length, semOferta: validas.length - ofertas.length, erros, semMatch }, validas } as const;
+    // Quantidade diferente da pedida a este fornecedor: aceita, mas fica registrada e aparece na comparação.
+    const pedidas = new Map(itensDoFornecedor(pedido, cotacao.codigoFornecedor).map((x) => [x.item.produtoId, x.quantidade]));
+    const diferentes = validas.filter((l) => l.quantidade !== null && l.quantidade !== (pedidas.get(l.produtoId) ?? 0));
+    return { corpo, previa: { validas: ofertas.length, semOferta: validas.length - ofertas.length, quantidadesDiferentes: diferentes.length, erros, semMatch }, validas } as const;
   };
 
   routes.post(`${BASE}/:codigo/previa`, auth, async (c: AuthContext) => {
@@ -198,7 +240,9 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     if (conferido.previa.erros.length > 0) return c.json({ error: "A planilha tem linhas com erro. Corrija e envie de novo." }, 400);
     const precos: Record<string, number | null> = Object.fromEntries(achado.pedido.itens.map((i) => [i.produtoId, null]));
     for (const l of conferido.validas) precos[l.produtoId] = l.preco;
-    const gravada = await cotacoes.gravarPrecos(achado.pedido.id, achado.cotacao.codigoFornecedor, precos, version);
+    const quantidades: Record<string, number> = {};
+    for (const l of conferido.validas) if (l.quantidade !== null) quantidades[l.produtoId] = l.quantidade;
+    const gravada = await cotacoes.gravarPrecos(achado.pedido.id, achado.cotacao.codigoFornecedor, precos, quantidades, version);
     if (!gravada) return c.json(DESATUALIZADO, 409);
     const atual = (await pedidos.marcarCotado(achado.pedido.id)) ?? (await pedidos.pedido(achado.pedido.id)) ?? achado.pedido;
     await registrar(c, COTACAO_ACTIONS.importar, atual, { codigoFornecedor: gravada.codigoFornecedor, ofertas: conferido.previa.validas });
@@ -207,15 +251,41 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
 }
 
 /** Quantidade total do produto no Pedido, sem divisão por Loja. */
+/**
+ * A planilha de um fornecedor leva só o que o Pedido pede a ele: as linhas (produto, Loja) com esse fornecedor, somando as
+ * quantidades. Pedido sem fornecedor nas linhas (anterior à escolha por linha) manda tudo a todos.
+ */
+function itensDoFornecedor(pedido: Pedido, codigo: number): { item: Pedido["itens"][number]; quantidade: number }[] {
+  const porLinha = pedido.itens.some((i) => i.quantidades.some((q) => (q.codigosFornecedor ?? []).length > 0));
+  if (!porLinha) return pedido.itens.map((item) => ({ item, quantidade: totalDoItem(item) }));
+  return pedido.itens
+    .map((item) => ({ item, quantidade: item.quantidades.filter((q) => (q.codigosFornecedor ?? []).includes(codigo)).reduce((soma, q) => soma + q.quantidade, 0) }))
+    .filter((x) => x.quantidade > 0);
+}
+
 const totalDoItem = (item: Pedido["itens"][number]) => item.quantidades.reduce((soma, q) => soma + q.quantidade, 0);
 
-/** Fabricante e fração vêm do ERP; sem resposta a planilha sai com essas colunas em branco. */
-async function detalhesDosProdutos(client: ErpQuery | undefined, pedido: Pedido): Promise<Map<string, { fabricante: string | null; fracao: string | null }>> {
-  const mapa = new Map<string, { fabricante: string | null; fracao: string | null }>();
+/** O fabricante vem do ERP; sem resposta a planilha sai com a coluna em branco. */
+async function ultimasCompras(client: ErpQuery | undefined, pedido: Pedido, fornecedores: number[]): Promise<Map<string, { preco: number; dia: string }>> {
+  const mapa = new Map<string, { preco: number; dia: string }>();
+  if (!client || fornecedores.length === 0 || pedido.itens.length === 0) return mapa;
+  try {
+    const params = Object.fromEntries(pedido.itens.map((i, n) => [`p${n}`, i.produtoId]));
+    for (const r of await client.query<{ produtoId: string; codigoFornecedor: number; preco: number | null; dia: string | null }>(ultimasComprasSql(pedido.itens.length, fornecedores), params)) {
+      if (r.dia && Number(r.preco) > 0) mapa.set(`${r.produtoId}|${Number(r.codigoFornecedor)}`, { preco: Number(r.preco), dia: r.dia });
+    }
+  } catch {
+    // Sem o ERP a planilha e a comparação seguem sem o último preço.
+  }
+  return mapa;
+}
+
+async function detalhesDosProdutos(client: ErpQuery | undefined, pedido: Pedido): Promise<Map<string, { fabricante: string | null }>> {
+  const mapa = new Map<string, { fabricante: string | null }>();
   if (!client) return mapa;
   try {
     const params = Object.fromEntries(pedido.itens.map((i, n) => [`p${n}`, i.produtoId]));
-    for (const r of await client.query<{ produtoId: string; fabricante: string | null; fracao: string | null }>(produtosSql(pedido.itens.length), params)) mapa.set(String(r.produtoId), { fabricante: plano(r.fabricante), fracao: plano(r.fracao) });
+    for (const r of await client.query<{ produtoId: string; fabricante: string | null }>(produtosSql(pedido.itens.length), params)) mapa.set(String(r.produtoId), { fabricante: plano(r.fabricante) });
   } catch {
     // A planilha ainda serve ao fornecedor sem estas colunas.
   }

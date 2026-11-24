@@ -10,11 +10,18 @@ export interface ItemDoPdf {
 /** Quantidade total do produto no Pedido, sem divisão por Loja. */
 export const quantidadeTotal = (item: Pedido["itens"][number]) => item.quantidades.reduce((soma, q) => soma + q.quantidade, 0);
 
-/** Só os produtos escolhidos neste fornecedor e com preço dele. */
-export function itensDoFornecedor(pedido: Pick<Pedido, "itens" | "escolhas">, codigoFornecedor: number, precos: Record<string, number | null>): ItemDoPdf[] {
+/** O que o Pedido pede a este fornecedor: as linhas (produto, Loja) com ele; Pedido sem fornecedor nas linhas leva o total. */
+function quantidadePedida(pedido: Pick<Pedido, "itens">, item: Pedido["itens"][number], codigoFornecedor: number): number {
+  const porLinha = pedido.itens.some((i) => i.quantidades.some((q) => (q.codigosFornecedor ?? []).length > 0));
+  return porLinha ? item.quantidades.filter((q) => (q.codigosFornecedor ?? []).includes(codigoFornecedor)).reduce((soma, q) => soma + q.quantidade, 0) : quantidadeTotal(item);
+}
+
+/** Só os produtos escolhidos neste fornecedor e com preço dele, na quantidade que ele confirmou (ou, sem isso, na pedida a ele). */
+export function itensDoFornecedor(pedido: Pick<Pedido, "itens" | "escolhas">, codigoFornecedor: number, precos: Record<string, number | null>, quantidades: Record<string, number> | null = null): ItemDoPdf[] {
   return pedido.itens.flatMap((i) => {
     const preco = precos[i.produtoId];
-    return pedido.escolhas[i.produtoId] === codigoFornecedor && preco !== null && preco !== undefined ? [{ nome: i.nome, quantidade: quantidadeTotal(i), preco }] : [];
+    const quantidade = quantidades?.[i.produtoId] ?? quantidadePedida(pedido, i, codigoFornecedor);
+    return pedido.escolhas[i.produtoId] === codigoFornecedor && preco !== null && preco !== undefined && quantidade > 0 ? [{ nome: i.nome, quantidade, preco }] : [];
   });
 }
 

@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Cotacao, CotacaoStore } from "./cotacao-store.js";
 import { pedidosCotacoes } from "./schema.js";
@@ -19,11 +19,27 @@ export class PostgresCotacaoStore implements CotacaoStore {
     return rows.map(cotacao);
   }
 
-  async gravarPrecos(pedidoId: string, codigoFornecedor: number, precos: Record<string, number | null>, expectedVersion: number): Promise<Cotacao | null> {
+  async acrescentar(pedidoId: string, codigosFornecedor: number[]): Promise<Cotacao[]> {
+    const lista = await this.listar(pedidoId);
+    const novos = codigosFornecedor.filter((c) => !lista.some((x) => x.codigoFornecedor === c));
+    if (novos.length === 0) return lista;
+    await this.db.insert(pedidosCotacoes).values(novos.map((codigoFornecedor, i) => ({ pedidoId, codigoFornecedor, ordem: lista.length + i })));
+    return this.listar(pedidoId);
+  }
+
+  async definirQuantidades(pedidoId: string, codigoFornecedor: number, quantidades: Record<string, number>): Promise<void> {
+    const t = pedidosCotacoes;
+    await this.db
+      .update(t)
+      .set({ quantidades: sql`coalesce(${t.quantidades}, '{}'::jsonb) || ${JSON.stringify(quantidades)}::jsonb` })
+      .where(and(eq(t.pedidoId, pedidoId), eq(t.codigoFornecedor, codigoFornecedor)));
+  }
+
+  async gravarPrecos(pedidoId: string, codigoFornecedor: number, precos: Record<string, number | null>, quantidades: Record<string, number>, expectedVersion: number): Promise<Cotacao | null> {
     const t = pedidosCotacoes;
     const [row] = await this.db
       .update(t)
-      .set({ precos, importadoEm: new Date(), version: expectedVersion + 1 })
+      .set({ precos, quantidades, importadoEm: new Date(), version: expectedVersion + 1 })
       .where(and(eq(t.pedidoId, pedidoId), eq(t.codigoFornecedor, codigoFornecedor), eq(t.version, expectedVersion)))
       .returning();
     return row ? cotacao(row) : null;

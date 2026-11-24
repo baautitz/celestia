@@ -42,7 +42,7 @@ async function boot({ erpFalha = false }: { erpFalha?: boolean } = {}) {
       query: async <T,>(sql: string, params?: Record<string, unknown>) => {
         if (erpFalha) throw new Error("boom");
         if (sql.includes("FROM Fornecedor")) return FORNECEDORES.filter((f) => !params?.busca || f.nome.includes(String(params.busca).toUpperCase())) as T[];
-        return [{ produtoId: "p-1", fabricante: "EMS", fracao: "1" }] as T[];
+        return [{ produtoId: "p-1", fabricante: "EMS" }] as T[];
       },
     }),
   });
@@ -63,14 +63,14 @@ async function baixarPlanilha(b: Boot, codigo: number): Promise<Buffer> {
   const res = await b.req("gil", "GET", `${BASE(b.pedido.id)}/${codigo}/planilha`);
   expect(res.status).toBe(200);
   const { nome, conteudo } = (await res.json()) as { nome: string; conteudo: string };
-  expect(nome).toBe(`cotacao-${codigo}.xlsx`);
+  expect(nome).toMatch(/^Cotacao-.+-\d{4}-\d{2}-\d{2}\.xlsx$/);
   return Buffer.from(conteudo, "base64");
 }
 
 async function preencher(buffer: Buffer, precos: Record<number, number>): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer as never);
-  for (const [linha, valor] of Object.entries(precos)) defined(wb.worksheets[0], "a planilha").getRow(Number(linha)).getCell(6).value = valor;
+  for (const [linha, valor] of Object.entries(precos)) defined(wb.worksheets[0], "a planilha").getRow(Number(linha) + 5).getCell(7).value = valor;
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -135,8 +135,8 @@ describe("Cotação: planilha e importação", () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await baixarPlanilha(b, 7)) as never);
     const ws = defined(wb.worksheets[0], "a planilha");
-    expect([2, 3].map((n) => ws.getRow(n).getCell(5).value)).toEqual([13, 3]);
-    expect(ws.getRow(2).getCell(3).value).toBe("EMS");
+    expect([7, 8].map((n) => ws.getRow(n).getCell(4).value)).toEqual([13, 3]);
+    expect(ws.getRow(7).getCell(3).value).toBe("EMS");
   });
 
   it("devolve a prévia sem gravar nada", async () => {
@@ -144,7 +144,7 @@ describe("Cotação: planilha e importação", () => {
     await iniciar(b);
     const previa = await enviar(b, "/7/previa", await preencher(await baixarPlanilha(b, 7), { 2: 12.5 }));
     expect(previa.status).toBe(200);
-    expect(await previa.json()).toEqual({ validas: 1, semOferta: 1, erros: [], semMatch: [] });
+    expect(await previa.json()).toEqual({ validas: 1, semOferta: 1, quantidadesDiferentes: 0, erros: [], semMatch: [] });
     const detalhe = (await (await b.req("gil", "GET", BASE(b.pedido.id))).json()) as { pedido: Pedido; fornecedores: { importado: boolean }[] };
     expect(detalhe.pedido.status).toBe("aguardando_precos");
     expect(detalhe.fornecedores[0]?.importado).toBe(false);
@@ -170,6 +170,30 @@ describe("Cotação: planilha e importação", () => {
     expect(b.log.at(-1)).toBe("Importou a planilha de preços do fornecedor 9: 1 oferta.");
   });
 
+  it("aceita a quantidade corrigida pelo fornecedor e a mostra na comparação junto da pedida", async () => {
+    const b = await boot();
+    await iniciar(b);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await baixarPlanilha(b, 7)) as never);
+    const ws = defined(wb.worksheets[0], "a planilha");
+    ws.getRow(7).getCell(7).value = 12.5;
+    ws.getRow(7).getCell(4).value = 10;
+    const arquivo = Buffer.from(await wb.xlsx.writeBuffer());
+    expect(await (await enviar(b, "/7/previa", arquivo)).json()).toMatchObject({ validas: 1, quantidadesDiferentes: 1 });
+    expect((await enviar(b, "/7/importar", arquivo, 1)).status).toBe(200);
+    const detalhe = (await (await b.req("gil", "GET", BASE(b.pedido.id))).json()) as { produtos: { produtoId: string; pedidas: Record<string, number>; ofertadas: Record<string, number | null> }[] };
+    expect(detalhe.produtos[0]).toMatchObject({ produtoId: "p-1", pedidas: { 7: 13 }, ofertadas: { 7: 10 } });
+  });
+
+  it("identifica de quem é a planilha pelo próprio arquivo", async () => {
+    const b = await boot();
+    await iniciar(b);
+    const res = await enviar(b, "/identificar", await baixarPlanilha(b, 9));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ codigoFornecedor: 9 });
+    expect((await enviar(b, "/identificar", Buffer.from("não é excel"))).status).toBe(422);
+  });
+
   it("rejeita a planilha de outro fornecedor ou de outra cotação", async () => {
     const b = await boot();
     await iniciar(b);
@@ -185,9 +209,9 @@ describe("Cotação: planilha e importação", () => {
     await iniciar(b);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await baixarPlanilha(b, 7)) as never);
-    defined(wb.worksheets[0], "a planilha").getRow(2).getCell(6).value = "abc";
+    defined(wb.worksheets[0], "a planilha").getRow(7).getCell(7).value = "abc";
     const arquivo = Buffer.from(await wb.xlsx.writeBuffer());
-    expect(await (await enviar(b, "/7/previa", arquivo)).json()).toMatchObject({ erros: [{ linha: 2, mensagem: "Preço inválido." }] });
+    expect(await (await enviar(b, "/7/previa", arquivo)).json()).toMatchObject({ erros: [{ linha: 7, mensagem: "Preço inválido." }] });
     expect((await enviar(b, "/7/importar", arquivo, 1)).status).toBe(400);
   });
 
@@ -197,11 +221,11 @@ describe("Cotação: planilha e importação", () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await baixarPlanilha(b, 7)) as never);
     const ws = defined(wb.worksheets[0], "a planilha");
-    ws.getRow(2).getCell(6).value = 5;
-    ws.getRow(3).getCell(7).value = String(ws.getRow(3).getCell(7).value).replace("p-2", "p-99");
-    ws.getRow(3).getCell(6).value = 9;
+    ws.getRow(7).getCell(7).value = 5;
+    ws.getRow(8).getCell(8).value = String(ws.getRow(8).getCell(8).value).replace("p-2", "p-99");
+    ws.getRow(8).getCell(7).value = 9;
     const previa = await (await enviar(b, "/7/previa", Buffer.from(await wb.xlsx.writeBuffer()))).json();
-    expect(previa).toMatchObject({ validas: 1, semMatch: [{ linha: 3 }] });
+    expect(previa).toMatchObject({ validas: 1, semMatch: [{ linha: 8 }] });
   });
 
   it("exige a version do fornecedor ao importar (409 se mudou)", async () => {

@@ -61,8 +61,8 @@ async function boot({ erpFalha = false, semNome = false, entradas = [] }: Opcoes
   const criado = await pedidos.criar({ itens: [dipirona, aas, raro] }, { id: "gil", nome: "gil" });
   await pedidos.iniciarCotacao(criado.id, 1);
   await cotacoes.criar(criado.id, [7, 9]);
-  await cotacoes.gravarPrecos(criado.id, 7, { "p-1": 12.5, "p-2": 5, "p-3": null }, 1);
-  await cotacoes.gravarPrecos(criado.id, 9, { "p-1": 11, "p-2": null, "p-3": null }, 1);
+  await cotacoes.gravarPrecos(criado.id, 7, { "p-1": 12.5, "p-2": 5, "p-3": null }, {}, 1);
+  await cotacoes.gravarPrecos(criado.id, 9, { "p-1": 11, "p-2": null, "p-3": null }, {}, 1);
   const cotado = (await pedidos.marcarCotado(criado.id)) as Pedido;
   return { req, log, consultas, pedidos, id: cotado.id, version: cotado.version };
 }
@@ -127,7 +127,7 @@ describe("PDF por fornecedor", () => {
     const res = await pdf(b, 9);
     expect(res.status).toBe(200);
     const { nome, conteudo } = (await res.json()) as { nome: string; conteudo: string };
-    expect(nome).toBe("pedido-9.pdf");
+    expect(nome).toMatch(/^Pedido-BETA-\d{4}-\d{2}-\d{2}\.pdf$/);
     expect(Buffer.from(conteudo, "base64").subarray(0, 5).toString()).toBe("%PDF-");
   });
 

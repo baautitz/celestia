@@ -263,6 +263,8 @@ export const pedidosCotacoes = inovafarmaSchema.table(
     codigoFornecedor: integer("codigo_fornecedor").notNull(),
     /** Preço por produto (`produtoId` -> preço; null = sem oferta); null enquanto a planilha não foi importada. */
     precos: jsonb("precos").$type<Record<string, number | null>>(),
+    /** Quantidade que o fornecedor confirmou por produto na planilha (`produtoId` -> quantidade); só os produtos em que ela veio preenchida. */
+    quantidades: jsonb("quantidades").$type<Record<string, number>>(),
     /** Posição em que o fornecedor foi escolhido. */
     ordem: integer("ordem").notNull(),
     importadoEm: timestamp("importado_em"),

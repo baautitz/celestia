@@ -1,0 +1,1 @@
+ALTER TABLE "inovafarma"."pedidos_cotacoes" ADD COLUMN "quantidades" jsonb;
