@@ -1,5 +1,5 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
 import { Checkbox } from "@platform/ui/components/checkbox";
 import { Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
@@ -18,6 +18,7 @@ import { FalhaAoCarregar, useContexto } from "./contexto";
 import { API, json } from "./inovafarma-api";
 import { ListaProdutosCampo } from "./lista-produtos-campo";
 import type { EntradaLista } from "./tipos-meta";
+import { LojasAdicionarWindow } from "./lojas-adicionar-window";
 import { DistribuidorasLinhaWindow, type Distribuidora } from "./distribuidoras-linha-window";
 import { PEDIDOS_BASE, type ItemPedido, type Pedido } from "./pedido-rascunho-window";
 import type { LojaOpcao } from "./loja-opcao";
@@ -249,7 +250,8 @@ function CampoPedir({ valor, rotulo, onChange }: { valor: number | undefined; ro
 /** Célula das distribuidoras da Loja: o resumo e o botão que abre a janela de busca e lista. */
 function CampoDistribuidoras({ produtoId, codigoLoja, nomeLoja, valor, lista, onChange }: { produtoId: string; codigoLoja: number; nomeLoja: string; valor: number[] | undefined; lista: Distribuidora[]; onChange: (codigos: number[]) => void }) {
   const { windows } = useUi();
-  const resumo = !valor || valor.length === 0 ? "Escolher" : valor.length === 1 ? (lista.find((d) => d.codigo === valor[0])?.nome ?? `Distribuidora ${valor[0]}`) : `${valor.length} distribuidoras`;
+  const curto = (nome: string) => (nome.length > 18 ? `${nome.slice(0, 17)}…` : nome);
+  const resumo = !valor || valor.length === 0 ? "Escolher" : valor.length === 1 ? curto(lista.find((d) => d.codigo === valor[0])?.nome ?? `Distribuidora ${valor[0]}`) : `${valor.length} distribuidoras`;
   const abrir = async () => {
     const resultado = await windows.open<number[]>({
       surface: "dialog",
@@ -270,7 +272,7 @@ function CampoDistribuidoras({ produtoId, codigoLoja, nomeLoja, valor, lista, on
 /** Campo de mínimo/máximo estreito e à direita, para a tabela de Lojas caber sem rolagem lateral. */
 const CAMPO_LOJA = "[&_input]:w-14 [&_input]:px-1.5 [&_input]:text-right";
 
-const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora }: { produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void; quantidades: Map<string, number>; onQuantidade: (produto: ProdutoLancamento, codigoLoja: number, quantidade: number) => void; distribuidoras: Map<string, number[]>; listaDistribuidoras: Distribuidora[]; onDistribuidora: (produto: ProdutoLancamento, codigoLoja: number, codigos: number[]) => void }) {
+const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora, removidas, onRemovidas }: { removidas: number[]; onRemovidas: (codigos: number[]) => void; produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void; quantidades: Map<string, number>; onQuantidade: (produto: ProdutoLancamento, codigoLoja: number, quantidade: number) => void; distribuidoras: Map<string, number[]>; listaDistribuidoras: Distribuidora[]; onDistribuidora: (produto: ProdutoLancamento, codigoLoja: number, codigos: number[]) => void }) {
   const { feedback } = useUi();
   const novaConsulta = useLatestFetch();
   const [meses, setMeses] = useState<Mes[]>([]);
@@ -343,20 +345,27 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo,
     loja,
     { key: "pedir", label: "Pedir", tooltip: "Quantidade a pedir", format: "decimal", render: (l) => <CampoPedir valor={quantidades.get(chaveQtd(produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)} rotulo={`Quantidade a pedir da Loja ${nomeLoja(l.codigoLoja)}`} onChange={(q) => produto && onQuantidade(produto, l.codigoLoja, q)} />, cellClassName: CAMPO_LOJA, mobileWide: true },
     { key: "distribuidora", label: "Distribuidora", render: (l) => <CampoDistribuidoras produtoId={produtoId} codigoLoja={l.codigoLoja} nomeLoja={nomeLoja(l.codigoLoja)} valor={distribuidoras.get(chaveQtd(produtoId, l.codigoLoja))} lista={listaDistribuidoras} onChange={(c) => produto && onDistribuidora(produto, l.codigoLoja, c)} />, mobileWide: true },
+    { key: "remover", label: "", width: 40, centered: true, render: (l) => <Button type="button" variant="ghost" size="icon" aria-label={`Remover a Loja ${nomeLoja(l.codigoLoja)}`} onClick={() => onRemovidas([...removidas, l.codigoLoja])}><X /></Button>, mobileRole: "hidden" },
     ];
     return { estatisticas, pedido };
-  }, [contexto.lojas, contexto.podeEditarMinimos, ultimasCompras, produtoId, produto, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora]);
+  }, [removidas, onRemovidas, contexto.lojas, contexto.podeEditarMinimos, ultimasCompras, produtoId, produto, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora]);
   // Todas as Lojas, mesmo as sem venda nem estoque do produto (zeradas).
   const todasLojas = useMemo<LinhaLoja[]>(() => {
     if (!produto) return [];
-    return contexto.lojas.map((l) => produto.lojas.find((x) => x.codigoLoja === l.codigo) ?? { codigoLoja: l.codigo, vendida: 0, estoque: 0, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 });
-  }, [produto, contexto.lojas]);
+    return contexto.lojas.filter((l) => !removidas.includes(l.codigo)).map((l) => produto.lojas.find((x) => x.codigoLoja === l.codigo) ?? { codigoLoja: l.codigo, vendida: 0, estoque: 0, minimo: null, maximo: null, sugestao: 0, aChegar: 0, version: 0 });
+  }, [produto, contexto.lojas, removidas]);
+  const removidasOpcoes = contexto.lojas.filter((l) => removidas.includes(l.codigo));
+  const { windows } = useUi();
+  const adicionarLojas = async () => {
+    const resultado = await windows.open<number[]>({ surface: "dialog", size: "medium", title: "Adicionar Lojas", description: "Escolha as Lojas que voltam para o Pedido.", content: () => <LojasAdicionarWindow removidas={removidasOpcoes} /> });
+    if (resultado.status === "confirmed") onRemovidas(removidas.filter((c) => !resultado.value.includes(c)));
+  };
   const colunasMes = useMemo(() => colunasMovimento(ultimosMeses(contexto.hoje, meses)), [contexto.hoje, meses]);
   const vazio = "Selecione um produto para ver o estoque e as vendas por Loja e a movimentação mensal.";
   return (
     <>
       <Stack grow>
-        <DataTable scroll="fill" compact title={produto ? `Lojas: ${produto.nome}` : "Lojas"} columns={colunasLoja.pedido} rows={todasLojas} getRowId={idLoja} activeRowId={lojaAtiva} onActiveRowChange={setLojaAtiva} emptyMessage={produto ? "Nenhuma Loja." : vazio} />
+        <DataTable scroll="fill" compact title={produto ? `Lojas: ${produto.nome}` : "Lojas"} headerActions={removidasOpcoes.length > 0 ? <Button type="button" variant="outline" onClick={() => void adicionarLojas()}>Adicionar Loja</Button> : undefined} columns={colunasLoja.pedido} rows={todasLojas} getRowId={idLoja} activeRowId={lojaAtiva} onActiveRowChange={setLojaAtiva} emptyMessage={produto ? "Nenhuma Loja." : vazio} />
       </Stack>
       <Stack span="full" scroll="clip" surface="card" gap="section">
         <Stack direction="row" gap="group" align="center" justify="between" shrink={false}>
@@ -496,15 +505,44 @@ interface EdicaoPedido {
   aoSalvar: (salvo: Pedido) => void;
 }
 
-function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto; notificar: (e: Error) => void; abas: ReactNode; edicao?: EdicaoPedido }) {
+/** O que o Lançamento de correção recebe (produtos e Lojas faltantes) e devolve ao salvar. */
+interface Correcao {
+  produtos: ProdutoLancamento[];
+  quantidades: Map<string, number>;
+  distribuidoras: Map<string, number[]>;
+  /** Lojas já fora da grade: as que não faltam em nenhum produto. */
+  ocultas: number[];
+  aoSalvar: (resultado: ResultadoCorrecao) => void;
+}
+interface ResultadoCorrecao {
+  quantidades: Map<string, number>;
+  distribuidoras: Map<string, number[]>;
+  /** Lojas tiradas durante a correção. */
+  removidas: number[];
+  /** Produtos que continuam marcados. */
+  marcados: string[];
+}
+
+/** Produto marcado, Loja na grade e Pedir em zero: o que impede de salvar. */
+const pendenciasDe = (selecionados: Iterable<ProdutoLancamento>, quantidades: Map<string, number>, removidas: number[]) =>
+  [...selecionados].flatMap((p) => p.lojas.filter((l) => !removidas.includes(l.codigoLoja) && (quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)) <= 0).map((l) => ({ produto: p, codigoLoja: l.codigoLoja })));
+
+/** O mesmo Lançamento, só com os produtos e as Lojas faltantes; Salvar aplica no Pedido em montagem e fecha. */
+function CorrecaoWindow({ contexto, correcao }: { contexto: Contexto; correcao: Omit<Correcao, "aoSalvar"> }) {
+  const { resolve } = useWindow<ResultadoCorrecao>();
+  const { feedback } = useUi();
+  return <Lancamento contexto={contexto} notificar={feedback.notifyError} abas={null} correcao={{ ...correcao, aoSalvar: resolve }} />;
+}
+
+function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto: Contexto; notificar: (e: Error) => void; abas: ReactNode; edicao?: EdicaoPedido; correcao?: Correcao }) {
   const { windows, feedback } = useUi();
   const novaConsulta = useLatestFetch();
   const [visoes, setVisoes] = useState<VisaoPedidos[]>([]);
   const [visao, setVisao] = useState<string | null>(null);
-  const [produtos, setProdutos] = useState<ProdutoLancamento[]>([]);
-  const [carregando, setCarregando] = useState(true);
+  const [produtos, setProdutos] = useState<ProdutoLancamento[]>(correcao?.produtos ?? []);
+  const [carregando, setCarregando] = useState(!correcao);
   // A seleção sobrevive aos filtros: guarda o produto inteiro, para o detalhe não depender da grade atual.
-  const [selecionados, setSelecionados] = useState<ReadonlyMap<string, ProdutoLancamento>>(new Map());
+  const [selecionados, setSelecionados] = useState<ReadonlyMap<string, ProdutoLancamento>>(() => new Map((correcao?.produtos ?? []).map((p) => [p.produtoId, p])));
   // O cursor da grade (linha ativa) é o que o detalhe mostra; os marcados só alimentam o "Gerar pedido".
   const [ativo, setAtivo] = useState<string | null>(null);
   // Os filtros só valem na consulta depois de "Filtrar" no sheet; a primeira consulta espera as visões e usa a padrão.
@@ -513,6 +551,7 @@ function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: só na abertura da aba; depois as visões recarregam dentro do sheet.
   useEffect(() => {
+    if (correcao) return;
     void (async () => {
       let inicial = padrao;
       try {
@@ -580,8 +619,10 @@ function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto;
       return proximo;
     });
   }, []);
+  // Lojas tiradas da grade: ficam fora do Pedido todo.
+  const [lojasRemovidas, setLojasRemovidas] = useState<number[]>(correcao?.ocultas ?? []);
   // Quantidade a pedir digitada na grade de Lojas; digitar marca o produto.
-  const [quantidades, setQuantidades] = useState<Map<string, number>>(() => new Map());
+  const [quantidades, setQuantidades] = useState<Map<string, number>>(() => new Map(correcao?.quantidades));
   const definirQuantidade = useCallback(
     (p: ProdutoLancamento, codigoLoja: number, quantidade: number) => {
       setQuantidades((atual) => {
@@ -593,7 +634,7 @@ function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto;
     },
     [alternar],
   );
-  const [distribuidoras, setDistribuidoras] = useState<Map<string, number[]>>(() => new Map());
+  const [distribuidoras, setDistribuidoras] = useState<Map<string, number[]>>(() => new Map(correcao?.distribuidoras));
   const [listaDistribuidoras, setListaDistribuidoras] = useState<Distribuidora[]>([]);
   useEffect(() => {
     apiFetch<Distribuidora[]>(`${API}/pedidos/fornecedores?busca=`)
@@ -622,6 +663,9 @@ function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto;
     }
     setQuantidades(qtds);
     setDistribuidoras(dists);
+    // Loja que o rascunho não leva fica fora da grade, para não contar como faltante.
+    const comItem = new Set(pedidoEditado.itens.flatMap((i) => i.quantidades.map((q) => q.codigoLoja)));
+    setLojasRemovidas(contexto.lojas.map((l) => l.codigo).filter((c) => !comItem.has(c)));
     const vazio = (i: ItemPedido): ProdutoLancamento => ({ produtoId: i.produtoId, nome: i.nome, codigoBarra: i.codigoBarra, vendida: 0, estoque: 0, minimo: 0, sugestao: 0, aChegar: 0, lojas: [] });
     const filtro = JSON.stringify(pedidoEditado.itens.map((i) => ({ tipo: "produto", id: i.produtoId })));
     const params = new URLSearchParams({ modo: "apartir", de: contexto.ontem, entradas: filtro });
@@ -647,9 +691,40 @@ function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto;
   );
 
   const gerarPedido = async () => {
+    if (correcao) {
+      const ocultas = correcao.ocultas;
+      correcao.aoSalvar({ quantidades, distribuidoras, removidas: lojasRemovidas.filter((c) => !ocultas.includes(c)), marcados: [...selecionados.keys()] });
+      return;
+    }
+    // Produto marcado com Loja em zero não passa: abre o mesmo Lançamento só com o que falta; salvar lá fecha, e salvar aqui de novo confere outra vez.
+    const pendencias = pendenciasDe(selecionados.values(), quantidades, lojasRemovidas);
+    if (pendencias.length > 0) {
+      const faltantes = new Set(pendencias.map((x) => x.codigoLoja));
+      const resultado = await windows.open<ResultadoCorrecao>({
+        surface: "dialog",
+        size: "screen",
+        title: "Completar o Pedido",
+        description: "Produtos marcados com Loja sem quantidade a pedir: informe a quantidade ou tire a Loja.",
+        content: () => (
+          <CorrecaoWindow
+            contexto={contexto}
+            correcao={{ produtos: [...new Map(pendencias.map((x) => [x.produto.produtoId, x.produto])).values()], quantidades, distribuidoras, ocultas: contexto.lojas.map((l) => l.codigo).filter((c) => !faltantes.has(c)), }}
+          />
+        ),
+      });
+      if (resultado.status === "confirmed") {
+        const { quantidades: q, distribuidoras: d, removidas, marcados } = resultado.value;
+        const emCorrecao = new Set(pendencias.map((x) => x.produto.produtoId));
+        setQuantidades(q);
+        setDistribuidoras(d);
+        setLojasRemovidas((atual) => [...new Set([...atual, ...removidas])]);
+        setSelecionados((atual) => new Map([...atual].filter(([id]) => !emCorrecao.has(id) || marcados.includes(id))));
+      }
+      return;
+    }
     // A quantidade já foi digitada na grade de Lojas; só entram os produtos com alguma quantidade a pedir.
     const itens: ItemPedido[] = [...selecionados.values()]
-      .map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: p.lojas.map((l) => ({ codigoLoja: l.codigoLoja, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l), codigosFornecedor: distribuidoras.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? [] })) }))
+      .map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: p.lojas.filter((l) => !lojasRemovidas.includes(l.codigoLoja)).map((l) => ({ codigoLoja: l.codigoLoja, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l), codigosFornecedor: distribuidoras.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? [] })) }))
       .filter((i) => i.quantidades.some((q) => q.quantidade > 0));
     if (itens.length === 0) {
       notificar(new Error("Informe a quantidade a pedir de ao menos um produto."));
@@ -702,13 +777,15 @@ function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto;
 
   const emFoco = useMemo(() => (ativo ? produtos.find((p) => p.produtoId === ativo) : undefined), [ativo, produtos]);
 
-  // Ao focar um produto, as Lojas já vêm com as distribuidoras que deram entrada nele (uma consulta por produto; o que o usuário já escolheu fica).
+  // Todo produto marcado ou em foco já traz as distribuidoras que deram entrada nele (uma consulta por produto; o que o usuário já escolheu fica).
   const idEmFoco = emFoco?.produtoId;
   const jaConsultados = useRef(new Set<string>());
+  const idsMarcados = [...selecionados.keys()].sort().join(",");
   useEffect(() => {
-    if (!idEmFoco || jaConsultados.current.has(idEmFoco)) return;
-    jaConsultados.current.add(idEmFoco);
-    apiFetch<{ produtoId: string; codigoLoja: number; codigoFornecedor: number }[]>(`${BASE}/entradas?produtoIds=${encodeURIComponent(idEmFoco)}`)
+    const ids = [...new Set([...(idEmFoco ? [idEmFoco] : []), ...idsMarcados.split(",").filter(Boolean)])].filter((id) => !jaConsultados.current.has(id)).slice(0, 200);
+    if (ids.length === 0) return;
+    for (const id of ids) jaConsultados.current.add(id);
+    apiFetch<{ produtoId: string; codigoLoja: number; codigoFornecedor: number }[]>(`${BASE}/entradas?produtoIds=${encodeURIComponent(ids.join(","))}`)
       .then((entradas) =>
         setDistribuidoras((atual) => {
           const proximo = new Map(atual);
@@ -720,23 +797,25 @@ function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto;
           return proximo;
         }),
       )
-      .catch(() => jaConsultados.current.delete(idEmFoco));
-  }, [idEmFoco]);
+      .catch(() => {
+        for (const id of ids) jaConsultados.current.delete(id);
+      });
+  }, [idEmFoco, idsMarcados]);
 
   return (
-    <Stack gap="field" viewport={edicao ? "modal" : true}>
+    <Stack gap="field" viewport={edicao || correcao ? "modal" : true}>
       <Stack direction="row" gap="group" align="center" shrink={false}>
         {abas}
         <Stack grow>
           <Text variant="caption" tone="muted" truncate>
-            {resumo(aplicados ?? padrao)}
+            {correcao ? "Só os produtos e Lojas que faltam" : resumo(aplicados ?? padrao)}
           </Text>
         </Stack>
         <Text variant="caption" tone="muted">
           {formatNumber(selecionados.size)} {selecionados.size === 1 ? "produto selecionado" : "produtos selecionados"}
         </Text>
         <Button type="button" disabled={selecionados.size === 0} onClick={() => void gerarPedido()}>
-          {edicao ? "Salvar rascunho" : "Gerar pedido"}
+          {edicao ? "Salvar rascunho" : correcao ? "Salvar" : "Gerar pedido"}
         </Button>
       </Stack>
       <Grid columns="workspace" gap="tight">
@@ -745,10 +824,12 @@ function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto;
             scroll="fill"
             title="Produtos"
             headerActions={
-              <Button type="button" variant="outline" onClick={() => void abrirFiltros()}>
-                <SlidersHorizontal />
-                Filtros
-              </Button>
+              correcao ? undefined : (
+                <Button type="button" variant="outline" onClick={() => void abrirFiltros()}>
+                  <SlidersHorizontal />
+                  Filtros
+                </Button>
+              )
             }
             compact
             columns={colunas}
@@ -764,7 +845,7 @@ function Lancamento({ contexto, notificar, abas, edicao }: { contexto: Contexto;
             emptyMessage="Nenhuma venda no período e filtros escolhidos."
           />
         </Stack>
-        <Detalhe produto={emFoco} contexto={contexto} lojasFiltro={aplicados?.lojas ?? padrao.lojas} onSalvo={aoGravarMinimo} quantidades={quantidades} onQuantidade={definirQuantidade} distribuidoras={distribuidoras} listaDistribuidoras={listaDistribuidoras} onDistribuidora={definirDistribuidora} />
+        <Detalhe produto={emFoco} contexto={contexto} lojasFiltro={aplicados?.lojas ?? padrao.lojas} onSalvo={aoGravarMinimo} quantidades={quantidades} onQuantidade={definirQuantidade} distribuidoras={distribuidoras} listaDistribuidoras={listaDistribuidoras} onDistribuidora={definirDistribuidora} removidas={lojasRemovidas} onRemovidas={setLojasRemovidas} />
       </Grid>
     </Stack>
   );

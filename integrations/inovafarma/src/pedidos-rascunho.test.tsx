@@ -61,12 +61,13 @@ describe("Pedido em rascunho", () => {
     fireEvent.click(await screen.findByLabelText("Selecionar DIPIRONA"));
     fireEvent.change(await screen.findByLabelText("Quantidade a pedir da Loja Centro"), { target: { value: "12" } });
     fireEvent.blur(screen.getByLabelText("Quantidade a pedir da Loja Centro"));
+    fireEvent.click(screen.getByRole("button", { name: "Remover a Loja Norte" }));
     fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
     await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
     const [url, init] = chamadas("POST")[0] as [string, RequestInit];
     expect(url).toBe("/api/m/inovafarma/pedidos/pedidos");
     expect(JSON.parse(String(init.body))).toEqual({
-      itens: [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidades: [{ codigoLoja: 1, quantidade: 12, codigosFornecedor: [7] }, { codigoLoja: 2, quantidade: 0, codigosFornecedor: [] }] }],
+      itens: [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidades: [{ codigoLoja: 1, quantidade: 12, codigosFornecedor: [7] }] }],
     });
   });
 
@@ -78,6 +79,7 @@ describe("Pedido em rascunho", () => {
     fireEvent.change(campo, { target: { value: "5" } });
     fireEvent.blur(campo);
     await waitFor(() => expect(screen.getByLabelText("Selecionar DIPIRONA").getAttribute("aria-checked") ?? String(caixa.checked)).toBe("true"));
+    fireEvent.click(screen.getByRole("button", { name: "Remover a Loja Norte" }));
     fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
     await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
     expect(JSON.parse(String((chamadas("POST")[0] as [string, RequestInit])[1].body)).itens[0].quantidades[0]).toMatchObject({ codigoLoja: 1, quantidade: 5 });
@@ -93,10 +95,31 @@ describe("Pedido em rascunho", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Distribuidoras da Loja Centro" }).textContent).toBe("DISTRIBUIDORA SETE"));
     fireEvent.change(screen.getByLabelText("Quantidade a pedir da Loja Centro"), { target: { value: "4" } });
     fireEvent.blur(screen.getByLabelText("Quantidade a pedir da Loja Centro"));
+    fireEvent.click(screen.getByRole("button", { name: "Remover a Loja Norte" }));
     fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
     await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
     const [, init] = chamadas("POST")[0] as [string, RequestInit];
     expect(JSON.parse(String(init.body)).itens[0].quantidades[0]).toEqual({ codigoLoja: 1, quantidade: 4, codigosFornecedor: [7] });
+  });
+
+  it("não gera com Loja em zero: abre o Lançamento só com o que falta, e salvar de novo confere outra vez", async () => {
+    renderizar();
+    fireEvent.click(await screen.findByLabelText("Selecionar DIPIRONA"));
+    fireEvent.change(await screen.findByLabelText("Quantidade a pedir da Loja Centro"), { target: { value: "12" } });
+    fireEvent.blur(screen.getByLabelText("Quantidade a pedir da Loja Centro"));
+    fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
+    const janela = await screen.findByRole("dialog");
+    expect(within(janela).getByText("Completar o Pedido")).toBeDefined();
+    // Só a Loja que falta; a Centro já tem quantidade e fica fora.
+    expect(within(janela).queryByLabelText("Quantidade a pedir da Loja Centro")).toBeNull();
+    fireEvent.click(within(janela).getByText("DIPIRONA"));
+    fireEvent.click(await within(janela).findByRole("button", { name: "Remover a Loja Norte" }));
+    fireEvent.click(within(janela).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(screen.queryByText("Completar o Pedido")).toBeNull());
+    expect(chamadas("POST")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
+    await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
+    expect(JSON.parse(String((chamadas("POST")[0] as [string, RequestInit])[1].body)).itens[0].quantidades).toHaveLength(1);
   });
 
   it("lista os Pedidos, edita o rascunho com a versão e cancela depois de confirmar", async () => {
