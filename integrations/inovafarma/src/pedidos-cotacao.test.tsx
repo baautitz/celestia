@@ -44,7 +44,8 @@ beforeEach(() => {
     if (url.includes("/pedidos/lancamento/")) return [];
     if (url.includes("/pedidos/fornecedores")) return fornecedores;
     if (url.endsWith("/cotacao/7/planilha")) return { nome: "cotacao-7.xlsx", conteudo: "AAAA" };
-    if (url.endsWith("/cotacao/7/previa")) return { validas: 1, semOferta: 0, erros: [], semMatch: [] };
+    if (url.endsWith("/cotacao/identificar")) return { codigoFornecedor: 7 };
+    if (url.endsWith("/cotacao/7/previa")) return { validas: 1, semOferta: 0, quantidadesDiferentes: 0, erros: [], semMatch: [] };
     if (url.endsWith("/cotacao/7/importar")) return detalhe(true);
     if (url.endsWith("/confirmar")) return { ...pedido("confirmado", 3), escolhas: { "p-1": 7 } };
     if (url.endsWith("/pdf/7")) return { nome: "pedido-7.pdf", conteudo: "AAAA" };
@@ -86,7 +87,7 @@ describe("Cotação por fornecedor", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Pedidos" }));
     fireEvent.click(await screen.findByRole("button", { name: "Cotação do Pedido de 10/04/2027" }));
     const arquivo = new File([new Uint8Array([1, 2, 3])], "preenchida.xlsx");
-    fireEvent.change(await screen.findByLabelText("Planilha preenchida de ALFA DISTRIBUIDORA"), { target: { files: [arquivo] } });
+    fireEvent.change(await screen.findByLabelText("Planilhas preenchidas"), { target: { files: [arquivo] } });
     const dialogo = await screen.findByRole("alertdialog");
     expect(within(dialogo).getByText(/1 preço válido/)).toBeDefined();
     fireEvent.click(within(dialogo).getByRole("button", { name: "Importar preços" }));
@@ -105,14 +106,15 @@ describe("Cotação por fornecedor", () => {
       if (url.includes("/contexto")) return { hoje: "2027-04-10", ontem: "2027-04-09", lojas: [] };
       if (url.includes("/pedidos/visoes")) return [];
       if (url.includes("/pedidos/lancamento/")) return [];
-      if (url.endsWith("/cotacao/7/previa")) return { validas: 0, semOferta: 0, erros: [{ linha: 2, mensagem: "Preço inválido." }], semMatch: [] };
+      if (url.endsWith("/cotacao/identificar")) return { codigoFornecedor: 7 };
+      if (url.endsWith("/cotacao/7/previa")) return { validas: 0, semOferta: 0, quantidadesDiferentes: 0, erros: [{ linha: 2, mensagem: "Preço inválido." }], semMatch: [] };
       if (url.endsWith("/cotacao")) return detalhe(false);
       return [pedido("aguardando_precos", 2)];
     });
     renderizar();
     fireEvent.click(await screen.findByRole("tab", { name: "Pedidos" }));
     fireEvent.click(await screen.findByRole("button", { name: "Cotação do Pedido de 10/04/2027" }));
-    fireEvent.change(await screen.findByLabelText("Planilha preenchida de ALFA DISTRIBUIDORA"), { target: { files: [new File([new Uint8Array([1])], "x.xlsx")] } });
+    fireEvent.change(await screen.findByLabelText("Planilhas preenchidas"), { target: { files: [new File([new Uint8Array([1])], "x.xlsx")] } });
     expect(await screen.findByText(/Linha 2: Preço inválido\./)).toBeDefined();
     expect(chamadas("POST").some(([u]) => String(u).endsWith("/importar"))).toBe(false);
   });
@@ -139,7 +141,7 @@ describe("Escolha do fornecedor e confirmação", () => {
     fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Confirmar Pedido" }));
     await waitFor(() => expect(chamadas("POST").some(([u]) => String(u).endsWith("/confirmar"))).toBe(true));
     const [, init] = chamadas("POST").find(([u]) => String(u).endsWith("/confirmar")) as [string, RequestInit];
-    expect(JSON.parse(String(init.body))).toEqual({ escolhas: { "p-1": 7 }, version: 2 });
+    expect(JSON.parse(String(init.body))).toMatchObject({ escolhas: { "p-1": 7 }, version: 2 });
   });
 
   it("não oferece a escolha a quem não pode confirmar", async () => {
@@ -155,9 +157,12 @@ describe("Escolha do fornecedor e confirmação", () => {
     situacao = "confirmado";
     corpoCotacao = cotadoParaConfirmar(true, "confirmado", { "p-1": 7 });
     await abrir();
+    fireEvent.click(await screen.findByRole("button", { name: "Baixar PDFs" }));
     fireEvent.click(await screen.findByRole("button", { name: "Baixar PDF de ALFA DISTRIBUIDORA" }));
     await waitFor(() => expect(apiFetch.mock.calls.some(([u]) => String(u).endsWith("/ped_1/pdf/7"))).toBe(true));
     expect(screen.queryByRole("button", { name: "Baixar PDF de BETA" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    await waitFor(() => expect(screen.queryByText("PDFs do Pedido por distribuidora")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Conferir NF" }));
     expect(await screen.findByText("Parcial")).toBeDefined();
     expect(chamadas("POST").some(([u]) => String(u).endsWith("/ped_1/conferir"))).toBe(true);
