@@ -39,7 +39,7 @@ const Inicio = z.object({
 /** A planilha viaja em base64: o cliente de API da plataforma só fala JSON. */
 const Envio = z.object({ arquivo: z.string().min(1, "Envie a planilha preenchida.").max(MAX_ARQUIVO * 2), version: Version.optional() });
 
-const FORNECEDORES_SQL = `
+export const FORNECEDORES_SQL = `
   SELECT f.CodigoFornecedor AS codigo, LTRIM(RTRIM(c.Nome)) AS nome
   FROM Fornecedor f
   JOIN Cadastro c ON c.CodigoCadastro = f.CodigoCadastro

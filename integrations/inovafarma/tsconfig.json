@@ -14,6 +14,7 @@
     // Web-only helpers, imported by the .tsx pages and resolved by Vite (bundler mode, no .js extensions).
     "src/colaboradores-totals.ts",
     "src/loja-opcao.ts",
+    "src/pedidos-limites-comum.ts",
     "src/previous-closing-period.ts",
     "src/projecao.ts",
     "src/username-sugerido.ts"

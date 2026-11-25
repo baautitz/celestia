@@ -2,7 +2,9 @@ import type { MiddlewareHandler } from "hono";
 import type { ModuleContext } from "@platform/core/module";
 import { horaDoErp } from "./baixas-da-loja.js";
 import type { CotacaoStore } from "./cotacao-store.js";
+import { FORNECEDORES_SQL } from "./cotacao-routes.js";
 import { NomeDuplicadoError } from "./erros-de-store.js";
+import { registrarBuscaDaLista } from "./lista-busca-routes.js";
 import { ator, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDaQuery, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import { PEDIDOS_PLUGIN } from "./pedidos-audit.js";
 import { LIMITE_REGRA_TARGET, LIMITE_VALOR_TARGET, LIMITES_ACTIONS } from "./pedidos-limites-audit.js";
@@ -12,6 +14,7 @@ import { RegraComValoresError, RegraInexistenteError, type LimitesStore } from "
 import type { PedidoStore } from "./pedidos-store.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { lojasDoErp } from "./pre-vencidos-comum.js";
+import { parametrosBusca } from "./produtos-erp.js";
 import type { AuditService } from "./vinculo-audit.js";
 
 export interface PedidosLimitesRoutesDeps {
@@ -74,6 +77,22 @@ export function registerPedidosLimitesRoutes({ routes, permissions, auth, erpCli
     if (negado) return negado;
     const [regras, valores, lojas] = await Promise.all([limites.regras(), limites.valores(), lojasDoErp(erpClient())]);
     return c.json({ hoje: horaDoErp(new Date().toISOString()).slice(0, 10), podeGerir: tem(c, gerir.key), lojas, regras, valores });
+  });
+
+  registrarBuscaDaLista({ routes, auth, erpClient, base: `${BASE}/lista`, recusa: (c) => recusa(c, gerir) });
+
+  /** As distribuidoras ativas do ERP, para a Regra. */
+  routes.get(`${BASE}/fornecedores`, auth, async (c: AuthContext) => {
+    const negado = recusa(c, ver);
+    if (negado) return negado;
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    try {
+      const linhas = await client.query<{ codigo: number; nome: string | null }>(FORNECEDORES_SQL, parametrosBusca(""));
+      return c.json(linhas.map((l) => ({ codigo: Number(l.codigo), nome: l.nome?.trim() || `Distribuidora ${l.codigo}` })));
+    } catch (err: unknown) {
+      return c.json(erroDoErp(err), 503);
+    }
   });
 
   routes.post(`${BASE}/regras`, auth, async (c: AuthContext) => {
