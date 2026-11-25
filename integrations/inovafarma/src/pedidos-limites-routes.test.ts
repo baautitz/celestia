@@ -19,13 +19,15 @@ const novembro = (regraId: string) => ({ regraId, inicio: "2026-11-01", fim: "20
 interface Erp {
   entradas?: { codigoLoja: number; valor: number }[];
   vendas?: { codigoLoja: number; valor: number }[];
+  transferencias?: { codigoLoja: number; valor: number }[];
 }
 
-const erp = ({ entradas = [], vendas = [] }: Erp, consultas: string[] = []): ErpQuery => ({
+const erp = ({ entradas = [], vendas = [], transferencias = [] }: Erp, consultas: string[] = []): ErpQuery => ({
   query: async <T,>(sql: string) => {
     consultas.push(sql);
     if (sql.includes("FROM Venda v")) return vendas as T[];
     if (sql.includes("cp.Quantidade * cp.Preco")) return entradas as T[];
+    if (sql.includes("FROM Estoque_Movimentacao m")) return transferencias as T[];
     if (sql.includes("FROM Produto p WHERE")) return [{ produtoId: "p-1" }] as T[];
     return [] as T[];
   },
@@ -67,6 +69,14 @@ describe("consumo do Limite de Compras", () => {
       { tipo: "porLoja", lojas: [{ codigoLoja: 1, valorCentavos: 10_000 }, { codigoLoja: 2, valorCentavos: 1_000 }] },
     );
     expect(saldos.map((s) => [s.codigoLoja, s.comprometidoCentavos, s.saldoCentavos])).toEqual([[1, 5_000, 10_000], [2, 2_000, -3_000]]);
+  });
+
+  it("conta a transferência recebida na entrada e desconta a enviada", async () => {
+    const saldos = await consumo(
+      { entradas: [{ codigoLoja: 1, valor: 10_000 }], transferencias: [{ codigoLoja: 1, valor: -4_000 }, { codigoLoja: 2, valor: 4_000 }] },
+      { tipo: "porLoja", lojas: [{ codigoLoja: 1, valorCentavos: 1_000_000 }, { codigoLoja: 2, valorCentavos: 1_000_000 }] },
+    );
+    expect(saldos.map((s) => s.entradasCentavos)).toEqual([600_000, 400_000]);
   });
 
   it("ignora o comprometido de outra distribuidora e fora da vigência em curso", async () => {

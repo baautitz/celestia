@@ -13,6 +13,7 @@ export interface SaldoLimite {
   /** null: o saldo único de todas as Lojas. */
   codigoLoja: number | null;
   valorCentavos: number;
+  /** NF mais transferência recebida, menos a transferência enviada. */
   entradasCentavos: number;
   /** O que falta chegar dos Pedidos confirmados, ao preço cotado. */
   comprometidoCentavos: number;
@@ -67,6 +68,30 @@ async function entradasPorLoja(client: ErpQuery, regra: RegraLimite, valor: Valo
        JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
        WHERE c.Eliminado = 0 AND c.DataNota >= @dataInicio AND c.DataNota <= @dataFim AND ${lista} ${distribuidoras}
        GROUP BY c.CodigoEmpresa`,
+      params,
+    ),
+  );
+}
+
+/** Grupo "TRANSFERENCIAS" em `Estoque_Movimentacao_Grupo`. */
+const GRUPO_TRANSFERENCIA = 21;
+
+/**
+ * Transferências entre Lojas da lista na vigência, pelo custo: a recebida (`+`) soma, a enviada (`-`) desconta, e a
+ * mesma mercadoria não conta duas vezes. Não têm distribuidora: todas contam.
+ */
+async function transferenciasPorLoja(client: ErpQuery, regra: RegraLimite, valor: ValorLimite): Promise<PorLoja> {
+  const params: Record<string, unknown> = { dataInicio: `${valor.inicio} 00:00:00`, dataFim: `${valor.fim} 23:59:59` };
+  const lista = daLista(regra, params);
+  return porLoja(
+    await client.query<{ codigoLoja: number; valor: number | null }>(
+      `SELECT m.CodigoEmpresa AS codigoLoja, CAST(SUM(CASE m.Operacao WHEN '-' THEN -mp.TotalCusto ELSE mp.TotalCusto END) AS float) AS valor
+       FROM Estoque_Movimentacao m
+       JOIN Lancamento l ON l.CodigoLancamento = m.CodigoLancamento
+       JOIN Estoque_Movimentacao_Produto mp ON mp.CodigoMovimento = m.CodigoMovimento
+       JOIN Produto p ON p.CodigoProduto = mp.CodigoProduto
+       WHERE m.CodigoGrupo = ${GRUPO_TRANSFERENCIA} AND m.Eliminado = 0 AND l.DataLancamento >= @dataInicio AND l.DataLancamento <= @dataFim AND ${lista}
+       GROUP BY m.CodigoEmpresa`,
       params,
     ),
   );
@@ -131,8 +156,9 @@ async function comprometidoPorLoja({ client, pedidos, cotacoes }: DepsDoConsumo,
 export async function consumoDoLimite(deps: DepsDoConsumo, regra: RegraLimite, valor: ValorLimite): Promise<SaldoLimite[]> {
   const hoje = deps.hoje ?? horaDoErp(new Date().toISOString()).slice(0, 10);
   const emCurso = valor.inicio <= hoje && hoje <= valor.fim;
-  const [entradas, reposto, comprometido] = await Promise.all([
+  const [notas, transferencias, reposto, comprometido] = await Promise.all([
     entradasPorLoja(deps.client, regra, valor),
+    transferenciasPorLoja(deps.client, regra, valor),
     custoVendidoPorLoja(deps.client, regra, valor),
     emCurso ? comprometidoPorLoja(deps, regra) : Promise.resolve<PorLoja>(new Map()),
   ]);
@@ -140,7 +166,7 @@ export async function consumoDoLimite(deps: DepsDoConsumo, regra: RegraLimite, v
   const saldos = distribuicao.tipo === "todas" ? [{ codigoLoja: null, valorCentavos: distribuicao.valorCentavos }] : distribuicao.lojas;
   const soma = (mapa: PorLoja, codigoLoja: number | null) => (codigoLoja === null ? [...mapa.values()].reduce((t, n) => t + n, 0) : (mapa.get(codigoLoja) ?? 0));
   return saldos.map(({ codigoLoja, valorCentavos }) => {
-    const entradasCentavos = soma(entradas, codigoLoja);
+    const entradasCentavos = soma(notas, codigoLoja) + soma(transferencias, codigoLoja);
     const comprometidoCentavos = soma(comprometido, codigoLoja);
     const repostoCentavos = soma(reposto, codigoLoja);
     return {
