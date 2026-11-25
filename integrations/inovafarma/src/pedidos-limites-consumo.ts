@@ -1,0 +1,155 @@
+import { horaDoErp } from "./baixas-da-loja.js";
+import type { CotacaoStore } from "./cotacao-store.js";
+import { vendasFromWhere } from "./desempenho-vendas.js";
+import { COLUNA_DO_PRODUTO, idsPorTipo } from "./lista-produtos.js";
+import type { ErpQuery } from "./metas-comum.js";
+import { chaveDaLinha, conferir } from "./pedidos-conferencia.js";
+import type { RegraLimite, ValorLimite } from "./pedidos-limites.js";
+import { entradasDosPedidos } from "./pedidos-nf.js";
+import type { PedidoStore } from "./pedidos-store.js";
+
+/** O consumo de um saldo do Valor do Limite, em centavos. */
+export interface SaldoLimite {
+  /** null: o saldo único de todas as Lojas. */
+  codigoLoja: number | null;
+  valorCentavos: number;
+  entradasCentavos: number;
+  /** O que falta chegar dos Pedidos confirmados, ao preço cotado. */
+  comprometidoCentavos: number;
+  /** Custo do que foi vendido da lista: volta para o saldo. */
+  repostoCentavos: number;
+  /** Nunca passa do valor; negativo quando o Limite estourou. */
+  saldoCentavos: number;
+}
+
+export interface DepsDoConsumo {
+  client: ErpQuery;
+  pedidos: PedidoStore;
+  cotacoes: CotacaoStore;
+  /** Hoje na hora do ERP, `AAAA-MM-DD`. */
+  hoje?: string;
+}
+
+/** Produtos por consulta: o SQL Server aceita cerca de 2100 parâmetros, e a Lista usa até 500 deles. */
+const LOTE_PRODUTOS = 1000;
+const ABERTOS = ["confirmado", "parcialmente_recebido"];
+
+type PorLoja = Map<number, number>;
+
+const nomesDeParametros = (prefixo: string, valores: readonly unknown[], params: Record<string, unknown>) =>
+  valores
+    .map((valor, i) => {
+      params[`${prefixo}${i}`] = valor;
+      return `@${prefixo}${i}`;
+    })
+    .join(", ");
+
+/** A condição sobre `p` (Produto) da Lista da Regra: as entradas unidas por `OR`, então cada produto conta uma vez. */
+function daLista(regra: Pick<RegraLimite, "entradas">, params: Record<string, unknown>): string {
+  const condicoes = idsPorTipo(regra.entradas, params, "ent").map(([tipo, nomes]) => `${COLUNA_DO_PRODUTO[tipo]} IN (${nomes})`);
+  return condicoes.length ? `(${condicoes.join(" OR ")})` : "1 = 0";
+}
+
+const porLoja = (linhas: { codigoLoja: number; valor: number | null }[]): PorLoja => new Map(linhas.map((l) => [Number(l.codigoLoja), Math.round((Number(l.valor) || 0) * 100)]));
+
+/** Entradas de NF (quantidade × preço da nota) da lista, na vigência, só das distribuidoras da Regra. */
+async function entradasPorLoja(client: ErpQuery, regra: RegraLimite, valor: ValorLimite): Promise<PorLoja> {
+  const params: Record<string, unknown> = { dataInicio: `${valor.inicio} 00:00:00`, dataFim: `${valor.fim} 23:59:59` };
+  const lista = daLista(regra, params);
+  const distribuidoras = regra.fornecedores.length
+    ? `AND EXISTS (SELECT 1 FROM Fornecedor f WHERE f.CodigoCadastro = c.CodigoCadastro AND f.CodigoFornecedor IN (${nomesDeParametros("forn", regra.fornecedores, params)}))`
+    : "";
+  return porLoja(
+    await client.query<{ codigoLoja: number; valor: number | null }>(
+      `SELECT c.CodigoEmpresa AS codigoLoja, CAST(SUM(cp.Quantidade * cp.Preco) AS float) AS valor
+       FROM Compra c
+       JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
+       JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
+       WHERE c.Eliminado = 0 AND c.DataNota >= @dataInicio AND c.DataNota <= @dataFim AND ${lista} ${distribuidoras}
+       GROUP BY c.CodigoEmpresa`,
+      params,
+    ),
+  );
+}
+
+/** Custo das vendas da lista na vigência (regras da Venda Líquida). A venda não tem distribuidora: todas contam. */
+async function custoVendidoPorLoja(client: ErpQuery, regra: RegraLimite, valor: ValorLimite): Promise<PorLoja> {
+  const params: Record<string, unknown> = { dataInicio: `${valor.inicio} 00:00:00`, dataFim: `${valor.fim} 23:59:59` };
+  const lista = daLista(regra, params);
+  return porLoja(
+    await client.query<{ codigoLoja: number; valor: number | null }>(
+      `SELECT v.CodigoEmpresa AS codigoLoja, CAST(SUM(vp.Quantidade * vp.PrecoCusto) AS float) AS valor
+       ${vendasFromWhere(`AND ${lista}`)}
+       GROUP BY v.CodigoEmpresa`,
+      params,
+    ),
+  );
+}
+
+/** Quais dos produtos estão na Lista da Regra. */
+async function produtosDaLista(client: ErpQuery, regra: RegraLimite, ids: string[]): Promise<Set<string>> {
+  const dentro = new Set<string>();
+  for (let i = 0; i < ids.length; i += LOTE_PRODUTOS) {
+    const params: Record<string, unknown> = {};
+    const lote = nomesDeParametros("p", ids.slice(i, i + LOTE_PRODUTOS), params);
+    const linhas = await client.query<{ produtoId: string }>(
+      `SELECT CONVERT(varchar(36), p.rowguid) AS produtoId FROM Produto p WHERE CONVERT(varchar(36), p.rowguid) IN (${lote}) AND ${daLista(regra, params)}`,
+      params,
+    );
+    for (const l of linhas) dentro.add(String(l.produtoId));
+  }
+  return dentro;
+}
+
+/** O que falta chegar dos Pedidos confirmados (lista e distribuidoras da Regra) vezes o preço cotado do fornecedor escolhido. */
+async function comprometidoPorLoja({ client, pedidos, cotacoes }: DepsDoConsumo, regra: RegraLimite): Promise<PorLoja> {
+  const total: PorLoja = new Map();
+  const abertos = (await pedidos.listar()).filter((p) => ABERTOS.includes(p.status));
+  const ids = [...new Set(abertos.flatMap((p) => Object.keys(p.escolhas)))];
+  if (ids.length === 0) return total;
+  const dentro = await produtosDaLista(client, regra, ids);
+  const entradas = await entradasDosPedidos(client, abertos);
+  for (const pedido of abertos) {
+    const cotados = await cotacoes.listar(pedido.id);
+    const recebidas = entradas.get(pedido) ?? new Map<string, number>();
+    for (const linha of conferir(pedido, recebidas)) {
+      const fornecedor = pedido.escolhas[linha.produtoId];
+      if (fornecedor === undefined || !dentro.has(linha.produtoId)) continue;
+      if (regra.fornecedores.length && !regra.fornecedores.includes(fornecedor)) continue;
+      const falta = linha.pedida - (recebidas.get(chaveDaLinha(linha.produtoId, linha.codigoLoja)) ?? 0);
+      const preco = cotados.find((c) => c.codigoFornecedor === fornecedor)?.precos?.[linha.produtoId] ?? 0;
+      if (falta > 0) total.set(linha.codigoLoja, (total.get(linha.codigoLoja) ?? 0) + Math.round(falta * preco * 100));
+    }
+  }
+  return total;
+}
+
+/**
+ * Os saldos do Valor do Limite: um só (todas as Lojas somadas) ou um por Loja. O comprometido só pesa na vigência em
+ * curso: um Pedido ainda não recebido não pertence a um mês encerrado nem a um que não começou.
+ */
+export async function consumoDoLimite(deps: DepsDoConsumo, regra: RegraLimite, valor: ValorLimite): Promise<SaldoLimite[]> {
+  const hoje = deps.hoje ?? horaDoErp(new Date().toISOString()).slice(0, 10);
+  const emCurso = valor.inicio <= hoje && hoje <= valor.fim;
+  const [entradas, reposto, comprometido] = await Promise.all([
+    entradasPorLoja(deps.client, regra, valor),
+    custoVendidoPorLoja(deps.client, regra, valor),
+    emCurso ? comprometidoPorLoja(deps, regra) : Promise.resolve<PorLoja>(new Map()),
+  ]);
+  const { distribuicao } = valor;
+  const saldos = distribuicao.tipo === "todas" ? [{ codigoLoja: null, valorCentavos: distribuicao.valorCentavos }] : distribuicao.lojas;
+  const soma = (mapa: PorLoja, codigoLoja: number | null) => (codigoLoja === null ? [...mapa.values()].reduce((t, n) => t + n, 0) : (mapa.get(codigoLoja) ?? 0));
+  return saldos.map(({ codigoLoja, valorCentavos }) => {
+    const entradasCentavos = soma(entradas, codigoLoja);
+    const comprometidoCentavos = soma(comprometido, codigoLoja);
+    const repostoCentavos = soma(reposto, codigoLoja);
+    return {
+      codigoLoja,
+      valorCentavos,
+      entradasCentavos,
+      comprometidoCentavos,
+      repostoCentavos,
+      saldoCentavos: Math.min(valorCentavos, valorCentavos - entradasCentavos - comprometidoCentavos + repostoCentavos),
+    };
+  });
+}

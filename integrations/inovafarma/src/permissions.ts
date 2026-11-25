@@ -132,4 +132,14 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite editar o estoque mínimo e máximo dos produtos por Loja na grade do Lançamento de Pedidos.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para editar o estoque mínimo e máximo.",
   },
+  "pedidos-limites:ver": {
+    label: "Pedidos: Ver Limites de Compras",
+    description: "Permite ver as Regras e os Valores do Limite de Compras e o consumo de cada um.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver os Limites de Compras.",
+  },
+  "pedidos-limites:gerir": {
+    label: "Pedidos: Gerir Limites de Compras",
+    description: "Permite criar, alterar e excluir as Regras e os Valores do Limite de Compras.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir os Limites de Compras.",
+  },
 });

@@ -129,7 +129,9 @@
           "inovafarma:pedidos-lancamento:ver",
           "inovafarma:pedidos-pedidos:gerir",
           "inovafarma:pedidos-pedidos:confirmar",
-          "inovafarma:pedidos-minimos:editar"
+          "inovafarma:pedidos-minimos:editar",
+          "inovafarma:pedidos-limites:ver",
+          "inovafarma:pedidos-limites:gerir"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -295,7 +297,9 @@
         "inovafarma:pedidos-lancamento:ver",
         "inovafarma:pedidos-pedidos:gerir",
         "inovafarma:pedidos-pedidos:confirmar",
-        "inovafarma:pedidos-minimos:editar"
+        "inovafarma:pedidos-minimos:editar",
+        "inovafarma:pedidos-limites:ver",
+        "inovafarma:pedidos-limites:gerir"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -631,6 +635,20 @@
             "label": "Pedidos: Editar estoque mínimo e máximo",
             "description": "Permite editar o estoque mínimo e máximo dos produtos por Loja na grade do Lançamento de Pedidos.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para editar o estoque mínimo e máximo.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pedidos-limites:ver",
+            "label": "Pedidos: Ver Limites de Compras",
+            "description": "Permite ver as Regras e os Valores do Limite de Compras e o consumo de cada um.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver os Limites de Compras.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pedidos-limites:gerir",
+            "label": "Pedidos: Gerir Limites de Compras",
+            "description": "Permite criar, alterar e excluir as Regras e os Valores do Limite de Compras.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir os Limites de Compras.",
             "module": "inovafarma"
           }
         ]
@@ -969,6 +987,20 @@
             "label": "Pedidos: Editar estoque mínimo e máximo",
             "description": "Permite editar o estoque mínimo e máximo dos produtos por Loja na grade do Lançamento de Pedidos.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para editar o estoque mínimo e máximo.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pedidos-limites:ver",
+            "label": "Pedidos: Ver Limites de Compras",
+            "description": "Permite ver as Regras e os Valores do Limite de Compras e o consumo de cada um.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para ver os Limites de Compras.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pedidos-limites:gerir",
+            "label": "Pedidos: Gerir Limites de Compras",
+            "description": "Permite criar, alterar e excluir as Regras e os Valores do Limite de Compras.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir os Limites de Compras.",
             "module": "inovafarma"
           }
         ]
