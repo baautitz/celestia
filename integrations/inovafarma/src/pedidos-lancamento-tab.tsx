@@ -234,6 +234,19 @@ const faltaParaMinimo = (l: LinhaLoja) => Math.max(0, Math.ceil((l.minimo ?? 0) 
 /** Chave da quantidade a pedir de um produto numa Loja. */
 const chaveQtd = (produtoId: string, codigoLoja: number) => `${produtoId}:${codigoLoja}`;
 
+/**
+ * As Lojas do produto no Pedido, com a quantidade a pedir de cada uma. A grade mostra todas as Lojas, então entra também
+ * a que não veio do ERP (sem venda nem mínimo) mas teve quantidade digitada.
+ */
+function lojasDoPedido(p: ProdutoLancamento, lojas: LojaOpcao[], quantidades: Map<string, number>): { codigoLoja: number; quantidade: number }[] {
+  const doErp = p.lojas.map((l) => ({ codigoLoja: l.codigoLoja, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l) }));
+  const digitadas = lojas
+    .filter((l) => !p.lojas.some((x) => x.codigoLoja === l.codigo))
+    .map((l) => ({ codigoLoja: l.codigo, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigo)) ?? 0 }))
+    .filter((l) => l.quantidade > 0);
+  return [...doErp, ...digitadas];
+}
+
 /** Célula editável da quantidade a pedir da Loja: confirma ao sair do campo. */
 function CampoPedir({ valor, rotulo, onChange }: { valor: number | undefined; rotulo: string; onChange: (valor: number) => void }) {
   return (
@@ -536,9 +549,17 @@ interface ResultadoCorrecao {
   marcados: string[];
 }
 
-/** Produto marcado, Loja na grade e Pedir em zero: o que impede de salvar. */
-const pendenciasDe = (selecionados: Iterable<ProdutoLancamento>, quantidades: Map<string, number>, removidas: number[]) =>
-  [...selecionados].flatMap((p) => p.lojas.filter((l) => !removidas.includes(l.codigoLoja) && (quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)) <= 0).map((l) => ({ produto: p, codigoLoja: l.codigoLoja })));
+/** Produto marcado, Loja na grade (com ou sem movimento) e Pedir em zero: o que impede de salvar. */
+const pendenciasDe = (selecionados: Iterable<ProdutoLancamento>, lojas: LojaOpcao[], quantidades: Map<string, number>, removidas: number[]) =>
+  [...selecionados].flatMap((p) =>
+    lojas
+      .filter((l) => {
+        if (removidas.includes(l.codigo)) return false;
+        const doErp = p.lojas.find((x) => x.codigoLoja === l.codigo);
+        return (quantidades.get(chaveQtd(p.produtoId, l.codigo)) ?? (doErp ? faltaParaMinimo(doErp) : 0)) <= 0;
+      })
+      .map((l) => ({ produto: p, codigoLoja: l.codigo })),
+  );
 
 /** O mesmo Lançamento, só com os produtos e as Lojas faltantes; Salvar aplica no Pedido em montagem e fecha. */
 function CorrecaoWindow({ contexto, correcao }: { contexto: Contexto; correcao: Omit<Correcao, "aoSalvar"> }) {
@@ -710,7 +731,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
       return;
     }
     // Produto marcado com Loja em zero não passa: abre o mesmo Lançamento só com o que falta; salvar lá fecha, e salvar aqui de novo confere outra vez.
-    const pendencias = pendenciasDe(selecionados.values(), quantidades, lojasRemovidas);
+    const pendencias = pendenciasDe(selecionados.values(), contexto.lojas, quantidades, lojasRemovidas);
     if (pendencias.length > 0) {
       const faltantes = new Set(pendencias.map((x) => x.codigoLoja));
       const resultado = await windows.open<ResultadoCorrecao>({
@@ -737,7 +758,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
     }
     // A quantidade já foi digitada na grade de Lojas; só entram os produtos com alguma quantidade a pedir.
     const itens: ItemPedido[] = [...selecionados.values()]
-      .map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: p.lojas.filter((l) => !lojasRemovidas.includes(l.codigoLoja)).map((l) => ({ codigoLoja: l.codigoLoja, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l), codigosFornecedor: distribuidoras.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? [] })) }))
+      .map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: lojasDoPedido(p, contexto.lojas, quantidades).filter((l) => !lojasRemovidas.includes(l.codigoLoja)).map((l) => ({ ...l, codigosFornecedor: distribuidoras.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? [] })) }))
       .filter((i) => i.quantidades.some((q) => q.quantidade > 0));
     if (itens.length === 0) {
       notificar(new Error("Informe a quantidade a pedir de ao menos um produto."));

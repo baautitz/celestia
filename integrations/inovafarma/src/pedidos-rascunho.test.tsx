@@ -85,6 +85,34 @@ describe("Pedido em rascunho", () => {
     expect(JSON.parse(String((chamadas("POST")[0] as [string, RequestInit])[1].body)).itens[0].quantidades[0]).toMatchObject({ codigoLoja: 1, quantidade: 5 });
   });
 
+  it("leva a quantidade digitada numa Loja sem venda do produto, que a grade mostra zerada", async () => {
+    const base = apiFetch.getMockImplementation() as (url: string, init?: RequestInit) => Promise<unknown>;
+    apiFetch.mockImplementation(async (url: string, init?: RequestInit) => (url.includes("/pedidos/lancamento/produtos") ? [{ ...dipirona, lojas: [] }] : base(url, init)));
+    renderizar();
+    fireEvent.click(await screen.findByText("DIPIRONA"));
+    const campo = await screen.findByLabelText("Quantidade a pedir da Loja Norte");
+    fireEvent.change(campo, { target: { value: "200" } });
+    fireEvent.blur(campo);
+    fireEvent.click(screen.getByRole("button", { name: "Remover a Loja Centro" }));
+    fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
+    await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
+    expect(JSON.parse(String((chamadas("POST")[0] as [string, RequestInit])[1].body)).itens[0].quantidades).toMatchObject([{ codigoLoja: 2, quantidade: 200 }]);
+  });
+
+  it("cobra também a Loja sem movimento que aparece zerada na grade", async () => {
+    const base = apiFetch.getMockImplementation() as (url: string, init?: RequestInit) => Promise<unknown>;
+    apiFetch.mockImplementation(async (url: string, init?: RequestInit) => (url.includes("/pedidos/lancamento/produtos") ? [{ ...dipirona, lojas: [] }] : base(url, init)));
+    renderizar();
+    fireEvent.click(await screen.findByText("DIPIRONA"));
+    const campo = await screen.findByLabelText("Quantidade a pedir da Loja Norte");
+    fireEvent.change(campo, { target: { value: "200" } });
+    fireEvent.blur(campo);
+    fireEvent.click(screen.getByRole("button", { name: "Gerar pedido" }));
+    const janela = await screen.findByRole("dialog");
+    expect(await within(janela).findByLabelText("Quantidade a pedir da Loja Centro")).toBeTruthy();
+    expect(chamadas("POST")).toHaveLength(0);
+  });
+
   it("a janela das distribuidoras da Loja já traz a que deu entrada no produto, e o rascunho a leva", async () => {
     renderizar();
     fireEvent.click(await screen.findByText("DIPIRONA"));
