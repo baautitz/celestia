@@ -30,8 +30,8 @@ export class PostgresPedidoStore implements PedidoStore {
     return this.mudar(id, expectedVersion, { itens: dados.itens }, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
-  async cancelarRascunho(id: string, expectedVersion: number): Promise<Pedido | null> {
-    return this.mudar(id, expectedVersion, { status: "cancelado" });
+  async cancelar(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "cancelado" }, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
   async iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null> {

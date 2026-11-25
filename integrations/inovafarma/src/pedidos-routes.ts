@@ -69,7 +69,7 @@ export function registerPedidosRoutes({ routes, permissions, auth, store, audit 
     if (!(await store.pedido(id))) return c.json({ error: NAO_ENCONTRADO }, 404);
     const lido = await ler(c, Cancelamento);
     if ("recusa" in lido) return lido.recusa;
-    const cancelado = await store.cancelarRascunho(id, lido.dados.version);
+    const cancelado = await store.cancelar(id, lido.dados.version);
     if (!cancelado) return c.json(DESATUALIZADO, 409);
     await registrar(c, PEDIDOS_ACTIONS.cancelar, cancelado);
     return c.json(cancelado);

@@ -21,7 +21,7 @@ const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguarda
 interface Recebimento { pedidoId: string; pedida: number; recebida: number; produtos: number; produtosOk: number }
 const dia = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
 
-/** Aba Pedidos: a listagem dos Pedidos, com edição e cancelamento do rascunho. */
+/** Aba Pedidos: a listagem dos Pedidos, com edição e cancelamento antes da confirmação. */
 export function PedidosTab() {
   const { windows, feedback } = useUi();
   const novaConsulta = useLatestFetch();
@@ -108,7 +108,7 @@ export function PedidosTab() {
   const cancelar = async (pedido: Pedido) => {
     const ok = await windows.confirm({
       title: "Cancelar Pedido",
-      description: `Cancelar o rascunho do Pedido de ${dia(pedido.criadoEm)}? Um Pedido cancelado não pode mais ser editado.`,
+      description: `Cancelar o Pedido de ${dia(pedido.criadoEm)}? Um Pedido cancelado não pode mais ser editado nem cotado.`,
       confirmLabel: "Cancelar Pedido",
       destructive: true,
     });
@@ -182,6 +182,11 @@ export function PedidosTab() {
             <Button size="icon" variant="outline" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
               <Scale />
             </Button>
+              {EDITAVEIS.includes(p.status) && (
+                <Button size="icon" variant="outline" aria-label={`Cancelar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cancelar(p)}>
+                  <Ban />
+                </Button>
+              )}
             </Stack>
           )
         }

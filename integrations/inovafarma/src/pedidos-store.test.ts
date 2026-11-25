@@ -24,11 +24,23 @@ describe("Store de Pedidos", () => {
     expect(await store.registrarRecebimento("nada", "recebido")).toBeNull();
   });
 
+  it("cancela o Pedido em cotação, mas não o confirmado", async () => {
+    const store = new MemoryPedidoStore();
+    const emCotacao = await store.criar(dados, autor);
+    await store.iniciarCotacao(emCotacao.id, 1);
+    expect(await store.cancelar(emCotacao.id, 2)).toMatchObject({ status: "cancelado" });
+    const confirmado = await store.criar(dados, autor);
+    await store.iniciarCotacao(confirmado.id, 1);
+    await store.marcarCotado(confirmado.id);
+    await store.confirmar(confirmado.id, { "p-1": 7 }, 3);
+    expect(await store.cancelar(confirmado.id, 4)).toBeNull();
+  });
+
   it("não edita nem cancela de novo um Pedido cancelado", async () => {
     const store = new MemoryPedidoStore();
     const p = await store.criar(dados, autor);
-    expect(await store.cancelarRascunho(p.id, 1)).toMatchObject({ status: "cancelado", version: 2 });
+    expect(await store.cancelar(p.id, 1)).toMatchObject({ status: "cancelado", version: 2 });
     expect(await store.atualizarRascunho(p.id, dados, 2)).toBeNull();
-    expect(await store.cancelarRascunho(p.id, 2)).toBeNull();
+    expect(await store.cancelar(p.id, 2)).toBeNull();
   });
 });

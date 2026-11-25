@@ -84,7 +84,7 @@ describe("Pedidos em rascunho", () => {
     const res = await req("gil", "POST", `/pedidos/pedidos/${pedido.id}/cancelar`, { version: 1 });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ status: "cancelado", version: 2 });
-    expect(log[1]).toBe("Cancelou o Pedido em rascunho.");
+    expect(log[1]).toBe("Cancelou o Pedido.");
     expect((await req("gil", "PUT", `/pedidos/pedidos/${pedido.id}`, { itens: [aas], version: 2 })).status).toBe(409);
     expect((await req("gil", "POST", `/pedidos/pedidos/${pedido.id}/cancelar`, { version: 2 })).status).toBe(409);
   });

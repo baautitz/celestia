@@ -8,8 +8,8 @@ export interface PedidoStore {
   criar(dados: DadosPedido, autor: { id: string; nome: string }): Promise<Pedido>;
   /** Compare-and-set pela `version`, só em rascunho; null se o Pedido mudou, sumiu ou saiu do rascunho. */
   atualizarRascunho(id: string, dados: DadosPedido, expectedVersion: number): Promise<Pedido | null>;
-  /** Compare-and-set pela `version`, só em rascunho; null como em `atualizarRascunho`. */
-  cancelarRascunho(id: string, expectedVersion: number): Promise<Pedido | null>;
+  /** Compare-and-set pela `version`, em rascunho ou em cotação (antes de confirmar); null como em `atualizarRascunho`. */
+  cancelar(id: string, expectedVersion: number): Promise<Pedido | null>;
   /** Compare-and-set pela `version`: rascunho -> aguardando preços; null se o Pedido mudou, sumiu ou saiu do rascunho. */
   iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null>;
   /** aguardando preços -> cotado; null se o Pedido não está aguardando preços. */
@@ -44,8 +44,8 @@ export class MemoryPedidoStore implements PedidoStore {
     return this.mudar(id, expectedVersion, dados, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
-  async cancelarRascunho(id: string, expectedVersion: number): Promise<Pedido | null> {
-    return this.mudar(id, expectedVersion, { status: "cancelado" });
+  async cancelar(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "cancelado" }, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
   async iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null> {

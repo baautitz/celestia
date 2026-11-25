@@ -13,5 +13,5 @@ export function declarePedidosAudit(audit: AuditService): void {
   const base = { plugin: PEDIDOS_PLUGIN, schemaVersion: 1, schema: Atributos };
   audit.declareAction({ ...base, action: PEDIDOS_ACTIONS.gerar, summary: (a) => `Gerou o Pedido em rascunho com ${produtos(a.produtos)}.` });
   audit.declareAction({ ...base, action: PEDIDOS_ACTIONS.editar, summary: (a) => `Editou o Pedido em rascunho: ${produtos(a.produtos)}.` });
-  audit.declareAction({ ...base, action: PEDIDOS_ACTIONS.cancelar, summary: () => "Cancelou o Pedido em rascunho." });
+  audit.declareAction({ ...base, action: PEDIDOS_ACTIONS.cancelar, summary: () => "Cancelou o Pedido." });
 }
