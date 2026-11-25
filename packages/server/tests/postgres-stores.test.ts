@@ -18,6 +18,8 @@ import { PostgresCorrecaoBaixaStore } from "../../../integrations/inovafarma/src
 import { CorrecaoDuplicadaError } from "../../../integrations/inovafarma/src/correcoes-baixa-store.js";
 import { PostgresAvaliacaoStore } from "../../../integrations/inovafarma/src/postgres-avaliacao-store.js";
 import { PostgresFuroEstoqueStore } from "../../../integrations/inovafarma/src/postgres-furo-estoque-store.js";
+import { PostgresLimitesStore } from "../../../integrations/inovafarma/src/postgres-pedidos-limites-store.js";
+import { RegraComValoresError, RegraInexistenteError } from "../../../integrations/inovafarma/src/pedidos-limites-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { PeriodOverlapError } from "../src/closing-period/closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
@@ -79,6 +81,8 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "inovafarma", name: "avaliacoes" },
         { schema: "inovafarma", name: "colunas_desempenho" },
         { schema: "inovafarma", name: "justificativas_ajuste" },
+        { schema: "inovafarma", name: "limites_regras" },
+        { schema: "inovafarma", name: "limites_valores" },
         { schema: "inovafarma", name: "metas" },
         { schema: "inovafarma", name: "metas_participantes" },
         { schema: "inovafarma", name: "motivos_ajuste" },
@@ -140,7 +144,23 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_itens, inovafarma.pre_vencidos_baixas_congeladas, inovafarma.pre_vencidos_correcoes_baixa, inovafarma.avaliacoes, inovafarma.justificativas_ajuste CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_itens, inovafarma.pre_vencidos_baixas_congeladas, inovafarma.pre_vencidos_correcoes_baixa, inovafarma.avaliacoes, inovafarma.justificativas_ajuste, inovafarma.limites_regras CASCADE`);
+    });
+
+    describe("Limite de Compras", () => {
+      it("grava Regra e Valor e traduz as recusas do banco", async () => {
+        const store = new PostgresLimitesStore(db);
+        const dados = { nome: "Genéricos", entradas: [{ tipo: "grupo" as const, id: "3", nome: "Genéricos" }], fornecedores: [7] };
+        const regra = await store.criarRegra(dados);
+        expect(await store.regras()).toEqual([regra]);
+        const valor = { regraId: regra.id, inicio: "2026-11-01", fim: "2026-11-30", distribuicao: { tipo: "porLoja" as const, lojas: [{ codigoLoja: 1, valorCentavos: 500 }] } };
+        await expect(store.criarValor({ ...valor, regraId: "nope" })).rejects.toThrow(RegraInexistenteError);
+        const lancado = await store.criarValor(valor);
+        expect(await store.valores()).toEqual([lancado]);
+        await expect(store.removerRegra(regra.id, 1)).rejects.toThrow(RegraComValoresError);
+        expect(await store.removerValor(lancado.id, 1)).toBe(true);
+        expect(await store.removerRegra(regra.id, 1)).toBe(true);
+      });
     });
 
     describe("Users e Roles", () => {

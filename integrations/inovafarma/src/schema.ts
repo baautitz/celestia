@@ -1,11 +1,12 @@
 import { sql } from "drizzle-orm";
-import { boolean, doublePrecision, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, doublePrecision, foreignKey, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { IndicadorId } from "./indicadores.js";
 import type { MetaApurada } from "./apuracao-store.js";
 import type { BaixaDoPeriodo } from "./baixas-do-periodo.js";
 import type { ItemCongelado } from "./baixas-congeladas-store.js";
 import type { MedidaColuna } from "./colunas-desempenho.js";
 import type { ItemPedido } from "./pedidos.js";
+import type { Distribuicao } from "./pedidos-limites.js";
 import type { EntradaLista, Exibicao, ListaTipo, RegraPremio } from "./tipos-meta.js";
 
 /** Um schema Postgres por Module. */
@@ -308,4 +309,35 @@ export const pedidosVisoes = inovafarmaSchema.table(
     uniqueIndex("pedidos_visoes_usuario_nome_unique").on(t.usuarioId, sql`lower(${t.nome})`),
     uniqueIndex("pedidos_visoes_usuario_padrao_unique").on(t.usuarioId).where(sql`${t.padrao}`),
   ],
+);
+
+/** Regras de Limite de Compras: o que se controla (Lista de Produtos e distribuidoras). */
+export const limitesRegras = inovafarmaSchema.table(
+  "limites_regras",
+  {
+    id: text("id").primaryKey(),
+    nome: text("nome").notNull(),
+    /** A Lista de Produtos, validada por `EntradaLista`: ids do ERP, sem FK. */
+    entradas: jsonb("entradas").$type<EntradaLista[]>().notNull(),
+    /** Códigos das distribuidoras no ERP, sem FK; vazio: todas. */
+    fornecedores: integer("fornecedores").array().notNull().default(sql`'{}'::integer[]`),
+    version: integer("version").notNull().default(1),
+  },
+  (t) => [uniqueIndex("limites_regras_nome_unique").on(sql`lower(${t.nome})`)],
+);
+
+/** Valores do Limite: quanto se pode comprar de uma Regra em uma vigência, no total ou por Loja. */
+export const limitesValores = inovafarmaSchema.table(
+  "limites_valores",
+  {
+    id: text("id").primaryKey(),
+    regraId: text("regra_id").notNull(),
+    /** Primeiro e último dia da vigência, `AAAA-MM-DD`. */
+    inicio: text("inicio").notNull(),
+    fim: text("fim").notNull(),
+    /** Validada por `Distribuicao` (R$ em centavos). */
+    distribuicao: jsonb("distribuicao").$type<Distribuicao>().notNull(),
+    version: integer("version").notNull().default(1),
+  },
+  (t) => [foreignKey({ name: "limites_valores_regra_fk", columns: [t.regraId], foreignColumns: [limitesRegras.id] }), index("limites_valores_regra_idx").on(t.regraId)],
 );
