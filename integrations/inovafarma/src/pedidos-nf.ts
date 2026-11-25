@@ -6,25 +6,37 @@ import type { Pedido } from "./pedidos.js";
 type Escolhido = Pick<Pedido, "itens" | "escolhas" | "criadoEm">;
 
 /**
- * Entradas de NF do ERP por produto, Loja e dia da nota desde a data mais antiga dos Pedidos: `Compra` (não eliminada,
- * por `DataNota`) e `Compra_Produto`. Sem vínculo com `Compra_Pedido`: a conferência é só por produto, Loja e data.
+ * Entradas do ERP por produto, Loja e dia desde a data mais antiga dos Pedidos: as NFs (`Compra`, não eliminada, por
+ * `DataNota`) e as transferências recebidas de outra Loja (movimentação `+` do grupo 21, "TRANSFERENCIAS"). Sem vínculo
+ * com `Compra_Pedido`: a conferência é só por produto, Loja e data.
  */
-const entradasSql = (produtos: number) => `
-  SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, c.CodigoEmpresa AS codigoLoja, CONVERT(varchar(10), c.DataNota, 120) AS dia,
-         CAST(SUM(cp.Quantidade) AS float) AS recebida
-  FROM Compra c
-  JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
-  JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
-  WHERE c.Eliminado = 0 AND c.DataNota >= @desde
-    AND CONVERT(varchar(36), p.rowguid) IN (${Array.from({ length: produtos }, (_, i) => `@p${i}`).join(", ")})
-  GROUP BY CONVERT(varchar(36), p.rowguid), c.CodigoEmpresa, CONVERT(varchar(10), c.DataNota, 120)`;
+const entradasSql = (produtos: number) => {
+  const ids = Array.from({ length: produtos }, (_, i) => `@p${i}`).join(", ");
+  return `
+  SELECT produtoId, codigoLoja, dia, CAST(SUM(quantidade) AS float) AS recebida
+  FROM (
+    SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, c.CodigoEmpresa AS codigoLoja, CONVERT(varchar(10), c.DataNota, 120) AS dia, cp.Quantidade AS quantidade
+    FROM Compra c
+    JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
+    JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
+    WHERE c.Eliminado = 0 AND c.DataNota >= @desde AND CONVERT(varchar(36), p.rowguid) IN (${ids})
+    UNION ALL
+    SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, m.CodigoEmpresa AS codigoLoja, CONVERT(varchar(10), l.DataLancamento, 120) AS dia, mp.Quantidade AS quantidade
+    FROM Estoque_Movimentacao m
+    JOIN Lancamento l ON l.CodigoLancamento = m.CodigoLancamento
+    JOIN Estoque_Movimentacao_Produto mp ON mp.CodigoMovimento = m.CodigoMovimento
+    JOIN Produto p ON p.CodigoProduto = mp.CodigoProduto
+    WHERE m.CodigoGrupo = 21 AND m.Operacao = '+' AND m.Eliminado = 0 AND l.DataLancamento >= @desde AND CONVERT(varchar(36), p.rowguid) IN (${ids})
+  ) e
+  GROUP BY produtoId, codigoLoja, dia`;
+};
 
 const idsEscolhidos = (pedido: Escolhido) => pedido.itens.filter((i) => pedido.escolhas[i.produtoId] !== undefined).map((i) => i.produtoId);
 const diaDoPedido = (pedido: Escolhido) => horaDoErp(pedido.criadoEm).slice(0, 10);
 
 /**
- * O que já entrou por NF (`produtoId|codigoLoja` -> quantidade) de cada Pedido, com uma só consulta ao ERP para todos:
- * a janela começa no Pedido mais antigo e cada Pedido soma só as notas a partir da própria data.
+ * O que já entrou (`produtoId|codigoLoja` -> quantidade) de cada Pedido, com uma só consulta ao ERP para todos:
+ * a janela começa no Pedido mais antigo e cada Pedido soma só as entradas a partir da própria data.
  */
 export async function entradasDosPedidos<P extends Escolhido>(client: ErpQuery, pedidos: P[]): Promise<Map<P, Map<string, number>>> {
   const resultado = new Map<P, Map<string, number>>(pedidos.map((p) => [p, new Map()]));
@@ -47,7 +59,7 @@ export async function entradasDosPedidos<P extends Escolhido>(client: ErpQuery, 
   return resultado;
 }
 
-/** O que já entrou por NF (`produtoId|codigoLoja` -> quantidade) dos produtos com fornecedor escolhido no Pedido. */
+/** O que já entrou (`produtoId|codigoLoja` -> quantidade) dos produtos com fornecedor escolhido no Pedido. */
 export async function entradasDoPedido(client: ErpQuery, pedido: Escolhido): Promise<Map<string, number>> {
   return (await entradasDosPedidos(client, [pedido])).get(pedido) as Map<string, number>;
 }
