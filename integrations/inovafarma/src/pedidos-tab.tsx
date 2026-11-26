@@ -164,6 +164,15 @@ export function PedidosTab() {
     await abrirPdfsDasLojas({ windows, feedback }, pedido.id, lojas, baixar);
   };
 
+  /** As Lojas em que o Usuário mexe; `null` = todas. O servidor é quem recusa: aqui só se escondem as ações. */
+  const [minhasLojas, setMinhasLojas] = useState<number[] | null>(null);
+  useEffect(() => {
+    apiFetch<{ lojas?: number[] | null }>(`${API}/pedidos/meu-escopo`)
+      .then((r) => setMinhasLojas(Array.isArray(r?.lojas) ? r.lojas : null))
+      .catch(() => undefined);
+  }, []);
+  const noEscopo = (p: Pedido) => minhasLojas === null || p.itens.every((i) => i.quantidades.every((q) => q.quantidade <= 0 || minhasLojas.includes(q.codigoLoja)));
+
   const finalizar = async (pedido: Pedido) => {
     const ok = await windows.confirm({
       title: "Finalizar Pedido",
@@ -250,7 +259,15 @@ export function PedidosTab() {
         emptyMessage={resumo ? "Nenhum Pedido com esses filtros." : "Nenhum Pedido ainda. Marque produtos no Lançamento e use Gerar pedido."}
         search={{ placeholder: "Buscar Pedido" }}
         rowActions={(p) =>
-          p.status === "rascunho" ? (
+          !noEscopo(p) ? (
+            p.status === "rascunho" || p.status === "cancelado" || soDeLojas(p) ? null : (
+              <Stack direction="row" gap="tight">
+                <Button size="icon" variant="outline" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
+                  <Scale />
+                </Button>
+              </Stack>
+            )
+          ) : p.status === "rascunho" ? (
             <Stack direction="row" gap="tight">
               <Button size="icon" variant="outline" aria-label={`Editar Pedido de ${dia(p.criadoEm)}`} onClick={() => void editar(p)}>
                 <Pencil />

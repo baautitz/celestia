@@ -61,7 +61,7 @@ export function versaoDaQuery(c: Context) {
 }
 
 /** Vínculo em vigor do Usuário com um Colaborador; null sem Vínculo ou com ele desfeito. */
-export const vinculoDoUsuario = async (vinculos: VinculoStore, usuarioId: string): Promise<VinculoColaborador | null> => {
+export const vinculoDoUsuario = async (vinculos: Pick<VinculoStore, "porUsuario">, usuarioId: string): Promise<VinculoColaborador | null> => {
   const vinculo = await vinculos.porUsuario(usuarioId);
   return vinculo && !vinculoDesfeito(vinculo) ? vinculo : null;
 };

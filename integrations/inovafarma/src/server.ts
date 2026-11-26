@@ -16,6 +16,7 @@ import { MemoryCotacaoStore } from "./cotacao-store.js";
 import { PostgresCotacaoStore } from "./postgres-cotacao-store.js";
 import { declareConfirmacaoAudit } from "./pedidos-confirmacao-audit.js";
 import { registerConfirmacaoRoutes } from "./pedidos-confirmacao-routes.js";
+import { authDoPedido } from "./pedidos-escopo-lojas.js";
 import { registerPedidosRoutes } from "./pedidos-routes.js";
 import { MemoryPedidoStore } from "./pedidos-store.js";
 import { PostgresPedidoStore } from "./postgres-pedidos-store.js";
@@ -169,10 +170,12 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       const pedidos = db ? new PostgresPedidoStore(db) : new MemoryPedidoStore();
       registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos: db ? new PostgresMinimoMaximoStore(db) : new MemoryMinimoMaximoStore(), audit, pedidos });
       registerPedidosEstudoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId] });
-      registerPedidosRoutes({ routes, permissions, auth, store: pedidos, audit });
+      // Gerar e alterar Pedido só nas Lojas do Vínculo do Usuário, salvo com a Permission de todas.
+      const authPedido = authDoPedido({ permissions, auth, vinculos: store, pedidos });
+      registerPedidosRoutes({ routes, permissions, auth: authPedido, store: pedidos, vinculos: store, audit });
       const cotacoes = db ? new PostgresCotacaoStore(db) : new MemoryCotacaoStore();
-      registerCotacaoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], pedidos, cotacoes, audit });
-      registerConfirmacaoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], pedidos, cotacoes, audit });
+      registerCotacaoRoutes({ routes, permissions, auth: authPedido, erpClient: () => erpClients[erpId], pedidos, cotacoes, audit });
+      registerConfirmacaoRoutes({ routes, permissions, auth: authPedido, erpClient: () => erpClients[erpId], pedidos, cotacoes, audit });
       declareLimitesAudit(audit);
       registerPedidosLimitesRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], limites: db ? new PostgresLimitesStore(db) : new MemoryLimitesStore(), pedidos, cotacoes, audit });
       const tiposMeta = db ? new PostgresTipoMetaStore(db) : new MemoryTipoMetaStore();
