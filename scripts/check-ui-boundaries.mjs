@@ -32,6 +32,7 @@ for await (const rel of glob("{packages/*/src/**/*.{ts,tsx},integrations/**/*.{t
     if (node.type !== "ImportDeclaration") return
     const name = node.source.value
     if (name === "sonner") report(node, "import direto de sonner")
+    if (name === "@platform/ui/components/toggle-group") report(node, "botoes segmentados (troca de visao usa Tabs de @platform/ui/components/tabs)")
     if (name.startsWith("@base-ui/react")) report(node, "import direto de @base-ui/react")
     if (name.startsWith("@/components/ui")) report(node, "import de @/components/ui (legado)")
     if (windowModules.test(name)) {

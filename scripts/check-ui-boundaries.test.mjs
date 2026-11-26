@@ -17,6 +17,7 @@ function runTest() {
     "base.tsx": 'import { Dialog } from "@base-ui/react/dialog"\nexport const a = Dialog\n',
     "open.tsx":
       'import { Dialog } from "@platform/ui/components/dialog"\nexport const A = () => <Dialog open={true} onOpenChange={() => {}} />\n',
+    "segmentado.tsx": 'import { ToggleGroup } from "@platform/ui/components/toggle-group"\nexport const a = ToggleGroup\n',
     "legacy.tsx": 'import { Button } from "@/components/ui/button"\nexport const a = Button\n',
   }
   const plugin = join(root, "integrations/acme/src")
