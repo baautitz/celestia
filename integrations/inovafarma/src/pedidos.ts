@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Codigo } from "./metas-comum.js";
 
 /** Estados do Pedido: a Cotação leva o rascunho a cotado; a confirmação a confirmado; a conferência com a NF a parcialmente recebido e recebido. */
-export const PEDIDO_STATUS = ["rascunho", "aguardando_precos", "cotado", "confirmado", "parcialmente_recebido", "recebido", "cancelado"] as const;
+export const PEDIDO_STATUS = ["rascunho", "aguardando_precos", "cotado", "confirmado", "parcialmente_recebido", "recebido", "finalizado", "cancelado"] as const;
 export type PedidoStatus = (typeof PEDIDO_STATUS)[number];
 
 const MAX_QUANTIDADE = 1_000_000;

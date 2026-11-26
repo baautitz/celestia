@@ -11,7 +11,7 @@ export interface ItemPedido {
 
 export interface Pedido {
   id: string;
-  status: "rascunho" | "aguardando_precos" | "cotado" | "confirmado" | "parcialmente_recebido" | "recebido" | "cancelado";
+  status: "rascunho" | "aguardando_precos" | "cotado" | "confirmado" | "parcialmente_recebido" | "recebido" | "finalizado" | "cancelado";
   itens: ItemPedido[];
   /** A escolha da cotação por produto; vazia até a confirmação. */
   escolhas?: Record<string, number | { codigoLoja: number; codigoFornecedor: number; quantidade: number }[]>;

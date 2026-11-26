@@ -9,7 +9,10 @@ export interface PedidoStore {
   /** Compare-and-set pela `version`, só em rascunho; null se o Pedido mudou, sumiu ou saiu do rascunho. */
   atualizarRascunho(id: string, dados: DadosPedido, expectedVersion: number): Promise<Pedido | null>;
   /** Compare-and-set pela `version`, em rascunho ou em cotação (antes de confirmar); null como em `atualizarRascunho`. */
+  /** Vale até depois de confirmado, com ou sem entrada; e no finalizado; só o recebido por inteiro não se cancela. */
   cancelar(id: string, expectedVersion: number): Promise<Pedido | null>;
+  /** Encerra à mão um Pedido confirmado, mesmo faltando itens: o que não chegou deixa de ser esperado. */
+  finalizar(id: string, expectedVersion: number): Promise<Pedido | null>;
   /** Compare-and-set pela `version`: rascunho -> aguardando preços; null se o Pedido mudou, sumiu ou saiu do rascunho. */
   iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null>;
   /** aguardando preços -> cotado; null se o Pedido não está aguardando preços. */
@@ -47,7 +50,11 @@ export class MemoryPedidoStore implements PedidoStore {
   }
 
   async cancelar(id: string, expectedVersion: number): Promise<Pedido | null> {
-    return this.mudar(id, expectedVersion, { status: "cancelado" }, ["rascunho", "aguardando_precos", "cotado"]);
+    return this.mudar(id, expectedVersion, { status: "cancelado" }, ["rascunho", "aguardando_precos", "cotado", "confirmado", "parcialmente_recebido", "finalizado"]);
+  }
+
+  async finalizar(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "finalizado" }, ["confirmado", "parcialmente_recebido"]);
   }
 
   async iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null> {

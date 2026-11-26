@@ -119,7 +119,7 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
   },
   "pedidos-pedidos:gerir": {
     label: "Pedidos: Gerir Pedidos",
-    description: "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar e cancelar Pedidos ainda não confirmados, cotar com fornecedores e conferir o recebimento pela NF.",
+    description: "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar Pedidos ainda não confirmados, cancelar e finalizar Pedidos, cotar com fornecedores e conferir o recebimento pela NF.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para gerir os Pedidos.",
   },
   "pedidos-pedidos:confirmar": {

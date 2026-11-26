@@ -129,6 +129,7 @@
           "inovafarma:pedidos-lancamento:ver",
           "inovafarma:pedidos-pedidos:gerir",
           "inovafarma:pedidos-pedidos:confirmar",
+          "inovafarma:pedidos-todas-lojas:gerir",
           "inovafarma:pedidos-minimos:editar",
           "inovafarma:pedidos-limites:ver",
           "inovafarma:pedidos-limites:gerir"
@@ -297,6 +298,7 @@
         "inovafarma:pedidos-lancamento:ver",
         "inovafarma:pedidos-pedidos:gerir",
         "inovafarma:pedidos-pedidos:confirmar",
+        "inovafarma:pedidos-todas-lojas:gerir",
         "inovafarma:pedidos-minimos:editar",
         "inovafarma:pedidos-limites:ver",
         "inovafarma:pedidos-limites:gerir"
@@ -619,7 +621,7 @@
           {
             "key": "inovafarma:pedidos-pedidos:gerir",
             "label": "Pedidos: Gerir Pedidos",
-            "description": "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar e cancelar Pedidos ainda não confirmados, cotar com fornecedores e conferir o recebimento pela NF.",
+            "description": "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar Pedidos ainda não confirmados, cancelar e finalizar Pedidos, cotar com fornecedores e conferir o recebimento pela NF.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir os Pedidos.",
             "module": "inovafarma"
           },
@@ -628,6 +630,13 @@
             "label": "Pedidos: Confirmar Pedidos",
             "description": "Permite escolher o fornecedor de cada produto, confirmar o Pedido cotado e gerar o PDF por fornecedor.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para confirmar Pedidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pedidos-todas-lojas:gerir",
+            "label": "Pedidos: Todas as Lojas",
+            "description": "Permite gerar e alterar Pedidos de qualquer Loja. Sem ela, o Usuário só mexe nos Pedidos das Lojas do Colaborador vinculado.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir Pedidos de todas as Lojas.",
             "module": "inovafarma"
           },
           {
@@ -971,7 +980,7 @@
           {
             "key": "inovafarma:pedidos-pedidos:gerir",
             "label": "Pedidos: Gerir Pedidos",
-            "description": "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar e cancelar Pedidos ainda não confirmados, cotar com fornecedores e conferir o recebimento pela NF.",
+            "description": "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar Pedidos ainda não confirmados, cancelar e finalizar Pedidos, cotar com fornecedores e conferir o recebimento pela NF.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir os Pedidos.",
             "module": "inovafarma"
           },
@@ -980,6 +989,13 @@
             "label": "Pedidos: Confirmar Pedidos",
             "description": "Permite escolher o fornecedor de cada produto, confirmar o Pedido cotado e gerar o PDF por fornecedor.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para confirmar Pedidos.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pedidos-todas-lojas:gerir",
+            "label": "Pedidos: Todas as Lojas",
+            "description": "Permite gerar e alterar Pedidos de qualquer Loja. Sem ela, o Usuário só mexe nos Pedidos das Lojas do Colaborador vinculado.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir Pedidos de todas as Lojas.",
             "module": "inovafarma"
           },
           {

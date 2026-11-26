@@ -49,7 +49,7 @@ interface LinhaConferida {
 }
 
 const ESTADOS = { pendente: "Pendente", parcial: "Parcial", recebido: "Recebido", excedente: "Excedente" } as const;
-const CONFIRMADOS = ["confirmado", "parcialmente_recebido", "recebido"];
+const CONFIRMADOS = ["confirmado", "parcialmente_recebido", "recebido", "finalizado"];
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -281,7 +281,7 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
               <FileText /> Baixar PDFs
             </Button>
             {botaoDasLojas}
-            <Button type="button" onClick={() => void conferirNf()}>Conferir NF</Button>
+            {detalhe.pedido.status === "finalizado" ? null : <Button type="button" onClick={() => void conferirNf()}>Conferir NF</Button>}
           </Stack>
         ) : null}
         {linhas ? (

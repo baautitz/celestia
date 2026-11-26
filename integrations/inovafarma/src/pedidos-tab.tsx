@@ -1,5 +1,6 @@
+import { Badge } from "@platform/ui/components/badge";
 import { useCallback, useEffect, useState } from "react";
-import { Ban, Check, ClipboardList, FileDown, PackageCheck, Pencil, Scale, SlidersHorizontal } from "lucide-react";
+import { Ban, Check, CheckCheck, ClipboardList, FileDown, PackageCheck, Pencil, Scale, SlidersHorizontal } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
 import { Stack, Text } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
@@ -19,7 +20,10 @@ import { API } from "./inovafarma-api";
 
 /** Situações em que o Pedido ainda pode ser editado. */
 const EDITAVEIS: Pedido["status"][] = ["aguardando_precos", "cotado"];
-const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguardando_precos: "Aguardando preços", cotado: "Cotado", confirmado: "Confirmado", parcialmente_recebido: "Parcialmente recebido", recebido: "Recebido", cancelado: "Cancelado" };
+const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguardando_precos: "Aguardando preços", cotado: "Cotado", confirmado: "Confirmado", parcialmente_recebido: "Parcialmente recebido", recebido: "Recebido", finalizado: "Finalizado", cancelado: "Cancelado" };
+const COR_DA_SITUACAO = { rascunho: "secondary", aguardando_precos: "warning", cotado: "info", confirmado: "default", parcialmente_recebido: "warning", recebido: "success", finalizado: "outline", cancelado: "destructive" } as const satisfies Record<Pedido["status"], string>;
+/** Confirmado e ainda em aberto: dá para finalizar à mão ou cancelar. */
+const ABERTOS: Pedido["status"][] = ["confirmado", "parcialmente_recebido"];
 interface Recebimento { pedidoId: string; pedida: number; recebida: number; produtos: number; produtosOk: number }
 const lojasFornecedoras = (p: Pedido) => [...new Set(p.itens.flatMap((i) => i.quantidades.flatMap((q) => (q.lojasFornecedoras ?? []).map((l) => l.codigoLoja))))];
 /** Tudo vem de outras Lojas: não há cotação. */
@@ -160,10 +164,28 @@ export function PedidosTab() {
     await abrirPdfsDasLojas({ windows, feedback }, pedido.id, lojas, baixar);
   };
 
+  const finalizar = async (pedido: Pedido) => {
+    const ok = await windows.confirm({
+      title: "Finalizar Pedido",
+      description: `Finalizar o Pedido de ${dia(pedido.criadoEm)}? O que ainda não chegou deixa de ser esperado. Não dá para reabrir.`,
+      confirmLabel: "Finalizar Pedido",
+    });
+    if (!ok) return;
+    try {
+      await apiFetch(`${PEDIDOS_BASE}/${pedido.id}/finalizar`, json("POST", { version: pedido.version }));
+      feedback.notify({ type: "success", title: "Pedido finalizado." });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao finalizar o Pedido."));
+    }
+    void carregar();
+  };
+
   const cancelar = async (pedido: Pedido) => {
     const ok = await windows.confirm({
       title: "Cancelar Pedido",
-      description: `Cancelar o Pedido de ${dia(pedido.criadoEm)}? Um Pedido cancelado não pode mais ser editado nem cotado.`,
+      description: ABERTOS.includes(pedido.status) || pedido.status === "finalizado"
+        ? `Cancelar o Pedido de ${dia(pedido.criadoEm)}? Ele já foi confirmado: deixa de ser esperado. O que já deu entrada continua no ERP.`
+        : `Cancelar o Pedido de ${dia(pedido.criadoEm)}? Um Pedido cancelado não pode mais ser editado nem cotado.`,
       confirmLabel: "Cancelar Pedido",
       destructive: true,
     });
@@ -183,7 +205,7 @@ export function PedidosTab() {
     { key: "criadoEm", label: "Criado em", format: "date", width: 120, value: (p) => p.criadoEm, sortable: true, firstSort: "desc" },
     { key: "criadoPor", label: "Criado por", value: (p) => p.criadoPorNome, searchable: true, mobileRole: "primary" },
     { key: "produtos", label: "Produtos", format: "decimal", width: 100, value: (p) => p.itens.length },
-    { key: "status", label: "Situação", value: (p) => STATUS[p.status], searchable: true },
+    { key: "status", label: "Situação", value: (p) => STATUS[p.status], searchable: true, render: (p) => <Badge variant={COR_DA_SITUACAO[p.status]}>{STATUS[p.status]}</Badge> },
     {
       key: "entrada",
       format: "number",
@@ -273,7 +295,12 @@ export function PedidosTab() {
                   <FileDown />
                 </Button>
               )}
-              {EDITAVEIS.includes(p.status) && (
+              {ABERTOS.includes(p.status) && (
+                <Button size="icon" variant="outline" aria-label={`Finalizar Pedido de ${dia(p.criadoEm)}`} onClick={() => void finalizar(p)}>
+                  <CheckCheck />
+                </Button>
+              )}
+              {(EDITAVEIS.includes(p.status) || ABERTOS.includes(p.status) || p.status === "finalizado") && (
                 <Button size="icon" variant="outline" aria-label={`Cancelar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cancelar(p)}>
                   <Ban />
                 </Button>

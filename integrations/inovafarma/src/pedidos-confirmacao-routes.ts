@@ -34,6 +34,8 @@ const NAO_ENCONTRADO = "Pedido não encontrado.";
 const DESATUALIZADO = versaoDesatualizada("O Pedido foi alterado por outra pessoa ou já não está cotado. A tela foi recarregada.");
 const SEM_NOME = "Não foi possível consultar o nome do fornecedor no ERP. O PDF não foi gerado; tente novamente em instantes.";
 const EM_RECEBIMENTO = ["confirmado", "parcialmente_recebido", "recebido"];
+/** Onde a entrada e os PDFs se consultam: o finalizado não muda mais de situação, mas continua visível. */
+const COM_ENTRADA = [...EM_RECEBIMENTO, "finalizado"];
 
 const Parcela = z.object({ codigoLoja: Codigo, codigoFornecedor: Codigo, quantidade: z.number().positive().max(1_000_000) });
 const Escolha = z.union([Codigo, z.array(Parcela).min(1).max(900)]);
@@ -77,7 +79,7 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
     try {
-      const abertos = (await pedidos.listar()).filter((p) => EM_RECEBIMENTO.includes(p.status));
+      const abertos = (await pedidos.listar()).filter((p) => COM_ENTRADA.includes(p.status));
       const entradas = await entradasDosPedidos(client, abertos);
       return c.json(
         abertos.map((p) => {
@@ -101,7 +103,7 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     const achado = await doPedido(c, gerir);
     if ("recusa" in achado) return achado.recusa;
     const { pedido } = achado;
-    if (!EM_RECEBIMENTO.includes(pedido.status)) return c.json({ error: "Confirme o Pedido antes de acompanhar a entrada." }, 409);
+    if (!COM_ENTRADA.includes(pedido.status)) return c.json({ error: "Confirme o Pedido antes de acompanhar a entrada." }, 409);
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
     try {
@@ -196,7 +198,7 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     const achado = await doPedido(c, confirmar);
     if ("recusa" in achado) return achado.recusa;
     const { pedido } = achado;
-    if (!EM_RECEBIMENTO.includes(pedido.status)) return c.json({ error: "Confirme o Pedido antes de gerar o PDF." }, 409);
+    if (!COM_ENTRADA.includes(pedido.status)) return c.json({ error: "Confirme o Pedido antes de gerar o PDF." }, 409);
     const codigo = CodigoEmTexto.safeParse(c.req.param("codigo"));
     const cotacao = codigo.success ? (await cotacoes.listar(pedido.id)).find((x) => x.codigoFornecedor === codigo.data) : undefined;
     const itens = cotacao?.precos ? itensDoFornecedor(pedido, cotacao.codigoFornecedor, cotacao.precos, cotacao.quantidades) : [];

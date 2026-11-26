@@ -74,4 +74,16 @@ export function registerPedidosRoutes({ routes, permissions, auth, store, audit 
     await registrar(c, PEDIDOS_ACTIONS.cancelar, cancelado);
     return c.json(cancelado);
   });
+
+  routes.post(`${BASE}/:id/finalizar`, auth, async (c: AuthContext) => {
+    if (!pode(c)) return c.json({ error: gerir.deniedMessage }, 403);
+    const id = c.req.param("id") ?? "";
+    if (!(await store.pedido(id))) return c.json({ error: NAO_ENCONTRADO }, 404);
+    const lido = await ler(c, Cancelamento);
+    if ("recusa" in lido) return lido.recusa;
+    const finalizado = await store.finalizar(id, lido.dados.version);
+    if (!finalizado) return c.json(DESATUALIZADO, 409);
+    await registrar(c, PEDIDOS_ACTIONS.finalizar, finalizado);
+    return c.json(finalizado);
+  });
 }
