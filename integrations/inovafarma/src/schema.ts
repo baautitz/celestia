@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { Escolhas } from "./pedidos.js";
 import { boolean, doublePrecision, foreignKey, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { IndicadorId } from "./indicadores.js";
 import type { MetaApurada } from "./apuracao-store.js";
@@ -242,7 +243,7 @@ export const pedidos = inovafarmaSchema.table(
     status: text("status").notNull(),
     itens: jsonb("itens").$type<ItemPedido[]>().notNull(),
     /** `produtoId` -> código do fornecedor escolhido na confirmação. */
-    escolhas: jsonb("escolhas").$type<Record<string, number>>().notNull().default({}),
+    escolhas: jsonb("escolhas").$type<Escolhas>().notNull().default({}),
     confirmadoEm: timestamp("confirmado_em"),
     /** Referência lógica a `iam.users`, sem FK entre Modules. */
     criadoPorId: text("criado_por_id").notNull(),

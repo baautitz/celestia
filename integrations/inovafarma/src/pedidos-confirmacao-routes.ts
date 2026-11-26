@@ -6,13 +6,13 @@ import type { CotacaoStore } from "./cotacao-store.js";
 import { ator, Codigo, CodigoEmTexto, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext } from "./metas-comum.js";
 import type { ErpQuery } from "./metas-comum.js";
 import { PEDIDO_TARGET, PEDIDOS_PLUGIN } from "./pedidos-audit.js";
-import { conferir, statusDoPedido, type LinhaConferida } from "./pedidos-conferencia.js";
+import { chaveDaLinha, conferir, estadoDaLinha, statusDoPedido, type LinhaConferida } from "./pedidos-conferencia.js";
 import { CONFIRMACAO_ACTIONS } from "./pedidos-confirmacao-audit.js";
-import { entradasDoPedido, entradasDosPedidos } from "./pedidos-nf.js";
+import { entradasDoPedido, entradasDosPedidos, entradasPorOrigem } from "./pedidos-nf.js";
 import { nomeDoArquivo } from "./nome-arquivo.js";
 import { lojasDoErp } from "./pre-vencidos-comum.js";
-import { gerarPdf, itensDoFornecedor, itensDoFornecedorPorLoja } from "./pedido-pdf.js";
-import type { Pedido } from "./pedidos.js";
+import { gerarPdf, gerarPdfDeLoja, itensDaLojaFornecedora, itensDoFornecedor, itensDoFornecedorPorLoja } from "./pedido-pdf.js";
+import { fornecedoresDa, paraCotar, semLinhasDeLoja, soDeLojas, type Pedido } from "./pedidos.js";
 import type { PedidoStore } from "./pedidos-store.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { AuditService } from "./vinculo-audit.js";
@@ -33,8 +33,11 @@ const DESATUALIZADO = versaoDesatualizada("O Pedido foi alterado por outra pesso
 const SEM_NOME = "Não foi possível consultar o nome do fornecedor no ERP. O PDF não foi gerado; tente novamente em instantes.";
 const EM_RECEBIMENTO = ["confirmado", "parcialmente_recebido", "recebido"];
 
+const Parcela = z.object({ codigoLoja: Codigo, codigoFornecedor: Codigo, quantidade: z.number().positive().max(1_000_000) });
+const Escolha = z.union([Codigo, z.array(Parcela).min(1).max(900)]);
+
 /** `quantidades`: por produto, a quantidade que o fornecedor escolhido vai atender (editada na comparação). */
-const Confirmacao = z.object({ escolhas: z.record(z.string().min(1).max(36), Codigo), quantidades: z.record(z.string().min(1).max(36), z.number().min(0).max(1_000_000)).optional(), version: Version });
+const Confirmacao = z.object({ escolhas: z.record(z.string().min(1).max(36), Escolha), quantidades: z.record(z.string().min(1).max(36), z.number().min(0).max(1_000_000)).optional(), version: Version });
 
 /** Confirmação do Pedido cotado, PDF por fornecedor e conferência com as entradas de NF do ERP. */
 export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient, pedidos, cotacoes, audit }: ConfirmacaoRoutesDeps): void {
@@ -85,18 +88,38 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
     try {
-      const linhas = conferir(pedido, await entradasDoPedido(client, pedido));
-      const codigos = [...new Set(Object.values(pedido.escolhas))];
+      const porOrigem = await entradasPorOrigem(client, pedido);
+      const somadas = new Map([...porOrigem].map(([chave, origens]) => [chave, [...origens.values()].reduce((t, n) => t + n, 0)]));
+      const linhas = conferir(pedido, somadas);
+      const chegaram = [...porOrigem.values()].flatMap((origens) => [...origens.keys()]);
+      const codigos = [...new Set([...Object.values(pedido.escolhas).flatMap(fornecedoresDa), ...chegaram.filter((c) => c > 0)])];
       const nomes = new Map<number, string>();
       if (codigos.length > 0) {
         const params = Object.fromEntries(codigos.map((cod, i) => [`c${i}`, cod]));
         for (const r of await client.query<{ codigo: number; nome: string | null }>(nomesSql(codigos.length), params)) nomes.set(Number(r.codigo), r.nome?.trim() || `Fornecedor ${r.codigo}`);
       }
       const detalhes = await detalhesDosProdutos(client, pedido);
+      const temLojas = chegaram.some((c) => c < 0) || pedido.itens.some((i) => i.quantidades.some((q) => q.lojasFornecedoras?.length));
+      const nomesLojas = temLojas ? new Map((await lojasDoErp(client)).map((l) => [l.codigo, l.nome])) : new Map<number, string>();
+      // Origem: código da distribuidora, negativo do código da Loja que transferiu, ou 0 quando o ERP não diz.
+      const nomeDa = (origem: number) => (origem > 0 ? (nomes.get(origem) ?? `Fornecedor ${origem}`) : origem < 0 ? (nomesLojas.get(-origem) ?? `Loja ${-origem}`) : "Origem não identificada");
       return c.json({
-        linhas: linhas.map((l) => {
-          const codigoFornecedor = pedido.escolhas[l.produtoId] ?? 0;
-          return { ...l, codigoProduto: detalhes.get(l.produtoId)?.codigoProduto ?? null, codigoFornecedor, fornecedor: nomes.get(codigoFornecedor) ?? `Fornecedor ${codigoFornecedor}` };
+        linhas: linhas.flatMap((l) => {
+          const linha = pedido.itens.find((i) => i.produtoId === l.produtoId)?.quantidades.find((q) => q.codigoLoja === l.codigoLoja);
+          const escolha = pedido.escolhas[l.produtoId];
+          // Uma linha por fornecedor: o que se pediu a cada um e o que de fato veio dele; quem mandou sem ter sido pedido entra com 0.
+          const pedidas = new Map<number, number>();
+          const pedir = (origem: number, quantidade: number) => quantidade > 0 && pedidas.set(origem, (pedidas.get(origem) ?? 0) + quantidade);
+          if (Array.isArray(escolha)) for (const p of escolha) p.codigoLoja === l.codigoLoja && pedir(p.codigoFornecedor, p.quantidade);
+          else if (escolha !== undefined && linha) pedir(escolha, paraCotar(linha));
+          for (const p of linha?.lojasFornecedoras ?? []) pedir(-p.codigoLoja, p.quantidade);
+          const recebidas = porOrigem.get(chaveDaLinha(l.produtoId, l.codigoLoja)) ?? new Map<number, number>();
+          const lojaOk = completa(l);
+          return [...new Set([...pedidas.keys(), ...recebidas.keys()])].map((origem) => {
+            const pedida = pedidas.get(origem) ?? 0;
+            const recebida = recebidas.get(origem) ?? 0;
+            return { produtoId: l.produtoId, nome: l.nome, codigoProduto: detalhes.get(l.produtoId)?.codigoProduto ?? null, codigoLoja: l.codigoLoja, codigoFornecedor: origem, fornecedor: nomeDa(origem), pedida, recebida, estado: estadoDaLinha(pedida, recebida), lojaOk };
+          });
         }),
       });
     } catch (err: unknown) {
@@ -111,30 +134,44 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     if (!lido.success) return recusaDeValidacao(c, lido.error);
     const { escolhas, quantidades, version } = lido.data;
     const { pedido } = achado;
-    if (pedido.status !== "cotado") return c.json(DESATUALIZADO, 409);
+    // Pedido só de Lojas não tem cotação: confirma direto do rascunho.
+    const semCotacao = soDeLojas(pedido) && ["rascunho", "aguardando_precos", "cotado"].includes(pedido.status);
+    if (!semCotacao && pedido.status !== "cotado") return c.json(DESATUALIZADO, 409);
     const lista = await cotacoes.listar(pedido.id);
     const precoDe = (produtoId: string, codigo: number) => lista.find((x) => x.codigoFornecedor === codigo)?.precos?.[produtoId] ?? null;
-    const produtos = new Set(pedido.itens.map((i) => i.produtoId));
+    const cotaveis = semLinhasDeLoja(pedido).itens;
+    const produtos = new Set(cotaveis.map((i) => i.produtoId));
     if (Object.keys(escolhas).some((id) => !produtos.has(id))) return c.json({ error: "Há produto fora do Pedido na escolha." }, 400);
-    for (const i of pedido.itens) {
+    for (const i of cotaveis) {
       const ofertado = lista.some((x) => (x.precos?.[i.produtoId] ?? null) !== null);
       const escolhido = escolhas[i.produtoId];
       if (!ofertado) continue;
       if (escolhido === undefined) return c.json({ error: `Escolha o fornecedor de ${i.nome}.` }, 400);
-      if (precoDe(i.produtoId, escolhido) === null) return c.json({ error: `O fornecedor escolhido não ofereceu preço para ${i.nome}.` }, 400);
+      if (fornecedoresDa(escolhido).some((codigo) => precoDe(i.produtoId, codigo) === null)) return c.json({ error: `O fornecedor escolhido não ofereceu preço para ${i.nome}.` }, 400);
+      if (Array.isArray(escolhido)) {
+        const lojasDoItem = new Set(i.quantidades.filter((q) => q.quantidade > 0).map((q) => q.codigoLoja));
+        const pares = new Set(escolhido.map((p) => `${p.codigoLoja}|${p.codigoFornecedor}`));
+        if (pares.size !== escolhido.length || escolhido.some((p) => !lojasDoItem.has(p.codigoLoja))) return c.json({ error: `Divisão inválida de ${i.nome}.` }, 400);
+      }
     }
     if (Object.keys(escolhas).some((id) => !lista.some((x) => (x.precos?.[id] ?? null) !== null))) return c.json({ error: "Há produto sem oferta na escolha." }, 400);
     if (Object.keys(quantidades ?? {}).some((id) => escolhas[id] === undefined)) return c.json({ error: "Há quantidade de produto sem fornecedor escolhido." }, 400);
-    const confirmado = await pedidos.confirmar(pedido.id, escolhas, version);
+    if (semCotacao && Object.keys(escolhas).length > 0) return c.json({ error: "Pedido só de Lojas não tem fornecedor a escolher." }, 400);
+    const confirmado = semCotacao ? await pedidos.confirmarSemCotacao(pedido.id, version) : await pedidos.confirmar(pedido.id, escolhas, version);
     if (!confirmado) return c.json(DESATUALIZADO, 409);
     // A quantidade confirmada vai para o fornecedor escolhido do produto: é a que o PDF dele leva.
     const porFornecedor = new Map<number, Record<string, number>>();
     for (const [produtoId, quantidade] of Object.entries(quantidades ?? {})) {
       const codigo = escolhas[produtoId];
-      if (codigo !== undefined) porFornecedor.set(codigo, { ...porFornecedor.get(codigo), [produtoId]: quantidade });
+      // No produto dividido a quantidade de cada distribuidora vem das parcelas.
+      if (typeof codigo === "number") porFornecedor.set(codigo, { ...porFornecedor.get(codigo), [produtoId]: quantidade });
     }
     for (const [codigo, qtds] of porFornecedor) await cotacoes.definirQuantidades(pedido.id, codigo, qtds);
-    await registrar(c, CONFIRMACAO_ACTIONS.confirmar, confirmado, { produtos: Object.keys(escolhas).length, fornecedores: new Set(Object.values(escolhas)).size });
+    const linhas = confirmado.itens.flatMap((i) => i.quantidades);
+    await registrar(c, CONFIRMACAO_ACTIONS.confirmar, confirmado, {
+      produtos: confirmado.itens.filter((i) => escolhas[i.produtoId] !== undefined || i.quantidades.some((q) => q.lojasFornecedoras?.length)).length,
+      fornecedores: new Set(Object.values(escolhas).flatMap(fornecedoresDa)).size + new Set(linhas.flatMap((q) => (q.lojasFornecedoras ?? []).map((l) => l.codigoLoja))).size,
+    });
     return c.json(confirmado);
   });
 
@@ -157,6 +194,28 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     if (porLoja && !lojas?.length) return c.json({ error: "Nenhum produto do Pedido foi escolhido neste fornecedor." }, 404);
     const arquivo = await gerarPdf({ fornecedor: nome, data: new Date(pedido.confirmadoEm ?? pedido.criadoEm).toLocaleDateString("pt-BR"), itens, lojas });
     return c.json({ nome: `${nomeDoArquivo(`Pedido ${nome} ${pedido.criadoEm.slice(0, 10)}${porLoja ? " por Loja" : ""}`)}.pdf`, conteudo: arquivo.toString("base64") });
+  });
+
+  routes.get(`${BASE}/pdf-loja/:codigo`, auth, async (c: AuthContext) => {
+    const achado = await doPedido(c, confirmar);
+    if ("recusa" in achado) return achado.recusa;
+    const { pedido } = achado;
+    // Sai já antes da confirmação: a Loja pode separar sem esperar os preços das distribuidoras.
+    if (pedido.status === "cancelado") return c.json({ error: "O Pedido foi cancelado." }, 409);
+    const codigo = CodigoEmTexto.safeParse(c.req.param("codigo"));
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    try {
+      const nomesLojas = new Map((await lojasDoErp(client)).map((l) => [l.codigo, l.nome]));
+      const nomeDe = (n: number) => nomesLojas.get(n) ?? `Loja ${n}`;
+      const destinos = codigo.success ? itensDaLojaFornecedora(pedido, codigo.data, nomeDe) : [];
+      if (!codigo.success || destinos.length === 0) return c.json({ error: "Nenhum produto do Pedido foi pedido a esta Loja." }, 404);
+      const nome = nomeDe(codigo.data);
+      const arquivo = await gerarPdfDeLoja({ fornecedora: nome, data: new Date(pedido.confirmadoEm ?? pedido.criadoEm).toLocaleDateString("pt-BR"), destinos });
+      return c.json({ nome: `${nomeDoArquivo(`Transferência ${nome} ${pedido.criadoEm.slice(0, 10)}`)}.pdf`, conteudo: arquivo.toString("base64") });
+    } catch (err: unknown) {
+      return c.json(erroDoErp(err), 503);
+    }
   });
 
   routes.post(`${BASE}/conferir`, auth, async (c: AuthContext) => {

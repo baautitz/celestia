@@ -16,7 +16,7 @@ const fornecedores = [{ codigo: 7, nome: "ALFA DISTRIBUIDORA" }, { codigo: 9, no
 const detalhe = (importados: boolean) => ({
   pedido: { id: "ped_1", status: importados ? "cotado" : "aguardando_precos", version: 2 },
   fornecedores: [{ codigo: 7, nome: "ALFA DISTRIBUIDORA", importado: importados, importadoEm: null, version: importados ? 2 : 1 }, { codigo: 9, nome: "Fornecedor 9", importado: importados, importadoEm: null, version: importados ? 2 : 1 }],
-  produtos: [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidade: 10, precos: importados ? { 7: 12.5, 9: 11 } : {} }],
+  produtos: [{ produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", quantidade: 10, lojas: [{ codigoLoja: 1, quantidade: 10 }], precos: importados ? { 7: 12.5, 9: 11 } : {} }],
 });
 
 const cotadoParaConfirmar = (podeConfirmar: boolean, status = "cotado", escolhas: Record<string, number> = {}) => ({
@@ -131,17 +131,21 @@ describe("Escolha do fornecedor e confirmação", () => {
     situacao = "cotado";
     corpoCotacao = cotadoParaConfirmar(true);
     await abrir();
-    const beta = await screen.findByRole("button", { name: "Escolher BETA para DIPIRONA" });
-    const alfa = screen.getByRole("button", { name: "Escolher ALFA DISTRIBUIDORA para DIPIRONA" });
-    expect(beta.getAttribute("aria-pressed")).toBe("true");
+    const beta = await screen.findByRole("checkbox", { name: "Escolher BETA para DIPIRONA" });
+    const alfa = screen.getByRole("checkbox", { name: "Escolher ALFA DISTRIBUIDORA para DIPIRONA" });
+    expect(beta.getAttribute("aria-checked")).toBe("true");
+    // Marca as duas: a segunda entra com o que falta (nada); depois desmarca a primeira e remarca para receber tudo.
     fireEvent.click(alfa);
-    expect(alfa.getAttribute("aria-pressed")).toBe("true");
-    expect(beta.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("checkbox", { name: "Escolher BETA para DIPIRONA" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Quantidade de ALFA DISTRIBUIDORA para DIPIRONA em Centro" }).value).toBe("0");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Escolher BETA para DIPIRONA" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Escolher ALFA DISTRIBUIDORA para DIPIRONA" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Escolher ALFA DISTRIBUIDORA para DIPIRONA" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirmar Pedido" }));
     fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Confirmar Pedido" }));
     await waitFor(() => expect(chamadas("POST").some(([u]) => String(u).endsWith("/confirmar"))).toBe(true));
     const [, init] = chamadas("POST").find(([u]) => String(u).endsWith("/confirmar")) as [string, RequestInit];
-    expect(JSON.parse(String(init.body))).toMatchObject({ escolhas: { "p-1": 7 }, version: 2 });
+    expect(JSON.parse(String(init.body))).toMatchObject({ escolhas: { "p-1": [{ codigoLoja: 1, codigoFornecedor: 7, quantidade: 10 }] }, version: 2 });
   });
 
   it("não oferece a escolha a quem não pode confirmar", async () => {
@@ -150,7 +154,7 @@ describe("Escolha do fornecedor e confirmação", () => {
     await abrir();
     await screen.findByTitle("Menor preço");
     expect(screen.queryByRole("button", { name: "Confirmar Pedido" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Escolher BETA para DIPIRONA" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Escolher BETA para DIPIRONA" })).toBeNull();
   });
 
   it("baixa o PDF de cada fornecedor escolhido e confere com a NF mostrando os estados", async () => {
@@ -162,7 +166,7 @@ describe("Escolha do fornecedor e confirmação", () => {
     await waitFor(() => expect(apiFetch.mock.calls.some(([u]) => String(u).endsWith("/ped_1/pdf/7"))).toBe(true));
     expect(screen.queryByRole("button", { name: "Baixar PDF de BETA" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
-    await waitFor(() => expect(screen.queryByText("PDFs do Pedido por distribuidora")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("PDFs do Pedido por fornecedor")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Conferir NF" }));
     expect(await screen.findByText("Parcial")).toBeDefined();
     expect(chamadas("POST").some(([u]) => String(u).endsWith("/ped_1/conferir"))).toBe(true);

@@ -40,6 +40,7 @@ beforeEach(() => {
     if (url.includes("/pedidos/visoes")) return [];
     if (url.includes("/pedidos/fornecedores")) return [{ codigo: 7, nome: "DISTRIBUIDORA SETE" }];
     if (url.includes("/movimentacao")) return [];
+    if (url.includes("/pedidos/lancamento/estoques")) return [{ codigoLoja: 2, estoque: 23 }];
     if (url.includes("/pedidos/lancamento/ultimas-compras")) return [];
     if (url.includes("/pedidos/lancamento/entradas")) return [{ produtoId: "p-1", codigoLoja: 1, codigoFornecedor: 7 }];
     if (url.includes("/pedidos/lancamento/produtos")) return [dipirona];
@@ -116,11 +117,11 @@ describe("Pedido em rascunho", () => {
   it("a janela das distribuidoras da Loja já traz a que deu entrada no produto, e o rascunho a leva", async () => {
     renderizar();
     fireEvent.click(await screen.findByText("DIPIRONA"));
-    fireEvent.click(await screen.findByRole("button", { name: "Distribuidoras da Loja Centro" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Fornecedor da Loja Centro" }));
     const janela = await screen.findByRole("dialog");
     expect(await within(janela).findByText("DISTRIBUIDORA SETE")).toBeDefined();
     fireEvent.click(within(janela).getByRole("button", { name: "Concluir" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Distribuidoras da Loja Centro" }).textContent).toBe("DISTRIBUIDORA SETE"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Fornecedor da Loja Centro" }).textContent).toBe("DISTRIBUIDORA SETE"));
     fireEvent.change(screen.getByLabelText("Quantidade a pedir da Loja Centro"), { target: { value: "4" } });
     fireEvent.blur(screen.getByLabelText("Quantidade a pedir da Loja Centro"));
     fireEvent.click(screen.getByRole("button", { name: "Remover a Loja Norte" }));
@@ -128,6 +129,16 @@ describe("Pedido em rascunho", () => {
     await waitFor(() => expect(chamadas("POST")).toHaveLength(1));
     const [, init] = chamadas("POST")[0] as [string, RequestInit];
     expect(JSON.parse(String(init.body)).itens[0].quantidades[0]).toEqual({ codigoLoja: 1, quantidade: 4, codigosFornecedor: [7] });
+  });
+
+  it("o Pedir informado na janela do fornecedor volta para a grade de Lojas", async () => {
+    renderizar();
+    fireEvent.click(await screen.findByText("DIPIRONA"));
+    fireEvent.click(await screen.findByRole("button", { name: "Fornecedor da Loja Centro" }));
+    const janela = await screen.findByRole("dialog");
+    fireEvent.change(within(janela).getByLabelText("Pedir nesta Loja"), { target: { value: "9" } });
+    fireEvent.click(within(janela).getByRole("button", { name: "Concluir" }));
+    await waitFor(() => expect((screen.getByLabelText("Quantidade a pedir da Loja Centro") as HTMLInputElement).value).toBe("9"));
   });
 
   it("não gera com Loja em zero: abre o Lançamento só com o que falta, e salvar de novo confere outra vez", async () => {

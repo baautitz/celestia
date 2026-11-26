@@ -3,7 +3,7 @@ import { Download } from "lucide-react";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
 import { Stack, Text } from "@platform/ui/components/layout";
-import { ToggleGroup, ToggleGroupItem } from "@platform/ui/components/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
 import { usePreference } from "@platform/ui/hooks/use-preference";
 import { WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 
@@ -22,7 +22,7 @@ export interface DistribuidoraDownload {
  * Modal de download por distribuidora (as planilhas da cotação ou os PDFs do Pedido confirmado): uma linha por
  * distribuidora, com o nome (e a situação) de um lado e o botão do outro, e "Baixar todos" para tirar tudo de uma vez.
  */
-export function CotacaoDownloadsWindow({ distribuidoras, tipo, baixar }: { distribuidoras: DistribuidoraDownload[]; tipo: "planilha" | "PDF"; baixar: (d: DistribuidoraDownload, modo: ModoDownload) => Promise<void> }) {
+export function CotacaoDownloadsWindow({ distribuidoras, tipo, semModo = false, baixar }: { distribuidoras: DistribuidoraDownload[]; tipo: "planilha" | "PDF"; /** O arquivo tem um só formato: sem a escolha de separação. */ semModo?: boolean; baixar: (d: DistribuidoraDownload, modo: ModoDownload) => Promise<void> }) {
   const [modo, salvarModo] = usePreference<ModoDownload>(`inovafarma:downloads:${tipo.toLowerCase()}:modo`, "consolidado", aceita);
   const [baixando, setBaixando] = useState(false);
   const baixarTodos = async () => {
@@ -36,11 +36,15 @@ export function CotacaoDownloadsWindow({ distribuidoras, tipo, baixar }: { distr
   return (
     <>
       <Stack gap="group">
-        <ToggleGroup variant="outline" spacing={0} value={[modo]} onValueChange={(v: string[]) => { if (aceita(v[0])) salvarModo(v[0]); }} aria-label="Como separar o arquivo">
-          <ToggleGroupItem value="consolidado">Consolidado</ToggleGroupItem>
-          <ToggleGroupItem value="loja">{tipo === "PDF" ? "Separado por Loja (uma página por Loja)" : "Separado por Loja (uma aba por Loja)"}</ToggleGroupItem>
-        </ToggleGroup>
-        {distribuidoras.length === 0 ? <Text tone="muted">Nenhuma distribuidora.</Text> : null}
+        {semModo ? null : (
+          <Tabs value={modo} onValueChange={(v) => { if (aceita(v)) salvarModo(v); }}>
+            <TabsList aria-label="Como separar o arquivo">
+              <TabsTrigger value="consolidado">Consolidado</TabsTrigger>
+              <TabsTrigger value="loja">Separado por Loja</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+        {distribuidoras.length === 0 ? <Text tone="muted">Nenhum fornecedor.</Text> : null}
         {distribuidoras.map((d) => (
           <Stack key={d.codigo} direction="row" gap="group" align="center" justify="between">
             <Stack direction="row" gap="group" align="center">

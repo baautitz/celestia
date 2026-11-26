@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { Ban, ClipboardList, PackageCheck, Pencil, Scale } from "lucide-react";
+import { Ban, Check, ClipboardList, FileDown, PackageCheck, Pencil, Scale } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
 import { Stack } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import { CotacaoWindow } from "./cotacao-window";
+import { abrirPdfsDasLojas } from "./pdfs-das-lojas";
+import { baixar, CotacaoWindow } from "./cotacao-window";
 import { FalhaAoCarregar, useContexto } from "./contexto";
 import { json } from "./inovafarma-api";
 import type { LojaOpcao } from "./loja-opcao";
@@ -19,6 +20,9 @@ import { API } from "./inovafarma-api";
 const EDITAVEIS: Pedido["status"][] = ["aguardando_precos", "cotado"];
 const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguardando_precos: "Aguardando preços", cotado: "Cotado", confirmado: "Confirmado", parcialmente_recebido: "Parcialmente recebido", recebido: "Recebido", cancelado: "Cancelado" };
 interface Recebimento { pedidoId: string; pedida: number; recebida: number; produtos: number; produtosOk: number }
+const lojasFornecedoras = (p: Pedido) => [...new Set(p.itens.flatMap((i) => i.quantidades.flatMap((q) => (q.lojasFornecedoras ?? []).map((l) => l.codigoLoja))))];
+/** Tudo vem de outras Lojas: não há cotação. */
+const soDeLojas = (p: Pedido) => p.itens.every((i) => i.quantidades.every((q) => q.quantidade === (q.lojasFornecedoras ?? []).reduce((t, l) => t + l.quantidade, 0)));
 const dia = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
 
 /** Aba Pedidos: a listagem dos Pedidos, com edição e cancelamento antes da confirmação. */
@@ -105,6 +109,27 @@ export function PedidosTab() {
     void carregar();
   };
 
+  const confirmarSoDeLojas = async (pedido: Pedido) => {
+    const ok = await windows.confirm({
+      title: "Confirmar Pedido",
+      description: `Confirmar o Pedido de ${dia(pedido.criadoEm)}? Ele é só de Lojas e não passa por cotação.`,
+      confirmLabel: "Confirmar Pedido",
+    });
+    if (!ok) return;
+    try {
+      await apiFetch(`${PEDIDOS_BASE}/${pedido.id}/confirmar`, json("POST", { escolhas: {}, version: pedido.version }));
+      feedback.notify({ type: "success", title: "Pedido confirmado." });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao confirmar o Pedido."));
+    }
+    void carregar();
+  };
+
+  const pdfDasLojas = async (pedido: Pedido) => {
+    const lojas = lojasFornecedoras(pedido).map((codigo) => ({ codigo, nome: contexto?.lojas.find((l) => l.codigo === codigo)?.nome ?? `Loja ${codigo}` }));
+    await abrirPdfsDasLojas({ windows, feedback }, pedido.id, lojas, baixar);
+  };
+
   const cancelar = async (pedido: Pedido) => {
     const ok = await windows.confirm({
       title: "Cancelar Pedido",
@@ -165,9 +190,20 @@ export function PedidosTab() {
               <Button size="icon" variant="outline" aria-label={`Editar Pedido de ${dia(p.criadoEm)}`} onClick={() => void editar(p)}>
                 <Pencil />
               </Button>
-              <Button size="icon" variant="outline" aria-label={`Cotar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cotar(p)}>
-                <ClipboardList />
-              </Button>
+              {soDeLojas(p) ? (
+                <Button size="icon" variant="outline" aria-label={`Confirmar Pedido de ${dia(p.criadoEm)}`} onClick={() => void confirmarSoDeLojas(p)}>
+                  <Check />
+                </Button>
+              ) : (
+                <Button size="icon" variant="outline" aria-label={`Cotar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cotar(p)}>
+                  <ClipboardList />
+                </Button>
+              )}
+              {lojasFornecedoras(p).length > 0 && (
+                <Button size="icon" variant="outline" aria-label={`PDF das Lojas do Pedido de ${dia(p.criadoEm)}`} onClick={() => void pdfDasLojas(p)}>
+                  <FileDown />
+                </Button>
+              )}
               <Button size="icon" variant="outline" aria-label={`Cancelar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cancelar(p)}>
                 <Ban />
               </Button>
@@ -179,9 +215,21 @@ export function PedidosTab() {
                   <Pencil />
                 </Button>
               )}
-            <Button size="icon" variant="outline" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
-              <Scale />
-            </Button>
+              {!soDeLojas(p) && (
+                <Button size="icon" variant="outline" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
+                  <Scale />
+                </Button>
+              )}
+              {soDeLojas(p) && EDITAVEIS.includes(p.status) && (
+                <Button size="icon" variant="outline" aria-label={`Confirmar Pedido de ${dia(p.criadoEm)}`} onClick={() => void confirmarSoDeLojas(p)}>
+                  <Check />
+                </Button>
+              )}
+              {lojasFornecedoras(p).length > 0 && (
+                <Button size="icon" variant="outline" aria-label={`PDF das Lojas do Pedido de ${dia(p.criadoEm)}`} onClick={() => void pdfDasLojas(p)}>
+                  <FileDown />
+                </Button>
+              )}
               {EDITAVEIS.includes(p.status) && (
                 <Button size="icon" variant="outline" aria-label={`Cancelar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cancelar(p)}>
                   <Ban />

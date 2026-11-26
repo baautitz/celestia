@@ -9,7 +9,7 @@ import { gerarPlanilha, identificarPlanilha, lerPlanilha, type PlanilhaLida } fr
 import type { Cotacao, CotacaoStore } from "./cotacao-store.js";
 import { ator, Codigo, CodigoEmTexto, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import { PEDIDO_TARGET, PEDIDOS_PLUGIN } from "./pedidos-audit.js";
-import type { Pedido } from "./pedidos.js";
+import { pedidaAoFornecedor, semLinhasDeLoja, type Pedido } from "./pedidos.js";
 import type { PedidoStore } from "./pedidos-store.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { parametrosBusca } from "./produtos-erp.js";
@@ -112,14 +112,17 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     const detalhes = await detalhesDosProdutos(erpClient(), pedido);
     return {
       pedido: { id: pedido.id, status: pedido.status, version: pedido.version, escolhas: pedido.escolhas },
+      lojasFornecedoras: [...new Set(pedido.itens.flatMap((i) => i.quantidades.flatMap((q) => (q.lojasFornecedoras ?? []).map((l) => l.codigoLoja))))],
       podeConfirmar,
       fornecedores: lista.map((c) => ({ codigo: c.codigoFornecedor, nome: nomeDe.get(c.codigoFornecedor) ?? fallback(c.codigoFornecedor), importado: c.precos !== null, importadoEm: c.importadoEm, version: c.version })),
-      produtos: pedido.itens.map((i) => ({
+      produtos: semLinhasDeLoja(pedido).itens.map((i) => ({
         produtoId: i.produtoId,
         codigoProduto: detalhes.get(i.produtoId)?.codigoProduto ?? null,
         nome: i.nome,
         codigoBarra: i.codigoBarra,
         quantidade: totalDoItem(i),
+        // O que cada Loja leva da cotação: a base da divisão entre distribuidoras.
+        lojas: i.quantidades.filter((q) => q.quantidade > 0).map((q) => ({ codigoLoja: q.codigoLoja, quantidade: q.quantidade, definidas: q.quantidadesDistribuidoras ?? [] })),
         // O que o Pedido pede a cada fornecedor e o que ele confirmou na planilha (null = não mexeu na quantidade).
         pedidas: Object.fromEntries(lista.map((c) => [c.codigoFornecedor, itensDoFornecedor(pedido, c.codigoFornecedor).find((x) => x.item.produtoId === i.produtoId)?.quantidade ?? 0])),
         ofertadas: Object.fromEntries(lista.map((c) => [c.codigoFornecedor, c.quantidades?.[i.produtoId] ?? null])),
@@ -221,7 +224,7 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     if (arquivo.length > MAX_ARQUIVO) return { recusa: c.json({ error: "A planilha passa de 5 MB." }, 400) } as const;
     const lida: PlanilhaLida = await lerPlanilha(arquivo, { pedidoId: pedido.id, codigoFornecedor: cotacao.codigoFornecedor });
     if (!lida.ok) return { recusa: c.json({ error: lida.erro }, 422) } as const;
-    const produtosDoPedido = new Set(pedido.itens.map((i) => i.produtoId));
+    const produtosDoPedido = new Set(semLinhasDeLoja(pedido).itens.map((i) => i.produtoId));
     const erros = lida.linhas.filter((l) => l.erro && produtosDoPedido.has(l.produtoId)).map((l) => ({ linha: l.linha, mensagem: l.erro ?? "" }));
     const semMatch = lida.linhas.filter((l) => !produtosDoPedido.has(l.produtoId)).map((l) => ({ linha: l.linha }));
     const validas = lida.linhas.filter((l) => produtosDoPedido.has(l.produtoId) && !l.erro);
@@ -247,7 +250,7 @@ export function registerCotacaoRoutes({ routes, permissions, auth, erpClient, pe
     const version = conferido.corpo.version;
     if (version === undefined) return c.json({ error: "Informe a versão da cotação." }, 400);
     if (conferido.previa.erros.length > 0) return c.json({ error: "A planilha tem linhas com erro. Corrija e envie de novo." }, 400);
-    const precos: Record<string, number | null> = Object.fromEntries(achado.pedido.itens.map((i) => [i.produtoId, null]));
+    const precos: Record<string, number | null> = Object.fromEntries(semLinhasDeLoja(achado.pedido).itens.map((i) => [i.produtoId, null]));
     for (const l of conferido.validas) precos[l.produtoId] = l.preco;
     const quantidades: Record<string, number> = {};
     for (const l of conferido.validas) if (l.quantidade !== null) quantidades[l.produtoId] = l.quantidade;
@@ -270,11 +273,12 @@ function lojasDaDistribuidora(pedido: Pedido, codigoFornecedor: number, nomeLoja
  * A planilha de um fornecedor leva só o que o Pedido pede a ele: as linhas (produto, Loja) com esse fornecedor, somando as
  * quantidades. Pedido sem fornecedor nas linhas (anterior à escolha por linha) manda tudo a todos.
  */
-function itensDoFornecedor(pedido: Pedido, codigo: number): { item: Pedido["itens"][number]; quantidade: number }[] {
+function itensDoFornecedor(completo: Pedido, codigo: number): { item: Pedido["itens"][number]; quantidade: number }[] {
+  const pedido = semLinhasDeLoja(completo);
   const porLinha = pedido.itens.some((i) => i.quantidades.some((q) => (q.codigosFornecedor ?? []).length > 0));
   if (!porLinha) return pedido.itens.map((item) => ({ item, quantidade: totalDoItem(item) }));
   return pedido.itens
-    .map((item) => ({ item, quantidade: item.quantidades.filter((q) => (q.codigosFornecedor ?? []).includes(codigo)).reduce((soma, q) => soma + q.quantidade, 0) }))
+    .map((item) => ({ item, quantidade: item.quantidades.filter((q) => (q.codigosFornecedor ?? []).includes(codigo)).reduce((soma, q) => soma + pedidaAoFornecedor(q, codigo), 0) }))
     .filter((x) => x.quantidade > 0);
 }
 

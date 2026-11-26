@@ -43,4 +43,12 @@ describe("Store de Pedidos", () => {
     expect(await store.atualizarRascunho(p.id, dados, 2)).toBeNull();
     expect(await store.cancelar(p.id, 2)).toBeNull();
   });
+
+  it("confirma sem cotação um rascunho, na versão esperada, e nunca um já confirmado", async () => {
+    const store = new MemoryPedidoStore();
+    const criado = await store.criar({ itens: [{ produtoId: "p", nome: "P", codigoBarra: null, quantidades: [{ codigoLoja: 2, quantidade: 1, lojasFornecedoras: [{ codigoLoja: 1, quantidade: 1 }] }] }] }, { id: "gil", nome: "gil" });
+    expect(await store.confirmarSemCotacao(criado.id, 9)).toBeNull();
+    expect((await store.confirmarSemCotacao(criado.id, 1))?.status).toBe("confirmado");
+    expect(await store.confirmarSemCotacao(criado.id, 2)).toBeNull();
+  });
 });

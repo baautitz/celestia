@@ -3,10 +3,11 @@ import type { CotacaoStore } from "./cotacao-store.js";
 import { vendasFromWhere } from "./desempenho-vendas.js";
 import { COLUNA_DO_PRODUTO, idsPorTipo } from "./lista-produtos.js";
 import type { ErpQuery } from "./metas-comum.js";
-import { chaveDaLinha, conferir } from "./pedidos-conferencia.js";
+import { chaveDaLinha } from "./pedidos-conferencia.js";
 import type { RegraLimite, ValorLimite } from "./pedidos-limites.js";
 import { entradasDosPedidos } from "./pedidos-nf.js";
 import type { PedidoStore } from "./pedidos-store.js";
+import { fornecedoresDa, paraCotar } from "./pedidos.js";
 
 /** O consumo de um saldo do Valor do Limite, em centavos. */
 export interface SaldoLimite {
@@ -130,20 +131,31 @@ async function produtosDaLista(client: ErpQuery, regra: RegraLimite, ids: string
 async function comprometidoPorLoja({ client, pedidos, cotacoes }: DepsDoConsumo, regra: RegraLimite): Promise<PorLoja> {
   const total: PorLoja = new Map();
   const abertos = (await pedidos.listar()).filter((p) => ABERTOS.includes(p.status));
-  const ids = [...new Set(abertos.flatMap((p) => Object.keys(p.escolhas)))];
+  const ids = [...new Set(abertos.flatMap((p) => Object.keys(p.escolhas).filter((id) => fornecedoresDa(p.escolhas[id]).length > 0)))];
   if (ids.length === 0) return total;
   const dentro = await produtosDaLista(client, regra, ids);
   const entradas = await entradasDosPedidos(client, abertos);
   for (const pedido of abertos) {
     const cotados = await cotacoes.listar(pedido.id);
     const recebidas = entradas.get(pedido) ?? new Map<string, number>();
-    for (const linha of conferir(pedido, recebidas)) {
-      const fornecedor = pedido.escolhas[linha.produtoId];
-      if (fornecedor === undefined || !dentro.has(linha.produtoId)) continue;
-      if (regra.fornecedores.length && !regra.fornecedores.includes(fornecedor)) continue;
-      const falta = linha.pedida - (recebidas.get(chaveDaLinha(linha.produtoId, linha.codigoLoja)) ?? 0);
-      const preco = cotados.find((c) => c.codigoFornecedor === fornecedor)?.precos?.[linha.produtoId] ?? 0;
-      if (falta > 0) total.set(linha.codigoLoja, (total.get(linha.codigoLoja) ?? 0) + Math.round(falta * preco * 100));
+    for (const item of pedido.itens) {
+      const escolha = pedido.escolhas[item.produtoId];
+      if (escolha === undefined || !dentro.has(item.produtoId)) continue;
+      const precoDe = (codigo: number) => (regra.fornecedores.length && !regra.fornecedores.includes(codigo) ? 0 : (cotados.find((c) => c.codigoFornecedor === codigo)?.precos?.[item.produtoId] ?? 0));
+      for (const q of item.quantidades) {
+        // A parte das outras Lojas não é compra: do que falta, só conta até o que foi para as distribuidoras.
+        const falta = Math.min(paraCotar(q), q.quantidade - (recebidas.get(chaveDaLinha(item.produtoId, q.codigoLoja)) ?? 0));
+        if (falta <= 0) continue;
+        let preco: number;
+        if (typeof escolha === "number") preco = precoDe(escolha);
+        else {
+          // Produto dividido: preço médio do que cada distribuidora manda para a Loja.
+          const parcelas = escolha.filter((p) => p.codigoLoja === q.codigoLoja);
+          const unidades = parcelas.reduce((t, p) => t + p.quantidade, 0);
+          preco = unidades ? parcelas.reduce((t, p) => t + p.quantidade * precoDe(p.codigoFornecedor), 0) / unidades : 0;
+        }
+        if (preco > 0) total.set(q.codigoLoja, (total.get(q.codigoLoja) ?? 0) + Math.round(falta * preco * 100));
+      }
     }
   }
   return total;
