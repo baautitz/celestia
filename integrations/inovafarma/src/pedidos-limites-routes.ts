@@ -1,14 +1,17 @@
 import type { MiddlewareHandler } from "hono";
+import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { horaDoErp } from "./baixas-da-loja.js";
 import type { CotacaoStore } from "./cotacao-store.js";
 import { FORNECEDORES_SQL } from "./cotacao-routes.js";
 import { NomeDuplicadoError } from "./erros-de-store.js";
 import { registrarBuscaDaLista } from "./lista-busca-routes.js";
-import { ator, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDaQuery, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
+import { ator, Codigo, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDaQuery, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import { PEDIDOS_PLUGIN } from "./pedidos-audit.js";
 import { LIMITE_REGRA_TARGET, LIMITE_VALOR_TARGET, LIMITES_ACTIONS } from "./pedidos-limites-audit.js";
+import { estourosDoPedido, sugestaoDoLimite, type CompraPretendida } from "./pedidos-limites-compra.js";
 import { consumoDoLimite } from "./pedidos-limites-consumo.js";
+import type { MinimoMaximoStore } from "./pedidos-minimos-store.js";
 import { DadosRegraLimite, DadosValorLimite, type RegraLimite, type ValorLimite } from "./pedidos-limites.js";
 import { RegraComValoresError, RegraInexistenteError, type LimitesStore } from "./pedidos-limites-store.js";
 import type { PedidoStore } from "./pedidos-store.js";
@@ -25,6 +28,7 @@ export interface PedidosLimitesRoutesDeps {
   limites: LimitesStore;
   pedidos: PedidoStore;
   cotacoes: CotacaoStore;
+  minimos: MinimoMaximoStore;
   audit: AuditService;
 }
 
@@ -38,10 +42,16 @@ const DESATUALIZADO = versaoDesatualizada("O Limite foi alterado por outra pesso
 const EdicaoRegra = DadosRegraLimite.extend({ version: Version });
 const EdicaoValor = DadosValorLimite.safeExtend({ version: Version });
 
+const Simulacao = z.object({
+  pedidoId: z.string().min(1).max(60),
+  parcelas: z.array(z.object({ produtoId: z.string().min(1).max(36), codigoLoja: Codigo, codigoFornecedor: Codigo, quantidade: z.number().min(0).max(1_000_000) })).max(5000),
+});
+const hojeNoErp = () => horaDoErp(new Date().toISOString()).slice(0, 10);
+
 const atributosDaRegra = (r: RegraLimite) => ({ nome: r.nome, entradas: r.entradas.length, fornecedores: r.fornecedores });
 
 /** Limite de Compras: Regras, Valores e o consumo de cada Valor, calculado ao vivo com o ERP (só leitura nele). */
-export function registerPedidosLimitesRoutes({ routes, permissions, auth, erpClient, limites, pedidos, cotacoes, audit }: PedidosLimitesRoutesDeps): void {
+export function registerPedidosLimitesRoutes({ routes, permissions, auth, erpClient, limites, pedidos, cotacoes, minimos, audit }: PedidosLimitesRoutesDeps): void {
   const ver = INOVAFARMA_PERMISSIONS.ref("pedidos-limites:ver");
   const gerir = INOVAFARMA_PERMISSIONS.ref("pedidos-limites:gerir");
   const tem = (c: AuthContext, key: string) => permissions.has(c.get("user")?.permissions, key);
@@ -199,6 +209,48 @@ export function registerPedidosLimitesRoutes({ routes, permissions, auth, erpCli
       return c.json(await consumoDoLimite({ client, pedidos, cotacoes }, regra, valor));
     } catch (err: unknown) {
       console.error("Pedidos: falha no consumo do Limite de Compras.", err);
+      return c.json(erroDoErp(err), 503);
+    }
+  });
+
+  /** Antes de confirmar: quais Limites em vigência a escolha atual ultrapassa, ao preço cotado. */
+  routes.post(`${BASE}/simular`, auth, async (c: AuthContext) => {
+    const confirmar = INOVAFARMA_PERMISSIONS.ref("pedidos-pedidos:confirmar");
+    if (!tem(c, confirmar.key)) return c.json({ error: confirmar.deniedMessage }, 403);
+    const lido = Simulacao.safeParse(await corpo(c));
+    if (!lido.success) return recusaDeValidacao(c, lido.error);
+    const { pedidoId, parcelas } = lido.data;
+    if (!(await pedidos.pedido(pedidoId))) return c.json({ error: "Pedido não encontrado." }, 404);
+    const [regras, valores, cotados] = await Promise.all([limites.regras(), limites.valores(), cotacoes.listar(pedidoId)]);
+    if (valores.length === 0) return c.json([]);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    const compras = parcelas.flatMap((p): CompraPretendida[] => {
+      const preco = cotados.find((x) => x.codigoFornecedor === p.codigoFornecedor)?.precos?.[p.produtoId];
+      return preco ? [{ ...p, preco }] : [];
+    });
+    try {
+      return c.json(await estourosDoPedido({ client, pedidos, cotacoes, hoje: hojeNoErp() }, regras, valores, compras));
+    } catch (err: unknown) {
+      console.error("Pedidos: falha ao conferir o Pedido com os Limites.", err);
+      return c.json(erroDoErp(err), 503);
+    }
+  });
+
+  routes.get(`${BASE}/valores/:id/sugestao`, auth, async (c: AuthContext) => {
+    const negado = recusa(c, ver);
+    if (negado) return negado;
+    const valor = await valorDe(c.req.param("id") ?? "");
+    const regra = valor && (await regraDe(valor.regraId));
+    if (!valor || !regra) return c.json({ error: VALOR_NAO_ENCONTRADO }, 404);
+    const consulta = z.object({ loja: z.coerce.number().int().positive().optional() }).safeParse(c.req.query());
+    if (!consulta.success) return recusaDeValidacao(c, consulta.error);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    try {
+      return c.json(await sugestaoDoLimite({ client, pedidos, cotacoes, minimos, hoje: hojeNoErp() }, regra, valor, consulta.data.loja ?? null));
+    } catch (err: unknown) {
+      console.error("Pedidos: falha na sugestão de compra do Limite.", err);
       return c.json(erroDoErp(err), 503);
     }
   });

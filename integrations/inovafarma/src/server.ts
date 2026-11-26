@@ -179,7 +179,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       registerCotacaoRoutes({ routes, permissions, auth: authPedido, erpClient: () => erpClients[erpId], pedidos, cotacoes, audit });
       registerConfirmacaoRoutes({ routes, permissions, auth: authPedido, erpClient: () => erpClients[erpId], pedidos, cotacoes, audit });
       declareLimitesAudit(audit);
-      registerPedidosLimitesRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], limites, pedidos, cotacoes, audit });
+      registerPedidosLimitesRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], limites, pedidos, cotacoes, minimos, audit });
       const tiposMeta = db ? new PostgresTipoMetaStore(db) : new MemoryTipoMetaStore();
       const metas = db ? new PostgresMetaStore(db) : new MemoryMetaStore();
       registerTiposMetaRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: tiposMeta, metas, periods, audit });

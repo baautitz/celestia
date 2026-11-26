@@ -5,6 +5,8 @@ import { declareLimitesAudit } from "./pedidos-limites-audit";
 import { consumoDoLimite } from "./pedidos-limites-consumo";
 import { registerPedidosLimitesRoutes } from "./pedidos-limites-routes";
 import { MemoryLimitesStore } from "./pedidos-limites-store";
+import { estourosDoPedido, sugestaoDoLimite } from "./pedidos-limites-compra";
+import { MemoryMinimoMaximoStore } from "./pedidos-minimos-store";
 import { MemoryPedidoStore } from "./pedidos-store";
 import type { ErpQuery } from "./metas-comum";
 import type { Pedido } from "./pedidos";
@@ -85,6 +87,36 @@ describe("consumo do Limite de Compras", () => {
   });
 });
 
+describe("aviso e sugestão do Limite de Compras", () => {
+  const valor = { ...novembro("r"), id: "v", version: 1 };
+  const daRegra = { ...regra, id: "r", version: 1 };
+  const deps = (client: ErpQuery) => ({ client, pedidos: new MemoryPedidoStore(), cotacoes: new MemoryCotacaoStore(), hoje: "2026-11-15" });
+  const compra = { produtoId: "p-1", codigoLoja: 1, codigoFornecedor: 7, quantidade: 10, preco: 1500 };
+
+  it("avisa quanto o Pedido passa do saldo, só em vigência", async () => {
+    expect(await estourosDoPedido(deps(erp({})), [daRegra], [valor], [compra])).toEqual([
+      { regra: "Genéricos", codigoLoja: null, saldoCentavos: 1_000_000, pedidoCentavos: 1_500_000, excedeCentavos: 500_000 },
+    ]);
+    expect(await estourosDoPedido(deps(erp({})), [daRegra], [valor], [{ ...compra, quantidade: 1 }])).toEqual([]);
+    expect(await estourosDoPedido({ ...deps(erp({})), hoje: "2026-12-01" }, [daRegra], [valor], [compra])).toEqual([]);
+    expect(await estourosDoPedido(deps(erp({})), [{ ...daRegra, fornecedores: [9] }], [valor], [compra])).toEqual([]);
+  });
+
+  it("sugere o que falta, os mais vendidos ocupando o saldo primeiro", async () => {
+    const venda = (produtoId: string, vendida: number) => ({ produtoId, codigoProduto: 1, nome: produtoId, codigoLoja: 1, vendida, estoque: 2 });
+    const client: ErpQuery = {
+      query: async <T,>(sql: string) => {
+        if (sql.includes("g.vendida AS vendida")) return [venda("b", 5), venda("a", 12)] as T[];
+        if (sql.includes("PARTITION BY p.CodigoProduto")) return [{ produtoId: "a", codigoLoja: 1, preco: 800 }, { produtoId: "b", codigoLoja: 1, preco: 800 }] as T[];
+        return [] as T[];
+      },
+    };
+    const sugestao = await sugestaoDoLimite({ ...deps(client), minimos: new MemoryMinimoMaximoStore() }, daRegra, valor, null);
+    expect(sugestao.produtos.map((p) => [p.produtoId, p.sugestao, p.valorCentavos, p.cabe])).toEqual([["a", 10, 800_000, true], ["b", 3, 240_000, false]]);
+    expect(sugestao.totalCentavos).toBe(1_040_000);
+  });
+});
+
 function boot() {
   const app = new Hono();
   const log: string[] = [];
@@ -99,7 +131,7 @@ function boot() {
     c.set("user" as never, { sub, fullname: sub, permissions: sub === "gil" ? [VER, GERIR] : sub === "bia" ? [VER] : [] } as never);
     await next();
   };
-  registerPedidosLimitesRoutes({ routes: app, permissions: { has: (p, k) => Boolean(p?.includes(k)) }, auth, audit, limites: new MemoryLimitesStore(), pedidos: new MemoryPedidoStore(), cotacoes: new MemoryCotacaoStore(), erpClient: () => erp({}) });
+  registerPedidosLimitesRoutes({ routes: app, permissions: { has: (p, k) => Boolean(p?.includes(k)) }, auth, audit, limites: new MemoryLimitesStore(), pedidos: new MemoryPedidoStore(), cotacoes: new MemoryCotacaoStore(), minimos: new MemoryMinimoMaximoStore(), erpClient: () => erp({}) });
   return {
     log,
     req: (who: string, method: string, path: string, body?: unknown) =>
