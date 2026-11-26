@@ -7,6 +7,7 @@ import { DataTable } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
+import { AvisoDeLimites, useEstouros } from "./cotacao-limites";
 import { abrirPdfsDasLojas } from "./pdfs-das-lojas";
 import { CotacaoComparacao, marcadosDa, parcelasDe, type Marcados, type ProdutoCotacao } from "./cotacao-comparacao";
 import type { Escolha, Escolhas } from "./pedidos";
@@ -230,15 +231,17 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
     }
   };
 
+  const confirmado = !!detalhe && CONFIRMADOS.includes(detalhe.pedido.status);
+  const editavel = !!detalhe && detalhe.pedido.status === "cotado" && detalhe.podeConfirmar;
+  /** Confirmado mostra o que foi gravado; antes disso, o menor preço de cada produto com as marcações do usuário por cima. */
+  const padrao = !detalhe ? {} : confirmado ? detalhe.pedido.escolhas : menorPreco(detalhe);
+  const marcados = Object.fromEntries((detalhe?.produtos ?? []).map((p) => [p.produtoId, (confirmado ? undefined : trocas[p.produtoId]) ?? marcadosDa(p, padrao[p.produtoId])]));
+  const limites = useEstouros(pedidoId, editavel ? Object.entries(marcados).flatMap(([produtoId, m]) => parcelasDe(m).map((x) => ({ produtoId, ...x }))) : null);
+
   if (!detalhe) return <Text tone="muted">Carregando a cotação...</Text>;
 
-  const confirmado = CONFIRMADOS.includes(detalhe.pedido.status);
-  const editavel = detalhe.pedido.status === "cotado" && detalhe.podeConfirmar;
-  /** Confirmado mostra o que foi gravado; antes disso, o menor preço de cada produto com as marcações do usuário por cima. */
-  const padrao = confirmado ? detalhe.pedido.escolhas : menorPreco(detalhe);
-  const marcados = Object.fromEntries(detalhe.produtos.map((p) => [p.produtoId, (confirmado ? undefined : trocas[p.produtoId]) ?? marcadosDa(p, padrao[p.produtoId])]));
   const confirmarPedido = async () => {
-    const ok = await windows.confirm({ title: "Confirmar Pedido", description: "Confirmar o Pedido com os fornecedores escolhidos? Depois de confirmado a escolha não muda.", confirmLabel: "Confirmar Pedido" });
+    const ok = await windows.confirm({ title: "Confirmar Pedido", description: `${limites.estouros.length > 0 ? "Este Pedido ultrapassa o Limite de Compras. " : ""}Confirmar o Pedido com os fornecedores escolhidos? Depois de confirmado a escolha não muda.`, confirmLabel: "Confirmar Pedido" });
     if (!ok) return;
     try {
       const escolhas: Escolhas = Object.fromEntries(Object.entries(marcados).flatMap(([id, m]) => (parcelasDe(m).length ? [[id, parcelasDe(m)]] : [])));
@@ -300,6 +303,7 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
             emptyMessage="Nenhum produto para conferir."
           />
         ) : null}
+        {editavel ? <AvisoDeLimites estouros={limites.estouros} falhou={limites.falhou} lojas={lojas} /> : null}
         <CotacaoComparacao
           produtos={detalhe.produtos}
           fornecedores={detalhe.fornecedores}

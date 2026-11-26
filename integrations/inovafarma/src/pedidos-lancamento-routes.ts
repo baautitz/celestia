@@ -14,6 +14,8 @@ import { COLUNA_DO_PRODUTO, idsPorTipo } from "./lista-produtos.js";
 import { EntradaLista, idValido } from "./tipos-meta.js";
 import { aChegarPorLinha, chaveDaLinha, conferir } from "./pedidos-conferencia.js";
 import { entradasDosPedidos } from "./pedidos-nf.js";
+import { daLista } from "./pedidos-limites-consumo.js";
+import type { LimitesStore } from "./pedidos-limites-store.js";
 import type { PedidoStore } from "./pedidos-store.js";
 import { lojasDoErp } from "./pre-vencidos-comum.js";
 
@@ -23,6 +25,8 @@ export interface PedidosLancamentoRoutesDeps {
   auth: MiddlewareHandler;
   erpClient: () => ErpQuery | undefined;
   minimos: MinimoMaximoStore;
+  /** As Regras de Limite, para filtrar a grade pelos produtos de uma delas. */
+  limites: Pick<LimitesStore, "regras">;
   /** Os Pedidos do Celestia: os confirmados e ainda não recebidos por inteiro alimentam a coluna a chegar. */
   pedidos: PedidoStore;
   audit: AuditService;
@@ -64,6 +68,7 @@ const ConsultaProdutos = z
     ate: DiaDoCalendario(MENSAGEM_DATA).optional(),
     lojas: Lojas,
     entradas: Entradas,
+    regra: z.string().min(1).max(60).optional(),
     apenasMinimo: z.enum(["1"]).optional(),
   })
   .refine((q) => q.modo === "apartir" || q.ate !== undefined, { error: "Informe a data final do período.", path: ["ate"] })
@@ -87,7 +92,7 @@ const ConsultaUltimasCompras = z.object({ produtoId: z.string().min(1, "Informe 
 
 const ConsultaMovimentacao = z.object({ produtoId: z.string().min(1, "Informe o produto.").max(36), lojas: Lojas });
 
-interface LinhaVenda {
+export interface LinhaVenda {
   produtoId: string;
   codigoProduto: number | null;
   nome: string | null;
@@ -150,7 +155,7 @@ function filtroDeLojas(coluna: string, lojas: number[] | undefined, params: Reco
  * Vendas do período por produto e Loja (regras da Venda Líquida), com o estoque atual da Loja. Os filtros entram por
  * parâmetro, nunca no SQL.
  */
-const produtosSql = (filtroVenda: string) => `
+export const produtosSql = (filtroVenda: string) => `
   SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, p.CodigoProduto AS codigoProduto, LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra,
          LTRIM(RTRIM(fa.NomeFabricante)) AS fabricante, LTRIM(RTRIM(fo.NomeFormula)) AS formula, LTRIM(RTRIM(gr.NomeGrupo)) AS grupo, LTRIM(RTRIM(se.NomeSessao)) AS secao,
          g.codigoLoja AS codigoLoja, g.vendida AS vendida,
@@ -245,7 +250,7 @@ async function nomeDaLoja(client: ErpQuery | undefined, codigo: number): Promise
 }
 
 /** Pedido aberto menos as entradas de NF (`produtoId|codigoLoja` -> quantidade), somado entre os Pedidos confirmados ou parcialmente recebidos. */
-async function aChegarDosPedidos(client: ErpQuery, pedidos: PedidoStore): Promise<Map<string, number>> {
+export async function aChegarDosPedidos(client: ErpQuery, pedidos: PedidoStore): Promise<Map<string, number>> {
   const total = new Map<string, number>();
   const abertos = (await pedidos.listar()).filter((p) => p.status === "confirmado" || p.status === "parcialmente_recebido");
   const entradas = await entradasDosPedidos(client, abertos);
@@ -260,7 +265,7 @@ const hojeNoErp = () => horaDoErp(new Date().toISOString()).slice(0, 10);
 const diaAnterior = (dia: string) => new Date(Date.parse(`${dia}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 
 /** Lançamento de Pedidos: filtros, grade de produtos por Loja e movimentação mensal. Só leitura no ERP. */
-export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, audit, pedidos }: PedidosLancamentoRoutesDeps): void {
+export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, limites, audit, pedidos }: PedidosLancamentoRoutesDeps): void {
   const recusa = (c: AuthContext) => (permissions.has(c.get("user")?.permissions, VER.key) ? null : c.json({ error: VER.deniedMessage }, 403));
 
   routes.get(`${BASE}/contexto`, auth, async (c: AuthContext) => {
@@ -270,8 +275,9 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
     try {
       const lojas = await lojasDoErp(client);
+      const regras = (await limites.regras()).map((r) => ({ id: r.id, nome: r.nome }));
       const hoje = hojeNoErp();
-      return c.json({ hoje, ontem: diaAnterior(hoje), podeEditarMinimos: permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key), lojas });
+      return c.json({ hoje, ontem: diaAnterior(hoje), podeEditarMinimos: permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key), lojas, regras });
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }
@@ -284,7 +290,7 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     if (!consulta.success) return recusaDeValidacao(c, consulta.error);
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
-    const { modo, de, entradas: filtroEntradas, lojas, apenasMinimo } = consulta.data;
+    const { modo, de, entradas: filtroEntradas, lojas, apenasMinimo, regra: regraId } = consulta.data;
     const ate = modo === "apartir" ? hojeNoErp() : (consulta.data.ate ?? de);
     const params: Record<string, unknown> = { dataInicio: `${de} 00:00:00`, dataFim: `${ate} 23:59:59` };
     const filtros = [filtroDeLojas("v.CodigoEmpresa", lojas, params)];
@@ -293,6 +299,12 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     if (filtroEntradas?.length) {
       const condicoes = idsPorTipo(filtroEntradas, params, "ent").map(([tipo, nomes]) => `${COLUNA_DO_PRODUTO[tipo]} IN (${nomes})`);
       filtros.push(`AND (${condicoes.join(" OR ")})`);
+    }
+    // A Regra de Limite restringe junto com os outros filtros (E).
+    if (regraId) {
+      const regra = (await limites.regras()).find((r) => r.id === regraId);
+      if (!regra) return c.json({ error: "Regra de Limite não encontrada." }, 404);
+      filtros.push(`AND ${daLista(regra, params, "regra")}`);
     }
     try {
       const linhas = await client.query<LinhaVenda>(produtosSql(filtros.join(" ")), params);

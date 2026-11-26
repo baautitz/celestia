@@ -39,6 +39,7 @@ interface Contexto {
   ontem: string;
   lojas: LojaOpcao[];
   podeEditarMinimos: boolean;
+  regras?: { id: string; nome: string }[];
 }
 
 interface LinhaLoja {
@@ -112,16 +113,17 @@ const colunasMovimento = (meses: Mes[]): DataTableColumn<LinhaMovimento>[] => [
   ...meses.map((m): DataTableColumn<LinhaMovimento> => ({ key: m.mes, label: mesBr(m.mes), format: "decimal", value: (l) => m[l.tipo] })),
 ];
 
-type FiltrosAplicados = { modo: Modo; de: string; ate: string; lojas: number[]; entradas: EntradaLista[]; apenasMinimo: boolean };
+type FiltrosAplicados = { modo: Modo; de: string; ate: string; lojas: number[]; entradas: EntradaLista[]; apenasMinimo: boolean; regra: string | null };
 
 const brData = (iso: string) => iso.split("-").reverse().join("/");
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 /** Uma linha com o que os filtros aplicados escolheram. */
-const resumo = (f: FiltrosAplicados) =>
+const resumo = (f: FiltrosAplicados, regras: { id: string; nome: string }[] = []) =>
   [
     f.modo === "periodo" ? `Período: ${brData(f.de)} a ${brData(f.ate)}` : `A partir de ${brData(f.de)}`,
     f.lojas.length ? plural(f.lojas.length, "Loja", "Lojas") : "Todas as Lojas",
     f.entradas.length ? "Filtro de produtos" : null,
+    f.regra ? `Regra de Limite: ${regras.find((r) => r.id === f.regra)?.nome ?? ""}` : null,
     f.apenasMinimo ? "Apenas com estoque mínimo" : null,
   ]
     .filter(Boolean)
@@ -464,7 +466,7 @@ function FiltrosSheet({ contexto, inicial, visoesIniciais, visaoInicial }: { con
   const [rascunho, setRascunho] = useState(inicial);
   const [visoes, setVisoes] = useState(visoesIniciais);
   const [visao, setVisao] = useState(visaoInicial);
-  const { modo, de, ate, lojas, entradas, apenasMinimo } = rascunho;
+  const { modo, de, ate, lojas, entradas, apenasMinimo, regra } = rascunho;
   const editar = (parte: Partial<FiltrosAplicados>) => setRascunho((r) => ({ ...r, ...parte }));
 
   const recarregarVisoes = async (salva?: VisaoPedidos) => {
@@ -518,6 +520,24 @@ function FiltrosSheet({ contexto, inicial, visoesIniciais, visaoInicial }: { con
       />
       <FiltroLojas lojas={contexto.lojas} escolhidas={lojas} onChange={(l) => editar({ lojas: l })} />
       <ListaProdutosCampo rotulo="Filtro de produtos" entradas={entradas} onChange={(e) => editar({ entradas: e })} />
+      {contexto.regras?.length ? (
+        <Stack gap="field">
+          <Label htmlFor="pedidos-regra">Regra de Limite</Label>
+          <Select value={regra ?? ""} onValueChange={(v) => editar({ regra: v || null })}>
+            <SelectTrigger id="pedidos-regra">
+              <SelectValue>{(id: string) => contexto.regras?.find((r) => r.id === id)?.nome ?? "Todos os produtos"}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todos os produtos</SelectItem>
+              {contexto.regras.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {r.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Stack>
+      ) : null}
       <Stack direction="row" gap="field" align="center">
         <Checkbox id="pedidos-apenas-minimo" checked={apenasMinimo} onCheckedChange={(v: boolean) => editar({ apenasMinimo: v })} />
         <Label htmlFor="pedidos-apenas-minimo">Apenas com estoque mínimo</Label>
@@ -591,7 +611,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
   const [ativo, setAtivo] = useState<string | null>(null);
   // Os filtros só valem na consulta depois de "Filtrar" no sheet; a primeira consulta espera as visões e usa a padrão.
   const [aplicados, setAplicados] = useState<FiltrosAplicados | null>(null);
-  const padrao: FiltrosAplicados = { modo: "apartir", de: contexto.ontem, ate: contexto.ontem, lojas: [], entradas: [], apenasMinimo: false };
+  const padrao: FiltrosAplicados = { modo: "apartir", de: contexto.ontem, ate: contexto.ontem, lojas: [], entradas: [], apenasMinimo: false, regra: null };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: só na abertura da aba; depois as visões recarregam dentro do sheet.
   useEffect(() => {
@@ -627,13 +647,14 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
   /** `silencioso`: releitura sem o efeito de carregando e sem soltar o produto em foco (ex.: após um conflito de version). */
   const carregar = useCallback(async (silencioso = false) => {
     if (!aplicados) return;
-    const { modo, de, ate, lojas, entradas, apenasMinimo } = aplicados;
+    const { modo, de, ate, lojas, entradas, apenasMinimo, regra } = aplicados;
     const vale = novaConsulta();
     const params = new URLSearchParams({ modo, de });
     if (modo === "periodo") params.set("ate", ate);
     if (lojas.length) params.set("lojas", lojas.join(","));
     if (entradas.length) params.set("entradas", JSON.stringify(entradas.map(({ tipo, id }) => ({ tipo, id }))));
     if (apenasMinimo) params.set("apenasMinimo", "1");
+    if (regra) params.set("regra", regra);
     if (!silencioso) {
       setCarregando(true);
       setAtivo(null);
@@ -858,7 +879,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
         {abas}
         <Stack grow>
           <Text variant="caption" tone="muted" truncate>
-            {correcao ? "Só os produtos e Lojas que faltam" : resumo(aplicados ?? padrao)}
+            {correcao ? "Só os produtos e Lojas que faltam" : resumo(aplicados ?? padrao, contexto.regras)}
           </Text>
         </Stack>
         <Text variant="caption" tone="muted">

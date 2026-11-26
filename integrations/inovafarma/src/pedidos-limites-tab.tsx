@@ -1,6 +1,6 @@
 import { PedidosRegrasLimiteTab } from "./pedidos-limites-regras-tab";
 import { useCallback, useEffect, useState } from "react";
-import { ListFilter, Pencil, Plus, Trash2 } from "lucide-react";
+import { ListFilter, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
 import { Stack, Text } from "@platform/ui/components/layout";
@@ -13,6 +13,7 @@ import { dataBr } from "./datas";
 import { LIMITES_BASE, nomeDaLoja, type CadastroLimites, type SaldoLimite } from "./pedidos-limites-comum";
 import type { ValorLimite } from "./pedidos-limites";
 import { ValorLimiteWindow } from "./pedidos-limites-valor-window";
+import { SugestaoLimiteWindow } from "./pedidos-limites-sugestao-window";
 import { useLatestFetch } from "./use-latest-fetch";
 
 /** Uma linha por saldo: o Valor "Por Loja" ocupa uma linha por Loja. */
@@ -108,6 +109,16 @@ export function PedidosLimitesTab() {
     void carregar();
   };
 
+  const abrirSugestao = (l: Linha) =>
+    void windows.open({
+      surface: "dialog",
+      size: "screen",
+      title: `Sugestão de compra: ${l.regra}`,
+      description: `${l.codigoLoja === null ? "Todas as Lojas" : nomeDaLoja(cadastro.lojas, l.codigoLoja)}. Vendas da vigência mais o mínimo, menos o estoque e o que está a chegar.`,
+      content: () => <SugestaoLimiteWindow valorId={l.valor.id} codigoLoja={l.codigoLoja} />,
+    });
+  const emVigencia = (v: ValorLimite) => v.inicio <= cadastro.hoje && cadastro.hoje <= v.fim;
+
   const dinheiro = (key: string, label: string, centavos: (l: Linha) => number | undefined): DataTableColumn<Linha> => ({ key, label, format: "currency", value: (l) => reais(centavos(l)), sortable: true });
   const colunas: DataTableColumn<Linha>[] = [
     { key: "regra", label: "Regra", value: (l) => l.regra, searchable: true, sortable: true, mobileRole: "primary" },
@@ -148,20 +159,25 @@ export function PedidosLimitesTab() {
         getRowId={(l) => l.id}
         search={{ placeholder: "Buscar Regra ou Loja" }}
         emptyMessage={cadastro.regras.length === 0 ? "Nenhuma Regra de Limite. Comece pelo botão Regras." : "Nenhum Valor lançado. Use Novo valor."}
-        rowActions={
-          cadastro.podeGerir
-            ? (l) => (
-                <Stack direction="row" gap="tight">
-                  <Button size="icon" variant="outline" aria-label={`Editar Valor de ${l.regra} de ${dataBr(l.valor.inicio)}`} onClick={() => void abrirValor(l.valor)}>
-                    <Pencil />
-                  </Button>
-                  <Button size="icon" variant="outline" tone="destructive" aria-label={`Excluir Valor de ${l.regra} de ${dataBr(l.valor.inicio)}`} onClick={() => void excluir(l.valor, l.regra)}>
-                    <Trash2 />
-                  </Button>
-                </Stack>
-              )
-            : undefined
-        }
+        rowActions={(l) => (
+          <Stack direction="row" gap="tight">
+            {emVigencia(l.valor) && (
+              <Button size="icon" variant="outline" aria-label={`Sugestão de compra de ${l.regra}${l.codigoLoja === null ? "" : ` na ${nomeDaLoja(cadastro.lojas, l.codigoLoja)}`}`} onClick={() => abrirSugestao(l)}>
+                <ShoppingCart />
+              </Button>
+            )}
+            {cadastro.podeGerir && (
+              <>
+                <Button size="icon" variant="outline" aria-label={`Editar Valor de ${l.regra} de ${dataBr(l.valor.inicio)}`} onClick={() => void abrirValor(l.valor)}>
+                  <Pencil />
+                </Button>
+                <Button size="icon" variant="outline" tone="destructive" aria-label={`Excluir Valor de ${l.regra} de ${dataBr(l.valor.inicio)}`} onClick={() => void excluir(l.valor, l.regra)}>
+                  <Trash2 />
+                </Button>
+              </>
+            )}
+          </Stack>
+        )}
       />
     </Stack>
   );
