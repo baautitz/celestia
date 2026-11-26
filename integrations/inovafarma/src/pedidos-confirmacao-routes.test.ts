@@ -19,7 +19,7 @@ interface Opcoes {
   erpFalha?: boolean;
   semNome?: boolean;
   /** Linhas de Compra_Produto devolvidas pelo ERP. */
-  entradas?: { produtoId: string; codigoLoja: number; recebida: number }[];
+  entradas?: { produtoId: string; codigoLoja: number; recebida: number; origem?: number }[];
 }
 
 async function boot({ erpFalha = false, semNome = false, entradas = [] }: Opcoes = {}) {
@@ -51,7 +51,7 @@ async function boot({ erpFalha = false, semNome = false, entradas = [] }: Opcoes
       query: async <T,>(sql: string, params?: Record<string, unknown>) => {
         consultas.push({ sql, params });
         if (erpFalha) throw new Error("boom");
-        if (sql.includes("FROM Fornecedor")) return (semNome ? [] : [{ codigo: 9, nome: "BETA" }, { codigo: 7, nome: "ALFA" }]) as T[];
+        if (sql.includes("FROM Fornecedor") && !sql.includes("AS origem")) return (semNome ? [] : [{ codigo: 9, nome: "BETA" }, { codigo: 7, nome: "ALFA" }]) as T[];
         return entradas.map((e) => ({ dia: "2999-01-01", ...e })) as T[];
       },
     }),
@@ -78,6 +78,24 @@ describe("Confirmação do Pedido", () => {
     const res = await confirmar(b);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ status: "confirmado", escolhas: { "p-1": 9, "p-2": 7 }, version: b.version + 1 });
+    expect(b.log).toEqual(["Confirmou o Pedido: 2 produtos em 2 fornecedores."]);
+  });
+
+  it("separa a entrada por fornecedor, com o que veio de quem não foi pedido em linha própria", async () => {
+    const loja = dipirona.quantidades[0]?.codigoLoja ?? 0;
+    const b = await boot({ entradas: [{ produtoId: "p-1", codigoLoja: loja, recebida: 1, origem: 7 }] });
+    await confirmar(b);
+    const { linhas } = (await (await b.req("gil", "GET", `/pedidos/pedidos/${b.id}/recebimento`)).json()) as { linhas: { produtoId: string; codigoLoja: number; fornecedor: string; pedida: number; recebida: number }[] };
+    expect(linhas.filter((l) => l.produtoId === "p-1" && l.codigoLoja === loja).map((l) => [l.fornecedor, l.pedida > 0, l.recebida])).toEqual([["BETA", true, 0], ["ALFA", false, 1]]);
+  });
+
+  it("aceita o produto dividido por Loja e distribuidora, e recusa distribuidora sem preço ou Loja fora do produto", async () => {
+    const b = await boot();
+    const loja = dipirona.quantidades[0]?.codigoLoja ?? 0;
+    const dividir = (...parcelas: [number, number][]) => ({ escolhas: { "p-1": parcelas.map(([codigoLoja, codigoFornecedor]) => ({ codigoLoja, codigoFornecedor, quantidade: 1 })), "p-2": 7 }, version: b.version });
+    expect((await confirmar(b, dividir([999, 9]))).status).toBe(400);
+    expect((await confirmar(b, dividir([loja, 55]))).status).toBe(400);
+    expect((await confirmar(b, dividir([loja, 9], [loja, 7]))).status).toBe(200);
     expect(b.log).toEqual(["Confirmou o Pedido: 2 produtos em 2 fornecedores."]);
   });
 

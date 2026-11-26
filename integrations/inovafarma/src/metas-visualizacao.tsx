@@ -1,5 +1,5 @@
 import { List, Table2, Target, Users } from "lucide-react";
-import { ToggleGroup, ToggleGroupItem } from "@platform/ui/components/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "@platform/ui/components/tabs";
 import { useIsMobile } from "@platform/ui/hooks/use-mobile";
 import { usePreference } from "@platform/ui/hooks/use-preference";
 
@@ -30,25 +30,24 @@ export function useVisaoMetas(aba: string, opcoes: readonly VisaoMetas[], semTab
 /** Seletor da visualização em abas com ícone, ao lado dos filtros. */
 export function VisaoSelect({ visao, disponiveis, onChange }: { visao: VisaoMetas; disponiveis: readonly VisaoMetas[]; onChange: (v: VisaoMetas) => void }) {
   return (
-    <ToggleGroup
-      variant="outline"
-      spacing={0}
-      aria-label="Visualização das Metas"
-      value={[visao]}
-      onValueChange={(v: string[]) => {
-        const escolhida = v[0] as VisaoMetas | undefined;
-        if (escolhida && disponiveis.includes(escolhida)) onChange(escolhida);
+    <Tabs
+      value={visao}
+      onValueChange={(v) => {
+        const escolhida = v as VisaoMetas;
+        if (disponiveis.includes(escolhida)) onChange(escolhida);
       }}
     >
-      {disponiveis.map((v) => {
-        const Icone = ICONE[v];
-        return (
-          <ToggleGroupItem key={v} value={v} aria-label={ROTULO[v]}>
-            <Icone />
-            {ROTULO[v]}
-          </ToggleGroupItem>
-        );
-      })}
-    </ToggleGroup>
+      <TabsList aria-label="Visualização das Metas">
+        {disponiveis.map((v) => {
+          const Icone = ICONE[v];
+          return (
+            <TabsTrigger key={v} value={v} aria-label={ROTULO[v]}>
+              <Icone />
+              {ROTULO[v]}
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
+    </Tabs>
   );
 }

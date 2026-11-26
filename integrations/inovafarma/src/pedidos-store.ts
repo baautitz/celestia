@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { DadosPedido, Pedido } from "./pedidos.js";
+import type { DadosPedido, Escolhas, Pedido } from "./pedidos.js";
 
 export interface PedidoStore {
   /** Do mais recente para o mais antigo. */
@@ -8,14 +8,19 @@ export interface PedidoStore {
   criar(dados: DadosPedido, autor: { id: string; nome: string }): Promise<Pedido>;
   /** Compare-and-set pela `version`, só em rascunho; null se o Pedido mudou, sumiu ou saiu do rascunho. */
   atualizarRascunho(id: string, dados: DadosPedido, expectedVersion: number): Promise<Pedido | null>;
-  /** Compare-and-set pela `version`, só em rascunho; null como em `atualizarRascunho`. */
-  cancelarRascunho(id: string, expectedVersion: number): Promise<Pedido | null>;
+  /** Compare-and-set pela `version`, em rascunho ou em cotação (antes de confirmar); null como em `atualizarRascunho`. */
+  /** Vale até depois de confirmado, com ou sem entrada; e no finalizado; só o recebido por inteiro não se cancela. */
+  cancelar(id: string, expectedVersion: number): Promise<Pedido | null>;
+  /** Encerra à mão um Pedido confirmado, mesmo faltando itens: o que não chegou deixa de ser esperado. */
+  finalizar(id: string, expectedVersion: number): Promise<Pedido | null>;
   /** Compare-and-set pela `version`: rascunho -> aguardando preços; null se o Pedido mudou, sumiu ou saiu do rascunho. */
   iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null>;
   /** aguardando preços -> cotado; null se o Pedido não está aguardando preços. */
   marcarCotado(id: string): Promise<Pedido | null>;
   /** Compare-and-set pela `version`: cotado -> confirmado com o fornecedor escolhido por produto; null se mudou ou não está cotado. */
-  confirmar(id: string, escolhas: Record<string, number>, expectedVersion: number): Promise<Pedido | null>;
+  confirmar(id: string, escolhas: Escolhas, expectedVersion: number): Promise<Pedido | null>;
+  /** Compare-and-set pela `version`: o Pedido só de Lojas é confirmado sem cotação, de qualquer situação antes da confirmação. */
+  confirmarSemCotacao(id: string, expectedVersion: number): Promise<Pedido | null>;
   /** Grava o resultado da conferência com a NF em um Pedido confirmado ou já em recebimento; null se o Pedido não está nessa fase. */
   registrarRecebimento(id: string, status: "confirmado" | "parcialmente_recebido" | "recebido"): Promise<Pedido | null>;
 }
@@ -44,8 +49,12 @@ export class MemoryPedidoStore implements PedidoStore {
     return this.mudar(id, expectedVersion, dados, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
-  async cancelarRascunho(id: string, expectedVersion: number): Promise<Pedido | null> {
-    return this.mudar(id, expectedVersion, { status: "cancelado" });
+  async cancelar(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "cancelado" }, ["rascunho", "aguardando_precos", "cotado", "confirmado", "parcialmente_recebido", "finalizado"]);
+  }
+
+  async finalizar(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "finalizado" }, ["confirmado", "parcialmente_recebido"]);
   }
 
   async iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null> {
@@ -56,8 +65,12 @@ export class MemoryPedidoStore implements PedidoStore {
     return this.mudar(id, undefined, { status: "cotado" }, "aguardando_precos");
   }
 
-  async confirmar(id: string, escolhas: Record<string, number>, expectedVersion: number): Promise<Pedido | null> {
+  async confirmar(id: string, escolhas: Escolhas, expectedVersion: number): Promise<Pedido | null> {
     return this.mudar(id, expectedVersion, { status: "confirmado", escolhas, confirmadoEm: new Date().toISOString() }, "cotado");
+  }
+
+  async confirmarSemCotacao(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "confirmado", escolhas: {}, confirmadoEm: new Date().toISOString() }, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
   async registrarRecebimento(id: string, status: "confirmado" | "parcialmente_recebido" | "recebido"): Promise<Pedido | null> {

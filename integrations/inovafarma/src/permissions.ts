@@ -119,7 +119,7 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
   },
   "pedidos-pedidos:gerir": {
     label: "Pedidos: Gerir Pedidos",
-    description: "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar e cancelar Pedidos em rascunho, cotar com fornecedores e conferir o recebimento pela NF.",
+    description: "Permite gerar Pedidos a partir dos produtos marcados no Lançamento, editar Pedidos ainda não confirmados, cancelar e finalizar Pedidos, cotar com fornecedores e conferir o recebimento pela NF.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para gerir os Pedidos.",
   },
   "pedidos-pedidos:confirmar": {
@@ -127,9 +127,24 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite escolher o fornecedor de cada produto, confirmar o Pedido cotado e gerar o PDF por fornecedor.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para confirmar Pedidos.",
   },
+  "pedidos-todas-lojas:gerir": {
+    label: "Pedidos: Todas as Lojas",
+    description: "Permite gerar e alterar Pedidos de qualquer Loja. Sem ela, o Usuário só mexe nos Pedidos das Lojas do Colaborador vinculado.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir Pedidos de todas as Lojas.",
+  },
   "pedidos-minimos:editar": {
     label: "Pedidos: Editar estoque mínimo e máximo",
     description: "Permite editar o estoque mínimo e máximo dos produtos por Loja na grade do Lançamento de Pedidos.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para editar o estoque mínimo e máximo.",
+  },
+  "pedidos-limites:ver": {
+    label: "Pedidos: Ver Limites de Compras",
+    description: "Permite ver as Regras e os Valores do Limite de Compras e o consumo de cada um.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para ver os Limites de Compras.",
+  },
+  "pedidos-limites:gerir": {
+    label: "Pedidos: Gerir Limites de Compras",
+    description: "Permite criar, alterar e excluir as Regras e os Valores do Limite de Compras.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir os Limites de Compras.",
   },
 });

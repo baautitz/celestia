@@ -14,6 +14,7 @@ import { MIN_BUSCA_LISTA, TIPOS_ENTRADA, TIPO_ENTRADA_LABEL, ordenarEntradas, ty
 import { API } from "./inovafarma-api";
 
 const BASE_LISTA = `${API}/tipos-meta/lista`;
+const DESCRICAO = "Os Produtos, Grupos, Seções e Laboratórios que a Meta soma. Cada produto vendido conta uma vez.";
 const ESPERA_BUSCA_MS = 300;
 
 const NENHUM: Record<TipoEntrada, string> = {
@@ -49,7 +50,7 @@ type Busca = { estado: "parado" } | { estado: "carregando" } | { estado: "pronto
  * Lista de Produtos no construtor do Tipo de Meta: o resumo em uma linha e o botão "Montar Lista", que abre a janela
  * larga com a busca e a tabela. Confere uma vez, ao abrir o construtor, quais entradas gravadas saíram do ERP.
  */
-export function ListaProdutosCampo({ entradas, onChange, erro, rotulo = "Lista de Produtos" }: { entradas: EntradaLista[]; onChange: (entradas: EntradaLista[]) => void; erro?: string | null; rotulo?: string }) {
+export function ListaProdutosCampo({ entradas, onChange, erro, rotulo = "Lista de Produtos", base = BASE_LISTA, descricao = DESCRICAO }: { entradas: EntradaLista[]; onChange: (entradas: EntradaLista[]) => void; erro?: string | null; rotulo?: string; base?: string; descricao?: string }) {
   const { windows } = useUi();
   const [ausentes, setAusentes] = useState<ReadonlySet<string>>(new Set());
 
@@ -57,7 +58,7 @@ export function ListaProdutosCampo({ entradas, onChange, erro, rotulo = "Lista d
   useEffect(() => {
     if (entradasIniciais.length === 0) return;
     let atual = true;
-    apiFetch<{ ausentes: Pick<EntradaLista, "tipo" | "id">[] }>(`${BASE_LISTA}/conferir`, {
+    apiFetch<{ ausentes: Pick<EntradaLista, "tipo" | "id">[] }>(`${base}/conferir`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entradas: entradasIniciais.map(({ tipo, id }) => ({ tipo, id })) }),
@@ -68,7 +69,7 @@ export function ListaProdutosCampo({ entradas, onChange, erro, rotulo = "Lista d
     return () => {
       atual = false;
     };
-  }, [entradasIniciais]);
+  }, [entradasIniciais, base]);
 
   const foraDoErp = entradas.filter((e) => ausentes.has(chave(e))).length;
 
@@ -77,8 +78,8 @@ export function ListaProdutosCampo({ entradas, onChange, erro, rotulo = "Lista d
       surface: "dialog",
       size: "full",
       title: "Lista de Produtos",
-      description: "Os Produtos, Grupos, Seções e Laboratórios que a Meta soma. Cada produto vendido conta uma vez.",
-      content: () => <ListaProdutosWindow inicial={entradas} ausentes={ausentes} />,
+      description: descricao,
+      content: () => <ListaProdutosWindow inicial={entradas} ausentes={ausentes} base={base} />,
     });
     if (resultado.status === "confirmed") onChange(resultado.value);
   };
@@ -114,7 +115,7 @@ export function ListaProdutosCampo({ entradas, onChange, erro, rotulo = "Lista d
  * Janela "Lista de Produtos": a busca no ERP em toda a largura, com o seletor de tipo à direita, e a tabela das entradas
  * por tipo e depois em ordem alfabética. Concluir devolve as entradas; Cancelar descarta (com confirmação se mudou).
  */
-function ListaProdutosWindow({ inicial, ausentes }: { inicial: EntradaLista[]; ausentes: ReadonlySet<string> }) {
+function ListaProdutosWindow({ inicial, ausentes, base }: { inicial: EntradaLista[]; ausentes: ReadonlySet<string>; base: string }) {
   const { resolve, setDirtyCheck } = useWindow<EntradaLista[]>();
   const [entradas, setEntradas] = useState(inicial);
   const [tipo, setTipo] = useState<TipoEntrada>("produto");
@@ -140,7 +141,7 @@ function ListaProdutosWindow({ inicial, ausentes }: { inicial: EntradaLista[]; a
     let atual = true;
     setBusca({ estado: "carregando" });
     const espera = setTimeout(() => {
-      apiFetch<Resultado[]>(`${BASE_LISTA}/busca?tipo=${tipo}&q=${encodeURIComponent(q)}`)
+      apiFetch<Resultado[]>(`${base}/busca?tipo=${tipo}&q=${encodeURIComponent(q)}`)
         .then((achados) => atual && setBusca({ estado: "pronto", achados }))
         .catch((err: unknown) => atual && setBusca({ estado: "erro", mensagem: err instanceof Error ? err.message : "Erro ao buscar no ERP." }));
     }, ESPERA_BUSCA_MS);
@@ -148,7 +149,7 @@ function ListaProdutosWindow({ inicial, ausentes }: { inicial: EntradaLista[]; a
       atual = false;
       clearTimeout(espera);
     };
-  }, [termo, tipo, tentativa]);
+  }, [termo, tipo, tentativa, base]);
 
   const adicionar = (r: Resultado | null) => {
     if (!r || incluidas.has(chave(r))) return;

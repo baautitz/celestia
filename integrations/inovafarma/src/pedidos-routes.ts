@@ -2,6 +2,8 @@ import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { PEDIDO_TARGET, PEDIDOS_ACTIONS, PEDIDOS_PLUGIN } from "./pedidos-audit.js";
+import { lojasDoUsuario } from "./pedidos-escopo-lojas.js";
+import type { VinculoStore } from "./vinculo-store.js";
 import { DadosPedido, type Pedido } from "./pedidos.js";
 import type { PedidoStore } from "./pedidos-store.js";
 import { ator, recusaDeValidacao, Version, versaoDesatualizada, type AuthContext } from "./metas-comum.js";
@@ -14,6 +16,8 @@ export interface PedidosRoutesDeps {
   auth: MiddlewareHandler;
   store: PedidoStore;
   audit: AuditService;
+  /** Para dizer à tela as Lojas em que o Usuário mexe; sem ele, só a Permission de todas as Lojas conta. */
+  vinculos?: VinculoStore;
 }
 
 const BASE = "/pedidos/pedidos";
@@ -23,7 +27,7 @@ const Edicao = DadosPedido.and(z.object({ version: Version }));
 const Cancelamento = z.object({ version: Version });
 
 /** Pedidos em rascunho: gerados a partir dos produtos marcados no Lançamento, editados e cancelados aqui. */
-export function registerPedidosRoutes({ routes, permissions, auth, store, audit }: PedidosRoutesDeps): void {
+export function registerPedidosRoutes({ routes, permissions, auth, store, audit, vinculos }: PedidosRoutesDeps): void {
   const gerir = INOVAFARMA_PERMISSIONS.ref("pedidos-pedidos:gerir");
   const pode = (c: AuthContext) => permissions.has(c.get("user")?.permissions, gerir.key);
 
@@ -38,6 +42,12 @@ export function registerPedidosRoutes({ routes, permissions, auth, store, audit 
   routes.get(BASE, auth, async (c: AuthContext) => {
     if (!pode(c)) return c.json({ error: gerir.deniedMessage }, 403);
     return c.json(await store.listar());
+  });
+
+  // Caminho próprio, fora de `/:id`, para não ser lido como um Pedido.
+  routes.get("/pedidos/meu-escopo", auth, async (c: AuthContext) => {
+    if (!pode(c)) return c.json({ error: gerir.deniedMessage }, 403);
+    return c.json({ lojas: vinculos ? await lojasDoUsuario({ permissions, vinculos }, c) : null });
   });
 
   routes.post(BASE, auth, async (c: AuthContext) => {
@@ -69,9 +79,21 @@ export function registerPedidosRoutes({ routes, permissions, auth, store, audit 
     if (!(await store.pedido(id))) return c.json({ error: NAO_ENCONTRADO }, 404);
     const lido = await ler(c, Cancelamento);
     if ("recusa" in lido) return lido.recusa;
-    const cancelado = await store.cancelarRascunho(id, lido.dados.version);
+    const cancelado = await store.cancelar(id, lido.dados.version);
     if (!cancelado) return c.json(DESATUALIZADO, 409);
     await registrar(c, PEDIDOS_ACTIONS.cancelar, cancelado);
     return c.json(cancelado);
+  });
+
+  routes.post(`${BASE}/:id/finalizar`, auth, async (c: AuthContext) => {
+    if (!pode(c)) return c.json({ error: gerir.deniedMessage }, 403);
+    const id = c.req.param("id") ?? "";
+    if (!(await store.pedido(id))) return c.json({ error: NAO_ENCONTRADO }, 404);
+    const lido = await ler(c, Cancelamento);
+    if ("recusa" in lido) return lido.recusa;
+    const finalizado = await store.finalizar(id, lido.dados.version);
+    if (!finalizado) return c.json(DESATUALIZADO, 409);
+    await registrar(c, PEDIDOS_ACTIONS.finalizar, finalizado);
+    return c.json(finalizado);
   });
 }

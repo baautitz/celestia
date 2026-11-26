@@ -20,7 +20,7 @@ import { ListaProdutosCampo } from "./lista-produtos-campo";
 import type { EntradaLista } from "./tipos-meta";
 import { LojasAdicionarWindow } from "./lojas-adicionar-window";
 import { EstudoProdutoWindow } from "./pedido-estudo-window";
-import { DistribuidorasLinhaWindow, type Distribuidora } from "./distribuidoras-linha-window";
+import { DistribuidorasLinhaWindow, type Distribuidora, type Fornecimento } from "./distribuidoras-linha-window";
 import { PEDIDOS_BASE, type ItemPedido, type Pedido } from "./pedido-rascunho-window";
 import type { LojaOpcao } from "./loja-opcao";
 import { useLatestFetch } from "./use-latest-fetch";
@@ -127,7 +127,7 @@ const resumo = (f: FiltrosAplicados) =>
     .filter(Boolean)
     .join(" · ");
 
-function FiltroLojas({ lojas, escolhidas, onChange }: { lojas: LojaOpcao[]; escolhidas: number[]; onChange: (codigos: number[]) => void }) {
+export function FiltroLojas({ lojas, escolhidas, onChange }: { lojas: LojaOpcao[]; escolhidas: number[]; onChange: (codigos: number[]) => void }) {
   const ancora = useComboboxAnchor();
   return (
     <Stack gap="field">
@@ -234,6 +234,19 @@ const faltaParaMinimo = (l: LinhaLoja) => Math.max(0, Math.ceil((l.minimo ?? 0) 
 /** Chave da quantidade a pedir de um produto numa Loja. */
 const chaveQtd = (produtoId: string, codigoLoja: number) => `${produtoId}:${codigoLoja}`;
 
+/**
+ * As Lojas do produto no Pedido, com a quantidade a pedir de cada uma. A grade mostra todas as Lojas, então entra também
+ * a que não veio do ERP (sem venda nem mínimo) mas teve quantidade digitada.
+ */
+function lojasDoPedido(p: ProdutoLancamento, lojas: LojaOpcao[], quantidades: Map<string, number>): { codigoLoja: number; quantidade: number }[] {
+  const doErp = p.lojas.map((l) => ({ codigoLoja: l.codigoLoja, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l) }));
+  const digitadas = lojas
+    .filter((l) => !p.lojas.some((x) => x.codigoLoja === l.codigo))
+    .map((l) => ({ codigoLoja: l.codigo, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigo)) ?? 0 }))
+    .filter((l) => l.quantidade > 0);
+  return [...doErp, ...digitadas];
+}
+
 /** Célula editável da quantidade a pedir da Loja: confirma ao sair do campo. */
 function CampoPedir({ valor, rotulo, onChange }: { valor: number | undefined; rotulo: string; onChange: (valor: number) => void }) {
   return (
@@ -255,23 +268,30 @@ function CampoPedir({ valor, rotulo, onChange }: { valor: number | undefined; ro
   );
 }
 
-/** Célula das distribuidoras da Loja: o resumo e o botão que abre a janela de busca e lista. */
-function CampoDistribuidoras({ produtoId, codigoLoja, nomeLoja, valor, lista, onChange }: { produtoId: string; codigoLoja: number; nomeLoja: string; valor: number[] | undefined; lista: Distribuidora[]; onChange: (codigos: number[]) => void }) {
+/** Célula do fornecedor da Loja: o resumo e o botão que abre a janela de busca e lista. */
+function CampoDistribuidoras({ produtoId, codigoLoja, nomeLoja, quantidade, valor, lista, lojas, onChange, onQuantidade }: { onQuantidade: (quantidade: number) => void; produtoId: string; codigoLoja: number; nomeLoja: string; quantidade: number; valor: Fornecimento | undefined; lista: Distribuidora[]; lojas: LojaOpcao[]; onChange: (valor: Fornecimento) => void }) {
   const { windows } = useUi();
   const curto = (nome: string) => (nome.length > 18 ? `${nome.slice(0, 17)}…` : nome);
-  const resumo = !valor || valor.length === 0 ? "Escolher" : valor.length === 1 ? curto(lista.find((d) => d.codigo === valor[0])?.nome ?? `Distribuidora ${valor[0]}`) : `${valor.length} distribuidoras`;
+  const nomes = [
+    ...(valor?.codigos ?? []).map((c) => lista.find((d) => d.codigo === c)?.nome ?? `Distribuidora ${c}`),
+    ...(valor?.lojas ?? []).map((l) => lojas.find((x) => x.codigo === l.codigoLoja)?.nome ?? `Loja ${l.codigoLoja}`),
+  ];
+  const resumo = nomes.length === 0 ? "Escolher" : nomes.length === 1 ? curto(nomes[0] as string) : `${nomes.length} fornecedores`;
   const abrir = async () => {
-    const resultado = await windows.open<number[]>({
+    const resultado = await windows.open<Fornecimento & { quantidade: number }>({
       surface: "dialog",
       size: "large",
-      title: "Distribuidoras",
-      description: `Loja ${nomeLoja}. Começa com as que já deram entrada neste produto.`,
-      content: () => <DistribuidorasLinhaWindow produtoId={produtoId} codigoLoja={codigoLoja} inicial={valor} lista={lista} />,
+      title: "Fornecedor",
+      description: `Loja ${nomeLoja}. Começa com as distribuidoras que já deram entrada neste produto.`,
+      content: () => <DistribuidorasLinhaWindow produtoId={produtoId} codigoLoja={codigoLoja} quantidade={quantidade} inicial={valor} lista={lista} lojas={lojas} />,
     });
-    if (resultado.status === "confirmed") onChange(resultado.value);
+    if (resultado.status !== "confirmed") return;
+    const { quantidade: pedir, ...fornecimento } = resultado.value;
+    onChange(fornecimento);
+    if (pedir !== quantidade) onQuantidade(pedir);
   };
   return (
-    <Button type="button" variant="outline" aria-label={`Distribuidoras da Loja ${nomeLoja}`} onClick={() => void abrir()}>
+    <Button type="button" variant="outline" aria-label={`Fornecedor da Loja ${nomeLoja}`} onClick={() => void abrir()}>
       {resumo}
     </Button>
   );
@@ -280,7 +300,7 @@ function CampoDistribuidoras({ produtoId, codigoLoja, nomeLoja, valor, lista, on
 /** Campo de mínimo/máximo estreito e à direita, para a tabela de Lojas caber sem rolagem lateral. */
 const CAMPO_LOJA = "[&_input]:w-14 [&_input]:px-1.5 [&_input]:text-right";
 
-const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora, removidas, onRemovidas }: { removidas: number[]; onRemovidas: (codigos: number[]) => void; produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void; quantidades: Map<string, number>; onQuantidade: (produto: ProdutoLancamento, codigoLoja: number, quantidade: number) => void; distribuidoras: Map<string, number[]>; listaDistribuidoras: Distribuidora[]; onDistribuidora: (produto: ProdutoLancamento, codigoLoja: number, codigos: number[]) => void }) {
+const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora, removidas, onRemovidas }: { removidas: number[]; onRemovidas: (codigos: number[]) => void; produto: ProdutoLancamento | undefined; contexto: Contexto; lojasFiltro: number[]; onSalvo: (produtoId: string, gravado?: MinimoGravado) => void; quantidades: Map<string, number>; onQuantidade: (produto: ProdutoLancamento, codigoLoja: number, quantidade: number) => void; distribuidoras: Map<string, Fornecimento>; listaDistribuidoras: Distribuidora[]; onDistribuidora: (produto: ProdutoLancamento, codigoLoja: number, valor: Fornecimento) => void }) {
   const { feedback } = useUi();
   const novaConsulta = useLatestFetch();
   const [meses, setMeses] = useState<Mes[]>([]);
@@ -352,7 +372,7 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo,
     const pedido: DataTableColumn<LinhaLoja>[] = [
     loja,
     { key: "pedir", label: "Pedir", tooltip: "Quantidade a pedir", format: "decimal", render: (l) => <CampoPedir valor={quantidades.get(chaveQtd(produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)} rotulo={`Quantidade a pedir da Loja ${nomeLoja(l.codigoLoja)}`} onChange={(q) => produto && onQuantidade(produto, l.codigoLoja, q)} />, cellClassName: CAMPO_LOJA, mobileWide: true },
-    { key: "distribuidora", label: "Distribuidora", render: (l) => <CampoDistribuidoras produtoId={produtoId} codigoLoja={l.codigoLoja} nomeLoja={nomeLoja(l.codigoLoja)} valor={distribuidoras.get(chaveQtd(produtoId, l.codigoLoja))} lista={listaDistribuidoras} onChange={(c) => produto && onDistribuidora(produto, l.codigoLoja, c)} />, mobileWide: true },
+    { key: "distribuidora", label: "Fornecedor", render: (l) => <CampoDistribuidoras onQuantidade={(n) => produto && onQuantidade(produto, l.codigoLoja, n)} lojas={contexto.lojas} quantidade={quantidades.get(chaveQtd(produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)} produtoId={produtoId} codigoLoja={l.codigoLoja} nomeLoja={nomeLoja(l.codigoLoja)} valor={distribuidoras.get(chaveQtd(produtoId, l.codigoLoja))} lista={listaDistribuidoras} onChange={(c) => produto && onDistribuidora(produto, l.codigoLoja, c)} />, mobileWide: true },
     { key: "remover", label: "", width: 40, centered: true, render: (l) => <Button type="button" variant="outline" size="icon" aria-label={`Remover a Loja ${nomeLoja(l.codigoLoja)}`} onClick={() => onRemovidas([...removidas, l.codigoLoja])}><X /></Button>, mobileRole: "hidden" },
     ];
     return { estatisticas, pedido };
@@ -522,23 +542,34 @@ interface EdicaoPedido {
 interface Correcao {
   produtos: ProdutoLancamento[];
   quantidades: Map<string, number>;
-  distribuidoras: Map<string, number[]>;
+  distribuidoras: Map<string, Fornecimento>;
   /** Lojas já fora da grade: as que não faltam em nenhum produto. */
   ocultas: number[];
   aoSalvar: (resultado: ResultadoCorrecao) => void;
 }
 interface ResultadoCorrecao {
   quantidades: Map<string, number>;
-  distribuidoras: Map<string, number[]>;
+  distribuidoras: Map<string, Fornecimento>;
   /** Lojas tiradas durante a correção. */
   removidas: number[];
   /** Produtos que continuam marcados. */
   marcados: string[];
 }
 
-/** Produto marcado, Loja na grade e Pedir em zero: o que impede de salvar. */
-const pendenciasDe = (selecionados: Iterable<ProdutoLancamento>, quantidades: Map<string, number>, removidas: number[]) =>
-  [...selecionados].flatMap((p) => p.lojas.filter((l) => !removidas.includes(l.codigoLoja) && (quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)) <= 0).map((l) => ({ produto: p, codigoLoja: l.codigoLoja })));
+/** O fornecimento da tela nos campos da linha do Pedido. */
+const fornecedorDaLinha = (f: Fornecimento | undefined) => ({ codigosFornecedor: f?.codigos ?? [], ...(f?.quantidades?.length ? { quantidadesDistribuidoras: f.quantidades } : {}), ...(f?.lojas.length ? { lojasFornecedoras: f.lojas } : {}) });
+
+/** Produto marcado, Loja na grade (com ou sem movimento) e Pedir em zero: o que impede de salvar. */
+const pendenciasDe = (selecionados: Iterable<ProdutoLancamento>, lojas: LojaOpcao[], quantidades: Map<string, number>, removidas: number[]) =>
+  [...selecionados].flatMap((p) =>
+    lojas
+      .filter((l) => {
+        if (removidas.includes(l.codigo)) return false;
+        const doErp = p.lojas.find((x) => x.codigoLoja === l.codigo);
+        return (quantidades.get(chaveQtd(p.produtoId, l.codigo)) ?? (doErp ? faltaParaMinimo(doErp) : 0)) <= 0;
+      })
+      .map((l) => ({ produto: p, codigoLoja: l.codigo })),
+  );
 
 /** O mesmo Lançamento, só com os produtos e as Lojas faltantes; Salvar aplica no Pedido em montagem e fecha. */
 function CorrecaoWindow({ contexto, correcao }: { contexto: Contexto; correcao: Omit<Correcao, "aoSalvar"> }) {
@@ -647,7 +678,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
     },
     [alternar],
   );
-  const [distribuidoras, setDistribuidoras] = useState<Map<string, number[]>>(() => new Map(correcao?.distribuidoras));
+  const [distribuidoras, setDistribuidoras] = useState<Map<string, Fornecimento>>(() => new Map(correcao?.distribuidoras));
   const [listaDistribuidoras, setListaDistribuidoras] = useState<Distribuidora[]>([]);
   useEffect(() => {
     apiFetch<Distribuidora[]>(`${API}/pedidos/fornecedores?busca=`)
@@ -655,9 +686,9 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
       .catch((err: unknown) => notificar(err instanceof Error ? err : new Error("Erro ao carregar as distribuidoras.")));
   }, [notificar]);
   const definirDistribuidora = useCallback(
-    (p: ProdutoLancamento, codigoLoja: number, codigos: number[]) => {
-      setDistribuidoras((atual) => new Map(atual).set(chaveQtd(p.produtoId, codigoLoja), codigos));
-      if (codigos.length > 0) alternar(p, true);
+    (p: ProdutoLancamento, codigoLoja: number, valor: Fornecimento) => {
+      setDistribuidoras((atual) => new Map(atual).set(chaveQtd(p.produtoId, codigoLoja), valor));
+      if (valor.codigos.length > 0 || valor.lojas.length > 0) alternar(p, true);
     },
     [alternar],
   );
@@ -667,11 +698,11 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
   useEffect(() => {
     if (!pedidoEditado) return;
     const qtds = new Map<string, number>();
-    const dists = new Map<string, number[]>();
+    const dists = new Map<string, Fornecimento>();
     for (const i of pedidoEditado.itens) {
       for (const q of i.quantidades) {
         qtds.set(chaveQtd(i.produtoId, q.codigoLoja), q.quantidade);
-        dists.set(chaveQtd(i.produtoId, q.codigoLoja), q.codigosFornecedor ?? []);
+        dists.set(chaveQtd(i.produtoId, q.codigoLoja), { codigos: q.codigosFornecedor ?? [], lojas: q.lojasFornecedoras ?? [], quantidades: q.quantidadesDistribuidoras ?? [] });
       }
     }
     setQuantidades(qtds);
@@ -710,7 +741,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
       return;
     }
     // Produto marcado com Loja em zero não passa: abre o mesmo Lançamento só com o que falta; salvar lá fecha, e salvar aqui de novo confere outra vez.
-    const pendencias = pendenciasDe(selecionados.values(), quantidades, lojasRemovidas);
+    const pendencias = pendenciasDe(selecionados.values(), contexto.lojas, quantidades, lojasRemovidas);
     if (pendencias.length > 0) {
       const faltantes = new Set(pendencias.map((x) => x.codigoLoja));
       const resultado = await windows.open<ResultadoCorrecao>({
@@ -737,10 +768,15 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
     }
     // A quantidade já foi digitada na grade de Lojas; só entram os produtos com alguma quantidade a pedir.
     const itens: ItemPedido[] = [...selecionados.values()]
-      .map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: p.lojas.filter((l) => !lojasRemovidas.includes(l.codigoLoja)).map((l) => ({ codigoLoja: l.codigoLoja, quantidade: quantidades.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? faltaParaMinimo(l), codigosFornecedor: distribuidoras.get(chaveQtd(p.produtoId, l.codigoLoja)) ?? [] })) }))
+      .map((p) => ({ produtoId: p.produtoId, nome: p.nome, codigoBarra: p.codigoBarra, quantidades: lojasDoPedido(p, contexto.lojas, quantidades).filter((l) => !lojasRemovidas.includes(l.codigoLoja)).map((l) => ({ ...l, ...fornecedorDaLinha(distribuidoras.get(chaveQtd(p.produtoId, l.codigoLoja))) })) }))
       .filter((i) => i.quantidades.some((q) => q.quantidade > 0));
     if (itens.length === 0) {
       notificar(new Error("Informe a quantidade a pedir de ao menos um produto."));
+      return;
+    }
+    const excedido = itens.find((i) => i.quantidades.some((q) => [...(q.lojasFornecedoras ?? []), ...(q.quantidadesDistribuidoras ?? [])].reduce((t, p) => t + p.quantidade, 0) > q.quantidade));
+    if (excedido) {
+      notificar(new Error(`Os fornecedores somam mais do que o pedido de ${excedido.nome}. Revise o Fornecedor.`));
       return;
     }
     try {
@@ -806,7 +842,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
           for (const e of entradas) {
             const chave = chaveQtd(e.produtoId, e.codigoLoja);
             if (atual.has(chave)) continue;
-            proximo.set(chave, [...(proximo.get(chave) ?? []), e.codigoFornecedor]);
+            proximo.set(chave, { codigos: [...(proximo.get(chave)?.codigos ?? []), e.codigoFornecedor], lojas: [] });
           }
           return proximo;
         }),

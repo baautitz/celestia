@@ -1,3 +1,4 @@
+import { PRECO_POR_UNIDADE, UNIDADES_COMPRADAS } from "./compra-fracao.js";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
@@ -174,7 +175,7 @@ const movimentacaoSql = (filtroVenda: string, filtroCompra: string) => `
     SELECT CONVERT(varchar(7), v.DataVenda, 120) AS mes, vp.Quantidade AS vendida, NULL AS comprada
     ${vendasFromWhere(filtroVenda)}
     UNION ALL
-    SELECT CONVERT(varchar(7), c.DataNota, 120) AS mes, NULL AS vendida, cp.Quantidade AS comprada
+    SELECT CONVERT(varchar(7), c.DataNota, 120) AS mes, NULL AS vendida, ${UNIDADES_COMPRADAS} AS comprada
     FROM Compra c
     JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
     JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
@@ -210,13 +211,20 @@ const entradasSql = (produtos: string) => `
 const ULTIMAS_COMPRAS_SQL = `
   SELECT codigoLoja, CAST(preco AS float) AS preco
   FROM (
-    SELECT c.CodigoEmpresa AS codigoLoja, cp.Preco AS preco, ROW_NUMBER() OVER (PARTITION BY c.CodigoEmpresa ORDER BY c.DataNota DESC, c.CodigoCompra DESC) AS n
+    SELECT c.CodigoEmpresa AS codigoLoja, ${PRECO_POR_UNIDADE} AS preco, ROW_NUMBER() OVER (PARTITION BY c.CodigoEmpresa ORDER BY c.DataNota DESC, c.CodigoCompra DESC) AS n
     FROM Compra c
     JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
     JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
     WHERE c.Eliminado = 0 AND CONVERT(varchar(36), p.rowguid) = @produtoId
   ) x
   WHERE x.n = 1`;
+
+/** O estoque atual do produto em cada Loja, tenha ou não venda no período. */
+const ESTOQUES_SQL = `
+  SELECT pe.CodigoEmpresa AS codigoLoja, CAST(pe.Estoque AS float) AS estoque
+  FROM Produto_Estoque pe
+  JOIN Produto p ON p.CodigoProduto = pe.CodigoProduto
+  WHERE CONVERT(varchar(36), p.rowguid) = @produtoId`;
 
 /** Nome para o Audit Log; se o ERP falhar, o que se tem (o código), sem barrar a gravação. */
 async function nomeDoProduto(client: ErpQuery | undefined, produtoId: string): Promise<string> {
@@ -320,6 +328,21 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
       }
       const todos = [...porProduto.values()];
       return c.json(apenasMinimo ? todos.filter((p) => p.lojas.some((l) => (l.minimo ?? 0) > 0)) : todos);
+    } catch (err: unknown) {
+      return c.json(erroDoErp(err), 503);
+    }
+  });
+
+  routes.get(`${BASE}/estoques`, auth, async (c: AuthContext) => {
+    const negado = recusa(c);
+    if (negado) return negado;
+    const produtoId = c.req.query("produtoId") ?? "";
+    if (!produtoId || produtoId.length > 36) return c.json({ error: "Informe o produto." }, 400);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    try {
+      const linhas = await client.query<{ codigoLoja: number; estoque: number | null }>(ESTOQUES_SQL, { produtoId });
+      return c.json(linhas.map((l) => ({ codigoLoja: Number(l.codigoLoja), estoque: Number(l.estoque) || 0 })));
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }

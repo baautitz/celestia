@@ -1,27 +1,36 @@
+import { Badge } from "@platform/ui/components/badge";
 import { useCallback, useEffect, useState } from "react";
-import { Ban, ClipboardList, PackageCheck, Pencil, Scale } from "lucide-react";
+import { Ban, Check, CheckCheck, ClipboardList, FileDown, PackageCheck, Pencil, Scale, SlidersHorizontal } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
-import { Stack } from "@platform/ui/components/layout";
+import { Stack, Text } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
-import { CotacaoWindow } from "./cotacao-window";
+import { abrirPdfsDasLojas } from "./pdfs-das-lojas";
+import { baixar, CotacaoWindow } from "./cotacao-window";
 import { FalhaAoCarregar, useContexto } from "./contexto";
 import { json } from "./inovafarma-api";
 import type { LojaOpcao } from "./loja-opcao";
 import { PEDIDOS_BASE, type Pedido } from "./pedido-rascunho-window";
 import { EntradaWindow } from "./pedido-entrada-window";
+import { filtrarPedidos, PedidosFiltrosSheet, resumoDosFiltros, SEM_FILTROS, type FiltrosPedidos, type OpcaoFornecedor } from "./pedidos-filtros";
 import { PedidoLancamentoWindow } from "./pedidos-lancamento-tab";
 import { useLatestFetch } from "./use-latest-fetch";
 import { API } from "./inovafarma-api";
 
 /** Situações em que o Pedido ainda pode ser editado. */
 const EDITAVEIS: Pedido["status"][] = ["aguardando_precos", "cotado"];
-const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguardando_precos: "Aguardando preços", cotado: "Cotado", confirmado: "Confirmado", parcialmente_recebido: "Parcialmente recebido", recebido: "Recebido", cancelado: "Cancelado" };
+const STATUS: Record<Pedido["status"], string> = { rascunho: "Rascunho", aguardando_precos: "Aguardando preços", cotado: "Cotado", confirmado: "Confirmado", parcialmente_recebido: "Parcialmente recebido", recebido: "Recebido", finalizado: "Finalizado", cancelado: "Cancelado" };
+const COR_DA_SITUACAO = { rascunho: "secondary", aguardando_precos: "warning", cotado: "info", confirmado: "default", parcialmente_recebido: "warning", recebido: "success", finalizado: "outline", cancelado: "destructive" } as const satisfies Record<Pedido["status"], string>;
+/** Confirmado e ainda em aberto: dá para finalizar à mão ou cancelar. */
+const ABERTOS: Pedido["status"][] = ["confirmado", "parcialmente_recebido"];
 interface Recebimento { pedidoId: string; pedida: number; recebida: number; produtos: number; produtosOk: number }
+const lojasFornecedoras = (p: Pedido) => [...new Set(p.itens.flatMap((i) => i.quantidades.flatMap((q) => (q.lojasFornecedoras ?? []).map((l) => l.codigoLoja))))];
+/** Tudo vem de outras Lojas: não há cotação. */
+const soDeLojas = (p: Pedido) => p.itens.every((i) => i.quantidades.every((q) => q.quantidade === (q.lojasFornecedoras ?? []).reduce((t, l) => t + l.quantidade, 0)));
 const dia = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
 
-/** Aba Pedidos: a listagem dos Pedidos, com edição e cancelamento do rascunho. */
+/** Aba Pedidos: a listagem dos Pedidos, com edição e cancelamento antes da confirmação. */
 export function PedidosTab() {
   const { windows, feedback } = useUi();
   const novaConsulta = useLatestFetch();
@@ -53,6 +62,35 @@ export function PedidosTab() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // `produtos`: os produtoIds que passam no filtro de produtos (grupo, seção e laboratório só o ERP resolve).
+  const [filtro, setFiltro] = useState<{ filtros: FiltrosPedidos; produtos: ReadonlySet<string> | null }>({ filtros: SEM_FILTROS, produtos: null });
+  const [distribuidoras, setDistribuidoras] = useState<OpcaoFornecedor[]>([]);
+  useEffect(() => {
+    apiFetch<OpcaoFornecedor[]>(`${API}/pedidos/fornecedores?busca=`)
+      .then((r) => setDistribuidoras(Array.isArray(r) ? r : []))
+      .catch(() => undefined);
+  }, []);
+  const fornecedores = [...distribuidoras, ...(contexto?.lojas ?? []).map((l) => ({ codigo: -l.codigo, nome: l.nome }))];
+
+  const abrirFiltros = async () => {
+    const r = await windows.open<FiltrosPedidos>({
+      surface: "sheet",
+      title: "Filtros",
+      content: () => <PedidosFiltrosSheet inicial={filtro.filtros} situacoes={STATUS} lojas={contexto?.lojas ?? []} fornecedores={fornecedores} />,
+    });
+    if (r.status !== "confirmed") return;
+    const filtros = r.value;
+    try {
+      const produtos = filtros.entradas.length
+        ? new Set((await apiFetch<{ produtoIds: string[] }>(`${PEDIDOS_BASE}/filtrar-produtos`, json("POST", { entradas: filtros.entradas }))).produtoIds)
+        : null;
+      setFiltro({ filtros, produtos });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao filtrar os produtos."));
+    }
+  };
+  const resumo = resumoDosFiltros(filtro.filtros, STATUS, fornecedores);
 
   const editar = async (pedido: Pedido) => {
     await windows.open<Pedido>({
@@ -105,10 +143,58 @@ export function PedidosTab() {
     void carregar();
   };
 
+  const confirmarSoDeLojas = async (pedido: Pedido) => {
+    const ok = await windows.confirm({
+      title: "Confirmar Pedido",
+      description: `Confirmar o Pedido de ${dia(pedido.criadoEm)}? Ele é só de Lojas e não passa por cotação.`,
+      confirmLabel: "Confirmar Pedido",
+    });
+    if (!ok) return;
+    try {
+      await apiFetch(`${PEDIDOS_BASE}/${pedido.id}/confirmar`, json("POST", { escolhas: {}, version: pedido.version }));
+      feedback.notify({ type: "success", title: "Pedido confirmado." });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao confirmar o Pedido."));
+    }
+    void carregar();
+  };
+
+  const pdfDasLojas = async (pedido: Pedido) => {
+    const lojas = lojasFornecedoras(pedido).map((codigo) => ({ codigo, nome: contexto?.lojas.find((l) => l.codigo === codigo)?.nome ?? `Loja ${codigo}` }));
+    await abrirPdfsDasLojas({ windows, feedback }, pedido.id, lojas, baixar);
+  };
+
+  /** As Lojas em que o Usuário mexe; `null` = todas. O servidor é quem recusa: aqui só se escondem as ações. */
+  const [minhasLojas, setMinhasLojas] = useState<number[] | null>(null);
+  useEffect(() => {
+    apiFetch<{ lojas?: number[] | null }>(`${API}/pedidos/meu-escopo`)
+      .then((r) => setMinhasLojas(Array.isArray(r?.lojas) ? r.lojas : null))
+      .catch(() => undefined);
+  }, []);
+  const noEscopo = (p: Pedido) => minhasLojas === null || p.itens.every((i) => i.quantidades.every((q) => q.quantidade <= 0 || minhasLojas.includes(q.codigoLoja)));
+
+  const finalizar = async (pedido: Pedido) => {
+    const ok = await windows.confirm({
+      title: "Finalizar Pedido",
+      description: `Finalizar o Pedido de ${dia(pedido.criadoEm)}? O que ainda não chegou deixa de ser esperado. Não dá para reabrir.`,
+      confirmLabel: "Finalizar Pedido",
+    });
+    if (!ok) return;
+    try {
+      await apiFetch(`${PEDIDOS_BASE}/${pedido.id}/finalizar`, json("POST", { version: pedido.version }));
+      feedback.notify({ type: "success", title: "Pedido finalizado." });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao finalizar o Pedido."));
+    }
+    void carregar();
+  };
+
   const cancelar = async (pedido: Pedido) => {
     const ok = await windows.confirm({
       title: "Cancelar Pedido",
-      description: `Cancelar o rascunho do Pedido de ${dia(pedido.criadoEm)}? Um Pedido cancelado não pode mais ser editado.`,
+      description: ABERTOS.includes(pedido.status) || pedido.status === "finalizado"
+        ? `Cancelar o Pedido de ${dia(pedido.criadoEm)}? Ele já foi confirmado: deixa de ser esperado. O que já deu entrada continua no ERP.`
+        : `Cancelar o Pedido de ${dia(pedido.criadoEm)}? Um Pedido cancelado não pode mais ser editado nem cotado.`,
       confirmLabel: "Cancelar Pedido",
       destructive: true,
     });
@@ -128,7 +214,7 @@ export function PedidosTab() {
     { key: "criadoEm", label: "Criado em", format: "date", width: 120, value: (p) => p.criadoEm, sortable: true, firstSort: "desc" },
     { key: "criadoPor", label: "Criado por", value: (p) => p.criadoPorNome, searchable: true, mobileRole: "primary" },
     { key: "produtos", label: "Produtos", format: "decimal", width: 100, value: (p) => p.itens.length },
-    { key: "status", label: "Situação", value: (p) => STATUS[p.status], searchable: true },
+    { key: "status", label: "Situação", value: (p) => STATUS[p.status], searchable: true, render: (p) => <Badge variant={COR_DA_SITUACAO[p.status]}>{STATUS[p.status]}</Badge> },
     {
       key: "entrada",
       format: "number",
@@ -153,21 +239,53 @@ export function PedidosTab() {
     <Stack gap="section">
       <DataTable
         title="Pedidos"
+        headerActions={
+          <Stack direction="row" gap="field" align="center">
+            {resumo ? (
+              <Text variant="caption" tone="muted">
+                {resumo}
+              </Text>
+            ) : null}
+            <Button type="button" variant="outline" onClick={() => void abrirFiltros()}>
+              <SlidersHorizontal />
+              Filtros
+            </Button>
+          </Stack>
+        }
         columns={colunas}
-        rows={pedidos}
+        rows={filtrarPedidos(pedidos, filtro.filtros, filtro.produtos)}
         getRowId={(p) => p.id}
         loading={carregando}
-        emptyMessage="Nenhum Pedido ainda. Marque produtos no Lançamento e use Gerar pedido."
+        emptyMessage={resumo ? "Nenhum Pedido com esses filtros." : "Nenhum Pedido ainda. Marque produtos no Lançamento e use Gerar pedido."}
         search={{ placeholder: "Buscar Pedido" }}
         rowActions={(p) =>
-          p.status === "rascunho" ? (
+          !noEscopo(p) ? (
+            p.status === "rascunho" || p.status === "cancelado" || soDeLojas(p) ? null : (
+              <Stack direction="row" gap="tight">
+                <Button size="icon" variant="outline" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
+                  <Scale />
+                </Button>
+              </Stack>
+            )
+          ) : p.status === "rascunho" ? (
             <Stack direction="row" gap="tight">
               <Button size="icon" variant="outline" aria-label={`Editar Pedido de ${dia(p.criadoEm)}`} onClick={() => void editar(p)}>
                 <Pencil />
               </Button>
-              <Button size="icon" variant="outline" aria-label={`Cotar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cotar(p)}>
-                <ClipboardList />
-              </Button>
+              {soDeLojas(p) ? (
+                <Button size="icon" variant="outline" aria-label={`Confirmar Pedido de ${dia(p.criadoEm)}`} onClick={() => void confirmarSoDeLojas(p)}>
+                  <Check />
+                </Button>
+              ) : (
+                <Button size="icon" variant="outline" aria-label={`Cotar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cotar(p)}>
+                  <ClipboardList />
+                </Button>
+              )}
+              {lojasFornecedoras(p).length > 0 && (
+                <Button size="icon" variant="outline" aria-label={`PDF das Lojas do Pedido de ${dia(p.criadoEm)}`} onClick={() => void pdfDasLojas(p)}>
+                  <FileDown />
+                </Button>
+              )}
               <Button size="icon" variant="outline" aria-label={`Cancelar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cancelar(p)}>
                 <Ban />
               </Button>
@@ -179,9 +297,31 @@ export function PedidosTab() {
                   <Pencil />
                 </Button>
               )}
-            <Button size="icon" variant="outline" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
-              <Scale />
-            </Button>
+              {!soDeLojas(p) && (
+                <Button size="icon" variant="outline" aria-label={`Cotação do Pedido de ${dia(p.criadoEm)}`} onClick={() => void verCotacao(p)}>
+                  <Scale />
+                </Button>
+              )}
+              {soDeLojas(p) && EDITAVEIS.includes(p.status) && (
+                <Button size="icon" variant="outline" aria-label={`Confirmar Pedido de ${dia(p.criadoEm)}`} onClick={() => void confirmarSoDeLojas(p)}>
+                  <Check />
+                </Button>
+              )}
+              {lojasFornecedoras(p).length > 0 && (
+                <Button size="icon" variant="outline" aria-label={`PDF das Lojas do Pedido de ${dia(p.criadoEm)}`} onClick={() => void pdfDasLojas(p)}>
+                  <FileDown />
+                </Button>
+              )}
+              {ABERTOS.includes(p.status) && (
+                <Button size="icon" variant="outline" aria-label={`Finalizar Pedido de ${dia(p.criadoEm)}`} onClick={() => void finalizar(p)}>
+                  <CheckCheck />
+                </Button>
+              )}
+              {(EDITAVEIS.includes(p.status) || ABERTOS.includes(p.status) || p.status === "finalizado") && (
+                <Button size="icon" variant="outline" aria-label={`Cancelar Pedido de ${dia(p.criadoEm)}`} onClick={() => void cancelar(p)}>
+                  <Ban />
+                </Button>
+              )}
             </Stack>
           )
         }

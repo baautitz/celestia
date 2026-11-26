@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import type { DadosPedido, Pedido, PedidoStatus } from "./pedidos.js";
+import type { DadosPedido, Escolhas, Pedido, PedidoStatus } from "./pedidos.js";
 import { novoIdPedido, type PedidoStore } from "./pedidos-store.js";
 import { returned } from "./returned.js";
 import { pedidos } from "./schema.js";
@@ -30,8 +30,12 @@ export class PostgresPedidoStore implements PedidoStore {
     return this.mudar(id, expectedVersion, { itens: dados.itens }, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
-  async cancelarRascunho(id: string, expectedVersion: number): Promise<Pedido | null> {
-    return this.mudar(id, expectedVersion, { status: "cancelado" });
+  async cancelar(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "cancelado" }, ["rascunho", "aguardando_precos", "cotado", "confirmado", "parcialmente_recebido", "finalizado"]);
+  }
+
+  async finalizar(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "finalizado" }, ["confirmado", "parcialmente_recebido"]);
   }
 
   async iniciarCotacao(id: string, expectedVersion: number): Promise<Pedido | null> {
@@ -42,8 +46,12 @@ export class PostgresPedidoStore implements PedidoStore {
     return this.mudar(id, undefined, { status: "cotado" }, "aguardando_precos");
   }
 
-  async confirmar(id: string, escolhas: Record<string, number>, expectedVersion: number): Promise<Pedido | null> {
+  async confirmar(id: string, escolhas: Escolhas, expectedVersion: number): Promise<Pedido | null> {
     return this.mudar(id, expectedVersion, { status: "confirmado", escolhas, confirmadoEm: new Date() }, "cotado");
+  }
+
+  async confirmarSemCotacao(id: string, expectedVersion: number): Promise<Pedido | null> {
+    return this.mudar(id, expectedVersion, { status: "confirmado", escolhas: {}, confirmadoEm: new Date() }, ["rascunho", "aguardando_precos", "cotado"]);
   }
 
   async registrarRecebimento(id: string, status: "confirmado" | "parcialmente_recebido" | "recebido"): Promise<Pedido | null> {

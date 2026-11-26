@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, FileText, Upload } from "lucide-react";
-import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
 import { Input } from "@platform/ui/components/input";
 import { Stack, Text } from "@platform/ui/components/layout";
-import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
+import { DataTable } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { WindowActions, WindowCancelButton } from "@platform/ui/imperative/use-window";
 import { apiFetch } from "@platform/ui/lib/api";
+import { abrirPdfsDasLojas } from "./pdfs-das-lojas";
+import { CotacaoComparacao, marcadosDa, parcelasDe, type Marcados, type ProdutoCotacao } from "./cotacao-comparacao";
+import type { Escolha, Escolhas } from "./pedidos";
 import { CotacaoDownloadsWindow, type ModoDownload } from "./cotacao-downloads-window";
 import { json } from "./inovafarma-api";
 import type { LojaOpcao } from "./loja-opcao";
@@ -20,23 +22,11 @@ interface FornecedorCotacao {
   version: number;
 }
 
-interface ProdutoCotacao {
-  produtoId: string;
-  codigoProduto?: number | null;
-  nome: string;
-  quantidade: number;
-  /** Código do fornecedor -> preço; null = sem oferta. */
-  precos: Record<string, number | null>;
-  /** Código do fornecedor -> quantidade que o Pedido pede a ele, e a que ele confirmou na planilha (null = não mexeu). */
-  pedidas: Record<string, number>;
-  ofertadas: Record<string, number | null>;
-  /** Código do fornecedor -> última compra dele (preço e dia, AAAA-MM-DD); null = nunca comprou. */
-  ultimas: Record<string, { preco: number; dia: string } | null>;
-}
-
 interface DetalheCotacao {
-  pedido: { id: string; status: string; version: number; escolhas: Record<string, number> };
+  pedido: { id: string; status: string; version: number; escolhas: Escolhas };
   podeConfirmar: boolean;
+  /** Lojas que fornecem parte do Pedido, por transferência. */
+  lojasFornecedoras?: number[];
   fornecedores: FornecedorCotacao[];
   produtos: ProdutoCotacao[];
 }
@@ -59,10 +49,8 @@ interface LinhaConferida {
 }
 
 const ESTADOS = { pendente: "Pendente", parcial: "Parcial", recebido: "Recebido", excedente: "Excedente" } as const;
-const CONFIRMADOS = ["confirmado", "parcialmente_recebido", "recebido"];
+const CONFIRMADOS = ["confirmado", "parcialmente_recebido", "recebido", "finalizado"];
 
-const preco = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const dia = (iso: string) => iso.split("-").reverse().join("/");
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 async function emBase64(arquivo: File): Promise<string> {
@@ -74,7 +62,7 @@ async function emBase64(arquivo: File): Promise<string> {
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-function baixar(nome: string, conteudoBase64: string, tipo = XLSX): void {
+export function baixar(nome: string, conteudoBase64: string, tipo = XLSX): void {
   const bytes = Uint8Array.from(atob(conteudoBase64), (c) => c.charCodeAt(0));
   const url = URL.createObjectURL(new Blob([bytes], { type: tipo }));
   const link = document.createElement("a");
@@ -100,42 +88,36 @@ function ErrosDaPrevia({ erros }: { erros: Previa["erros"] }) {
   );
 }
 
+const fornecedoresDe = (escolha: Escolha | undefined): number[] => (escolha === undefined ? [] : typeof escolha === "number" ? [escolha] : [...new Set(escolha.map((p) => p.codigoFornecedor))]);
+
 /** Fornecedor de menor preço por produto; produto sem oferta fica sem escolha. */
-function menorPreco(detalhe: DetalheCotacao): Record<string, number> {
-  const escolhas: Record<string, number> = {};
+function menorPreco(detalhe: DetalheCotacao): Escolhas {
+  const escolhas: Escolhas = {};
   for (const p of detalhe.produtos) {
     let melhor: { codigo: number; valor: number } | null = null;
     for (const f of detalhe.fornecedores) {
       const valor = p.precos[f.codigo];
       if (valor !== null && valor !== undefined && (!melhor || valor < melhor.valor)) melhor = { codigo: f.codigo, valor };
     }
-    if (melhor) escolhas[p.produtoId] = melhor.codigo;
+    if (!melhor) continue;
+    const lojas = p.lojas ?? [];
+    if (!lojas.some((l) => l.definidas?.length)) {
+      escolhas[p.produtoId] = melhor.codigo;
+      continue;
+    }
+    // Há quantidade definida no Lançamento: a divisão começa nela; o resto (e o de quem não deu preço) vai no menor preço.
+    const barato = melhor.codigo;
+    escolhas[p.produtoId] = lojas.flatMap((l) => {
+      const partes = new Map((l.definidas ?? []).filter((d) => (p.precos[d.codigoFornecedor] ?? null) !== null).map((d) => [d.codigoFornecedor, d.quantidade]));
+      const resto = l.quantidade - [...partes.values()].reduce((t, n) => t + n, 0);
+      if (resto > 0) partes.set(barato, (partes.get(barato) ?? 0) + resto);
+      return [...partes].map(([codigoFornecedor, quantidade]) => ({ codigoLoja: l.codigoLoja, codigoFornecedor, quantidade }));
+    });
   }
   return escolhas;
 }
 
 /** Botão "Enviar planilha": o seletor de arquivo do navegador fica escondido, porque o texto dele sai no idioma do sistema. */
-/** Quantidade que a distribuidora atende: número a partir de zero, gravado ao sair do campo. */
-function CampoQtde({ valor, rotulo, onChange }: { valor: number; rotulo: string; onChange: (valor: number) => void }) {
-  return (
-    <Input
-      key={valor}
-      type="text"
-      inputMode="decimal"
-      aria-label={rotulo}
-      defaultValue={valor}
-      onBlur={(e) => {
-        const n = Number(e.target.value.trim().replace(",", "."));
-        if (e.target.value.trim() === "" || !Number.isFinite(n) || n < 0) {
-          e.target.value = String(valor);
-          return;
-        }
-        if (n !== valor) onChange(n);
-      }}
-    />
-  );
-}
-
 function EnvioPlanilha({ rotulo, onArquivos }: { rotulo: string; onArquivos: (arquivos: File[]) => void }) {
   const campo = useRef<HTMLInputElement>(null);
   return (
@@ -165,12 +147,9 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
   const { windows, feedback } = useUi();
   const base = `${PEDIDOS_BASE}/${pedidoId}/cotacao`;
   const [detalhe, setDetalhe] = useState<DetalheCotacao | null>(null);
-  /** Trocas do usuário sobre a escolha padrão (menor preço). */
-  const [trocas, setTrocas] = useState<Record<string, number>>({});
+  /** Marcações do usuário sobre a escolha padrão (menor preço). */
+  const [trocas, setTrocas] = useState<Record<string, Marcados>>({});
   const [linhas, setLinhas] = useState<LinhaConferida[] | null>(null);
-  /** Quantidade editada por (produto, distribuidora), sobre a que ela deixou na planilha. */
-  const [qtdes, setQtdes] = useState<Record<string, number>>({});
-
   const erro = useCallback((err: unknown, padrao: string) => feedback.notifyError(err instanceof Error ? err : new Error(padrao)), [feedback]);
 
   useEffect(() => {
@@ -217,13 +196,13 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
   /** O modal de download: as planilhas da cotação (todas as distribuidoras) ou os PDFs (só as escolhidas no Pedido confirmado). */
   const abrirDownloads = async (tipo: "planilha" | "PDF", sobre: DetalheCotacao | null = detalhe) => {
     if (!sobre) return;
-    const codigos = tipo === "PDF" ? new Set(Object.values(sobre.pedido.escolhas)) : null;
+    const codigos = tipo === "PDF" ? new Set(Object.values(sobre.pedido.escolhas).flatMap(fornecedoresDe)) : null;
     const distribuidoras = sobre.fornecedores.filter((f) => !codigos || codigos.has(f.codigo)).map((f) => ({ codigo: f.codigo, nome: f.nome, situacao: tipo === "planilha" ? (f.importado ? "Preços importados" : "Aguardando preços") : undefined }));
     await windows.open({
       surface: "dialog",
       size: "large",
-      title: tipo === "PDF" ? "PDFs do Pedido por distribuidora" : "Planilhas por distribuidora",
-      description: tipo === "PDF" ? "Pedido de compra de cada distribuidora, com os produtos e as quantidades confirmados." : "Uma planilha para cada distribuidora, só com os produtos pedidos a ela.",
+      title: tipo === "PDF" ? "PDFs do Pedido por fornecedor" : "Planilhas por fornecedor",
+      description: tipo === "PDF" ? "Pedido de compra de cada fornecedor, com os produtos e as quantidades confirmados." : "Uma planilha para cada fornecedor, só com os produtos pedidos a ela.",
       content: () => <CotacaoDownloadsWindow distribuidoras={distribuidoras} tipo={tipo} baixar={(d, modo) => (tipo === "PDF" ? baixarPdf(d, modo) : baixarPlanilha(d, modo))} />,
     });
   };
@@ -255,21 +234,15 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
 
   const confirmado = CONFIRMADOS.includes(detalhe.pedido.status);
   const editavel = detalhe.pedido.status === "cotado" && detalhe.podeConfirmar;
-  /** Menor preço por produto (o primeiro fornecedor da lista em empate), trocável pelo usuário. */
-  const escolhas: Record<string, number> = confirmado ? detalhe.pedido.escolhas : { ...menorPreco(detalhe), ...trocas };
-
-  /** Por produto, a quantidade da distribuidora escolhida (a editada, a da planilha ou a pedida a ela). */
-  const quantidadesEscolhidas = Object.fromEntries(
-    detalhe.produtos.flatMap((p) => {
-      const codigo = escolhas[p.produtoId];
-      return codigo === undefined ? [] : [[p.produtoId, qtdes[`${p.produtoId}|${codigo}`] ?? p.ofertadas?.[codigo] ?? p.pedidas?.[codigo] ?? p.quantidade] as const];
-    }),
-  );
+  /** Confirmado mostra o que foi gravado; antes disso, o menor preço de cada produto com as marcações do usuário por cima. */
+  const padrao = confirmado ? detalhe.pedido.escolhas : menorPreco(detalhe);
+  const marcados = Object.fromEntries(detalhe.produtos.map((p) => [p.produtoId, (confirmado ? undefined : trocas[p.produtoId]) ?? marcadosDa(p, padrao[p.produtoId])]));
   const confirmarPedido = async () => {
     const ok = await windows.confirm({ title: "Confirmar Pedido", description: "Confirmar o Pedido com os fornecedores escolhidos? Depois de confirmado a escolha não muda.", confirmLabel: "Confirmar Pedido" });
     if (!ok) return;
     try {
-      await apiFetch(`${PEDIDOS_BASE}/${pedidoId}/confirmar`, json("POST", { escolhas, quantidades: quantidadesEscolhidas, version: detalhe.pedido.version }));
+      const escolhas: Escolhas = Object.fromEntries(Object.entries(marcados).flatMap(([id, m]) => (parcelasDe(m).length ? [[id, parcelasDe(m)]] : [])));
+      await apiFetch(`${PEDIDOS_BASE}/${pedidoId}/confirmar`, json("POST", { escolhas, version: detalhe.pedido.version }));
       feedback.notify({ type: "success", title: "Pedido confirmado." });
     } catch (err: unknown) {
       erro(err, "Erro ao confirmar o Pedido.");
@@ -280,83 +253,24 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
     if (CONFIRMADOS.includes(novo.pedido.status)) await abrirDownloads("PDF", novo);
   };
   const nomeLoja = (codigo: number) => lojas.find((l) => l.codigo === codigo)?.nome ?? `Loja ${codigo}`;
-
-  const colunas: DataTableColumn<ProdutoCotacao>[] = [
-    { key: "codigo", label: "Código", value: (p) => p.codigoProduto ?? "", searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
-    { key: "nome", label: "Produto", value: (p) => p.nome, searchable: true, mobileRole: "primary" },
-    { key: "quantidade", label: "Qtde pedida", format: "decimal", value: (p) => p.quantidade },
-    // Cada distribuidora é um grupo de duas colunas, numa linha só por produto: Preço (escolhe; o tooltip traz a última compra) e Qtde (editável).
-    ...detalhe.fornecedores.flatMap((f): DataTableColumn<ProdutoCotacao>[] => {
-      const chaveDe = (p: ProdutoCotacao) => `${p.produtoId}|${f.codigo}`;
-      const pedidaDe = (p: ProdutoCotacao) => p.pedidas?.[f.codigo] ?? p.quantidade;
-      // A quantidade que vale é a editada aqui; senão a que a distribuidora deixou na planilha; senão a pedida.
-      const efetivaDe = (p: ProdutoCotacao) => qtdes[chaveDe(p)] ?? p.ofertadas?.[f.codigo] ?? pedidaDe(p);
-      const menorDe = (p: ProdutoCotacao) => Math.min(...Object.values(p.precos).filter((x): x is number => x !== null));
-      return [
-        {
-          key: `f${f.codigo}p`,
-          group: f.nome,
-          label: "Preço",
-          width: 96,
-          // O tooltip do Desempenho de Vendas, pelo DataTable: preço cotado x última compra desta distribuidora, com a data.
-          format: "currency",
-          value: (p) => p.precos[f.codigo] ?? null,
-          compare: (p) => {
-            const ultima = p.ultimas?.[f.codigo];
-            return ultima ? { previous: ultima.preco, label: `Última compra em ${dia(ultima.dia)}`, favorable: "down" } : undefined;
-          },
-          render: (p) => {
-            const v = p.precos[f.codigo];
-            if (v === null || v === undefined) return <Text tone="muted">-</Text>;
-            const menor = v === menorDe(p);
-            const valor = menor ? <Text weight="bold" tone="success" title="Menor preço">{preco(v)}</Text> : <Text>{preco(v)}</Text>;
-            const escolhido = escolhas[p.produtoId] === f.codigo;
-            if (!editavel) return confirmado && escolhido ? <Badge>{preco(v)}</Badge> : valor;
-            return (
-              <Button type="button" variant={escolhido ? "default" : "outline"} aria-pressed={escolhido} aria-label={`Escolher ${f.nome} para ${p.nome}`} onClick={() => setTrocas((t) => ({ ...t, [p.produtoId]: f.codigo }))}>
-                {/* No botão escolhido (fundo escuro) o texto herda a cor do botão: o verde do menor preço não tem contraste. */}
-                {escolhido ? <Text title={menor ? "Menor preço" : undefined}>{preco(v)}</Text> : valor}
-              </Button>
-            );
-          },
-        },
-        {
-          key: `f${f.codigo}q`,
-          group: f.nome,
-          label: "Qtde",
-          width: 96,
-          // Numérica como o Preço: cabeçalho e valores alinhados à direita nas duas colunas.
-          format: "decimal",
-          value: (p) => (p.precos[f.codigo] === null || p.precos[f.codigo] === undefined ? null : efetivaDe(p)),
-          cellClassName: "[&_input]:w-16 [&_input]:px-1.5 [&_input]:text-right",
-          render: (p) => {
-            const v = p.precos[f.codigo];
-            if (v === null || v === undefined) return null;
-            const efetiva = efetivaDe(p);
-            const difere = efetiva !== pedidaDe(p);
-            if (!editavel) return <Text tone={difere ? "warning" : "default"} weight={difere ? "semibold" : undefined} title={difere ? `Diferente do pedido (${preco(pedidaDe(p))})` : undefined}>{preco(efetiva)}</Text>;
-            return (
-              <>
-                {difere && <Text tone="warning" weight="semibold" title={`Diferente do pedido (${preco(pedidaDe(p))})`}>≠ </Text>}
-                <CampoQtde valor={efetiva} rotulo={`Quantidade de ${f.nome} para ${p.nome}`} onChange={(n) => setQtdes((q) => ({ ...q, [chaveDe(p)]: n }))} />
-              </>
-            );
-          },
-        },
-      ];
-    }),
-  ];
+  const lojasFornecedoras = (detalhe.lojasFornecedoras ?? []).map((codigo) => ({ codigo, nome: nomeLoja(codigo) }));
+  const botaoDasLojas = lojasFornecedoras.length > 0 && detalhe.podeConfirmar ? (
+    <Button type="button" variant="outline" onClick={() => void abrirPdfsDasLojas({ windows, feedback }, pedidoId, lojasFornecedoras, baixar)}>
+      <FileText /> PDFs das Lojas
+    </Button>
+  ) : null;
 
   return (
     <>
-      <Stack gap="section" viewport="modal">
+      <Stack gap="field" viewport="modal">
         {!confirmado && (
           <Stack direction="row" gap="group" align="center" justify="between" wrap>
-            <Text tone="muted">Baixe a planilha de cada distribuidora e, com os preços preenchidos, importe todas de uma vez: o arquivo já diz de quem é.</Text>
+            <Text tone="muted">Baixe a planilha de cada fornecedor e, com os preços preenchidos, importe todas de uma vez: o arquivo já diz de quem é.</Text>
             <Stack direction="row" gap="field" align="center">
               <Button type="button" variant="outline" onClick={() => void abrirDownloads("planilha")}>
                 <Download /> Baixar planilhas
               </Button>
+              {botaoDasLojas}
               <EnvioPlanilha rotulo="Planilhas preenchidas" onArquivos={(arquivos) => void importarTodas(arquivos)} />
             </Stack>
           </Stack>
@@ -366,7 +280,8 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
             <Button type="button" variant="outline" onClick={() => void abrirDownloads("PDF")}>
               <FileText /> Baixar PDFs
             </Button>
-            <Button type="button" onClick={() => void conferirNf()}>Conferir NF</Button>
+            {botaoDasLojas}
+            {detalhe.pedido.status === "finalizado" ? null : <Button type="button" onClick={() => void conferirNf()}>Conferir NF</Button>}
           </Stack>
         ) : null}
         {linhas ? (
@@ -385,9 +300,15 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
             emptyMessage="Nenhum produto para conferir."
           />
         ) : null}
-        <Stack grow>
-        <DataTable embedded scroll="fill" title="Comparação de preços" columns={colunas} rows={detalhe.produtos} getRowId={(p) => p.produtoId} emptyMessage="Nenhum produto no Pedido." search={{ placeholder: "Buscar produto" }} />
-        </Stack>
+        <CotacaoComparacao
+          produtos={detalhe.produtos}
+          fornecedores={detalhe.fornecedores}
+          marcados={marcados}
+          editavel={editavel}
+          confirmado={confirmado}
+          nomeLoja={nomeLoja}
+          onChange={(produtoId, m) => setTrocas((t) => ({ ...t, [produtoId]: m }))}
+        />
       </Stack>
       <WindowActions>
         <WindowCancelButton>Fechar</WindowCancelButton>

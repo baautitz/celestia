@@ -2,17 +2,16 @@ import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
 import { formatarValor } from "./indicadores.js";
-import { BUSCA_LISTA_SQL, conferirSql, type ResultadoBusca } from "./lista-produtos.js";
 import { NomeDuplicadoError } from "./erros-de-store.js";
-import { ator, ERP_INDISPONIVEL, META_DESATUALIZADA, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
+import { ator, META_DESATUALIZADA, recusaDeValidacao, Version, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import type { MetaStore } from "./metas-store.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import type { PeriodsService } from "./pre-vencidos-routes.js";
-import { parametrosBusca } from "./produtos-erp.js";
-import { DadosTipoMeta, EXIBICAO_LABEL, EntradaLista, idValido, indicadorDoTipo, MIN_BUSCA_LISTA, TIPOS_ENTRADA, descreverEntrada, descreverPremio, ordenarEntradas, problemaDoTipo, type TipoMeta } from "./tipos-meta.js";
+import { DadosTipoMeta, EXIBICAO_LABEL, indicadorDoTipo, descreverEntrada, descreverPremio, ordenarEntradas, problemaDoTipo, type TipoMeta } from "./tipos-meta.js";
 import { META_TARGET, TIPO_META_TARGET, TIPOS_META_ACTIONS, TIPOS_META_PLUGIN, type ValoresTipo } from "./tipos-meta-audit.js";
 import type { TipoMetaStore } from "./tipos-meta-store.js";
 import type { AuditService } from "./vinculo-audit.js";
+import { registrarBuscaDaLista } from "./lista-busca-routes.js";
 
 export interface TiposMetaRoutesDeps {
   routes: ModuleContext["routes"];
@@ -41,10 +40,6 @@ const Aplicacao = z.object({
     .array(z.object({ metaId: z.string().min(1), version: Version, codigos: z.array(z.number().int()).min(1, "Escolha ao menos um Participante.") }))
     .min(1, "Escolha ao menos um Período."),
 });
-
-const ID_INVALIDO = "Uma entrada da Lista tem um identificador inválido.";
-const Conferencia = z.object({ entradas: z.array(EntradaLista.pick({ tipo: true, id: true }).refine(idValido, ID_INVALIDO)).max(500) });
-const TipoBusca = z.enum(TIPOS_ENTRADA, { error: "Tipo de entrada da Lista inválido." });
 
 const comPremio = (t: TipoMeta, temMetas = false) => ({ ...t, premio: descreverPremio(t), temMetas });
 
@@ -136,40 +131,7 @@ export function registerTiposMetaRoutes({ routes, permissions, auth, erpClient, 
     return c.json(comPremio(atualizado, (await tiposComMetas()).has(atualizado.id)));
   });
 
-  // Busca de entradas da Lista de Produtos no ERP, só no tipo escolhido.
-  routes.get("/tipos-meta/lista/busca", auth, async (c: AuthContext) => {
-    if (!podeBuscar(c)) return c.json({ error: manage.deniedMessage }, 403);
-    const parsedTipo = TipoBusca.safeParse(c.req.query("tipo"));
-    if (!parsedTipo.success) return recusaDeValidacao(c, parsedTipo.error);
-    const tipo = parsedTipo.data;
-    const q = (c.req.query("q") ?? "").trim().slice(0, 100);
-    if (q.length < MIN_BUSCA_LISTA[tipo]) return c.json([]);
-    const client = erpClient();
-    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
-    try {
-      const rows = await client.query<ResultadoBusca>(BUSCA_LISTA_SQL[tipo], parametrosBusca(q));
-      return c.json(rows.map((r) => ({ tipo, id: String(r.id), nome: (r.nome || "").trim(), detalhe: r.detalhe ?? null })));
-    } catch {
-      return c.json({ error: ERP_INDISPONIVEL }, 503);
-    }
-  });
-
-  // Quais entradas da Lista ainda existem no ERP: as outras aparecem com o aviso "não encontrado no ERP".
-  routes.post("/tipos-meta/lista/conferir", auth, async (c: AuthContext) => {
-    if (!podeBuscar(c)) return c.json({ error: manage.deniedMessage }, 403);
-    const parsed = Conferencia.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return recusaDeValidacao(c, parsed.error);
-    const consulta = conferirSql(parsed.data.entradas);
-    if (!consulta) return c.json({ ausentes: [] });
-    const client = erpClient();
-    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
-    try {
-      const existem = new Set((await client.query<{ tipo: string; id: string | number }>(consulta.sql, consulta.params)).map((r) => `${r.tipo}:${String(r.id).toUpperCase()}`));
-      return c.json({ ausentes: parsed.data.entradas.filter((e) => !existem.has(`${e.tipo}:${e.id.toUpperCase()}`)) });
-    } catch {
-      return c.json({ error: ERP_INDISPONIVEL }, 503);
-    }
-  });
+  registrarBuscaDaLista({ routes, auth, erpClient, base: "/tipos-meta/lista", recusa: (c) => (podeBuscar(c) ? null : c.json({ error: manage.deniedMessage }, 403)) });
 
   const periodosAbertos = async () => (await periods.list()).filter((p) => p.status === "open").sort((a, b) => b.startDate.localeCompare(a.startDate));
 

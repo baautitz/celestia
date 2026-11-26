@@ -1,4 +1,4 @@
-import type { Pedido, PedidoStatus } from "./pedidos.js";
+import { deLojas, type Pedido, type PedidoStatus } from "./pedidos.js";
 
 export type EstadoDaLinha = "pendente" | "parcial" | "recebido" | "excedente";
 
@@ -20,18 +20,16 @@ export function estadoDaLinha(pedida: number, recebida: number): EstadoDaLinha {
   return recebida === pedida ? "recebido" : "excedente";
 }
 
-/** Só os produtos com fornecedor escolhido entram na conferência, e só as Lojas com quantidade pedida. */
+/** Entra na conferência o que outras Lojas fornecem e, do produto com fornecedor escolhido, a linha inteira. */
 export function conferir(pedido: Pick<Pedido, "itens" | "escolhas">, recebidas: Map<string, number>): LinhaConferida[] {
-  return pedido.itens
-    .filter((i) => pedido.escolhas[i.produtoId] !== undefined)
-    .flatMap((i) =>
-      i.quantidades
-        .filter((q) => q.quantidade > 0)
-        .map((q) => {
-          const recebida = recebidas.get(chaveDaLinha(i.produtoId, q.codigoLoja)) ?? 0;
-          return { produtoId: i.produtoId, nome: i.nome, codigoLoja: q.codigoLoja, pedida: q.quantidade, recebida, estado: estadoDaLinha(q.quantidade, recebida) };
-        }),
-    );
+  return pedido.itens.flatMap((i) =>
+    i.quantidades.flatMap((q) => {
+      const pedida = pedido.escolhas[i.produtoId] === undefined ? deLojas(q) : q.quantidade;
+      if (pedida <= 0) return [];
+      const recebida = recebidas.get(chaveDaLinha(i.produtoId, q.codigoLoja)) ?? 0;
+      return [{ produtoId: i.produtoId, nome: i.nome, codigoLoja: q.codigoLoja, pedida, recebida, estado: estadoDaLinha(pedida, recebida) }];
+    }),
+  );
 }
 
 /** Recebido quando nenhuma linha está pendente ou parcial; parcialmente recebido quando algo já entrou; senão segue confirmado. */
