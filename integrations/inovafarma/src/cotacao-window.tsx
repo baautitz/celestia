@@ -143,6 +143,30 @@ function EnvioPlanilha({ rotulo, onArquivos }: { rotulo: string; onArquivos: (ar
   );
 }
 
+/** O que cada Loja já recebeu do Pedido, conforme as entradas de NF. */
+function ConferenciaNf({ linhas, codigoDe, nomeLoja }: { linhas: LinhaConferida[]; codigoDe: (produtoId: string) => number | string; nomeLoja: (codigo: number) => string }) {
+  return (
+    <>
+      <DataTable
+        columns={[
+          { key: "codigo", label: "Código", value: (l: LinhaConferida) => codigoDe(l.produtoId), searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
+          { key: "nome", label: "Produto", value: (l: LinhaConferida) => l.nome, searchable: true, mobileRole: "primary" },
+          { key: "loja", label: "Loja", value: (l: LinhaConferida) => nomeLoja(l.codigoLoja) },
+          { key: "pedida", label: "Pedida", format: "decimal", value: (l: LinhaConferida) => l.pedida },
+          { key: "recebida", label: "Recebida", format: "decimal", value: (l: LinhaConferida) => l.recebida },
+          { key: "estado", label: "Situação", value: (l: LinhaConferida) => ESTADOS[l.estado] },
+        ]}
+        rows={linhas}
+        getRowId={(l) => `${l.produtoId}|${l.codigoLoja}`}
+        emptyMessage="Nenhum produto para conferir."
+      />
+      <WindowActions>
+        <WindowCancelButton>Fechar</WindowCancelButton>
+      </WindowActions>
+    </>
+  );
+}
+
 /** Cotação do Pedido: a planilha de cada fornecedor (baixar, importar com prévia) e a comparação de preços. */
 export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; lojas?: LojaOpcao[] }) {
   const { windows, feedback } = useUi();
@@ -150,7 +174,6 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
   const [detalhe, setDetalhe] = useState<DetalheCotacao | null>(null);
   /** Marcações do usuário sobre a escolha padrão (menor preço). */
   const [trocas, setTrocas] = useState<Record<string, Marcados>>({});
-  const [linhas, setLinhas] = useState<LinhaConferida[] | null>(null);
   const erro = useCallback((err: unknown, padrao: string) => feedback.notifyError(err instanceof Error ? err : new Error(padrao)), [feedback]);
 
   useEffect(() => {
@@ -224,8 +247,14 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
   const conferirNf = async () => {
     try {
       const { linhas: conferidas } = await apiFetch<{ linhas: LinhaConferida[] }>(`${PEDIDOS_BASE}/${pedidoId}/conferir`, json("POST", {}));
-      setLinhas(conferidas);
-      setDetalhe(await apiFetch<DetalheCotacao>(base));
+      const novo = await apiFetch<DetalheCotacao>(base);
+      setDetalhe(novo);
+      await windows.open({
+        surface: "dialog",
+        size: "screen",
+        title: "Conferência com a NF",
+        content: () => <ConferenciaNf linhas={conferidas} codigoDe={(id) => novo.produtos.find((p) => p.produtoId === id)?.codigoProduto ?? ""} nomeLoja={(codigo) => lojas.find((l) => l.codigo === codigo)?.nome ?? `Loja ${codigo}`} />,
+      });
     } catch (err: unknown) {
       erro(err, "Erro ao conferir com a NF.");
     }
@@ -286,22 +315,6 @@ export function CotacaoWindow({ pedidoId, lojas = [] }: { pedidoId: string; loja
             {botaoDasLojas}
             {detalhe.pedido.status === "finalizado" ? null : <Button type="button" onClick={() => void conferirNf()}>Conferir NF</Button>}
           </Stack>
-        ) : null}
-        {linhas ? (
-          <DataTable
-            title="Conferência com a NF"
-            columns={[
-              { key: "codigo", label: "Código", value: (l: LinhaConferida) => detalhe.produtos.find((p) => p.produtoId === l.produtoId)?.codigoProduto ?? "", searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
-              { key: "nome", label: "Produto", value: (l: LinhaConferida) => l.nome, searchable: true, mobileRole: "primary" },
-              { key: "loja", label: "Loja", value: (l: LinhaConferida) => nomeLoja(l.codigoLoja) },
-              { key: "pedida", label: "Pedida", format: "decimal", value: (l: LinhaConferida) => l.pedida },
-              { key: "recebida", label: "Recebida", format: "decimal", value: (l: LinhaConferida) => l.recebida },
-              { key: "estado", label: "Situação", value: (l: LinhaConferida) => ESTADOS[l.estado] },
-            ]}
-            rows={linhas}
-            getRowId={(l) => `${l.produtoId}|${l.codigoLoja}`}
-            emptyMessage="Nenhum produto para conferir."
-          />
         ) : null}
         {editavel ? <AvisoDeLimites estouros={limites.estouros} falhou={limites.falhou} lojas={lojas} /> : null}
         <CotacaoComparacao

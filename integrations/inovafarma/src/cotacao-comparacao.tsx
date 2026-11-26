@@ -112,8 +112,8 @@ interface Oferta {
 }
 
 /**
- * No desenho do Gerar pedido: produtos à esquerda, as Lojas do produto em foco à direita (as quantidades) e, embaixo,
- * os fornecedores dele (marcar).
+ * No desenho do Gerar pedido: produtos à esquerda, as Lojas do produto em foco à direita e, embaixo,
+ * os fornecedores dele, onde se marca e se digita a quantidade para a Loja em foco.
  */
 export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, confirmado, nomeLoja, onChange }: Props) {
   const [visao, salvarVisao] = usePreference<Visao>("inovafarma:cotacao:view", "produto", aceita);
@@ -129,8 +129,9 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
 
   const ofertas: Oferta[] = emFoco ? fornecedores.flatMap((f) => (ofereceu(emFoco, f.codigo) ? [{ ...f, preco: emFoco.precos[f.codigo] as number }] : [])) : [];
   const menor = Math.min(...ofertas.map((o) => o.preco));
-  const marcadas = ofertas.filter((o) => m[o.codigo] !== undefined);
-  const totalDa = (codigoLoja: number) => marcadas.reduce((t, f) => t + (m[f.codigo]?.[codigoLoja] ?? 0), 0);
+  const [lojaAtiva, setLojaAtiva] = useState<string | null>(null);
+  const loja = emFoco?.lojas?.find((l) => String(l.codigoLoja) === lojaAtiva) ?? emFoco?.lojas?.[0];
+  const totalDa = (codigoLoja: number) => Object.values(m).reduce((t, porLoja) => t + (porLoja[codigoLoja] ?? 0), 0);
 
   const colunasProduto: DataTableColumn<ProdutoCotacao>[] = [
     { key: "codigo", label: "Código", value: (p) => p.codigoProduto ?? "", searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
@@ -152,30 +153,25 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
   const colunasLoja: DataTableColumn<Loja>[] = [
     { key: "loja", label: "Loja", value: (l) => nomeLoja(l.codigoLoja), mobileRole: "primary" },
     { key: "pedida", label: "Pedida", format: "decimal", value: (l) => l.quantidade },
-    ...marcadas.map(
-      (f): DataTableColumn<Loja> => ({
-        key: `f${f.codigo}`,
-        label: f.nome.split(" ")[0] ?? f.nome,
-        tooltip: f.nome,
-        // Numérica: cabeçalho e campo alinhados à direita.
-        format: "decimal",
-        value: (l) => m[f.codigo]?.[l.codigoLoja] ?? 0,
-        cellClassName: "[&_input]:ml-auto [&_input]:w-20 [&_input]:text-right",
-        render: (l) => {
-          const q = m[f.codigo]?.[l.codigoLoja] ?? 0;
-          if (!editavel || !emFoco) return <Text>{numero(q)}</Text>;
-          return <CampoQtde key={`${emFoco.produtoId}|${q}`} valor={q} rotulo={`Quantidade de ${f.nome} para ${emFoco.nome} em ${nomeLoja(l.codigoLoja)}`} onChange={(n) => onChange(emFoco.produtoId, { ...m, [f.codigo]: { ...m[f.codigo], [l.codigoLoja]: n } })} />;
-        },
-      }),
-    ),
     {
       key: "total",
-      label: "Total",
+      label: "Escolhida",
       format: "decimal",
       value: (l) => totalDa(l.codigoLoja),
       render: (l) => <Text tone={totalDa(l.codigoLoja) === l.quantidade ? "default" : "warning"} weight={totalDa(l.codigoLoja) === l.quantidade ? undefined : "semibold"}>{numero(totalDa(l.codigoLoja))}</Text>,
     },
   ];
+
+  /** O que o fornecedor disse na planilha; sem mexer na quantidade, o que se pediu a ele. Vale para o produto, não por Loja. */
+  const daPlanilha = (p: ProdutoCotacao, codigo: number) => p.ofertadas?.[codigo] ?? p.pedidas?.[codigo] ?? null;
+  /** A quantidade do fornecedor para a Loja em foco: é aqui que se digita. */
+  const campoDaLoja = (p: ProdutoCotacao, codigo: number, nome: string) => {
+    const doProduto = marcadosDe(p);
+    const q = loja ? (doProduto[codigo]?.[loja.codigoLoja] ?? 0) : 0;
+    if (!editavel || !loja) return <Text>{numero(q)}</Text>;
+    return <CampoQtde key={`${p.produtoId}|${codigo}|${loja.codigoLoja}|${q}`} valor={q} rotulo={`Quantidade de ${nome} para ${p.nome} em ${nomeLoja(loja.codigoLoja)}`} onChange={(n) => onChange(p.produtoId, { ...doProduto, [codigo]: { ...doProduto[codigo], [loja.codigoLoja]: n } })} />;
+  };
+  const CAMPO = "[&_input]:ml-auto [&_input]:w-20 [&_input]:text-right";
 
   const ultimaDe = (o: Oferta) => emFoco?.ultimas?.[o.codigo] ?? null;
   const variacaoDe = (o: Oferta) => {
@@ -194,6 +190,8 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
         ]
       : []),
     { key: "nome", label: "Fornecedor", value: (o) => o.nome, mobileRole: "primary", cellClassName: "w-full" },
+    { key: "planilha", label: "Planilha", tooltip: "Quantidade informada na planilha do fornecedor", format: "decimal", value: (o) => (emFoco ? daPlanilha(emFoco, o.codigo) : null) },
+    { key: "qtde", label: "Qtde", format: "decimal", value: (o) => (loja ? (m[o.codigo]?.[loja.codigoLoja] ?? 0) : 0), cellClassName: CAMPO, render: (o) => (emFoco ? campoDaLoja(emFoco, o.codigo, o.nome) : null) },
     {
       key: "preco",
       label: "Preço",
@@ -231,6 +229,7 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
   const totais = fornecedores.flatMap((f) => (valorDo(f.codigo) > 0 ? [{ nome: f.nome, valor: valorDo(f.codigo) }] : []));
   const total = totais.reduce((t, x) => t + x.valor, 0);
   const sufixo = emFoco ? `: ${emFoco.nome}` : "";
+  const daLoja = loja ? ` - ${nomeLoja(loja.codigoLoja)}` : "";
 
   type Fornecedor = Props["fornecedores"][number];
   const colunasDosFornecedores: DataTableColumn<Fornecedor>[] = [
@@ -259,7 +258,11 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
     { key: "codigo", label: "Código", value: (p) => p.codigoProduto ?? "", searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
     { key: "nome", label: "Produto", value: (p) => p.nome, searchable: true, sortable: true, mobileRole: "primary", cellClassName: "w-full" },
     { key: "pedida", label: "Pedida", format: "decimal", value: (p) => p.quantidade },
+    { key: "planilha", label: "Planilha", tooltip: "Quantidade informada na planilha do fornecedor", format: "decimal", value: (p) => (fornEmFoco ? daPlanilha(p, fornEmFoco.codigo) : null) },
     { key: "escolhida", label: "Escolhida", format: "decimal", value: (p) => (fornEmFoco ? somaDe(marcadosDe(p)[fornEmFoco.codigo]) : 0) },
+    ...(loja
+      ? [{ key: "qtde", label: "Qtde", tooltip: `Quantidade para ${nomeLoja(loja.codigoLoja)}`, format: "decimal", cellClassName: CAMPO, value: (p: ProdutoCotacao) => (fornEmFoco ? (marcadosDe(p)[fornEmFoco.codigo]?.[loja.codigoLoja] ?? 0) : 0), render: (p: ProdutoCotacao) => (fornEmFoco && p.lojas?.some((l) => l.codigoLoja === loja.codigoLoja) ? campoDaLoja(p, fornEmFoco.codigo, fornEmFoco.nome) : null) } satisfies DataTableColumn<ProdutoCotacao>]
+      : []),
     {
       key: "preco",
       label: "Preço",
@@ -286,7 +289,7 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
 
   const tabelaLojas = (
     <Stack grow>
-      <DataTable scroll="fill" title={`Lojas${sufixo}`} columns={colunasLoja} rows={emFoco?.lojas ?? []} getRowId={(l) => String(l.codigoLoja)} emptyMessage="Nenhuma Loja." />
+      <DataTable scroll="fill" title={`Lojas${sufixo}`} columns={colunasLoja} rows={emFoco?.lojas ?? []} getRowId={(l) => String(l.codigoLoja)} activeRowId={loja ? String(loja.codigoLoja) : null} onActiveRowChange={setLojaAtiva} emptyMessage="Nenhuma Loja." />
     </Stack>
   );
 
@@ -305,7 +308,7 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
           </Stack>
           {tabelaLojas}
           <Stack span="full" scroll="clip">
-            <DataTable scroll="fill" title={`Fornecedores${sufixo}`} columns={colunasFornecedor} rows={ofertas} getRowId={(o) => String(o.codigo)} emptyMessage="Nenhum preço para este produto." />
+            <DataTable scroll="fill" title={`Fornecedores${sufixo}${daLoja}`} columns={colunasFornecedor} rows={ofertas} getRowId={(o) => String(o.codigo)} emptyMessage="Nenhum preço para este produto." />
           </Stack>
         </Grid>
       ) : (
@@ -315,7 +318,7 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
           </Stack>
           {tabelaLojas}
           <Stack span="full" scroll="clip">
-            <DataTable scroll="fill" title={fornEmFoco ? `Produtos: ${fornEmFoco.nome}` : "Produtos"} columns={colunasDosProdutos} rows={doFornecedor} getRowId={(p) => p.produtoId} activeRowId={emFoco?.produtoId ?? null} onActiveRowChange={setAtivo} emptyMessage="Nenhum preço deste fornecedor." search={{ placeholder: "Buscar produto" }} />
+            <DataTable scroll="fill" title={fornEmFoco ? `Produtos: ${fornEmFoco.nome}${daLoja}` : "Produtos"} columns={colunasDosProdutos} rows={doFornecedor} getRowId={(p) => p.produtoId} activeRowId={emFoco?.produtoId ?? null} onActiveRowChange={setAtivo} emptyMessage="Nenhum preço deste fornecedor." search={{ placeholder: "Buscar produto" }} />
           </Stack>
         </Grid>
       )}
