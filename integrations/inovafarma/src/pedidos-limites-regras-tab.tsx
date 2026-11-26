@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
 import { Stack, Text } from "@platform/ui/components/layout";
-import { HeaderActions } from "@platform/ui/context/header-actions";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
@@ -13,7 +12,7 @@ import type { RegraLimite } from "./pedidos-limites";
 import { RegraLimiteWindow } from "./pedidos-limites-regra-window";
 import { useLatestFetch } from "./use-latest-fetch";
 
-/** Aba Regras de Limite: o que cada Limite de Compras controla, com criar, editar e excluir. */
+/** Janela Regras de Limite: o que cada Limite de Compras controla, com criar, editar e excluir. */
 export function PedidosRegrasLimiteTab() {
   const { windows, feedback } = useUi();
   const novaConsulta = useLatestFetch();
@@ -77,16 +76,16 @@ export function PedidosRegrasLimiteTab() {
 
   return (
     <Stack gap="section">
-      {podeGerir && (
-        <HeaderActions>
-          <Button onClick={() => void abrir()}>
-            <Plus />
-            Nova regra
-          </Button>
-        </HeaderActions>
-      )}
       <DataTable
-        title="Regras de Limite"
+        // Vive numa janela, aberta pela aba Limites: o botão fica na tabela, não no cabeçalho da página.
+        headerActions={
+          podeGerir ? (
+            <Button type="button" onClick={() => void abrir()}>
+              <Plus />
+              Nova regra
+            </Button>
+          ) : undefined
+        }
         columns={colunas}
         rows={regras}
         getRowId={(r) => r.id}

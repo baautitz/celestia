@@ -1,5 +1,6 @@
+import { PedidosRegrasLimiteTab } from "./pedidos-limites-regras-tab";
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { ListFilter, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
 import { Stack, Text } from "@platform/ui/components/layout";
@@ -72,6 +73,12 @@ export function PedidosLimitesTab() {
     void carregar();
   }, [carregar]);
 
+  /** As Regras abrem numa janela; ao fechar, os Limites são relidos com o que mudou nelas. */
+  const abrirRegras = async () => {
+    await windows.open({ surface: "dialog", size: "screen", title: "Regras de Limite", content: () => <PedidosRegrasLimiteTab /> });
+    void carregar();
+  };
+
   if (!cadastro) return falha ? <FalhaAoCarregar titulo="Não foi possível carregar os Limites" descricao={falha} onTentarNovamente={() => void carregar()} /> : <Text tone="muted">Carregando…</Text>;
 
   const abrirValor = async (valor?: ValorLimite) => {
@@ -122,21 +129,25 @@ export function PedidosLimitesTab() {
 
   return (
     <Stack gap="section">
-      {cadastro.podeGerir && (
-        <HeaderActions>
+      <HeaderActions>
+        <Button type="button" variant="outline" onClick={() => void abrirRegras()}>
+          <ListFilter />
+          Regras
+        </Button>
+        {cadastro.podeGerir && (
           <Button disabled={cadastro.regras.length === 0} onClick={() => void abrirValor()}>
             <Plus />
             Novo valor
           </Button>
-        </HeaderActions>
-      )}
+        )}
+      </HeaderActions>
       <DataTable
         title="Limites de Compras"
         columns={colunas}
         rows={linhasDe(cadastro, consumos)}
         getRowId={(l) => l.id}
         search={{ placeholder: "Buscar Regra ou Loja" }}
-        emptyMessage={cadastro.regras.length === 0 ? "Nenhuma Regra de Limite. Comece pela aba Regras de Limite." : "Nenhum Valor lançado. Use Novo valor."}
+        emptyMessage={cadastro.regras.length === 0 ? "Nenhuma Regra de Limite. Comece pelo botão Regras." : "Nenhum Valor lançado. Use Novo valor."}
         rowActions={
           cadastro.podeGerir
             ? (l) => (

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HeaderActionsProvider, useHeaderActions } from "@platform/ui/context/header-actions";
 import { UiProvider } from "@platform/ui/imperative/provider";
 import { PedidosLimitesTab } from "./pedidos-limites-tab";
@@ -42,6 +42,13 @@ const renderizar = () =>
   );
 
 describe("aba Limites", () => {
+  it("abre as Regras numa janela, com o botão de nova regra dentro dela", async () => {
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Regras" }));
+    const janela = await screen.findByRole("dialog", { name: "Regras de Limite" });
+    expect(await within(janela).findByRole("button", { name: "Nova regra" })).toBeTruthy();
+  });
+
   it("mostra o saldo por Loja e exclui o Valor com a version", async () => {
     renderizar();
     expect(await screen.findByText(/-R\$\s200,00/)).toBeTruthy();
