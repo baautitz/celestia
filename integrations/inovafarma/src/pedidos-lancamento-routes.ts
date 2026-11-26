@@ -1,3 +1,4 @@
+import { PRECO_POR_UNIDADE, UNIDADES_COMPRADAS } from "./compra-fracao.js";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
@@ -174,7 +175,7 @@ const movimentacaoSql = (filtroVenda: string, filtroCompra: string) => `
     SELECT CONVERT(varchar(7), v.DataVenda, 120) AS mes, vp.Quantidade AS vendida, NULL AS comprada
     ${vendasFromWhere(filtroVenda)}
     UNION ALL
-    SELECT CONVERT(varchar(7), c.DataNota, 120) AS mes, NULL AS vendida, cp.Quantidade AS comprada
+    SELECT CONVERT(varchar(7), c.DataNota, 120) AS mes, NULL AS vendida, ${UNIDADES_COMPRADAS} AS comprada
     FROM Compra c
     JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
     JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
@@ -210,7 +211,7 @@ const entradasSql = (produtos: string) => `
 const ULTIMAS_COMPRAS_SQL = `
   SELECT codigoLoja, CAST(preco AS float) AS preco
   FROM (
-    SELECT c.CodigoEmpresa AS codigoLoja, cp.Preco AS preco, ROW_NUMBER() OVER (PARTITION BY c.CodigoEmpresa ORDER BY c.DataNota DESC, c.CodigoCompra DESC) AS n
+    SELECT c.CodigoEmpresa AS codigoLoja, ${PRECO_POR_UNIDADE} AS preco, ROW_NUMBER() OVER (PARTITION BY c.CodigoEmpresa ORDER BY c.DataNota DESC, c.CodigoCompra DESC) AS n
     FROM Compra c
     JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
     JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto

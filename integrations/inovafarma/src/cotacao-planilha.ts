@@ -66,7 +66,7 @@ export async function gerarPlanilha({ linhas, fornecedor, pedidoEm, porLoja, ...
   ws.getCell("A1").font = { bold: true, size: 14 };
   ws.getCell("A2").value = `Distribuidora: ${fornecedor} (código ${alvo.codigoFornecedor})`;
   ws.getCell("A3").value = `Pedido de ${diaBr(pedidoEm)}`;
-  ws.getCell("A4").value = 'Preencha as colunas amarelas (só números): "Preço unitário" e, se a quantidade que você atende for outra, corrija a "Qtde". Deixe o preço em branco se não tiver o produto. "Últ. preço unit." é só referência.';
+  ws.getCell("A4").value = 'Preencha as colunas amarelas (só números): "Preço unitário" (por unidade, não por caixa ou embalagem) e, se a quantidade que você atende for outra, corrija a "Qtde". Deixe o preço em branco se não tiver o produto. "Últ. preço unit." é só referência.';
   ws.getRow(LINHA_CABECALHO).values = [...CABECALHO];
   ws.getRow(LINHA_CABECALHO).font = { bold: true };
   for (const l of linhas) {

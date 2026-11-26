@@ -1,3 +1,4 @@
+import { UNIDADES_COMPRADAS } from "./compra-fracao.js";
 import { horaDoErp } from "./baixas-da-loja.js";
 import { chaveDaLinha } from "./pedidos-conferencia.js";
 import type { ErpQuery } from "./metas-comum.js";
@@ -15,7 +16,7 @@ const entradasSql = (produtos: number) => {
   return `
   SELECT produtoId, codigoLoja, dia, CAST(SUM(quantidade) AS float) AS recebida
   FROM (
-    SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, c.CodigoEmpresa AS codigoLoja, CONVERT(varchar(10), c.DataNota, 120) AS dia, cp.Quantidade AS quantidade
+    SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, c.CodigoEmpresa AS codigoLoja, CONVERT(varchar(10), c.DataNota, 120) AS dia, ${UNIDADES_COMPRADAS} AS quantidade
     FROM Compra c
     JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
     JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
@@ -73,7 +74,7 @@ const porOrigemSql = (produtos: number) => {
   return `
   SELECT produtoId, codigoLoja, origem, CAST(SUM(quantidade) AS float) AS recebida
   FROM (
-    SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, c.CodigoEmpresa AS codigoLoja, ISNULL(f.CodigoFornecedor, 0) AS origem, cp.Quantidade AS quantidade
+    SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, c.CodigoEmpresa AS codigoLoja, ISNULL(f.CodigoFornecedor, 0) AS origem, ${UNIDADES_COMPRADAS} AS quantidade
     FROM Compra c
     JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
     JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto

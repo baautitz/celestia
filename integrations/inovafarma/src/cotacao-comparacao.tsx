@@ -21,7 +21,7 @@ export interface ProdutoCotacao {
   pedidas?: Record<string, number>;
   ofertadas?: Record<string, number | null>;
   /** Código do fornecedor -> última compra dele (preço e dia, AAAA-MM-DD); null = nunca comprou. */
-  ultimas?: Record<string, { preco: number; dia: string } | null>;
+  ultimas?: Record<string, { preco: number; dia: string; embalagem?: string | null } | null>;
 }
 
 /** Os fornecedores marcados no produto, cada um com a quantidade por Loja. Marcado com zero continua marcado. */
@@ -205,13 +205,13 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
         </Text>
       ),
     },
-    { key: "ultima", label: "Últ. compra", tooltip: "Preço da última compra deste fornecedor", format: "currency", value: (o) => ultimaDe(o)?.preco ?? null },
+    { key: "ultima", label: "Últ. compra", tooltip: "Preço por unidade da última compra deste fornecedor", format: "currency", value: (o) => ultimaDe(o)?.preco ?? null },
     {
       key: "dia",
       label: "Data",
       value: (o) => {
         const ultima = ultimaDe(o);
-        return ultima ? dia(ultima.dia) : "-";
+        return ultima ? `${dia(ultima.dia)}${ultima.embalagem ? ` · ${ultima.embalagem}` : ""}` : "-";
       },
     },
     {
@@ -270,7 +270,7 @@ export function CotacaoComparacao({ produtos, fornecedores, marcados, editavel, 
         return <Text title={ehMenor ? "Menor preço" : undefined} weight={ehMenor ? "bold" : undefined} tone={ehMenor ? "success" : undefined}>{numero(precoDo(p))}</Text>;
       },
     },
-    { key: "ultima", label: "Últ. compra", tooltip: "Preço da última compra deste fornecedor", format: "currency", value: (p) => ultimaDo(p)?.preco ?? null },
+    { key: "ultima", label: "Últ. compra", tooltip: "Preço por unidade da última compra deste fornecedor", format: "currency", value: (p) => ultimaDo(p)?.preco ?? null },
     {
       key: "variacao",
       label: "Variação",

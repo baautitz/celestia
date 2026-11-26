@@ -1,3 +1,4 @@
+import { PRECO_POR_UNIDADE } from "./compra-fracao.js";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
@@ -60,9 +61,9 @@ const produtosSql = (n: number) => `
 
 /** A última compra (entrada de NF) de cada produto de cada fornecedor: preço unitário e dia. */
 const ultimasComprasSql = (n: number, fornecedores: number[]) => `
-  SELECT produtoId, codigoFornecedor, preco, dia
+  SELECT produtoId, codigoFornecedor, preco, dia, unidade, fracao
   FROM (
-    SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, f.CodigoFornecedor AS codigoFornecedor, CAST(cp.Preco AS float) AS preco, CONVERT(varchar(10), c.DataNota, 23) AS dia,
+    SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, f.CodigoFornecedor AS codigoFornecedor, CAST(${PRECO_POR_UNIDADE} AS float) AS preco, CONVERT(varchar(10), c.DataNota, 23) AS dia, RTRIM(cp.Unidade) AS unidade, CAST(cp.FracaoVenda AS float) AS fracao,
       ROW_NUMBER() OVER (PARTITION BY p.rowguid, f.CodigoFornecedor ORDER BY c.DataNota DESC, c.CodigoCompra DESC) AS n
     FROM Compra c
     JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
@@ -71,6 +72,13 @@ const ultimasComprasSql = (n: number, fornecedores: number[]) => `
     WHERE c.Eliminado = 0 AND f.CodigoFornecedor IN (${fornecedores.map((c) => Math.trunc(c)).join(", ")}) AND CONVERT(varchar(36), p.rowguid) IN (${Array.from({ length: n }, (_, i) => `@p${i}`).join(", ")})
   ) x
   WHERE x.n = 1`;
+
+/** A última compra por unidade; `embalagem` diz em que embalagem a NF veio, quando não foi por unidade. */
+interface UltimaCompra {
+  preco: number;
+  dia: string;
+  embalagem: string | null;
+}
 
 const fallback = (codigo: number) => `Fornecedor ${codigo}`;
 const plano = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
@@ -285,13 +293,13 @@ function itensDoFornecedor(completo: Pedido, codigo: number): { item: Pedido["it
 const totalDoItem = (item: Pedido["itens"][number]) => item.quantidades.reduce((soma, q) => soma + q.quantidade, 0);
 
 /** O fabricante vem do ERP; sem resposta a planilha sai com a coluna em branco. */
-async function ultimasCompras(client: ErpQuery | undefined, pedido: Pedido, fornecedores: number[]): Promise<Map<string, { preco: number; dia: string }>> {
-  const mapa = new Map<string, { preco: number; dia: string }>();
+async function ultimasCompras(client: ErpQuery | undefined, pedido: Pedido, fornecedores: number[]): Promise<Map<string, UltimaCompra>> {
+  const mapa = new Map<string, UltimaCompra>();
   if (!client || fornecedores.length === 0 || pedido.itens.length === 0) return mapa;
   try {
     const params = Object.fromEntries(pedido.itens.map((i, n) => [`p${n}`, i.produtoId]));
-    for (const r of await client.query<{ produtoId: string; codigoFornecedor: number; preco: number | null; dia: string | null }>(ultimasComprasSql(pedido.itens.length, fornecedores), params)) {
-      if (r.dia && Number(r.preco) > 0) mapa.set(`${r.produtoId}|${Number(r.codigoFornecedor)}`, { preco: Number(r.preco), dia: r.dia });
+    for (const r of await client.query<{ produtoId: string; codigoFornecedor: number; preco: number | null; dia: string | null; unidade?: string | null; fracao?: number | null }>(ultimasComprasSql(pedido.itens.length, fornecedores), params)) {
+      if (r.dia && Number(r.preco) > 0) mapa.set(`${r.produtoId}|${Number(r.codigoFornecedor)}`, { preco: Number(r.preco), dia: r.dia, embalagem: Number(r.fracao) > 1 ? `${r.unidade?.trim() || "Embalagem"} com ${Number(r.fracao)}` : null });
     }
   } catch {
     // Sem o ERP a planilha e a comparação seguem sem o último preço.

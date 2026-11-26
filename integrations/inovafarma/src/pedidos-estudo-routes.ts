@@ -1,3 +1,4 @@
+import { UNIDADES_COMPRADAS } from "./compra-fracao.js";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { ModuleContext } from "@platform/core/module";
@@ -47,7 +48,7 @@ const vendasSql = (filtroVenda: string) => `
 /** As entradas de NF do produto por mês, Loja e distribuidora, com a quantidade e o valor. */
 const COMPRAS_SQL = `
   SELECT CONVERT(varchar(7), c.DataNota, 120) AS mes, c.CodigoEmpresa AS codigoLoja, f.CodigoFornecedor AS codigoFornecedor,
-         CAST(SUM(cp.Quantidade) AS float) AS quantidade, CAST(SUM(cp.Quantidade * cp.Preco) AS float) AS valor
+         CAST(SUM(${UNIDADES_COMPRADAS}) AS float) AS quantidade, CAST(SUM(cp.Quantidade * cp.Preco) AS float) AS valor
   FROM Compra c
   JOIN Compra_Produto cp ON cp.CodigoCompra = c.CodigoCompra
   JOIN Produto p ON p.CodigoProduto = cp.CodigoProduto
