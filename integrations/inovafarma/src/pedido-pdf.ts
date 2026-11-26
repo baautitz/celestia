@@ -73,16 +73,10 @@ export function itensDaLojaFornecedora(pedido: Pick<Pedido, "itens">, lojaFornec
 
 const moeda = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const numero = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
-const resumo = (itens: ItemDeTransferencia[]) => {
-  const produtos = new Set(itens.map((i) => `${i.codigoBarra}|${i.nome}`)).size;
-  return `${produtos} ${produtos === 1 ? "produto" : "produtos"} · ${numero(itens.reduce((soma, i) => soma + i.quantidade, 0))} un.`;
-};
-
 const MARGEM = 40;
 const LARGURA = 515;
 const FIM_DA_PAGINA = 770;
 const ALTURA_LINHA = 18;
-const COR = { destaque: "#1f2937", suave: "#6b7280", zebra: "#f3f4f6", borda: "#d1d5db" };
 
 interface Coluna {
   titulo: string;
@@ -90,10 +84,10 @@ interface Coluna {
   direita?: boolean;
 }
 
-const CODIGO: Coluna = { titulo: "Código de barras", largura: 95 };
+const CODIGO: Coluna = { titulo: "Código de barras", largura: 90 };
 const QUANTIDADE: Coluna = { titulo: "Qtd.", largura: 50, direita: true };
-const COLUNAS_DE_COMPRA: Coluna[] = [CODIGO, { titulo: "Produto", largura: 235 }, QUANTIDADE, { titulo: "Preço", largura: 60, direita: true }, { titulo: "Total", largura: 75, direita: true }];
-const COLUNAS_DE_TRANSFERENCIA: Coluna[] = [CODIGO, { titulo: "Produto", largura: 370 }, QUANTIDADE];
+const COLUNAS_DE_COMPRA: Coluna[] = [CODIGO, { titulo: "Produto", largura: 240 }, QUANTIDADE, { titulo: "Preço", largura: 60, direita: true }, { titulo: "Total", largura: 75, direita: true }];
+const COLUNAS_DE_TRANSFERENCIA: Coluna[] = [CODIGO, { titulo: "Produto", largura: 375 }, QUANTIDADE];
 
 type Documento = InstanceType<typeof PDFDocument>;
 
@@ -111,61 +105,61 @@ function emitir(montar: (doc: Documento) => void): Promise<Buffer> {
       doc.switchToPage(start + n);
       // Sem margem inferior, para o rodapé não abrir uma página nova.
       doc.page.margins.bottom = 0;
-      doc.font("Helvetica").fontSize(8).fillColor(COR.suave).text(`Página ${n + 1} de ${count}`, MARGEM, 810, { width: LARGURA, align: "right", lineBreak: false });
+      doc.font("Helvetica").fontSize(8).text(`Página ${n + 1} de ${count}`, MARGEM, 810, { width: LARGURA, align: "right", lineBreak: false });
     }
     doc.end();
   });
 }
 
-function celulas(doc: Documento, y: number, colunas: Coluna[], textos: string[]) {
+/** Uma linha da grade: os textos e o contorno de cada célula. */
+function linhaDaGrade(doc: Documento, y: number, colunas: Coluna[], textos: string[], altura: number) {
   let x = MARGEM;
   colunas.forEach((coluna, n) => {
+    doc.rect(x, y, coluna.largura, altura).stroke();
     doc.text(textos[n] ?? "", x + 4, y + 5, { width: coluna.largura - 8, align: coluna.direita ? "right" : "left" });
     x += coluna.largura;
   });
 }
 
-/** Faixa do título e os dados do pedido; devolve o y onde a tabela começa. */
+/** Título, data e os dados do pedido; devolve o y onde a tabela começa. */
 function cabecalho(doc: Documento, titulo: string, data: string, dados: [string, string][]): number {
-  doc.rect(MARGEM, MARGEM, LARGURA, 36).fill(COR.destaque);
-  doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(14).text(titulo.toUpperCase(), MARGEM + 12, MARGEM + 12, { lineBreak: false });
-  doc.font("Helvetica").fontSize(10).text(data, MARGEM, MARGEM + 14, { width: LARGURA - 12, align: "right", lineBreak: false });
-  const largura = LARGURA / dados.length;
-  dados.forEach(([rotulo, valor], n) => {
-    const x = MARGEM + n * largura;
-    doc.font("Helvetica").fontSize(8).fillColor(COR.suave).text(rotulo.toUpperCase(), x, MARGEM + 48, { lineBreak: false });
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(COR.destaque).text(valor, x, MARGEM + 60, { width: largura - 10, height: 13, ellipsis: true });
-  });
-  return MARGEM + 88;
+  doc.font("Helvetica-Bold").fontSize(14).text(titulo, MARGEM, MARGEM, { lineBreak: false });
+  doc.font("Helvetica").fontSize(10).text(`Data: ${data}`, MARGEM, MARGEM + 3, { width: LARGURA, align: "right", lineBreak: false });
+  doc.moveTo(MARGEM, MARGEM + 22).lineTo(MARGEM + LARGURA, MARGEM + 22).lineWidth(1).stroke();
+  let y = MARGEM + 32;
+  for (const [rotulo, valor] of dados) {
+    doc.font("Helvetica-Bold").text(`${rotulo}:`, MARGEM, y, { lineBreak: false });
+    doc.font("Helvetica").text(valor, MARGEM + 100, y, { width: LARGURA - 100 });
+    y = doc.y + 3;
+  }
+  return y + 10;
 }
 
-/** Tabela zebrada que repete o cabeçalho a cada página; devolve o y depois da última linha. */
+/** Tabela em grade que repete o cabeçalho a cada página; devolve o y depois da última linha. */
 function tabela(doc: Documento, inicio: number, colunas: Coluna[], linhas: string[][], novaPagina: () => number): number {
   const titulos = (y: number) => {
-    doc.font("Helvetica-Bold").fontSize(9).fillColor(COR.destaque);
-    celulas(doc, y, colunas, colunas.map((c) => c.titulo));
-    doc.moveTo(MARGEM, y + ALTURA_LINHA).lineTo(MARGEM + LARGURA, y + ALTURA_LINHA).lineWidth(1).stroke(COR.destaque);
+    doc.font("Helvetica-Bold").fontSize(9).lineWidth(0.5);
+    linhaDaGrade(doc, y, colunas, colunas.map((c) => c.titulo), ALTURA_LINHA);
     return y + ALTURA_LINHA;
   };
   let y = titulos(inicio);
-  linhas.forEach((textos, n) => {
+  for (const textos of linhas) {
     // O nome longo quebra linha em vez de ser cortado: o fim costuma trazer a apresentação.
     doc.font("Helvetica").fontSize(9);
     const altura = Math.max(ALTURA_LINHA, ...colunas.map((c, i) => doc.heightOfString(textos[i] ?? "", { width: c.largura - 8 }) + 8));
     if (y + altura > FIM_DA_PAGINA) y = titulos(novaPagina());
-    if (n % 2 === 1) doc.rect(MARGEM, y, LARGURA, altura).fill(COR.zebra);
-    doc.font("Helvetica").fontSize(9).fillColor(COR.destaque);
-    celulas(doc, y, colunas, textos);
+    doc.font("Helvetica").fontSize(9);
+    linhaDaGrade(doc, y, colunas, textos, altura);
     y += altura;
-  });
-  doc.moveTo(MARGEM, y).lineTo(MARGEM + LARGURA, y).lineWidth(0.5).stroke(COR.borda);
+  }
   return y;
 }
 
-function totais(doc: Documento, y: number, esquerda: string, direita: string) {
-  doc.rect(MARGEM, y + 6, LARGURA, 24).fill(COR.zebra);
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(COR.destaque).text(esquerda, MARGEM + 8, y + 14, { lineBreak: false });
-  doc.text(direita, MARGEM, y + 14, { width: LARGURA - 8, align: "right", lineBreak: false });
+/** A linha de total, fechando a grade: o rótulo à esquerda do valor, na última coluna. */
+function total(doc: Documento, y: number, colunas: Coluna[], rotulo: string, valor: string) {
+  const ultima = colunas.at(-1)?.largura ?? 0;
+  doc.font("Helvetica-Bold").fontSize(9).lineWidth(0.5);
+  linhaDaGrade(doc, y, [{ titulo: "", largura: LARGURA - ultima, direita: true }, { titulo: "", largura: ultima, direita: true }], [rotulo, valor], ALTURA_LINHA);
 }
 
 /** PDF do pedido a uma Loja: uma página por Loja de destino, só produto e quantidade. */
@@ -180,7 +174,7 @@ export function gerarPdfDeLoja({ fornecedora, data, destinos }: { fornecedora: s
       };
       let y = tabela(doc, topo(), COLUNAS_DE_TRANSFERENCIA, destino.itens.map((i) => [i.codigoBarra ?? "-", i.nome, numero(i.quantidade)]), novaPagina);
       if (y + 30 > FIM_DA_PAGINA) y = novaPagina();
-      totais(doc, y, resumo(destino.itens), "");
+      total(doc, y, COLUNAS_DE_TRANSFERENCIA, "Total de unidades", numero(destino.itens.reduce((soma, i) => soma + i.quantidade, 0)));
     });
   });
 }
@@ -201,13 +195,13 @@ export function gerarPdf({ fornecedor, data, itens, lojas }: { fornecedor: strin
       topo = () => cabecalho(doc, "Pedido de compra", data, secao.loja ? [["Fornecedor", fornecedor], ["Loja", secao.loja]] : [["Fornecedor", fornecedor]]);
       let y = tabela(doc, topo(), COLUNAS_DE_COMPRA, secao.itens.map((i) => [i.codigoBarra ?? "-", i.nome, numero(i.quantidade), moeda(i.preco), moeda(i.quantidade * i.preco)]), novaPagina);
       if (y + 30 > FIM_DA_PAGINA) y = novaPagina();
-      totais(doc, y, resumo(secao.itens), `${secao.loja ? "Total da Loja" : "Total"}  R$ ${moeda(valor(secao.itens))}`);
+      total(doc, y, COLUNAS_DE_COMPRA, secao.loja ? "Total da Loja" : "Total", `R$ ${moeda(valor(secao.itens))}`);
       fim = y + 30;
     });
-    if (lojas) {
+    // Com uma Loja só, o total dela já é o geral.
+    if (lojas && lojas.length > 1) {
       if (fim + 30 > FIM_DA_PAGINA) fim = novaPagina();
-      const todos = lojas.flatMap((l) => l.itens);
-      totais(doc, fim, `${lojas.length} ${lojas.length === 1 ? "Loja" : "Lojas"} · ${resumo(todos)}`, `Total geral  R$ ${moeda(valor(todos))}`);
+      total(doc, fim, COLUNAS_DE_COMPRA, "Total geral", `R$ ${moeda(valor(lojas.flatMap((l) => l.itens)))}`);
     }
   });
 }
