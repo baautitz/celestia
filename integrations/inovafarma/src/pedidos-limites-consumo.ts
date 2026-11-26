@@ -113,7 +113,7 @@ async function custoVendidoPorLoja(client: ErpQuery, regra: RegraLimite, valor: 
 }
 
 /** Quais dos produtos estão na Lista da Regra. */
-async function produtosDaLista(client: ErpQuery, regra: RegraLimite, ids: string[]): Promise<Set<string>> {
+export async function produtosDaLista(client: ErpQuery, regra: Pick<RegraLimite, "entradas">, ids: string[]): Promise<Set<string>> {
   const dentro = new Set<string>();
   for (let i = 0; i < ids.length; i += LOTE_PRODUTOS) {
     const params: Record<string, unknown> = {};

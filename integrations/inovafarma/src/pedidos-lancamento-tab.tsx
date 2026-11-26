@@ -127,7 +127,7 @@ const resumo = (f: FiltrosAplicados) =>
     .filter(Boolean)
     .join(" · ");
 
-function FiltroLojas({ lojas, escolhidas, onChange }: { lojas: LojaOpcao[]; escolhidas: number[]; onChange: (codigos: number[]) => void }) {
+export function FiltroLojas({ lojas, escolhidas, onChange }: { lojas: LojaOpcao[]; escolhidas: number[]; onChange: (codigos: number[]) => void }) {
   const ancora = useComboboxAnchor();
   return (
     <Stack gap="field">

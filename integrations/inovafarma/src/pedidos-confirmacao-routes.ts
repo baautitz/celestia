@@ -7,6 +7,8 @@ import { ator, Codigo, CodigoEmTexto, erroDoErp, recusaDeValidacao, SEM_CONEXAO,
 import type { ErpQuery } from "./metas-comum.js";
 import { PEDIDO_TARGET, PEDIDOS_PLUGIN } from "./pedidos-audit.js";
 import { chaveDaLinha, conferir, estadoDaLinha, statusDoPedido, type LinhaConferida } from "./pedidos-conferencia.js";
+import { produtosDaLista } from "./pedidos-limites-consumo.js";
+import { DadosRegraLimite } from "./pedidos-limites.js";
 import { CONFIRMACAO_ACTIONS } from "./pedidos-confirmacao-audit.js";
 import { entradasDoPedido, entradasDosPedidos, entradasPorOrigem } from "./pedidos-nf.js";
 import { nomeDoArquivo } from "./nome-arquivo.js";
@@ -53,6 +55,21 @@ export function registerConfirmacaoRoutes({ routes, permissions, auth, erpClient
     const pedido = await pedidos.pedido(c.req.param("id") ?? "");
     return pedido ? ({ pedido } as const) : ({ recusa: c.json({ error: NAO_ENCONTRADO }, 404) } as const);
   };
+
+  /** Quais produtos dos Pedidos casam com o Filtro de produtos da aba Pedidos. */
+  routes.post("/pedidos/pedidos/filtrar-produtos", auth, async (c: AuthContext) => {
+    if (!permissions.has(c.get("user")?.permissions, gerir.key)) return c.json({ error: gerir.deniedMessage }, 403);
+    const lido = z.object({ entradas: DadosRegraLimite.shape.entradas }).safeParse(await c.req.json().catch(() => null));
+    if (!lido.success) return recusaDeValidacao(c, lido.error);
+    const client = erpClient();
+    if (!client) return c.json({ error: SEM_CONEXAO }, 503);
+    try {
+      const ids = [...new Set((await pedidos.listar()).flatMap((p) => p.itens.map((i) => i.produtoId)))];
+      return c.json({ produtoIds: [...(await produtosDaLista(client, lido.data, ids))] });
+    } catch (err: unknown) {
+      return c.json(erroDoErp(err), 503);
+    }
+  });
 
   /** Andamento da entrada de cada Pedido confirmado, calculado ao vivo com as NFs do ERP (a lista não precisa abrir o Pedido). */
   routes.get("/pedidos/pedidos/recebimentos", auth, async (c: AuthContext) => {

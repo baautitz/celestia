@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Ban, Check, ClipboardList, FileDown, PackageCheck, Pencil, Scale } from "lucide-react";
+import { Ban, Check, ClipboardList, FileDown, PackageCheck, Pencil, Scale, SlidersHorizontal } from "lucide-react";
 import { Button } from "@platform/ui/components/button";
-import { Stack } from "@platform/ui/components/layout";
+import { Stack, Text } from "@platform/ui/components/layout";
 import { DataTable, type DataTableColumn } from "@platform/ui/data-table/data-table";
 import { useUi } from "@platform/ui/imperative/provider";
 import { apiFetch } from "@platform/ui/lib/api";
@@ -12,6 +12,7 @@ import { json } from "./inovafarma-api";
 import type { LojaOpcao } from "./loja-opcao";
 import { PEDIDOS_BASE, type Pedido } from "./pedido-rascunho-window";
 import { EntradaWindow } from "./pedido-entrada-window";
+import { filtrarPedidos, PedidosFiltrosSheet, resumoDosFiltros, SEM_FILTROS, type FiltrosPedidos, type OpcaoFornecedor } from "./pedidos-filtros";
 import { PedidoLancamentoWindow } from "./pedidos-lancamento-tab";
 import { useLatestFetch } from "./use-latest-fetch";
 import { API } from "./inovafarma-api";
@@ -57,6 +58,35 @@ export function PedidosTab() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  // `produtos`: os produtoIds que passam no filtro de produtos (grupo, seção e laboratório só o ERP resolve).
+  const [filtro, setFiltro] = useState<{ filtros: FiltrosPedidos; produtos: ReadonlySet<string> | null }>({ filtros: SEM_FILTROS, produtos: null });
+  const [distribuidoras, setDistribuidoras] = useState<OpcaoFornecedor[]>([]);
+  useEffect(() => {
+    apiFetch<OpcaoFornecedor[]>(`${API}/pedidos/fornecedores?busca=`)
+      .then((r) => setDistribuidoras(Array.isArray(r) ? r : []))
+      .catch(() => undefined);
+  }, []);
+  const fornecedores = [...distribuidoras, ...(contexto?.lojas ?? []).map((l) => ({ codigo: -l.codigo, nome: l.nome }))];
+
+  const abrirFiltros = async () => {
+    const r = await windows.open<FiltrosPedidos>({
+      surface: "sheet",
+      title: "Filtros",
+      content: () => <PedidosFiltrosSheet inicial={filtro.filtros} situacoes={STATUS} lojas={contexto?.lojas ?? []} fornecedores={fornecedores} />,
+    });
+    if (r.status !== "confirmed") return;
+    const filtros = r.value;
+    try {
+      const produtos = filtros.entradas.length
+        ? new Set((await apiFetch<{ produtoIds: string[] }>(`${PEDIDOS_BASE}/filtrar-produtos`, json("POST", { entradas: filtros.entradas }))).produtoIds)
+        : null;
+      setFiltro({ filtros, produtos });
+    } catch (err: unknown) {
+      feedback.notifyError(err instanceof Error ? err : new Error("Erro ao filtrar os produtos."));
+    }
+  };
+  const resumo = resumoDosFiltros(filtro.filtros, STATUS, fornecedores);
 
   const editar = async (pedido: Pedido) => {
     await windows.open<Pedido>({
@@ -178,11 +208,24 @@ export function PedidosTab() {
     <Stack gap="section">
       <DataTable
         title="Pedidos"
+        headerActions={
+          <Stack direction="row" gap="field" align="center">
+            {resumo ? (
+              <Text variant="caption" tone="muted">
+                {resumo}
+              </Text>
+            ) : null}
+            <Button type="button" variant="outline" onClick={() => void abrirFiltros()}>
+              <SlidersHorizontal />
+              Filtros
+            </Button>
+          </Stack>
+        }
         columns={colunas}
-        rows={pedidos}
+        rows={filtrarPedidos(pedidos, filtro.filtros, filtro.produtos)}
         getRowId={(p) => p.id}
         loading={carregando}
-        emptyMessage="Nenhum Pedido ainda. Marque produtos no Lançamento e use Gerar pedido."
+        emptyMessage={resumo ? "Nenhum Pedido com esses filtros." : "Nenhum Pedido ainda. Marque produtos no Lançamento e use Gerar pedido."}
         search={{ placeholder: "Buscar Pedido" }}
         rowActions={(p) =>
           p.status === "rascunho" ? (
