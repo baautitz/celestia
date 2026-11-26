@@ -135,8 +135,8 @@ describe("Confirmação do Pedido", () => {
 describe("PDF por fornecedor", () => {
   it("lista só os itens escolhidos no fornecedor, com quantidade total e preço", () => {
     const pedido = { itens: [dipirona, aas, raro], escolhas: { "p-1": 9, "p-2": 7 } };
-    expect(itensDoFornecedor(pedido, 7, { "p-1": 12.5, "p-2": 5, "p-3": null })).toEqual([{ nome: "AAS", quantidade: 3, preco: 5 }]);
-    expect(itensDoFornecedor(pedido, 9, { "p-1": 11, "p-2": null })).toEqual([{ nome: "DIPIRONA", quantidade: 13, preco: 11 }]);
+    expect(itensDoFornecedor(pedido, 7, { "p-1": 12.5, "p-2": 5, "p-3": null })).toEqual([{ nome: "AAS", codigoBarra: aas.codigoBarra, quantidade: 3, preco: 5 }]);
+    expect(itensDoFornecedor(pedido, 9, { "p-1": 11, "p-2": null })).toEqual([{ nome: "DIPIRONA", codigoBarra: dipirona.codigoBarra, quantidade: 13, preco: 11 }]);
   });
 
   it("gera o PDF do fornecedor em base64 depois de confirmado", async () => {

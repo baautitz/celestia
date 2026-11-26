@@ -14,8 +14,8 @@ describe("Pedido a uma Loja", () => {
 
   it("fica fora da cotação e do PDF da distribuidora, e sai no PDF da Loja por destino", () => {
     expect(semLinhasDeLoja(misto).itens[0]?.quantidades.map((q) => q.codigoLoja)).toEqual([1]);
-    expect(itensDoFornecedor({ ...misto, escolhas: { p: 7 } }, 7, { p: 2 })).toEqual([{ nome: "Dipirona", quantidade: 5, preco: 2 }]);
-    expect(itensDaLojaFornecedora(misto, 1, (n) => `Loja ${n}`)).toEqual([{ loja: "Loja 2", itens: [{ nome: "Dipirona", quantidade: 3 }] }]);
+    expect(itensDoFornecedor({ ...misto, escolhas: { p: 7 } }, 7, { p: 2 })).toEqual([{ nome: "Dipirona", codigoBarra: null, quantidade: 5, preco: 2 }]);
+    expect(itensDaLojaFornecedora(misto, 1, (n) => `Loja ${n}`)).toEqual([{ loja: "Loja 2", itens: [{ nome: "Dipirona", codigoBarra: null, quantidade: 3 }] }]);
     expect(soDeLojas(misto)).toBe(false);
   });
 
@@ -27,8 +27,8 @@ describe("Pedido a uma Loja", () => {
 
   it("o produto dividido leva a cada distribuidora as parcelas dela, por Loja", () => {
     const pedido = { ...misto, escolhas: { p: [{ codigoLoja: 1, codigoFornecedor: 7, quantidade: 4 }, { codigoLoja: 1, codigoFornecedor: 9, quantidade: 1 }] } };
-    expect(itensDoFornecedor(pedido, 9, { p: 2 })).toEqual([{ nome: "Dipirona", quantidade: 1, preco: 2 }]);
-    expect(itensDoFornecedorPorLoja(pedido, 7, { p: 2 }, (n) => `Loja ${n}`)).toEqual([{ loja: "Loja 1", itens: [{ nome: "Dipirona", quantidade: 4, preco: 2 }] }]);
+    expect(itensDoFornecedor(pedido, 9, { p: 2 })).toEqual([{ nome: "Dipirona", codigoBarra: null, quantidade: 1, preco: 2 }]);
+    expect(itensDoFornecedorPorLoja(pedido, 7, { p: 2 }, (n) => `Loja ${n}`)).toEqual([{ loja: "Loja 1", itens: [{ nome: "Dipirona", codigoBarra: null, quantidade: 4, preco: 2 }] }]);
   });
 
   it("a distribuidora com quantidade definida recebe ela; a vazia, o restante depois das Lojas", () => {

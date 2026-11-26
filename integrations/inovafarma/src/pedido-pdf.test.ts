@@ -16,11 +16,11 @@ describe("Pedido por Loja", () => {
 
   it("agrupa os itens com preço por Loja, na ordem do código", () => {
     const lojas = itensDoFornecedorPorLoja(pedido, 7, { "p-1": 2, "p-2": null }, (c) => `Loja ${c}`);
-    expect(lojas).toEqual([{ loja: "Loja 1", itens: [{ nome: "DIPIRONA", quantidade: 10, preco: 2 }] }]);
+    expect(lojas).toEqual([{ loja: "Loja 1", itens: [{ nome: "DIPIRONA", codigoBarra: "789", quantidade: 10, preco: 2 }] }]);
   });
 
   it("gera o PDF com uma página por Loja", async () => {
-    const pdf = await gerarPdf({ fornecedor: "ALFA", data: "23/11/2026", itens: [], lojas: [{ loja: "A", itens: [{ nome: "X", quantidade: 1, preco: 1 }] }, { loja: "B", itens: [{ nome: "Y", quantidade: 2, preco: 1 }] }] });
+    const pdf = await gerarPdf({ fornecedor: "ALFA", data: "23/11/2026", itens: [], lojas: [{ loja: "A", itens: [{ nome: "X", codigoBarra: null, quantidade: 1, preco: 1 }] }, { loja: "B", itens: [{ nome: "Y", codigoBarra: null, quantidade: 2, preco: 1 }] }] });
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
     expect(pdf.toString("latin1").match(/\/Type \/Page\b/g)?.length).toBe(2);
   });
