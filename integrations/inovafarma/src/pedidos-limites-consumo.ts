@@ -47,8 +47,8 @@ const nomesDeParametros = (prefixo: string, valores: readonly unknown[], params:
     .join(", ");
 
 /** A condição sobre `p` (Produto) da Lista da Regra: as entradas unidas por `OR`, então cada produto conta uma vez. */
-function daLista(regra: Pick<RegraLimite, "entradas">, params: Record<string, unknown>): string {
-  const condicoes = idsPorTipo(regra.entradas, params, "ent").map(([tipo, nomes]) => `${COLUNA_DO_PRODUTO[tipo]} IN (${nomes})`);
+export function daLista(regra: Pick<RegraLimite, "entradas">, params: Record<string, unknown>, prefixo = "ent"): string {
+  const condicoes = idsPorTipo(regra.entradas, params, prefixo).map(([tipo, nomes]) => `${COLUNA_DO_PRODUTO[tipo]} IN (${nomes})`);
   return condicoes.length ? `(${condicoes.join(" OR ")})` : "1 = 0";
 }
 

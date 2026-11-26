@@ -31,6 +31,7 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
     auth,
     pedidos,
     minimos: store,
+    limites: { regras: async () => [{ id: "r-1", nome: "Genéricos", version: 1, fornecedores: [], entradas: [{ tipo: "grupo", id: "3", nome: "Genéricos" }] }] },
     audit,
     erpClient: () => ({
       query: async <T,>(sql: string, params?: Record<string, unknown>) => {

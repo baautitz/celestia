@@ -168,7 +168,9 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       registerPedidosVisoesRoutes({ routes, permissions, auth, store: db ? new PostgresPedidosVisoesStore(db) : new MemoryPedidosVisoesStore() });
       declarePedidosMinimosAudit(audit);
       const pedidos = db ? new PostgresPedidoStore(db) : new MemoryPedidoStore();
-      registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos: db ? new PostgresMinimoMaximoStore(db) : new MemoryMinimoMaximoStore(), audit, pedidos });
+      const minimos = db ? new PostgresMinimoMaximoStore(db) : new MemoryMinimoMaximoStore();
+      const limites = db ? new PostgresLimitesStore(db) : new MemoryLimitesStore();
+      registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos, limites, audit, pedidos });
       registerPedidosEstudoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId] });
       // Gerar e alterar Pedido só nas Lojas do Vínculo do Usuário, salvo com a Permission de todas.
       const authPedido = authDoPedido({ permissions, auth, vinculos: store, pedidos });
@@ -177,7 +179,7 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       registerCotacaoRoutes({ routes, permissions, auth: authPedido, erpClient: () => erpClients[erpId], pedidos, cotacoes, audit });
       registerConfirmacaoRoutes({ routes, permissions, auth: authPedido, erpClient: () => erpClients[erpId], pedidos, cotacoes, audit });
       declareLimitesAudit(audit);
-      registerPedidosLimitesRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], limites: db ? new PostgresLimitesStore(db) : new MemoryLimitesStore(), pedidos, cotacoes, audit });
+      registerPedidosLimitesRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], limites, pedidos, cotacoes, audit });
       const tiposMeta = db ? new PostgresTipoMetaStore(db) : new MemoryTipoMetaStore();
       const metas = db ? new PostgresMetaStore(db) : new MemoryMetaStore();
       registerTiposMetaRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], store: tiposMeta, metas, periods, audit });
