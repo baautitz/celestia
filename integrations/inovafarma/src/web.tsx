@@ -957,6 +957,11 @@ export const inovafarmaWebModule = defineWebModule({
       order: 60,
       permission: "inovafarma:pedidos-lancamento:ver",
       component: PedidosPage,
+      variants: [
+        { permission: "inovafarma:pedidos-pedidos:gerir", component: PedidosPage },
+        { permission: "inovafarma:pedidos-falteiro:gerir", component: PedidosPage },
+        { permission: "inovafarma:pedidos-limites:ver", component: PedidosPage },
+      ],
     },
     {
       id: "inovafarma-metas",
