@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Protocolo Obrigatório: Proibição Absoluta de Adivinhação & Consulta Mandatória à Documentação Oficial em TUDO
 
 > **Status**: INVARIANTE GLOBAL INEGOCIÁVEL (APLICA-SE A TODOS OS AGENTES E SESSÕES)  

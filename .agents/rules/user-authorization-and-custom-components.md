@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # User Authorization & Explicit Approval Rules
 
 > **Audience**: Autonomous Coding Agents, Antigravity, Claude Code, Cursor, Copilot, Cline, Windsurf.  
@@ -16,7 +20,7 @@
 
 ## 2. Prohibition of Custom Styled `<div>` Elements Without Prior Authorization
 - The agent must **NEVER** create custom components or layouts built with arbitrary styled `<div>` tags without explicit prior approval from the user.
-- All UI elements must use standard official `shadcn/ui` components from `@/components/ui/*`.
+- All UI elements must use standard official `shadcn/ui` components from `@platform/ui/components/*`.
 - If a custom container or layout abstraction is considered, the agent MUST explicitly ask the user if it is permitted before creating or modifying it.
 
 ---
