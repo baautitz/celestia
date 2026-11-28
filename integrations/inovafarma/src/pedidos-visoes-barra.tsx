@@ -87,7 +87,7 @@ export function PedidosVisoesBarra({ visoes, selecionada, filtros, onAplicar, on
     const r = await windows.open<VisaoPedidos>({
       surface: "dialog",
       title: "Salvar visão",
-      description: "Guarda as Lojas, Filtro de produtos e “apenas com mínimo”. A data não é guardada: ela sempre abre em ontem.",
+      description: "Guarda as Lojas, Filtro de produtos, Falteiro e opções de estoque mínimo e produtos sem venda. A data não é guardada: ela sempre abre em ontem.",
       content: () => <SalvarVisaoWindow filtros={filtros} visoes={visoes} inicial={atual} />,
     });
     if (r.status === "confirmed") onMudou(r.value);

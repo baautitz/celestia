@@ -20,6 +20,9 @@ import { PostgresAvaliacaoStore } from "../../../integrations/inovafarma/src/pos
 import { PostgresFuroEstoqueStore } from "../../../integrations/inovafarma/src/postgres-furo-estoque-store.js";
 import { PostgresLimitesStore } from "../../../integrations/inovafarma/src/postgres-pedidos-limites-store.js";
 import { RegraComValoresError, RegraInexistenteError } from "../../../integrations/inovafarma/src/pedidos-limites-store.js";
+import { PostgresFalteiroStore } from "../../../integrations/inovafarma/src/postgres-pedidos-falteiro-store.js";
+import { FaltaDuplicadaError } from "../../../integrations/inovafarma/src/pedidos-falteiro-store.js";
+import { PostgresPedidosVisoesStore } from "../../../integrations/inovafarma/src/postgres-pedidos-visoes-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { PeriodOverlapError } from "../src/closing-period/closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
@@ -88,6 +91,7 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
         { schema: "inovafarma", name: "motivos_ajuste" },
         { schema: "inovafarma", name: "pedidos" },
         { schema: "inovafarma", name: "pedidos_cotacoes" },
+        { schema: "inovafarma", name: "pedidos_falteiro" },
         { schema: "inovafarma", name: "pedidos_minimos" },
         { schema: "inovafarma", name: "pedidos_visoes" },
         { schema: "inovafarma", name: "pre_vencidos_baixas_congeladas" },
@@ -144,7 +148,55 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_itens, inovafarma.pre_vencidos_baixas_congeladas, inovafarma.pre_vencidos_correcoes_baixa, inovafarma.avaliacoes, inovafarma.justificativas_ajuste, inovafarma.limites_regras CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_itens, inovafarma.pre_vencidos_baixas_congeladas, inovafarma.pre_vencidos_correcoes_baixa, inovafarma.avaliacoes, inovafarma.justificativas_ajuste, inovafarma.limites_regras, inovafarma.pedidos_falteiro, inovafarma.pedidos_visoes CASCADE`);
+    });
+
+    describe("Visões salvas de Pedidos", () => {
+      it("cria, atualiza e lista preservando falteiro e incluirSemVenda", async () => {
+        const store = new PostgresPedidosVisoesStore(db);
+        const criada = await store.criar("u1", {
+          nome: "Em falta sem venda",
+          lojas: [1],
+          entradas: [],
+          apenasComMinimo: true,
+          falteiro: "somente",
+          incluirSemVenda: true,
+          padrao: true,
+        });
+        expect(criada).toMatchObject({ falteiro: "somente", incluirSemVenda: true, padrao: true, version: 1 });
+        expect(await store.listar("u1")).toEqual([criada]);
+
+        const atualizada = await store.atualizar(
+          "u1",
+          criada.id,
+          { ...criada, falteiro: "excluir", incluirSemVenda: false },
+          1,
+        );
+        expect(atualizada).toMatchObject({ falteiro: "excluir", incluirSemVenda: false, version: 2 });
+      });
+    });
+
+    describe("Falteiro de Pedidos", () => {
+      it("cria, garante unicidade por (produtoId, codigoLoja) incluindo null, edita e remove com version", async () => {
+        const store = new PostgresFalteiroStore(db);
+        const autor = { id: "u1", nome: "Ana" };
+        const loja1 = await store.criar({ produtoId: "p-1", codigoLoja: 1, quantidade: 3, observacao: "Faltou" }, autor);
+        const global = await store.criar({ produtoId: "p-1", codigoLoja: null, quantidade: null, observacao: null }, autor);
+        expect(await store.listar()).toEqual([global, loja1]);
+
+        await expect(store.criar({ produtoId: "p-1", codigoLoja: 1, quantidade: 5, observacao: null }, autor)).rejects.toThrow(FaltaDuplicadaError);
+        await expect(store.criar({ produtoId: "p-1", codigoLoja: null, quantidade: 2, observacao: null }, autor)).rejects.toThrow(FaltaDuplicadaError);
+
+        expect(await store.atualizar(loja1.id, { codigoLoja: 1, quantidade: 8, observacao: "Urgente" }, 99)).toBeNull();
+        const editada = await store.atualizar(loja1.id, { codigoLoja: 1, quantidade: 8, observacao: "Urgente" }, 1);
+        expect(editada).toMatchObject({ quantidade: 8, observacao: "Urgente", version: 2 });
+
+        await expect(store.atualizar(loja1.id, { codigoLoja: null, quantidade: 8, observacao: null }, 2)).rejects.toThrow(FaltaDuplicadaError);
+
+        expect(await store.remover(loja1.id, 1)).toBe(false);
+        expect(await store.remover(loja1.id, 2)).toBe(true);
+        expect(await store.get(loja1.id)).toBeNull();
+      });
     });
 
     describe("Limite de Compras", () => {

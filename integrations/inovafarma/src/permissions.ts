@@ -147,4 +147,9 @@ export const INOVAFARMA_PERMISSIONS = definePermissions("inovafarma", {
     description: "Permite criar, alterar e excluir as Regras e os Valores do Limite de Compras.",
     deniedMessage: "Acesso negado: o usuário não possui permissão para gerir os Limites de Compras.",
   },
+  "pedidos-falteiro:gerir": {
+    label: "Pedidos: Gerir Falteiro",
+    description: "Permite registrar, editar e remover produtos em falta no Falteiro (nas Lojas do Colaborador vinculado, ou em todas as Lojas com Pedidos: Todas as Lojas) e marcá-los direto no Lançamento.",
+    deniedMessage: "Acesso negado: o usuário não possui permissão para gerir o Falteiro.",
+  },
 });

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { Escolhas } from "./pedidos.js";
-import { boolean, doublePrecision, foreignKey, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, doublePrecision, foreignKey, index, integer, jsonb, pgSchema, primaryKey, text, timestamp, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import type { IndicadorId } from "./indicadores.js";
 import type { MetaApurada } from "./apuracao-store.js";
 import type { BaixaDoPeriodo } from "./baixas-do-periodo.js";
@@ -8,6 +8,7 @@ import type { ItemCongelado } from "./baixas-congeladas-store.js";
 import type { MedidaColuna } from "./colunas-desempenho.js";
 import type { ItemPedido } from "./pedidos.js";
 import type { Distribuicao } from "./pedidos-limites.js";
+import type { ModoFalteiro } from "./pedidos-visoes.js";
 import type { EntradaLista, Exibicao, ListaTipo, RegraPremio } from "./tipos-meta.js";
 
 /** Um schema Postgres por Module. */
@@ -303,6 +304,8 @@ export const pedidosVisoes = inovafarmaSchema.table(
     /** O "Filtro de produtos": entradas validadas por `EntradaLista`, ids do ERP, sem FK. */
     entradas: jsonb("entradas").$type<EntradaLista[]>().notNull().default(sql`'[]'::jsonb`),
     apenasComMinimo: boolean("apenas_com_minimo").notNull().default(false),
+    falteiro: text("falteiro").$type<ModoFalteiro>().notNull().default("incluir"),
+    incluirSemVenda: boolean("incluir_sem_venda").notNull().default(false),
     padrao: boolean("padrao").notNull().default(false),
     version: integer("version").notNull().default(1),
   },
@@ -341,4 +344,25 @@ export const limitesValores = inovafarmaSchema.table(
     version: integer("version").notNull().default(1),
   },
   (t) => [foreignKey({ name: "limites_valores_regra_fk", columns: [t.regraId], foreignColumns: [limitesRegras.id] }), index("limites_valores_regra_idx").on(t.regraId)],
+);
+
+/** Falteiro de Pedidos: produtos em falta registrados por Loja ou para todas as Lojas (`codigoLoja = null`). */
+export const pedidosFalteiro = inovafarmaSchema.table(
+  "pedidos_falteiro",
+  {
+    id: text("id").primaryKey(),
+    /** Identificador opaco do produto (`Produto.rowguid`), sem FK. */
+    produtoId: text("produto_id").notNull(),
+    /** Código da Loja no ERP, sem FK; null quando a falta vale para todas as Lojas. */
+    codigoLoja: integer("codigo_loja"),
+    quantidade: integer("quantidade"),
+    observacao: text("observacao"),
+    /** Referência lógica a `iam.users`, sem FK entre Modules. */
+    criadoPorId: text("criado_por_id").notNull(),
+    criadoPorNome: text("criado_por_nome").notNull(),
+    version: integer("version").notNull().default(1),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
+  },
+  (t) => [unique("pedidos_falteiro_produto_loja_unique").on(t.produtoId, t.codigoLoja).nullsNotDistinct()],
 );

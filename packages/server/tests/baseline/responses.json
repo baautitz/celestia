@@ -132,7 +132,8 @@
           "inovafarma:pedidos-todas-lojas:gerir",
           "inovafarma:pedidos-minimos:editar",
           "inovafarma:pedidos-limites:ver",
-          "inovafarma:pedidos-limites:gerir"
+          "inovafarma:pedidos-limites:gerir",
+          "inovafarma:pedidos-falteiro:gerir"
         ],
         "isAdmin": true,
         "iat": 1773144000,
@@ -301,7 +302,8 @@
         "inovafarma:pedidos-todas-lojas:gerir",
         "inovafarma:pedidos-minimos:editar",
         "inovafarma:pedidos-limites:ver",
-        "inovafarma:pedidos-limites:gerir"
+        "inovafarma:pedidos-limites:gerir",
+        "inovafarma:pedidos-falteiro:gerir"
       ],
       "isAdmin": true,
       "iat": 1773144000,
@@ -658,6 +660,13 @@
             "label": "Pedidos: Gerir Limites de Compras",
             "description": "Permite criar, alterar e excluir as Regras e os Valores do Limite de Compras.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir os Limites de Compras.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pedidos-falteiro:gerir",
+            "label": "Pedidos: Gerir Falteiro",
+            "description": "Permite registrar, editar e remover produtos em falta no Falteiro (nas Lojas do Colaborador vinculado, ou em todas as Lojas com Pedidos: Todas as Lojas) e marcá-los direto no Lançamento.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir o Falteiro.",
             "module": "inovafarma"
           }
         ]
@@ -1017,6 +1026,13 @@
             "label": "Pedidos: Gerir Limites de Compras",
             "description": "Permite criar, alterar e excluir as Regras e os Valores do Limite de Compras.",
             "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir os Limites de Compras.",
+            "module": "inovafarma"
+          },
+          {
+            "key": "inovafarma:pedidos-falteiro:gerir",
+            "label": "Pedidos: Gerir Falteiro",
+            "description": "Permite registrar, editar e remover produtos em falta no Falteiro (nas Lojas do Colaborador vinculado, ou em todas as Lojas com Pedidos: Todas as Lojas) e marcá-los direto no Lançamento.",
+            "deniedMessage": "Acesso negado: o usuário não possui permissão para gerir o Falteiro.",
             "module": "inovafarma"
           }
         ]
