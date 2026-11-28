@@ -24,6 +24,10 @@ import { declareLimitesAudit } from "./pedidos-limites-audit.js";
 import { registerPedidosLimitesRoutes } from "./pedidos-limites-routes.js";
 import { MemoryLimitesStore } from "./pedidos-limites-store.js";
 import { PostgresLimitesStore } from "./postgres-pedidos-limites-store.js";
+import { declareFalteiroAudit } from "./pedidos-falteiro-audit.js";
+import { registerPedidosFalteiroRoutes } from "./pedidos-falteiro-routes.js";
+import { MemoryFalteiroStore } from "./pedidos-falteiro-store.js";
+import { PostgresFalteiroStore } from "./postgres-pedidos-falteiro-store.js";
 import { declarePedidosMinimosAudit } from "./pedidos-minimos-audit.js";
 import { MemoryMinimoMaximoStore } from "./pedidos-minimos-store.js";
 import { PostgresMinimoMaximoStore } from "./postgres-pedidos-minimos-store.js";
@@ -167,10 +171,13 @@ export function createInovafarmaPlugin({ auth, erpClients = {}, erpId = "inovafa
       });
       registerPedidosVisoesRoutes({ routes, permissions, auth, store: db ? new PostgresPedidosVisoesStore(db) : new MemoryPedidosVisoesStore() });
       declarePedidosMinimosAudit(audit);
+      declareFalteiroAudit(audit);
       const pedidos = db ? new PostgresPedidoStore(db) : new MemoryPedidoStore();
       const minimos = db ? new PostgresMinimoMaximoStore(db) : new MemoryMinimoMaximoStore();
       const limites = db ? new PostgresLimitesStore(db) : new MemoryLimitesStore();
-      registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos, limites, audit, pedidos });
+      const falteiro = db ? new PostgresFalteiroStore(db) : new MemoryFalteiroStore();
+      registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], minimos, limites, audit, pedidos, falteiro, vinculos: store });
+      registerPedidosFalteiroRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId], falteiro, vinculos: store, audit });
       registerPedidosEstudoRoutes({ routes, permissions, auth, erpClient: () => erpClients[erpId] });
       // Gerar e alterar Pedido só nas Lojas do Vínculo do Usuário, salvo com a Permission de todas.
       const authPedido = authDoPedido({ permissions, auth, vinculos: store, pedidos });
