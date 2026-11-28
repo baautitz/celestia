@@ -307,3 +307,54 @@ describe("Pedidos: visões salvas", () => {
     await waitFor(() => expect(apiFetch.mock.calls.some((c) => String(c[0]).includes("/produtos") && String(c[0]).includes("lojas=1"))).toBe(true));
   });
 });
+
+describe("Pedidos: Falteiro no Lançamento", () => {
+  it("destaca o produto em falta com badge Em falta e linha destacada, e exibe detalhe por Loja sem alterar o cálculo do campo Pedir", async () => {
+    const faltaDipirona = {
+      id: "flt_1",
+      produtoId: "p-1",
+      codigoLoja: 1,
+      quantidade: 25,
+      observacao: "Cliente aguardando",
+      criadoPorId: "u1",
+      criadoPorNome: "Ana",
+      criadoEm: "2027-04-08T10:00:00.000Z",
+      atualizadoEm: "2027-04-08T10:00:00.000Z",
+      version: 1,
+    };
+    produtos = [{ ...dipirona, faltas: [faltaDipirona] }, aas];
+    contextoAtual = { ...contexto, podeGerirFalteiro: true, lojasFalteiro: null } as typeof contexto;
+    renderizar();
+
+    expect((await screen.findAllByText("Em falta")).length).toBeGreaterThan(0);
+    const linhaProduto = screen.getByText("DIPIRONA", { selector: "td, td span" }).closest("tr") as HTMLElement;
+    expect(linhaProduto.getAttribute("data-highlight")).toBe("true");
+    // A linha de AAS não está em falta
+    const linhaAas = screen.getByText("AAS", { selector: "td, td span" }).closest("tr") as HTMLElement;
+    expect(linhaAas.getAttribute("data-highlight")).toBeNull();
+
+    // No detalhe de Lojas de DIPIRONA, mostra a quantidade desejada (25) e a observação, mas o campo Pedir continua com o cálculo padrão (0, pois mínimo=0 e estoque=10)
+    expect((await screen.findAllByText(/25 un\./)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Cliente aguardando/).length).toBeGreaterThan(0);
+    const campoPedir = screen.getByLabelText("Quantidade a pedir da Loja Centro") as HTMLInputElement;
+    expect(campoPedir.value).toBe("0");
+  });
+
+  it("oferece atalho rápido na grade do Lançamento para quem tem pedidos-falteiro:gerir marcar ou desmarcar falta", async () => {
+    contextoAtual = { ...contexto, podeGerirFalteiro: true, lojasFalteiro: null } as typeof contexto;
+    renderizar();
+    await screen.findByLabelText("Selecionar DIPIRONA");
+
+    fireEvent.click(screen.getByRole("button", { name: "Marcar DIPIRONA em falta" }));
+    const dialog = await screen.findByRole("dialog", { name: /Falteiro: DIPIRONA/ });
+    fireEvent.click(screen.getByRole("button", { name: "Registrar" }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/pedidos/falteiro"),
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(dialog).toBeDefined();
+  });
+});

@@ -1,5 +1,6 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChartColumn, SlidersHorizontal, X } from "lucide-react";
+import { AlertTriangle, ChartColumn, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { Badge } from "@platform/ui/components/badge";
 import { Button } from "@platform/ui/components/button";
 import { Checkbox } from "@platform/ui/components/checkbox";
 import { Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor } from "@platform/ui/components/combobox";
@@ -26,6 +27,8 @@ import type { LojaOpcao } from "./loja-opcao";
 import { useLatestFetch } from "./use-latest-fetch";
 import type { VisaoPedidos } from "./pedidos-visoes";
 import { BASE_VISOES, PedidosVisoesBarra } from "./pedidos-visoes-barra";
+import type { Falta } from "./pedidos-falteiro";
+import { FALTEIRO_BASE, FalteiroWindow } from "./pedidos-falteiro-window";
 
 const BASE = `${API}/pedidos/lancamento`;
 /** Pausa do cursor antes de consultar a movimentação do produto em foco. */
@@ -39,6 +42,8 @@ interface Contexto {
   ontem: string;
   lojas: LojaOpcao[];
   podeEditarMinimos: boolean;
+  podeGerirFalteiro?: boolean;
+  lojasFalteiro?: number[] | null;
   regras?: { id: string; nome: string }[];
 }
 
@@ -71,6 +76,7 @@ export interface ProdutoLancamento {
   sugestao: number;
   aChegar: number;
   lojas: LinhaLoja[];
+  faltas?: Falta[];
 }
 
 interface Mes {
@@ -357,11 +363,35 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo,
   }, [idFoco]);
 
   const produtoId = produto?.produtoId ?? "";
+  const faltasDoProduto = produto?.faltas ?? [];
+  const faltaGlobal = faltasDoProduto.find((f) => f.codigoLoja === null);
   const colunasLoja = useMemo<{ estatisticas: DataTableColumn<LinhaLoja>[]; pedido: DataTableColumn<LinhaLoja>[] }>(() => {
     const nomeLoja = (codigo: number) => contexto.lojas.find((l) => l.codigo === codigo)?.nome || `Loja ${codigo}`;
+    const faltaDaLoja = (codigo: number) => faltasDoProduto.find((f) => f.codigoLoja === codigo) ?? faltaGlobal;
+    const resumoFalta = (f: Falta) => {
+      const partes = [
+        f.codigoLoja === null ? "Todas as Lojas" : "Em falta",
+        f.quantidade !== null ? `${f.quantidade} un.` : null,
+        f.observacao ? f.observacao : null,
+      ].filter(Boolean);
+      return partes.join(" · ");
+    };
     const loja: DataTableColumn<LinhaLoja> = { key: "loja", label: "Loja", value: (l) => nomeLoja(l.codigoLoja) };
+    const colunaFalta: DataTableColumn<LinhaLoja> = {
+      key: "falta",
+      label: "Falta",
+      value: (l) => {
+        const f = faltaDaLoja(l.codigoLoja);
+        return f ? resumoFalta(f) : "";
+      },
+      render: (l) => {
+        const f = faltaDaLoja(l.codigoLoja);
+        return f ? <Badge variant="warning">{resumoFalta(f)}</Badge> : null;
+      },
+    };
     const estatisticas: DataTableColumn<LinhaLoja>[] = [
     loja,
+    ...(faltasDoProduto.length > 0 ? [colunaFalta] : []),
     { key: "estoque", label: "Estoque", tooltip: "Estoque atual", format: "decimal", value: (l) => l.estoque },
     { key: "vendida", label: "Vendida", tooltip: "Qtde vendida", format: "decimal", value: (l) => l.vendida },
     contexto.podeEditarMinimos
@@ -373,12 +403,13 @@ const Detalhe = memo(function Detalhe({ produto, contexto, lojasFiltro, onSalvo,
     ];
     const pedido: DataTableColumn<LinhaLoja>[] = [
     loja,
+    ...(faltasDoProduto.length > 0 ? [colunaFalta] : []),
     { key: "pedir", label: "Pedir", tooltip: "Quantidade a pedir", format: "decimal", render: (l) => <CampoPedir valor={quantidades.get(chaveQtd(produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)} rotulo={`Quantidade a pedir da Loja ${nomeLoja(l.codigoLoja)}`} onChange={(q) => produto && onQuantidade(produto, l.codigoLoja, q)} />, cellClassName: CAMPO_LOJA, mobileWide: true },
     { key: "distribuidora", label: "Fornecedor", render: (l) => <CampoDistribuidoras onQuantidade={(n) => produto && onQuantidade(produto, l.codigoLoja, n)} lojas={contexto.lojas} quantidade={quantidades.get(chaveQtd(produtoId, l.codigoLoja)) ?? faltaParaMinimo(l)} produtoId={produtoId} codigoLoja={l.codigoLoja} nomeLoja={nomeLoja(l.codigoLoja)} valor={distribuidoras.get(chaveQtd(produtoId, l.codigoLoja))} lista={listaDistribuidoras} onChange={(c) => produto && onDistribuidora(produto, l.codigoLoja, c)} />, mobileWide: true },
     { key: "remover", label: "", width: 40, centered: true, render: (l) => <Button type="button" variant="outline" size="icon" aria-label={`Remover a Loja ${nomeLoja(l.codigoLoja)}`} onClick={() => onRemovidas([...removidas, l.codigoLoja])}><X /></Button>, mobileRole: "hidden" },
     ];
     return { estatisticas, pedido };
-  }, [removidas, onRemovidas, contexto.lojas, contexto.podeEditarMinimos, ultimasCompras, produtoId, produto, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora]);
+  }, [removidas, onRemovidas, contexto.lojas, contexto.podeEditarMinimos, ultimasCompras, produtoId, produto, faltasDoProduto, faltaGlobal, onSalvo, quantidades, onQuantidade, distribuidoras, listaDistribuidoras, onDistribuidora]);
   // Todas as Lojas, mesmo as sem venda nem estoque do produto (zeradas).
   const todasLojas = useMemo<LinhaLoja[]>(() => {
     if (!produto) return [];
@@ -820,6 +851,46 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
   // Estável entre movimentos do cursor: só muda ao marcar produtos (a coluna de seleção lê `selecionados`).
   // A ordem por seleção vale pelo que estava marcado ao clicar no cabeçalho: marcar depois não sobe a linha junto.
   const [ordemSelecao, setOrdemSelecao] = useState<ReadonlySet<string>>(new Set());
+
+  const atalhoFalteiro = useCallback(
+    async (p: ProdutoLancamento) => {
+      const permitidas = contexto.lojasFalteiro ?? null;
+      const lojasEscopo = permitidas === null ? contexto.lojas : contexto.lojas.filter((l) => permitidas.includes(l.codigo));
+      const faltasPermitidas = (p.faltas ?? []).filter((f) => permitidas === null || (f.codigoLoja !== null && permitidas.includes(f.codigoLoja)));
+      if (faltasPermitidas.length > 0) {
+        const descricaoLojas = faltasPermitidas
+          .map((f) => (f.codigoLoja === null ? "Todas as Lojas" : `Loja ${contexto.lojas.find((l) => l.codigo === f.codigoLoja)?.nome || `Loja ${f.codigoLoja}`}`))
+          .join(", ");
+        const ok = await windows.confirm({
+          title: "Remover falta",
+          description: `Remover "${p.nome}" (${descricaoLojas}) do Falteiro?`,
+          confirmLabel: "Remover",
+          destructive: true,
+        });
+        if (!ok) return;
+        try {
+          for (const f of faltasPermitidas) {
+            await apiFetch(`${FALTEIRO_BASE}/${f.id}?version=${f.version}`, { method: "DELETE" });
+          }
+          feedback.notify({ type: "success", title: "Falta removida do Falteiro." });
+        } catch (err: unknown) {
+          notificar(err instanceof Error ? err : new Error("Erro ao remover a falta."));
+        }
+        void carregar(true);
+        return;
+      }
+      await windows.open({
+        surface: "dialog",
+        size: "small",
+        title: `Falteiro: ${p.nome}`,
+        description: "Marque o produto em falta para destacá-lo no Lançamento.",
+        content: () => <FalteiroWindow lojas={lojasEscopo} todasAsLojas={permitidas === null} produtoFixo={{ id: p.produtoId, nome: p.nome }} />,
+      });
+      void carregar(true);
+    },
+    [contexto.lojas, contexto.lojasFalteiro, windows, feedback, notificar, carregar],
+  );
+
   const colunas = useMemo<DataTableColumn<ProdutoLancamento>[]>(() => [
       {
         key: "selecionar",
@@ -839,12 +910,42 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
       },
       { key: "codigo", label: "Código", value: (p) => p.codigoProduto ?? "", searchable: true, sortable: true, cellClassName: "font-mono text-xs" },
       { key: "nome", label: "Produto", value: (p) => p.nome, searchable: true, sortable: true, truncateAt: 32, mobileRole: "primary" },
+      {
+        key: "falta",
+        label: "Falta",
+        centered: true,
+        value: (p) => ((p.faltas?.length ?? 0) > 0 ? 1 : 0),
+        sortable: true,
+        firstSort: "desc",
+        render: (p) => {
+          const emFalta = (p.faltas?.length ?? 0) > 0;
+          if (!contexto.podeGerirFalteiro) {
+            return emFalta ? <Badge variant="warning">Em falta</Badge> : null;
+          }
+          const permitidas = contexto.lojasFalteiro ?? null;
+          const podeRemoverDireto = (p.faltas ?? []).some((f) => permitidas === null || (f.codigoLoja !== null && permitidas.includes(f.codigoLoja)));
+          return (
+            <Stack direction="row" gap="tight" align="center" justify="center">
+              {emFalta && <Badge variant="warning">Em falta</Badge>}
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={emFalta && podeRemoverDireto ? `Desmarcar ${p.nome} em falta` : `Marcar ${p.nome} em falta`}
+                onClick={() => void atalhoFalteiro(p)}
+              >
+                {emFalta && podeRemoverDireto ? <Trash2 /> : <AlertTriangle />}
+              </Button>
+            </Stack>
+          );
+        },
+      },
       { key: "fabricante", label: "Fabricante", value: (p) => p.fabricante ?? "", sortable: true, searchable: true, truncateAt: 16 },
       { key: "formula", label: "Fórmula", value: (p) => p.formula ?? "", sortable: true, truncateAt: 16 },
       { key: "grupo", label: "Grupo", value: (p) => p.grupo ?? "", sortable: true, truncateAt: 14 },
       { key: "secao", label: "Seção", value: (p) => p.secao ?? "", sortable: true, truncateAt: 14 },
       { key: "codigoBarra", label: "Cód. barras", tooltip: "Código de barras", value: (p) => p.codigoBarra ?? "", searchable: true },
-  ], [selecionados, ordemSelecao, alternar]);
+  ], [selecionados, ordemSelecao, alternar, contexto.podeGerirFalteiro, contexto.lojasFalteiro, atalhoFalteiro]);
 
   const emFoco = useMemo(() => (ativo ? produtos.find((p) => p.produtoId === ativo) : undefined), [ativo, produtos]);
 
@@ -907,6 +1008,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
             rows={produtos}
             getRowId={idProduto}
             loading={carregando}
+            highlightRow={(p) => (p.faltas?.length ?? 0) > 0}
             markedRow={(p) => selecionados.has(p.produtoId)}
             activeRowId={ativo}
             onActiveRowChange={setAtivo}

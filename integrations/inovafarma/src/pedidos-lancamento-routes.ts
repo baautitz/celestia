@@ -6,9 +6,13 @@ import { horaDoErp } from "./baixas-da-loja.js";
 import { vendasFromWhere } from "./desempenho-vendas.js";
 import { ator, DiaDoCalendario, erroDoErp, recusaDeValidacao, SEM_CONEXAO, Version, versaoDesatualizada, type AuthContext, type ErpQuery } from "./metas-comum.js";
 import { PEDIDOS_PLUGIN } from "./pedidos-audit.js";
+import { lojasDoUsuario } from "./pedidos-escopo-lojas.js";
+import type { FalteiroStore } from "./pedidos-falteiro-store.js";
+import type { Falta } from "./pedidos-falteiro.js";
 import { PEDIDOS_MINIMOS_ACTION, PEDIDOS_MINIMOS_TARGET } from "./pedidos-minimos-audit.js";
 import type { MinimoMaximoStore } from "./pedidos-minimos-store.js";
 import type { AuditService } from "./vinculo-audit.js";
+import type { VinculoStore } from "./vinculo-store.js";
 import { INOVAFARMA_PERMISSIONS } from "./permissions.js";
 import { COLUNA_DO_PRODUTO, idsPorTipo } from "./lista-produtos.js";
 import { EntradaLista, idValido } from "./tipos-meta.js";
@@ -29,11 +33,14 @@ export interface PedidosLancamentoRoutesDeps {
   limites: Pick<LimitesStore, "regras">;
   /** Os Pedidos do Celestia: os confirmados e ainda não recebidos por inteiro alimentam a coluna a chegar. */
   pedidos: PedidoStore;
+  falteiro?: Pick<FalteiroStore, "listar">;
+  vinculos?: Pick<VinculoStore, "porUsuario">;
   audit: AuditService;
 }
 
 const VER = INOVAFARMA_PERMISSIONS.ref("pedidos-lancamento:ver");
 const EDITAR_MINIMOS = INOVAFARMA_PERMISSIONS.ref("pedidos-minimos:editar");
+const GERIR_FALTEIRO = INOVAFARMA_PERMISSIONS.ref("pedidos-falteiro:gerir");
 const MINIMOS_DESATUALIZADOS = versaoDesatualizada("O estoque mínimo foi alterado por outra pessoa. A grade foi recarregada.");
 const BASE = "/pedidos/lancamento";
 /** Meses da movimentação do produto, contando o atual. */
@@ -134,6 +141,7 @@ interface ProdutoLancamento {
   sugestao: number;
   aChegar: number;
   lojas: LojaLancamento[];
+  faltas?: Falta[];
 }
 
 interface LinhaMes {
@@ -172,6 +180,24 @@ export const produtosSql = (filtroVenda: string) => `
   LEFT JOIN Produto_Sessao se ON se.CodigoSessao = p.CodigoSessao
   ORDER BY p.NomeProduto, g.codigoLoja
 `;
+
+/** Dados e estoques por Loja dos produtos em falta que não tiveram venda no período mas passam nos filtros de produto. */
+const faltantesSemVendaSql = (n: number, filtroProduto: string, filtroLojasEstoque: string) => {
+  const ids = Array.from({ length: n }, (_, i) => `@faltante${i}`).join(", ");
+  return `
+  SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, p.CodigoProduto AS codigoProduto, LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra,
+         LTRIM(RTRIM(fa.NomeFabricante)) AS fabricante, LTRIM(RTRIM(fo.NomeFormula)) AS formula, LTRIM(RTRIM(gr.NomeGrupo)) AS grupo, LTRIM(RTRIM(se.NomeSessao)) AS secao,
+         ISNULL(pe.CodigoEmpresa, 0) AS codigoLoja, CAST(0 AS float) AS vendida, CAST(pe.Estoque AS float) AS estoque
+  FROM Produto p
+  LEFT JOIN Produto_Estoque pe ON pe.CodigoProduto = p.CodigoProduto ${filtroLojasEstoque}
+  LEFT JOIN Produto_Fabricante fa ON fa.CodigoFabricante = p.CodigoFabricante
+  LEFT JOIN Produto_Formula fo ON fo.CodigoFormula = p.CodigoFormula
+  LEFT JOIN Produto_Grupo gr ON gr.CodigoGrupo = p.CodigoGrupo
+  LEFT JOIN Produto_Sessao se ON se.CodigoSessao = p.CodigoSessao
+  WHERE p.Eliminado = 0 AND CONVERT(varchar(36), p.rowguid) IN (${ids}) ${filtroProduto}
+  ORDER BY p.NomeProduto, pe.CodigoEmpresa
+`;
+};
 
 /** Vendas e compras (entradas de NF) do produto por mês, na janela de `@dataInicio` a `@dataFim`. */
 const movimentacaoSql = (filtroVenda: string, filtroCompra: string) => `
@@ -265,7 +291,7 @@ const hojeNoErp = () => horaDoErp(new Date().toISOString()).slice(0, 10);
 const diaAnterior = (dia: string) => new Date(Date.parse(`${dia}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 
 /** Lançamento de Pedidos: filtros, grade de produtos por Loja e movimentação mensal. Só leitura no ERP. */
-export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, limites, audit, pedidos }: PedidosLancamentoRoutesDeps): void {
+export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erpClient, minimos, limites, audit, pedidos, falteiro, vinculos }: PedidosLancamentoRoutesDeps): void {
   const recusa = (c: AuthContext) => (permissions.has(c.get("user")?.permissions, VER.key) ? null : c.json({ error: VER.deniedMessage }, 403));
 
   routes.get(`${BASE}/contexto`, auth, async (c: AuthContext) => {
@@ -277,7 +303,17 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
       const lojas = await lojasDoErp(client);
       const regras = (await limites.regras()).map((r) => ({ id: r.id, nome: r.nome }));
       const hoje = hojeNoErp();
-      return c.json({ hoje, ontem: diaAnterior(hoje), podeEditarMinimos: permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key), lojas, regras });
+      const podeGerirFalteiro = permissions.has(c.get("user")?.permissions, GERIR_FALTEIRO.key);
+      const lojasFalteiro = podeGerirFalteiro && vinculos ? await lojasDoUsuario({ permissions, vinculos }, c) : null;
+      return c.json({
+        hoje,
+        ontem: diaAnterior(hoje),
+        podeEditarMinimos: permissions.has(c.get("user")?.permissions, EDITAR_MINIMOS.key),
+        podeGerirFalteiro,
+        lojasFalteiro,
+        lojas,
+        regras,
+      });
     } catch (err: unknown) {
       return c.json(erroDoErp(err), 503);
     }
@@ -294,36 +330,67 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     const ate = modo === "apartir" ? hojeNoErp() : (consulta.data.ate ?? de);
     const params: Record<string, unknown> = { dataInicio: `${de} 00:00:00`, dataFim: `${ate} 23:59:59` };
     const filtros = [filtroDeLojas("v.CodigoEmpresa", lojas, params)];
+    const filtrosProduto: string[] = [];
     // As entradas do Filtro de produtos são
     // unidas por OU, como nas colunas do Desempenho de Vendas: o produto casa com qualquer entrada.
     if (filtroEntradas?.length) {
       const condicoes = idsPorTipo(filtroEntradas, params, "ent").map(([tipo, nomes]) => `${COLUNA_DO_PRODUTO[tipo]} IN (${nomes})`);
-      filtros.push(`AND (${condicoes.join(" OR ")})`);
+      const clausula = `AND (${condicoes.join(" OR ")})`;
+      filtros.push(clausula);
+      filtrosProduto.push(clausula);
     }
     // A Regra de Limite restringe junto com os outros filtros (E).
     if (regraId) {
       const regra = (await limites.regras()).find((r) => r.id === regraId);
       if (!regra) return c.json({ error: "Regra de Limite não encontrada." }, 404);
-      filtros.push(`AND ${daLista(regra, params, "regra")}`);
+      const clausula = `AND ${daLista(regra, params, "regra")}`;
+      filtros.push(clausula);
+      filtrosProduto.push(clausula);
     }
     try {
       const linhas = await client.query<LinhaVenda>(produtosSql(filtros.join(" ")), params);
       const definidos = new Map((await minimos.listar()).map((m) => [`${m.produtoId}|${m.codigoLoja}`, m]));
       const chegando = await aChegarDosPedidos(client, pedidos);
+      const faltasAtivas = falteiro ? await falteiro.listar() : [];
+      const faltasPorProduto = new Map<string, Falta[]>();
+      for (const f of faltasAtivas) {
+        if (lojas && lojas.length > 0 && f.codigoLoja !== null && !lojas.includes(f.codigoLoja)) continue;
+        const lista = faltasPorProduto.get(f.produtoId) ?? [];
+        lista.push(f);
+        faltasPorProduto.set(f.produtoId, lista);
+      }
+      const idsComVenda = new Set(linhas.map((l) => l.produtoId));
+      const idsFaltantesSemVenda = [...faltasPorProduto.keys()].filter((id) => !idsComVenda.has(id));
+      if (idsFaltantesSemVenda.length > 0) {
+        const paramsFaltantes: Record<string, unknown> = { ...params };
+        idsFaltantesSemVenda.forEach((id, i) => {
+          paramsFaltantes[`faltante${i}`] = id;
+        });
+        const filtroLojasEstoque = filtroDeLojas("pe.CodigoEmpresa", lojas, paramsFaltantes);
+        const linhasFaltantes = await client.query<LinhaVenda>(
+          faltantesSemVendaSql(idsFaltantesSemVenda.length, filtrosProduto.join(" "), filtroLojasEstoque),
+          paramsFaltantes,
+        );
+        linhas.push(...linhasFaltantes);
+      }
       const porProduto = new Map<string, ProdutoLancamento>();
       for (const l of linhas) {
         const vendida = Number(l.vendida) || 0;
         const estoque = Number(l.estoque) || 0;
-        const definido = definidos.get(`${l.produtoId}|${l.codigoLoja}`);
-        // Sugestão: só apoio ao comprador, nunca negativa.
-        const loja = { codigoLoja: Number(l.codigoLoja), vendida, estoque, minimo: definido?.minimo ?? null, maximo: definido?.maximo ?? null, sugestao: Math.max(0, vendida + (definido?.minimo ?? 0) - estoque), aChegar: chegando.get(chaveDaLinha(l.produtoId, Number(l.codigoLoja))) ?? 0, version: definido?.version ?? 0 };
-        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, codigoProduto: l.codigoProduto == null ? null : Number(l.codigoProduto), nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, fabricante: l.fabricante ?? "", formula: l.formula ?? "", grupo: l.grupo ?? "", secao: l.secao ?? "", vendida: 0, estoque: 0, minimo: 0, sugestao: 0, aChegar: 0, lojas: [] };
-        produto.vendida += vendida;
-        produto.estoque += estoque;
-        produto.minimo += loja.minimo ?? 0;
-        produto.sugestao += loja.sugestao;
-        produto.aChegar += loja.aChegar;
-        produto.lojas.push(loja);
+        const codigoLoja = Number(l.codigoLoja);
+        const faltasDoProduto = faltasPorProduto.get(l.produtoId);
+        const produto = porProduto.get(l.produtoId) ?? { produtoId: l.produtoId, codigoProduto: l.codigoProduto == null ? null : Number(l.codigoProduto), nome: (l.nome ?? "").trim(), codigoBarra: l.codigoBarra, fabricante: l.fabricante ?? "", formula: l.formula ?? "", grupo: l.grupo ?? "", secao: l.secao ?? "", vendida: 0, estoque: 0, minimo: 0, sugestao: 0, aChegar: 0, lojas: [], ...(faltasDoProduto?.length ? { faltas: faltasDoProduto } : {}) };
+        if (codigoLoja > 0) {
+          const definido = definidos.get(`${l.produtoId}|${codigoLoja}`);
+          // Sugestão: só apoio ao comprador, nunca negativa.
+          const loja = { codigoLoja, vendida, estoque, minimo: definido?.minimo ?? null, maximo: definido?.maximo ?? null, sugestao: Math.max(0, vendida + (definido?.minimo ?? 0) - estoque), aChegar: chegando.get(chaveDaLinha(l.produtoId, codigoLoja)) ?? 0, version: definido?.version ?? 0 };
+          produto.vendida += vendida;
+          produto.estoque += estoque;
+          produto.minimo += loja.minimo ?? 0;
+          produto.sugestao += loja.sugestao;
+          produto.aChegar += loja.aChegar;
+          produto.lojas.push(loja);
+        }
         porProduto.set(l.produtoId, produto);
       }
       // A Loja com mínimo gravado mas sem venda no período não vem do ERP: entra com o que está gravado (e a version dele),
