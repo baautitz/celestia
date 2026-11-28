@@ -22,6 +22,7 @@ import { PostgresLimitesStore } from "../../../integrations/inovafarma/src/postg
 import { RegraComValoresError, RegraInexistenteError } from "../../../integrations/inovafarma/src/pedidos-limites-store.js";
 import { PostgresFalteiroStore } from "../../../integrations/inovafarma/src/postgres-pedidos-falteiro-store.js";
 import { FaltaDuplicadaError } from "../../../integrations/inovafarma/src/pedidos-falteiro-store.js";
+import { PostgresPedidosVisoesStore } from "../../../integrations/inovafarma/src/postgres-pedidos-visoes-store.js";
 import { PostgresClosingPeriodStore } from "../src/closing-period/postgres-closing-period-store.js";
 import { PeriodOverlapError } from "../src/closing-period/closing-period-store.js";
 import { createTestPool, dbTestsEnabled } from "./helpers/test-db.js";
@@ -147,7 +148,32 @@ describe.skipIf(!dbTestsEnabled)("stores contra Postgres real", () => {
 
   describe("operações das stores (com banco limpo a cada teste)", () => {
     beforeEach(async () => {
-      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_itens, inovafarma.pre_vencidos_baixas_congeladas, inovafarma.pre_vencidos_correcoes_baixa, inovafarma.avaliacoes, inovafarma.justificativas_ajuste, inovafarma.limites_regras, inovafarma.pedidos_falteiro CASCADE`);
+      await db.execute(sql`TRUNCATE iam.users, iam.roles, erp.erps, closing_period.periods, inovafarma.pre_vencidos_itens, inovafarma.pre_vencidos_baixas_congeladas, inovafarma.pre_vencidos_correcoes_baixa, inovafarma.avaliacoes, inovafarma.justificativas_ajuste, inovafarma.limites_regras, inovafarma.pedidos_falteiro, inovafarma.pedidos_visoes CASCADE`);
+    });
+
+    describe("Visões salvas de Pedidos", () => {
+      it("cria, atualiza e lista preservando falteiro e incluirSemVenda", async () => {
+        const store = new PostgresPedidosVisoesStore(db);
+        const criada = await store.criar("u1", {
+          nome: "Em falta sem venda",
+          lojas: [1],
+          entradas: [],
+          apenasComMinimo: true,
+          falteiro: "somente",
+          incluirSemVenda: true,
+          padrao: true,
+        });
+        expect(criada).toMatchObject({ falteiro: "somente", incluirSemVenda: true, padrao: true, version: 1 });
+        expect(await store.listar("u1")).toEqual([criada]);
+
+        const atualizada = await store.atualizar(
+          "u1",
+          criada.id,
+          { ...criada, falteiro: "excluir", incluirSemVenda: false },
+          1,
+        );
+        expect(atualizada).toMatchObject({ falteiro: "excluir", incluirSemVenda: false, version: 2 });
+      });
     });
 
     describe("Falteiro de Pedidos", () => {

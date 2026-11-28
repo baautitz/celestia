@@ -8,6 +8,7 @@ import type { ItemCongelado } from "./baixas-congeladas-store.js";
 import type { MedidaColuna } from "./colunas-desempenho.js";
 import type { ItemPedido } from "./pedidos.js";
 import type { Distribuicao } from "./pedidos-limites.js";
+import type { ModoFalteiro } from "./pedidos-visoes.js";
 import type { EntradaLista, Exibicao, ListaTipo, RegraPremio } from "./tipos-meta.js";
 
 /** Um schema Postgres por Module. */
@@ -303,6 +304,8 @@ export const pedidosVisoes = inovafarmaSchema.table(
     /** O "Filtro de produtos": entradas validadas por `EntradaLista`, ids do ERP, sem FK. */
     entradas: jsonb("entradas").$type<EntradaLista[]>().notNull().default(sql`'[]'::jsonb`),
     apenasComMinimo: boolean("apenas_com_minimo").notNull().default(false),
+    falteiro: text("falteiro").$type<ModoFalteiro>().notNull().default("incluir"),
+    incluirSemVenda: boolean("incluir_sem_venda").notNull().default(false),
     padrao: boolean("padrao").notNull().default(false),
     version: integer("version").notNull().default(1),
   },

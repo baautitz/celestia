@@ -1,0 +1,2 @@
+ALTER TABLE "inovafarma"."pedidos_visoes" ADD COLUMN "falteiro" text DEFAULT 'incluir' NOT NULL;--> statement-breakpoint
+ALTER TABLE "inovafarma"."pedidos_visoes" ADD COLUMN "incluir_sem_venda" boolean DEFAULT false NOT NULL;

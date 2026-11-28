@@ -28,11 +28,36 @@ describe("Visões salvas de Pedidos", () => {
   it("guarda os filtros, nunca a data, e só mostra as visões do próprio usuário", async () => {
     const { req } = boot();
     const criada = (await (await req("ana", "POST", "/pedidos/visoes", { ...base, de: "2027-01-01", ate: "2027-01-02" })).json()) as Record<string, unknown>;
-    expect(criada).toMatchObject({ nome: "Genéricos Centro", lojas: [1], entradas: base.entradas, apenasComMinimo: true });
+    expect(criada).toMatchObject({
+      nome: "Genéricos Centro",
+      lojas: [1],
+      entradas: base.entradas,
+      apenasComMinimo: true,
+      falteiro: "incluir",
+      incluirSemVenda: false,
+    });
     expect(criada).not.toHaveProperty("de");
     expect(criada).not.toHaveProperty("ate");
     expect(((await (await req("ana", "GET", "/pedidos/visoes")).json()) as VisaoPedidos[]).length).toBe(1);
     expect(((await (await req("bia", "GET", "/pedidos/visoes")).json()) as VisaoPedidos[]).length).toBe(0);
+  });
+
+  it("persiste os filtros de Falteiro e de produtos sem venda na visão e exige recorte ativo quando incluirSemVenda é verdadeiro", async () => {
+    const { req } = boot();
+    const semRecorte = await req("ana", "POST", "/pedidos/visoes", {
+      ...base,
+      nome: "Sem Recorte",
+      entradas: [],
+      apenasComMinimo: false,
+      incluirSemVenda: true,
+    });
+    expect(semRecorte.status).toBe(400);
+
+    const res = await req("ana", "POST", "/pedidos/visoes", { ...base, nome: "Faltas Sem Venda", falteiro: "somente", incluirSemVenda: true });
+    expect(res.status).toBe(201);
+    const criada = (await res.json()) as VisaoPedidos;
+    expect(criada.falteiro).toBe("somente");
+    expect(criada.incluirSemVenda).toBe(true);
   });
 
   it("recusa nome repetido do mesmo usuário, mas aceita o de outro", async () => {

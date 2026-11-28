@@ -17,7 +17,7 @@ const BASE = "/pedidos/visoes";
 const NAO_ENCONTRADA = "Visão não encontrada.";
 const NOME_DUPLICADO = "Você já tem uma visão com este nome.";
 const VERSAO_DESATUALIZADA = versaoDesatualizada("A visão foi alterada em outra tela. As visões foram recarregadas.");
-const Edicao = DadosVisaoPedidos.extend({ version: Version });
+const Edicao = DadosVisaoPedidos.safeExtend({ version: Version });
 
 /** Visões salvas do Lançamento: privadas por Usuário, sem Audit Log (preferência pessoal, sem efeito sobre dados). */
 export function registerPedidosVisoesRoutes({ routes, permissions, auth, store }: PedidosVisoesRoutesDeps): void {
