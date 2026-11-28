@@ -52,6 +52,10 @@ function boot({ permissions = [PERMISSAO, EDITAR], falha = false }: { permission
           return [
             { produtoId: "p-3", nome: "PARACETAMOL", codigoBarra: "7893", codigoLoja: 1, vendida: 0, estoque: 0 },
           ] as T[];
+        if (sql.includes("pe.Ativo = 1"))
+          return [
+            { produtoId: "p-4", nome: "IBUPROFENO", codigoBarra: "7894", codigoLoja: 1, vendida: 0, estoque: 15 },
+          ] as T[];
         if (sql.includes("estoque"))
           return [
             { produtoId: "p-1", nome: "DIPIRONA", codigoBarra: "789", codigoLoja: 1, vendida: 5, estoque: 10 },
@@ -288,5 +292,52 @@ describe("Lançamento de Pedidos: Falteiro", () => {
       vendida: 0,
       faltas: [expect.objectContaining({ id: fSemVenda.id })],
     });
+  });
+
+  it("filtra por modo do Falteiro (incluir, somente, excluir) e casa falta global com qualquer filtro de Loja", async () => {
+    const { get, falteiro } = boot({ permissions: [PERMISSAO, FALTEIRO] });
+    await falteiro.criar({ produtoId: "p-1", codigoLoja: 1, quantidade: 2, observacao: null }, { id: "u", nome: "Ana" });
+    await falteiro.criar({ produtoId: "p-3", codigoLoja: null, quantidade: 5, observacao: "Global" }, { id: "u", nome: "Ana" });
+
+    // Somente em falta: traz apenas p-1 (teve venda) e p-3 (sem venda), excluindo p-2
+    const somente = (await (await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&falteiro=somente")).json()) as { produtoId: string }[];
+    expect(somente.map((p) => p.produtoId)).toEqual(["p-1", "p-3"]);
+
+    // Somente em falta filtrando pela Loja 2: p-1 (falta só na Loja 1) sai; p-3 (falta global, Todas as Lojas) permanece
+    const somenteLoja2 = (await (await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&lojas=2&falteiro=somente")).json()) as { produtoId: string }[];
+    expect(somenteLoja2.map((p) => p.produtoId)).toEqual(["p-3"]);
+
+    // Excluir em falta: oculta p-1 e p-3, mantendo apenas p-2
+    const excluir = (await (await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&falteiro=excluir")).json()) as { produtoId: string }[];
+    expect(excluir.map((p) => p.produtoId)).toEqual(["p-2"]);
+  });
+
+  it("inclui produtos ativos sem venda no período somente quando há recorte ativo (Filtro de produtos, Regra de Limite ou Apenas com estoque mínimo)", async () => {
+    const { get, put, consultas } = boot();
+    // Sem recorte ativo -> HTTP 400
+    const semRecorte = await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&incluirSemVenda=1");
+    expect(semRecorte.status).toBe(400);
+    const corpoErro = (await semRecorte.json()) as { error: { issues: { message: string }[] } };
+    expect(corpoErro.error.issues[0]?.message).toContain("Para incluir produtos sem venda no período");
+
+    // Com Regra de Limite -> 200 e traz p-4 (ativo sem venda)
+    const comRegra = await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&regra=r-1&incluirSemVenda=1");
+    expect(comRegra.status).toBe(200);
+    const listaRegra = (await comRegra.json()) as { produtoId: string; vendida: number; estoque: number }[];
+    expect(listaRegra.find((p) => p.produtoId === "p-4")).toMatchObject({ produtoId: "p-4", vendida: 0, estoque: 15 });
+
+    // Com Filtro de produtos -> 200
+    const entradas = encodeURIComponent(JSON.stringify([{ tipo: "grupo", id: "3", nome: "MEDICAMENTOS" }]));
+    const comEntradas = await get(`/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&entradas=${entradas}&incluirSemVenda=1`);
+    expect(comEntradas.status).toBe(200);
+
+    // Com Apenas com estoque mínimo -> 200 e filtra no SQL pelos produtos que possuem mínimo gravado
+    await put({ produtoId: "p-4", codigoLoja: 1, minimo: 10, maximo: null, version: 0 });
+    consultas.length = 0;
+    const comMinimo = await get("/pedidos/lancamento/produtos?modo=periodo&de=2027-04-01&ate=2027-04-02&apenasMinimo=1&incluirSemVenda=1");
+    expect(comMinimo.status).toBe(200);
+    const listaMinimo = (await comMinimo.json()) as { produtoId: string; minimo: number }[];
+    expect(listaMinimo.map((p) => p.produtoId)).toEqual(["p-4"]);
+    expect(consultas.some((q) => q.sql.includes("pe.Ativo = 1") && q.sql.includes("@minProd0"))).toBe(true);
   });
 });

@@ -21,6 +21,7 @@ import { entradasDosPedidos } from "./pedidos-nf.js";
 import { daLista } from "./pedidos-limites-consumo.js";
 import type { LimitesStore } from "./pedidos-limites-store.js";
 import type { PedidoStore } from "./pedidos-store.js";
+import { MODO_FALTEIRO } from "./pedidos-visoes.js";
 import { lojasDoErp } from "./pre-vencidos-comum.js";
 
 export interface PedidosLancamentoRoutesDeps {
@@ -68,6 +69,8 @@ const Entradas = z
   .optional();
 const MENSAGEM_DATA = "Informe a data no formato AAAA-MM-DD.";
 
+const EXIGE_RECORTE_SEM_VENDA = "Para incluir produtos sem venda no período, escolha ao menos um Filtro de produtos, uma Regra de Limite ou marque Apenas com estoque mínimo.";
+
 const ConsultaProdutos = z
   .object({
     modo: z.enum(["periodo", "apartir"], "Parâmetro 'modo' deve ser 'periodo' ou 'apartir'."),
@@ -77,9 +80,15 @@ const ConsultaProdutos = z
     entradas: Entradas,
     regra: z.string().min(1).max(60).optional(),
     apenasMinimo: z.enum(["1"]).optional(),
+    falteiro: z.enum(MODO_FALTEIRO, "Parâmetro 'falteiro' deve ser 'incluir', 'somente' ou 'excluir'.").default("incluir"),
+    incluirSemVenda: z.enum(["1"]).optional(),
   })
   .refine((q) => q.modo === "apartir" || q.ate !== undefined, { error: "Informe a data final do período.", path: ["ate"] })
-  .refine((q) => q.ate === undefined || q.modo === "apartir" || q.de <= q.ate, { error: "A data final não pode ser anterior à data inicial.", path: ["ate"] });
+  .refine((q) => q.ate === undefined || q.modo === "apartir" || q.de <= q.ate, { error: "A data final não pode ser anterior à data inicial.", path: ["ate"] })
+  .refine((q) => !q.incluirSemVenda || Boolean(q.entradas?.length || q.regra || q.apenasMinimo), {
+    error: EXIGE_RECORTE_SEM_VENDA,
+    path: ["incluirSemVenda"],
+  });
 
 const Quantidade = z.number().min(0, "Informe um valor maior ou igual a zero.").max(1_000_000_000);
 const EdicaoMinimo = z
@@ -198,6 +207,21 @@ const faltantesSemVendaSql = (n: number, filtroProduto: string, filtroLojasEstoq
   ORDER BY p.NomeProduto, pe.CodigoEmpresa
 `;
 };
+
+/** Produtos ativos do ERP (`Produto.Eliminado = 0` e `Produto_Estoque.Ativo = 1`) dentro do recorte ativo para incluir itens sem venda no período. */
+const ativosSemVendaSql = (filtroProduto: string, filtroLojasEstoque: string) => `
+  SELECT CONVERT(varchar(36), p.rowguid) AS produtoId, p.CodigoProduto AS codigoProduto, LTRIM(RTRIM(p.NomeProduto)) AS nome, p.CodigoBarra AS codigoBarra,
+         LTRIM(RTRIM(fa.NomeFabricante)) AS fabricante, LTRIM(RTRIM(fo.NomeFormula)) AS formula, LTRIM(RTRIM(gr.NomeGrupo)) AS grupo, LTRIM(RTRIM(se.NomeSessao)) AS secao,
+         ISNULL(pe.CodigoEmpresa, 0) AS codigoLoja, CAST(0 AS float) AS vendida, CAST(pe.Estoque AS float) AS estoque
+  FROM Produto p
+  JOIN Produto_Estoque pe ON pe.CodigoProduto = p.CodigoProduto AND pe.Ativo = 1 ${filtroLojasEstoque}
+  LEFT JOIN Produto_Fabricante fa ON fa.CodigoFabricante = p.CodigoFabricante
+  LEFT JOIN Produto_Formula fo ON fo.CodigoFormula = p.CodigoFormula
+  LEFT JOIN Produto_Grupo gr ON gr.CodigoGrupo = p.CodigoGrupo
+  LEFT JOIN Produto_Sessao se ON se.CodigoSessao = p.CodigoSessao
+  WHERE p.Eliminado = 0 ${filtroProduto}
+  ORDER BY p.NomeProduto, pe.CodigoEmpresa
+`;
 
 /** Vendas e compras (entradas de NF) do produto por mês, na janela de `@dataInicio` a `@dataFim`. */
 const movimentacaoSql = (filtroVenda: string, filtroCompra: string) => `
@@ -326,7 +350,7 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
     if (!consulta.success) return recusaDeValidacao(c, consulta.error);
     const client = erpClient();
     if (!client) return c.json({ error: SEM_CONEXAO }, 503);
-    const { modo, de, entradas: filtroEntradas, lojas, apenasMinimo, regra: regraId } = consulta.data;
+    const { modo, de, entradas: filtroEntradas, lojas, apenasMinimo, regra: regraId, falteiro: modoFalteiro, incluirSemVenda } = consulta.data;
     const ate = modo === "apartir" ? hojeNoErp() : (consulta.data.ate ?? de);
     const params: Record<string, unknown> = { dataInicio: `${de} 00:00:00`, dataFim: `${ate} 23:59:59` };
     const filtros = [filtroDeLojas("v.CodigoEmpresa", lojas, params)];
@@ -348,9 +372,6 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
       filtrosProduto.push(clausula);
     }
     try {
-      const linhas = await client.query<LinhaVenda>(produtosSql(filtros.join(" ")), params);
-      const definidos = new Map((await minimos.listar()).map((m) => [`${m.produtoId}|${m.codigoLoja}`, m]));
-      const chegando = await aChegarDosPedidos(client, pedidos);
       const faltasAtivas = falteiro ? await falteiro.listar() : [];
       const faltasPorProduto = new Map<string, Falta[]>();
       for (const f of faltasAtivas) {
@@ -359,19 +380,70 @@ export function registerPedidosLancamentoRoutes({ routes, permissions, auth, erp
         lista.push(f);
         faltasPorProduto.set(f.produtoId, lista);
       }
-      const idsComVenda = new Set(linhas.map((l) => l.produtoId));
-      const idsFaltantesSemVenda = [...faltasPorProduto.keys()].filter((id) => !idsComVenda.has(id));
-      if (idsFaltantesSemVenda.length > 0) {
-        const paramsFaltantes: Record<string, unknown> = { ...params };
-        idsFaltantesSemVenda.forEach((id, i) => {
-          paramsFaltantes[`faltante${i}`] = id;
+      if (modoFalteiro === "somente" && faltasPorProduto.size === 0) return c.json([]);
+      if (modoFalteiro === "somente") {
+        const idsFaltantes = [...faltasPorProduto.keys()];
+        idsFaltantes.forEach((id, i) => {
+          params[`somenteFalta${i}`] = id;
         });
-        const filtroLojasEstoque = filtroDeLojas("pe.CodigoEmpresa", lojas, paramsFaltantes);
-        const linhasFaltantes = await client.query<LinhaVenda>(
-          faltantesSemVendaSql(idsFaltantesSemVenda.length, filtrosProduto.join(" "), filtroLojasEstoque),
-          paramsFaltantes,
-        );
-        linhas.push(...linhasFaltantes);
+        const clausulaFaltantes = `AND CONVERT(varchar(36), p.rowguid) IN (${idsFaltantes.map((_, i) => `@somenteFalta${i}`).join(", ")})`;
+        filtros.push(clausulaFaltantes);
+      }
+
+      const linhas = (await client.query<LinhaVenda>(produtosSql(filtros.join(" ")), params)).filter((l) => {
+        if (modoFalteiro === "excluir") return !faltasPorProduto.has(l.produtoId);
+        if (modoFalteiro === "somente") return faltasPorProduto.has(l.produtoId);
+        return true;
+      });
+      const definidos = new Map((await minimos.listar()).map((m) => [`${m.produtoId}|${m.codigoLoja}`, m]));
+      const chegando = await aChegarDosPedidos(client, pedidos);
+
+      if (modoFalteiro !== "excluir") {
+        const idsPresentes = new Set(linhas.map((l) => l.produtoId));
+        const idsFaltantesSemVenda = [...faltasPorProduto.keys()].filter((id) => !idsPresentes.has(id));
+        if (idsFaltantesSemVenda.length > 0) {
+          const paramsFaltantes: Record<string, unknown> = { ...params };
+          idsFaltantesSemVenda.forEach((id, i) => {
+            paramsFaltantes[`faltante${i}`] = id;
+          });
+          const filtroLojasEstoque = filtroDeLojas("pe.CodigoEmpresa", lojas, paramsFaltantes);
+          const linhasFaltantes = await client.query<LinhaVenda>(
+            faltantesSemVendaSql(idsFaltantesSemVenda.length, filtrosProduto.join(" "), filtroLojasEstoque),
+            paramsFaltantes,
+          );
+          linhas.push(...linhasFaltantes);
+        }
+      }
+
+      if (incluirSemVenda && modoFalteiro !== "somente") {
+        const paramsSemVenda: Record<string, unknown> = { ...params };
+        const filtrosSemVenda = [...filtrosProduto];
+        if (!filtrosSemVenda.length && apenasMinimo) {
+          const idsComMinimo = [
+            ...new Set(
+              [...definidos.values()]
+                .filter((d) => d.minimo > 0 && (!lojas?.length || lojas.includes(d.codigoLoja)))
+                .map((d) => d.produtoId),
+            ),
+          ];
+          if (idsComMinimo.length > 0) {
+            idsComMinimo.forEach((id, i) => {
+              paramsSemVenda[`minProd${i}`] = id;
+            });
+            filtrosSemVenda.push(`AND CONVERT(varchar(36), p.rowguid) IN (${idsComMinimo.map((_, i) => `@minProd${i}`).join(", ")})`);
+          } else {
+            filtrosSemVenda.push("AND 1 = 0");
+          }
+        }
+        const filtroLojasEstoque = filtroDeLojas("pe.CodigoEmpresa", lojas, paramsSemVenda);
+        const linhasAtivos = await client.query<LinhaVenda>(ativosSemVendaSql(filtrosSemVenda.join(" "), filtroLojasEstoque), paramsSemVenda);
+        const chavesPresentes = new Set(linhas.map((l) => `${l.produtoId}|${l.codigoLoja}`));
+        for (const l of linhasAtivos) {
+          if (modoFalteiro === "excluir" && faltasPorProduto.has(l.produtoId)) continue;
+          if (chavesPresentes.has(`${l.produtoId}|${l.codigoLoja}`)) continue;
+          linhas.push(l);
+          chavesPresentes.add(`${l.produtoId}|${l.codigoLoja}`);
+        }
       }
       const porProduto = new Map<string, ProdutoLancamento>();
       for (const l of linhas) {

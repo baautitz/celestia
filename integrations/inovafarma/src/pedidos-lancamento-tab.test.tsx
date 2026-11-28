@@ -290,7 +290,15 @@ describe("Pedidos: visões salvas", () => {
     await waitFor(() => expect(apiFetch.mock.calls.some((c) => String(c[0]).endsWith("/pedidos/visoes") && c[1]?.method === "POST")).toBe(true));
     const chamada = apiFetch.mock.calls.find((c) => String(c[0]).endsWith("/pedidos/visoes") && c[1]?.method === "POST");
     const corpo = JSON.parse(chamada?.[1].body as string);
-    expect(corpo).toEqual({ nome: "Minha", lojas: [], entradas: [], apenasComMinimo: true, padrao: true });
+    expect(corpo).toEqual({
+      nome: "Minha",
+      lojas: [],
+      entradas: [],
+      apenasComMinimo: true,
+      falteiro: "incluir",
+      incluirSemVenda: false,
+      padrao: true,
+    });
   });
 
   it("aplica outra visão escolhida na lista", async () => {
@@ -356,5 +364,49 @@ describe("Pedidos: Falteiro no Lançamento", () => {
       ),
     );
     expect(dialog).toBeDefined();
+  });
+
+  it("filtra por modo do Falteiro (Somente em falta e Excluir em falta) e atualiza o resumo de filtros", async () => {
+    renderizar();
+    await screen.findByLabelText("Selecionar DIPIRONA");
+    await abrirFiltros();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Falteiro" }));
+    const opcaoSomente = await screen.findByRole("option", { name: "Somente em falta" });
+    fireEvent.mouseMove(opcaoSomente);
+    fireEvent.click(opcaoSomente);
+    fireEvent.click(screen.getByRole("button", { name: "Filtrar" }));
+
+    await waitFor(() =>
+      expect(apiFetch.mock.calls.some(([u]) => String(u).includes("/produtos") && String(u).includes("falteiro=somente"))).toBe(true),
+    );
+    expect(await screen.findByText(/Somente em falta/)).toBeDefined();
+  });
+
+  it("exige ao menos um recorte ativo para incluir produtos sem venda no período e envia incluirSemVenda=1 quando válido", async () => {
+    renderizar();
+    await screen.findByLabelText("Selecionar DIPIRONA");
+    await abrirFiltros();
+
+    const checkSemVenda = screen.getByRole("checkbox", { name: "Incluir produtos sem venda no período" });
+    fireEvent.click(checkSemVenda);
+
+    // Sem recorte ativo, exibe alerta e desabilita o botão Filtrar
+    expect(screen.getByRole("alert").textContent).toContain("Exige ao menos um recorte ativo");
+    expect((screen.getByRole("button", { name: "Filtrar" }) as HTMLButtonElement).disabled).toBe(true);
+
+    // Marcando "Apenas com estoque mínimo" libera o filtro
+    fireEvent.click(screen.getByRole("checkbox", { name: "Apenas com estoque mínimo" }));
+    expect((screen.getByRole("button", { name: "Filtrar" }) as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filtrar" }));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some(
+          ([u]) => String(u).includes("/produtos") && String(u).includes("incluirSemVenda=1") && String(u).includes("apenasMinimo=1"),
+        ),
+      ).toBe(true),
+    );
+    expect(await screen.findByText(/Incluindo sem venda/)).toBeDefined();
   });
 });

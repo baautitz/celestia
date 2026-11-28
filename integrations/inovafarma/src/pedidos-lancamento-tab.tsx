@@ -25,7 +25,7 @@ import { DistribuidorasLinhaWindow, type Distribuidora, type Fornecimento } from
 import { PEDIDOS_BASE, type ItemPedido, type Pedido } from "./pedido-rascunho-window";
 import type { LojaOpcao } from "./loja-opcao";
 import { useLatestFetch } from "./use-latest-fetch";
-import type { VisaoPedidos } from "./pedidos-visoes";
+import type { ModoFalteiro, VisaoPedidos } from "./pedidos-visoes";
 import { BASE_VISOES, PedidosVisoesBarra } from "./pedidos-visoes-barra";
 import type { Falta } from "./pedidos-falteiro";
 import { FALTEIRO_BASE, FalteiroWindow } from "./pedidos-falteiro-window";
@@ -119,7 +119,23 @@ const colunasMovimento = (meses: Mes[]): DataTableColumn<LinhaMovimento>[] => [
   ...meses.map((m): DataTableColumn<LinhaMovimento> => ({ key: m.mes, label: mesBr(m.mes), format: "decimal", value: (l) => m[l.tipo] })),
 ];
 
-type FiltrosAplicados = { modo: Modo; de: string; ate: string; lojas: number[]; entradas: EntradaLista[]; apenasMinimo: boolean; regra: string | null };
+type FiltrosAplicados = {
+  modo: Modo;
+  de: string;
+  ate: string;
+  lojas: number[];
+  entradas: EntradaLista[];
+  apenasMinimo: boolean;
+  regra: string | null;
+  falteiro: ModoFalteiro;
+  incluirSemVenda: boolean;
+};
+
+const ROTULOS_FALTEIRO: Record<ModoFalteiro, string> = {
+  incluir: "Incluir em falta",
+  somente: "Somente em falta",
+  excluir: "Excluir em falta",
+};
 
 const brData = (iso: string) => iso.split("-").reverse().join("/");
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
@@ -131,6 +147,8 @@ const resumo = (f: FiltrosAplicados, regras: { id: string; nome: string }[] = []
     f.entradas.length ? "Filtro de produtos" : null,
     f.regra ? `Regra de Limite: ${regras.find((r) => r.id === f.regra)?.nome ?? ""}` : null,
     f.apenasMinimo ? "Apenas com estoque mínimo" : null,
+    f.falteiro !== "incluir" ? ROTULOS_FALTEIRO[f.falteiro] : null,
+    f.incluirSemVenda ? "Incluindo sem venda" : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -480,15 +498,18 @@ interface ResultadoFiltros {
 }
 
 /** Filtros que uma visão deixa sobre `base`: a data não muda; Lojas que sumiram ficam de fora. */
-const comVisao = (base: FiltrosAplicados, v: VisaoPedidos | null, contexto: Contexto): FiltrosAplicados =>
-  v
-    ? {
-        ...base,
-        lojas: v.lojas.filter((codigo) => contexto.lojas.some((l) => l.codigo === codigo)),
-        entradas: v.entradas,
-        apenasMinimo: v.apenasComMinimo,
-      }
-    : base;
+const comVisao = (base: FiltrosAplicados, v: VisaoPedidos | null, contexto: Contexto): FiltrosAplicados => {
+  if (!v) return base;
+  const temRecorte = v.entradas.length > 0 || v.apenasComMinimo || Boolean(base.regra);
+  return {
+    ...base,
+    lojas: v.lojas.filter((codigo) => contexto.lojas.some((l) => l.codigo === codigo)),
+    entradas: v.entradas,
+    apenasMinimo: v.apenasComMinimo,
+    falteiro: v.falteiro ?? "incluir",
+    incluirSemVenda: Boolean(v.incluirSemVenda) && temRecorte,
+  };
+};
 
 /** Corpo do sheet "Filtros": edita um rascunho e só devolve o resultado em "Filtrar". */
 function FiltrosSheet({ contexto, inicial, visoesIniciais, visaoInicial }: { contexto: Contexto; inicial: FiltrosAplicados; visoesIniciais: VisaoPedidos[]; visaoInicial: string | null }) {
@@ -497,8 +518,10 @@ function FiltrosSheet({ contexto, inicial, visoesIniciais, visaoInicial }: { con
   const [rascunho, setRascunho] = useState(inicial);
   const [visoes, setVisoes] = useState(visoesIniciais);
   const [visao, setVisao] = useState(visaoInicial);
-  const { modo, de, ate, lojas, entradas, apenasMinimo, regra } = rascunho;
+  const { modo, de, ate, lojas, entradas, apenasMinimo, regra, falteiro, incluirSemVenda } = rascunho;
   const editar = (parte: Partial<FiltrosAplicados>) => setRascunho((r) => ({ ...r, ...parte }));
+  const temRecorteSemVenda = entradas.length > 0 || Boolean(regra) || apenasMinimo;
+  const semRecorteObrigatorio = incluirSemVenda && !temRecorteSemVenda;
 
   const recarregarVisoes = async (salva?: VisaoPedidos) => {
     try {
@@ -542,7 +565,7 @@ function FiltrosSheet({ contexto, inicial, visoesIniciais, visaoInicial }: { con
       <PedidosVisoesBarra
         visoes={visoes}
         selecionada={visao}
-        filtros={{ lojas, entradas, apenasComMinimo: apenasMinimo }}
+        filtros={{ lojas, entradas, apenasComMinimo: apenasMinimo, falteiro, incluirSemVenda }}
         onAplicar={(v) => {
           setVisao(v?.id ?? null);
           setRascunho((r) => comVisao(r, v, contexto));
@@ -569,13 +592,35 @@ function FiltrosSheet({ contexto, inicial, visoesIniciais, visaoInicial }: { con
           </Select>
         </Stack>
       ) : null}
+      <Stack gap="field">
+        <Label htmlFor="pedidos-falteiro">Falteiro</Label>
+        <Select value={falteiro} onValueChange={(v) => v && editar({ falteiro: v as ModoFalteiro })}>
+          <SelectTrigger id="pedidos-falteiro" aria-label="Falteiro">
+            <SelectValue>{(v: ModoFalteiro) => ROTULOS_FALTEIRO[v] ?? ROTULOS_FALTEIRO.incluir}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="incluir">{ROTULOS_FALTEIRO.incluir}</SelectItem>
+            <SelectItem value="somente">{ROTULOS_FALTEIRO.somente}</SelectItem>
+            <SelectItem value="excluir">{ROTULOS_FALTEIRO.excluir}</SelectItem>
+          </SelectContent>
+        </Select>
+      </Stack>
       <Stack direction="row" gap="field" align="center">
         <Checkbox id="pedidos-apenas-minimo" checked={apenasMinimo} onCheckedChange={(v: boolean) => editar({ apenasMinimo: v })} />
         <Label htmlFor="pedidos-apenas-minimo">Apenas com estoque mínimo</Label>
       </Stack>
+      <Stack gap="tight">
+        <Stack direction="row" gap="field" align="center">
+          <Checkbox id="pedidos-incluir-sem-venda" checked={incluirSemVenda} onCheckedChange={(v: boolean) => editar({ incluirSemVenda: v })} />
+          <Label htmlFor="pedidos-incluir-sem-venda">Incluir produtos sem venda no período</Label>
+        </Stack>
+        <Text variant="caption" tone={semRecorteObrigatorio ? "destructive" : "muted"} role={semRecorteObrigatorio ? "alert" : undefined}>
+          Exige ao menos um recorte ativo: Filtro de produtos, Regra de Limite ou Apenas com estoque mínimo.
+        </Text>
+      </Stack>
       <WindowActions>
         <WindowCancelButton />
-        <Button type="button" onClick={() => resolve({ filtros: rascunho, visao, visoes })}>
+        <Button type="button" disabled={semRecorteObrigatorio} onClick={() => resolve({ filtros: rascunho, visao, visoes })}>
           Filtrar
         </Button>
       </WindowActions>
@@ -642,7 +687,17 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
   const [ativo, setAtivo] = useState<string | null>(null);
   // Os filtros só valem na consulta depois de "Filtrar" no sheet; a primeira consulta espera as visões e usa a padrão.
   const [aplicados, setAplicados] = useState<FiltrosAplicados | null>(null);
-  const padrao: FiltrosAplicados = { modo: "apartir", de: contexto.ontem, ate: contexto.ontem, lojas: [], entradas: [], apenasMinimo: false, regra: null };
+  const padrao: FiltrosAplicados = {
+    modo: "apartir",
+    de: contexto.ontem,
+    ate: contexto.ontem,
+    lojas: [],
+    entradas: [],
+    apenasMinimo: false,
+    regra: null,
+    falteiro: "incluir",
+    incluirSemVenda: false,
+  };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: só na abertura da aba; depois as visões recarregam dentro do sheet.
   useEffect(() => {
@@ -678,7 +733,7 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
   /** `silencioso`: releitura sem o efeito de carregando e sem soltar o produto em foco (ex.: após um conflito de version). */
   const carregar = useCallback(async (silencioso = false) => {
     if (!aplicados) return;
-    const { modo, de, ate, lojas, entradas, apenasMinimo, regra } = aplicados;
+    const { modo, de, ate, lojas, entradas, apenasMinimo, regra, falteiro, incluirSemVenda } = aplicados;
     const vale = novaConsulta();
     const params = new URLSearchParams({ modo, de });
     if (modo === "periodo") params.set("ate", ate);
@@ -686,6 +741,8 @@ function Lancamento({ contexto, notificar, abas, edicao, correcao }: { contexto:
     if (entradas.length) params.set("entradas", JSON.stringify(entradas.map(({ tipo, id }) => ({ tipo, id }))));
     if (apenasMinimo) params.set("apenasMinimo", "1");
     if (regra) params.set("regra", regra);
+    if (falteiro !== "incluir") params.set("falteiro", falteiro);
+    if (incluirSemVenda) params.set("incluirSemVenda", "1");
     if (!silencioso) {
       setCarregando(true);
       setAtivo(null);
